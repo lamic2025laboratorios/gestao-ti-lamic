@@ -1303,6 +1303,7 @@ function addWifiRowInternal(container, data = {}) {
                     <option value="Brisanet" ${data.isp === 'Brisanet' ? 'selected' : ''}>Brisanet</option>
                     <option value="Iknet" ${data.isp === 'Iknet' ? 'selected' : ''}>Iknet</option>
                     <option value="Citynet" ${data.isp === 'Citynet' ? 'selected' : ''}>Citynet</option>
+                    <option value="Mobnet" ${data.isp === 'Mobnet' ? 'selected' : ''}>Mobnet</option>
                 </select>
             </div>
             <div class="form-group" style="margin:0">
