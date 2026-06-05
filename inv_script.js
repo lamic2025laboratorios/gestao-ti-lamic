@@ -1300,6 +1300,7 @@ function addWifiRowInternal(container, data = {}) {
                     <option value="VIVO" ${data.isp === 'VIVO' ? 'selected' : ''}>VIVO</option>
                     <option value="CLARO" ${data.isp === 'CLARO' ? 'selected' : ''}>CLARO</option>
                     <option value="OI" ${data.isp === 'OI' ? 'selected' : ''}>OI</option>
+                    <option value="TIM" ${data.isp === 'TIM' ? 'selected' : ''}>TIM</option>
                     <option value="Brisanet" ${data.isp === 'Brisanet' ? 'selected' : ''}>Brisanet</option>
                     <option value="Iknet" ${data.isp === 'Iknet' ? 'selected' : ''}>Iknet</option>
                     <option value="Citynet" ${data.isp === 'Citynet' ? 'selected' : ''}>Citynet</option>
