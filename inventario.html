@@ -63,10 +63,7 @@
     <nav class="sidebar-nav">
       <div class="nav-section-label sb-txt">Navegação</div>
       
-      <button class="nav-item" onclick="window.parent.postMessage('fecharInventario', '*')" style="color: #ff6b6b; background: rgba(217,64,64,.06); border-bottom: 1px solid #1e3355; margin-bottom: 8px;">
-        <i class="ph ph-arrow-left ni-ico" style="color: #ff6b6b;"></i>
-        <span class="ni-txt">Voltar ao Compras</span>
-      </button>
+
 
       <button class="nav-item active" id="btn-nav-units" onclick="showUnitsView(); deativarNavs(this)">
         <i class="ph ph-squares-four ni-ico"></i>
@@ -85,6 +82,10 @@
     </nav>
 
     <div style="padding: 0 14px; display: flex; flex-direction: column; gap: 8px; margin-top: auto;">
+        <button class="nav-item" onclick="window.parent.postMessage('fecharInventario', '*')" style="color: #ff6b6b; background: rgba(217,64,64,.06); border-bottom: 1px solid #1e3355; margin-bottom: 8px;">
+        <i class="ph ph-arrow-left ni-ico" style="color: #ff6b6b;"></i>
+        <span class="ni-txt">Voltar ao Compras</span>
+      </button>
       <button class="sidebar-exit" onclick="exportData()" style="color: #9aaec8; border-color: #1e3355; margin: 0; width: 100%;">
         <i class="ph ph-download-simple ni-ico"></i>
         <span class="ni-txt">Backup</span>
@@ -448,10 +449,12 @@
 <!-- Wi-Fi Modal -->
 <div id="wifi-modal" class="modal hidden">
     <div class="modal-content medium-modal">
-        <div class="modal-header-row">
-            <h3>Configurar Redes Wi-Fi</h3>
-            <button class="btn-primary btn-mini" onclick="addWifiRow()">+ Adicionar</button>
-        </div>
+       <div class="modal-header-row">
+    <h3>Configurar Redes Wi-Fi</h3>
+    <button class="btn-primary" onclick="addWifiRow()">
+        <i class="ph ph-plus"></i> Adicionar Rede
+    </button>
+</div>
         <div id="wifi-list-container" style="max-height:400px;overflow-y:auto;padding-right:5px;"></div>
         <div class="modal-actions"><button class="btn-secondary" onclick="closeModals()">Cancelar</button><button class="btn-primary" onclick="saveWifi()">Salvar</button></div>
     </div>
@@ -462,10 +465,12 @@
     <div class="modal-content small-modal">
         <div class="modal-header-row">
             <h3><i class="ph ph-wifi-high"></i> Informações do Wi-Fi</h3>
-            <div style="display:flex;gap:10px;">
-                <button class="btn-primary btn-mini" onclick="document.getElementById('wifi-info-modal').classList.add('hidden'); openWifiModal();"><i class="ph ph-gear"></i></button>
-                <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
-            </div>
+                <div style="display:flex;gap:10px;">
+    <button class="btn-icon" onclick="document.getElementById('wifi-info-modal').classList.add('hidden'); openWifiModal();" title="Configurar Redes Wi-Fi">
+        <i class="ph ph-gear"></i>
+    </button>
+    <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+</div>
         </div>
         <div class="wifi-footer-section" style="margin:0;">
             <div class="wifi-display-card" style="max-width:100%;padding:15px;">
@@ -525,8 +530,7 @@
             <div class="form-group"><label>Capacidade (BTU)</label>
                 <select id="ac-btu">
                     <option value="7500">7.500 BTU</option><option value="9000">9.000 BTU</option>
-                    <option value="12000">12.000 BTU</option><option value="15000">15.000 BTU</option>
-                    <option value="18000">18.000 BTU</option><option value="22000">22.000 BTU</option>
+                    <option value="12000" selected>12.000 BTU</option><option value="18000">18.000 BTU</option>
                     <option value="24000">24.000 BTU</option><option value="30000">30.000 BTU</option>
                     <option value="36000">36.000 BTU</option><option value="48000">48.000 BTU</option>
                     <option value="60000">60.000 BTU</option>
