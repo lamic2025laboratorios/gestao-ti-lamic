@@ -1288,7 +1288,60 @@ function addWifiRow() { addWifiRowInternal(document.getElementById('wifi-list-co
 function addWifiRowInternal(container, data = {}) {
     const div = document.createElement('div');
     div.className = 'wifi-input-group';
-    div.innerHTML = `<button class="btn-remove-row" onclick="this.parentElement.remove()" title="Remover"><i class="ph ph-trash"></i></button><div class="wifi-inputs-grid"><div class="form-group" style="margin:0"><label style="font-size:0.75rem;">Operadora</label><select class="wifi-isp" style="width:100%; height:32px;"><option value="VIVO" ${data.isp === 'VIVO' ? 'selected' : ''}>VIVO</option><option value="CLARO" ${data.isp === 'CLARO' ? 'selected' : ''}>CLARO</option><option value="OI" ${data.isp === 'OI' ? 'selected' : ''}>OI</option><option value="Brisanet" ${data.isp === 'Brisanet' ? 'selected' : ''}>Brisanet</option><option value="Iknet" ${data.isp === 'Iknet' ? 'selected' : ''}>Iknet</option><option value="Citynet" ${data.isp === 'Citynet' ? 'selected' : ''}>Citynet</option></select></div><div class="form-group" style="margin:0"><label style="font-size:0.75rem;">Plano</label><input type="text" class="wifi-plan" placeholder="Ex: 500MB" value="${data.plan || ''}" style="height:32px;"></div><div class="form-group" style="margin:0"><label style="font-size:0.75rem;">Equipamento</label><input type="text" class="wifi-equip" placeholder="Ex: Roteador" value="${data.equip || ''}" style="height:32px;"></div><div class="form-group" style="margin:0"><label style="font-size:0.75rem;">Localização</label><input type="text" class="wifi-loc" placeholder="Ex: Sala TI" value="${data.loc || ''}" style="height:32px;"></div></div><div class="wifi-inputs-grid"><div class="form-group" style="margin:0"><label style="font-size:0.75rem;">Rede (SSID)</label><input type="text" class="wifi-ssid" placeholder="Nome do Wi-Fi" value="${data.ssid || ''}" style="height:32px;"></div><div class="form-group" style="margin:0"><label style="font-size:0.75rem;">Senha</label><input type="text" class="wifi-pass" placeholder="Senha" value="${data.pass || ''}" style="height:32px;"></div><div class="form-group" style="margin:0"><label style="font-size:0.75rem;">Acesso</label><select class="wifi-access" style="width:100%; height:32px;"><option value="">Selecione...</option><option value="Restrito" ${data.access === 'Restrito' ? 'selected' : ''}>Restrito</option><option value="Público" ${data.access === 'Público' ? 'selected' : ''}>Público</option></select></div><div class="form-group" style="margin:0"><label style="font-size:0.75rem;">Função</label><input type="text" class="wifi-func" placeholder="Ex: Corporativo" value="${data.func || ''}" style="height:32px;"></div></div>`;
+    div.innerHTML = `
+        <button class="btn-remove-row" onclick="this.parentElement.remove()" title="Remover esta Rede">
+            <i class="ph ph-trash"></i>
+        </button>
+        
+        <div class="wifi-inputs-grid">
+            <div class="form-group" style="margin:0">
+                <label>Operadora</label>
+                <select class="wifi-isp">
+                    <option value="VIVO" ${data.isp === 'VIVO' ? 'selected' : ''}>VIVO</option>
+                    <option value="CLARO" ${data.isp === 'CLARO' ? 'selected' : ''}>CLARO</option>
+                    <option value="OI" ${data.isp === 'OI' ? 'selected' : ''}>OI</option>
+                    <option value="Brisanet" ${data.isp === 'Brisanet' ? 'selected' : ''}>Brisanet</option>
+                    <option value="Iknet" ${data.isp === 'Iknet' ? 'selected' : ''}>Iknet</option>
+                    <option value="Citynet" ${data.isp === 'Citynet' ? 'selected' : ''}>Citynet</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin:0">
+                <label>Plano Contratado</label>
+                <input type="text" class="wifi-plan" placeholder="Ex: 500 Mega" value="${data.plan || ''}">
+            </div>
+            <div class="form-group" style="margin:0">
+                <label>Equipamento / ONU</label>
+                <input type="text" class="wifi-equip" placeholder="Ex: Roteador Intelbras" value="${data.equip || ''}">
+            </div>
+            <div class="form-group" style="margin:0">
+                <label>Localização Física</label>
+                <input type="text" class="wifi-loc" placeholder="Ex: Recepção / CPD" value="${data.loc || ''}">
+            </div>
+        </div>
+
+        <div class="wifi-inputs-grid" style="margin-top: 12px;">
+            <div class="form-group" style="margin:0">
+                <label>Nome do Wi-Fi (SSID)</label>
+                <input type="text" class="wifi-ssid" placeholder="Ex: Lamic_Clientes" value="${data.ssid || ''}">
+            </div>
+            <div class="form-group" style="margin:0">
+                <label>Senha de Segurança</label>
+                <input type="text" class="wifi-pass" placeholder="Senha da Rede" value="${data.pass || ''}">
+            </div>
+            <div class="form-group" style="margin:0">
+                <label>Nível de Acesso</label>
+                <select class="wifi-access">
+                    <option value="" ${!data.access ? 'selected' : ''}>Selecione...</option>
+                    <option value="Restrito" ${data.access === 'Restrito' ? 'selected' : ''}>Restrito 🔒</option>
+                    <option value="Público" ${data.access === 'Público' ? 'selected' : ''}>Público 🌐</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin:0">
+                <label>Função Operacional</label>
+                <input type="text" class="wifi-func" placeholder="Ex: Uso Corporativo" value="${data.func || ''}">
+            </div>
+        </div>
+    `;
     container.appendChild(div);
 }
 
