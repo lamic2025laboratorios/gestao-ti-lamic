@@ -856,40 +856,134 @@ select { appearance: none; cursor: pointer; }
 }
 
 /* ============================================================
-   WIFI
+   REESTRUTURAÇÃO DO WI-FI (ESTILO INDUSTRIAL & DARK NAVY PRO)
    ============================================================ */
-.wifi-footer-section { margin-top: 30px; width: 100%; display: flex; justify-content: center; }
+
+/* MODAL DE LEITURA: Ajuste do card principal do carrossel */
 .wifi-display-card {
-  background: linear-gradient(135deg, #1d4ed8, #0369a1);
-  border-radius: var(--r-lg); padding: 25px;
-  color: var(--white); display: flex; align-items: flex-start;
-  box-shadow: var(--shadow); position: relative; overflow: hidden; width: 100%;
+  background: linear-gradient(145deg, #132542, #0b1628) !important;
+  border: 1px solid #1e3355 !important;
+  border-radius: 12px !important;
+  padding: 24px !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35) !important;
+  width: 100% !important;
 }
+
+/* Remove decorações esféricas legadas que desalinhavam o card */
 .wifi-display-card::after {
-  content: ''; position: absolute; top: -50%; left: -10%;
-  width: 200px; height: 200px; background: rgba(255,255,255,.08);
-  border-radius: 50%; pointer-events: none;
+  display: none !important; 
 }
-.wifi-icon-area { font-size: 3rem; margin-right: 25px; opacity: .9; margin-top: 5px; }
-.wifi-info-area { flex: 1; z-index: 1; }
-.wifi-info-area h3 { margin: 0 0 15px; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,.3); padding-bottom: 5px; display: inline-block; }
+
+/* Linhas internas do carrossel */
 .wifi-row {
-  background: rgba(0,0,0,.2); padding: 12px 15px; border-radius: var(--r);
-  margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
-  border: 1px solid rgba(255,255,255,.1);
+  background: #0f2547 !important;
+  border: 1px solid #254470 !important;
+  padding: 16px !important;
+  border-radius: 8px !important;
+  margin-bottom: 12px !important;
+  gap: 16px !important;
 }
-.wifi-item { display: flex; flex-direction: column; }
-.w-label { font-size: .68rem; text-transform: uppercase; opacity: .8; margin-bottom: 3px; font-weight: 700; }
-.wifi-item strong { font-size: .95rem; letter-spacing: .5px; }
-.wifi-pass-text { font-family: monospace; background: rgba(0,0,0,.3); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,.2); }
-.wifi-input-group { background: var(--surface-2); border: 1px solid var(--border); padding: 12px; border-radius: var(--r); margin-bottom: 10px; position: relative; }
-.wifi-inputs-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 10px; }
+
+/* MODAL DE CADASTRO/EDIÇÃO: Painel que agrupa cada rede */
+.wifi-input-group {
+  background: #132542 !important;
+  border: 1px solid #254470 !important;
+  padding: 24px 20px 20px 20px !important;
+  border-radius: 8px !important;
+  margin-bottom: 20px !important;
+  position: relative !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Reorganização estrutural do Grid para alinhamento milimétrico */
+.wifi-inputs-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 14px !important;
+  margin-bottom: 14px !important;
+  align-items: end !important;
+}
+
+.wifi-inputs-grid:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Força os inputs dinâmicos a herdarem o padrão industrial do painel master */
+.wifi-input-group input,
+.wifi-input-group select {
+  background: #0b1628 !important;
+  border: 1.5px solid #1e3355 !important;
+  color: #ffffff !important;
+  border-radius: 6px !important;
+  height: 38px !important;
+  padding: 0 12px !important;
+  font-size: 0.85rem !important;
+  outline: none !important;
+  transition: border-color 0.18s, box-shadow 0.18s !important;
+  width: 100% !important;
+}
+
+.wifi-input-group input:focus,
+.wifi-input-group select:focus {
+  border-color: #3a7ee8 !important;
+  box-shadow: 0 0 0 3px rgba(58, 126, 232, 0.2) !important;
+}
+
+.wifi-input-group label {
+  color: #94a3b8 !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 6px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  text-align: left !important;
+  display: block !important;
+}
+
+/* Botão lixeira integrado de forma limpa no canto superior direito */
 .btn-remove-row {
-  position: absolute; top: -8px; right: -8px;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--red); color: var(--white); border: none;
-  font-size: .75rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 5px rgba(0,0,0,.2);
+  position: absolute !important;
+  top: 12px !important;
+  right: 12px !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 6px !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+  border: 1px solid rgba(239, 68, 68, 0.25) !important;
+  color: #ef4444 !important;
+  font-size: 0.95rem !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.15s ease !important;
+}
+
+.btn-remove-row:hover {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
+}
+
+/* Responsividade de segurança para os inputs não esmagarem em telas menores */
+@media (max-width: 1100px) {
+  .wifi-inputs-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+@media (max-width: 600px) {
+  .wifi-inputs-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .btn-remove-row {
+    position: relative !important;
+    top: 0 !important;
+    right: 0 !important;
+    margin-bottom: 12px !important;
+    width: 100% !important;
+  }
 }
 
 /* ============================================================
