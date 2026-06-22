@@ -1097,6 +1097,13 @@ select { appearance: none; cursor: pointer; }
     padding: 0; overflow: hidden;
     display: flex; flex-direction: column;
 }
+@media (max-height: 700px) {
+    .eqd-modal { max-height: 96vh; }
+}
+@media (max-width: 500px) {
+    .eqd-info-grid { grid-template-columns: 1fr; }
+    .eqd-car-wrap  { height: 180px; }
+}
 
 /* Cabeçalho escuro */
 .eqd-header {
@@ -1131,8 +1138,8 @@ select { appearance: none; cursor: pointer; }
 .eqd-tab:hover { color: var(--navy); }
 .eqd-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
 
-/* Corpo — flex:1 + overflow-y garante scroll correto com qualquer conteúdo */
-.eqd-body { padding: 18px; overflow-y: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+/* Corpo — flex:1 + min-height:0 obrigatório para overflow-y funcionar em flex child */
+.eqd-body { padding: 16px; overflow-y: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 
 /* Hero escuro dentro do conteúdo */
 .eqd-hero {
@@ -1201,10 +1208,6 @@ select { appearance: none; cursor: pointer; }
 }
 .eqd-btn-edit:hover { background: var(--blue-light); }
 
-.eqd-body {
-    padding: 16px; overflow-y: auto; flex: 1;
-    display: flex; flex-direction: column; gap: 12px;
-}
 
 /* ── Upload de imagem no formulário ── */
 .equip-img-upload-area {
