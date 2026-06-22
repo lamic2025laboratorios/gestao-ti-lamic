@@ -1521,16 +1521,6 @@ select { appearance: none; cursor: pointer; }
 .status-dot-mini.dot-manut   { background: #f59e0b; }
 .status-dot-mini.dot-inativo { background: #ef4444; }
 
-/* Mini-painel nova categoria dentro do form */
-.nova-cat-panel {
-    background: #eff6ff; border: 1.5px solid #93c5fd;
-    border-radius: var(--r); padding: 12px 14px;
-}
-.nova-cat-panel.hidden { display: none; }
-.nova-cat-title {
-    font-size: .78rem; font-weight: 700; color: var(--blue);
-    margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
-}
 
 /* Lista de categorias em Configurações */
 .manage-list-item {

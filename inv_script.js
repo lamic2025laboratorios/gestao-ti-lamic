@@ -124,12 +124,6 @@ function iniciarConexaoFirebase() {
 
 // Orquestração de Boot controlado pelo Firebase
 document.addEventListener('DOMContentLoaded', () => {
-  // Fecha modal ao clicar no fundo escuro (backdrop) — evita que modal trave sobre o sidebar
-  document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('modal') && e.target.id !== 'settings-modal') {
-      closeModals();
-    }
-  });
 
   const boot = () => { iniciarConexaoFirebase(); };
   if (window._firebaseReady) boot();
@@ -458,7 +452,7 @@ function addNewMobileModel() {
 }
 
 function renderSettingsList() {
-    renderCategoryList('printer', 'list-printer');
+    renderCategoryList('printer', 'list-printer', 'desc');
     renderCategoryList('label', 'list-label');
     renderCategoryList('thermal', 'list-thermal');
     renderCategoryList('webcam', 'list-webcam');
@@ -495,11 +489,16 @@ function renderSettingsList() {
     }
 }
 
-function renderCategoryList(category, listId) {
+function renderCategoryList(category, listId, sortDir = 'asc') {
     const list = document.getElementById(listId);
     if (!list) return;
     list.innerHTML = '';
-    (modelSettings[category] || []).sort().forEach((item, index) => {
+    if (!modelSettings[category]) modelSettings[category] = [];
+    modelSettings[category].sort((a, b) =>
+        sortDir === 'desc' ? b.localeCompare(a, 'pt', { sensitivity: 'base' })
+                           : a.localeCompare(b, 'pt', { sensitivity: 'base' })
+    );
+    modelSettings[category].forEach((item, index) => {
         const li = document.createElement('li');
         li.innerHTML = `
             <span>${item}</span>
@@ -1861,20 +1860,34 @@ function filterUnitItems() {
 
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
-        // Popups reais (excluindo a página de Configurações que é uma seção, não overlay)
+        // Prioridade 1: fecha sub-modais abertos sobre outros modais (um por vez)
+        const subModalIds = [
+            'nova-cat-modal',      // popup sobre equip-modal
+            'quick-add-modal',     // popup sobre equip-modal
+            'model-name-modal',    // popup de novo modelo de periférico
+            'mobile-model-modal',  // popup de modelo de celular
+            'pc-preset-modal'      // popup de template de PC
+        ];
+        for (const id of subModalIds) {
+            const el = document.getElementById(id);
+            if (el && !el.classList.contains('hidden')) {
+                el.classList.add('hidden');
+                return; // interrompe — não fecha o modal pai por baixo
+            }
+        }
+
+        // Prioridade 2: fecha modais principais (excluindo a página de Configurações)
         const openPopups = [...document.querySelectorAll('.modal:not(.hidden)')]
             .filter(m => m.id !== 'settings-modal');
 
         if (openPopups.length > 0) {
-            // 1. Fecha apenas os popups abertos, mantendo Configurações intacto
             openPopups.forEach(m => m.classList.add('hidden'));
         } else {
-            // 2. Fecha Configurações se estiver aberto
+            // Fecha Configurações se estiver aberta e vai para o Dashboard
             const settings = document.getElementById('settings-modal');
             if (!settings.classList.contains('hidden')) {
                 settings.classList.add('hidden');
             }
-            // 3. Vai sempre para o Dashboard
             showUnitsView();
         }
     }
@@ -2827,14 +2840,19 @@ function deleteCategoriaEquip(nome) {
     renderCategoriasSettings();
 }
 
-// ── Nova categoria rápida (dentro do form de equipamento) ──────
+// ── Nova categoria rápida (popup sobre o form de equipamento) ──────
 function abrirNovaCategoria() {
-    const panel = document.getElementById('nova-cat-panel');
-    if (panel) { panel.classList.remove('hidden'); document.getElementById('nova-cat-nome')?.focus(); }
+    const modal = document.getElementById('nova-cat-modal');
+    if (!modal) return;
+    document.getElementById('nova-cat-nome').value    = '';
+    document.getElementById('nova-cat-prefixo').value = '';
+    document.getElementById('nova-cat-subtipo').value = 'Equipamentos Analíticos';
+    modal.classList.remove('hidden');
+    document.getElementById('nova-cat-nome')?.focus();
 }
 function fecharNovaCategoria() {
-    const panel = document.getElementById('nova-cat-panel');
-    if (panel) panel.classList.add('hidden');
+    const modal = document.getElementById('nova-cat-modal');
+    if (modal) modal.classList.add('hidden');
 }
 function salvarNovaCategoria() {
     const nome    = (document.getElementById('nova-cat-nome')?.value    || '').trim();
@@ -2854,9 +2872,6 @@ function salvarNovaCategoria() {
     const sel = document.getElementById('equip-categoria');
     if (sel) { sel.value = nome; onEquipCategoriaChange(nome); }
     fecharNovaCategoria();
-    document.getElementById('nova-cat-nome').value    = '';
-    document.getElementById('nova-cat-prefixo').value = '';
-    document.getElementById('nova-cat-subtipo').value = 'Equipamentos Analíticos';
 }
 
 function _gerarCodigoEquip(categoria) {

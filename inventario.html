@@ -988,17 +988,6 @@
                     </button>
                 </div>
             </div>
-            <!-- Mini-painel nova categoria (dentro do form) -->
-            <div id="nova-cat-panel" class="nova-cat-panel hidden" style="grid-column:1/-1;">
-                <div class="nova-cat-title"><i class="ph ph-tag"></i> Nova Categoria</div>
-                <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
-                    <div class="form-group" style="flex:2;margin:0;"><label>Nome</label><input type="text" id="nova-cat-nome" placeholder="Ex: Sorologia"></div>
-                    <div class="form-group" style="flex:1;margin:0;"><label>Prefixo</label><input type="text" id="nova-cat-prefixo" placeholder="SOR" maxlength="4" style="text-transform:uppercase;"></div>
-                    <div class="form-group" style="flex:2;margin:0;"><label>Subtipo padrão</label><input type="text" id="nova-cat-subtipo" placeholder="Equipamentos Analíticos" value="Equipamentos Analíticos"></div>
-                    <button class="btn-primary" onclick="salvarNovaCategoria()" style="padding:8px 16px;font-size:.83rem;">Salvar</button>
-                    <button class="btn-secondary" onclick="fecharNovaCategoria()" style="padding:8px 16px;font-size:.83rem;">Cancelar</button>
-                </div>
-            </div>
 
             <div class="form-group">
                 <label>Tipo / Subtipo</label>
@@ -1159,6 +1148,44 @@
         </div>
         <div class="file-preview-body">
             <iframe id="file-preview-iframe" src="" frameborder="0" allowfullscreen></iframe>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Nova Categoria de Equipamento (sub-modal sobre equip-modal) -->
+<div id="nova-cat-modal" class="modal hidden" style="z-index:3200;">
+    <div class="modal-content small-modal" style="max-width:520px;">
+        <div class="modal-header-row">
+            <h3><i class="ph ph-tag"></i> Nova Categoria de Equipamento</h3>
+            <button class="btn-icon" onclick="fecharNovaCategoria()"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="form-group">
+            <label>Nome da Categoria *</label>
+            <input type="text" id="nova-cat-nome" placeholder="Ex: Sorologia"
+                   onkeydown="if(event.key==='Enter') salvarNovaCategoria()">
+        </div>
+        <div class="grid-2-col">
+            <div class="form-group">
+                <label>Prefixo (Sigla) *</label>
+                <input type="text" id="nova-cat-prefixo" placeholder="SOR" maxlength="4"
+                       style="text-transform:uppercase;"
+                       onkeydown="if(event.key==='Enter') salvarNovaCategoria()">
+            </div>
+            <div class="form-group">
+                <label>Subtipo Padrão</label>
+                <input type="text" id="nova-cat-subtipo" placeholder="Equipamentos Analíticos"
+                       value="Equipamentos Analíticos"
+                       onkeydown="if(event.key==='Enter') salvarNovaCategoria()">
+            </div>
+        </div>
+        <small style="color:var(--text-muted);font-size:.7rem;display:block;margin-bottom:.5rem;">
+            A sigla gera o código automático (ex: SOR-001)
+        </small>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="fecharNovaCategoria()">Cancelar</button>
+            <button class="btn-primary" onclick="salvarNovaCategoria()">
+                <i class="ph ph-floppy-disk"></i> Salvar Categoria
+            </button>
         </div>
     </div>
 </div>
