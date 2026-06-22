@@ -313,6 +313,11 @@
           <span class="nav-badge" id="nav-badge-pending">0</span>
           <span class="ni-tip">Solicitações <span class="ni-tip-badge" id="ni-tip-badge">0</span></span>
         </button>
+        <button class="nav-item" onclick="window.location.href='relatorios.html'" data-tip="Relatórios">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><line x1="18" y1="20" x2="18" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span class="ni-txt">Relatórios</span>
+          <span class="ni-tip">Relatórios</span>
+        </button>
         <button class="nav-item" data-tab="tab-gerador-pdf" onclick="App.adminTab(this)" data-tip="Gerador de PDFs">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2"/></svg>
           <span class="ni-txt">Gerador de PDFs</span>
@@ -390,14 +395,22 @@
             Período de análise
           </div>
           <div class="date-range-inputs">
+            <!-- Filtro rápido por ano -->
+            <label class="date-range-field">
+              <span>Ano</span>
+              <select id="dash-year-select" class="input-field" style="width:90px;height:34px;padding:6px 8px;font-size:.82rem" onchange="App.onYearFilterChange(this)">
+                <option value="">Todos</option>
+              </select>
+            </label>
+            <span class="date-range-sep" style="color:#c8d4e8">|</span>
             <label class="date-range-field">
               <span>De</span>
-              <input type="date" id="filter-date-from" class="input-field" onchange="App.renderDashboard()" />
+              <input type="date" id="filter-date-from" class="input-field" onchange="App.clearYearSelect();App.renderDashboard()" />
             </label>
             <span class="date-range-sep">→</span>
             <label class="date-range-field">
               <span>Até</span>
-              <input type="date" id="filter-date-to" class="input-field" onchange="App.renderDashboard()" />
+              <input type="date" id="filter-date-to" class="input-field" onchange="App.clearYearSelect();App.renderDashboard()" />
             </label>
             <button class="btn-date-clear" onclick="App.clearDateRange()" title="Limpar datas">✕ Limpar</button>
           </div>
@@ -448,6 +461,61 @@
               <canvas id="chart-status" height="220" style="max-height:220px"></canvas>
               <div id="status-legend" class="status-legend-list"></div>
             </div>
+
+            <!-- Card Comparativo Anual -->
+            <div class="chart-card compare-year-card">
+              <div class="chart-card-header">
+                <span>Comparativo Anual de Gastos</span>
+                <span id="compare-trend-badge" class="compare-trend-badge"></span>
+              </div>
+
+              <!-- Ano atual -->
+              <div class="compare-row">
+                <div class="compare-row-meta">
+                  <span class="compare-row-year" id="cmp-cur-year">—</span>
+                  <span class="compare-row-tag">Atual</span>
+                </div>
+                <span class="compare-row-val" id="cmp-cur-val">R$ 0</span>
+              </div>
+              <div class="compare-bar-wrap">
+                <div class="compare-bar compare-bar-cur" id="cmp-cur-bar" style="width:0%"></div>
+              </div>
+
+              <!-- Ano anterior -->
+              <div class="compare-row" style="margin-top:10px">
+                <div class="compare-row-meta">
+                  <span class="compare-row-year compare-row-year-prev" id="cmp-prev-year">—</span>
+                  <span class="compare-row-tag compare-row-tag-prev">Anterior</span>
+                </div>
+                <span class="compare-row-val compare-row-val-prev" id="cmp-prev-val">R$ 0</span>
+              </div>
+              <div class="compare-bar-wrap">
+                <div class="compare-bar compare-bar-prev" id="cmp-prev-bar" style="width:0%"></div>
+              </div>
+
+              <!-- Métricas -->
+              <div class="compare-metrics-row">
+                <div class="compare-metric-box">
+                  <div class="compare-metric-val" id="cmp-diff-pct">—</div>
+                  <div class="compare-metric-lbl">Variação</div>
+                </div>
+                <div class="compare-metric-box">
+                  <div class="compare-metric-val" id="cmp-avg-month">—</div>
+                  <div class="compare-metric-lbl">Média/mês</div>
+                </div>
+                <div class="compare-metric-box">
+                  <div class="compare-metric-val" id="cmp-projection">—</div>
+                  <div class="compare-metric-lbl">Projeção anual</div>
+                </div>
+              </div>
+
+              <!-- Indicador de meta -->
+              <div class="compare-status-row" id="cmp-status-row">
+                <span id="cmp-status-icon"></span>
+                <span id="cmp-status-msg">Aguardando dados...</span>
+              </div>
+            </div>
+
           </div>
           <!-- Row 2 Col 1: Gastos por mês -->
           <div class="chart-card spending-card">
@@ -633,6 +701,31 @@
 
         </div>
         <!-- fim mini-KPIs -->
+
+        <!-- ── Barra de Ordenação e Filtro de Status ── -->
+        <div class="req-filter-bar">
+          <div class="req-filter-group">
+            <span class="req-filter-lbl">Ordenar por data:</span>
+            <button class="btn-sort-req active" id="sort-req-desc" onclick="App.setSortDate('desc',this)" title="Mais recentes primeiro">
+              <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Mais recente
+            </button>
+            <button class="btn-sort-req" id="sort-req-asc" onclick="App.setSortDate('asc',this)" title="Mais antigos primeiro">
+              <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Mais antigo
+            </button>
+          </div>
+          <div class="req-filter-sep"></div>
+          <div class="req-filter-group">
+            <span class="req-filter-lbl">Status:</span>
+            <button class="btn-toggle-all-status" id="btn-toggle-all-status" onclick="App.toggleAllStatus(this)" title="Marcar/Desmarcar todos">Todos ✓</button>
+            <button class="req-status-chip chip-sol active" data-status="Solicitado"  onclick="App.toggleStatusFilter(this)">Solicitado</button>
+            <button class="req-status-chip chip-agu active" data-status="Aguardando" onclick="App.toggleStatusFilter(this)">Aguardando</button>
+            <button class="req-status-chip chip-com active" data-status="Comprado"   onclick="App.toggleStatusFilter(this)">Comprado</button>
+            <button class="req-status-chip chip-est active" data-status="Estoque"    onclick="App.toggleStatusFilter(this)">Estoque</button>
+            <button class="req-status-chip chip-neg active" data-status="Negado"     onclick="App.toggleStatusFilter(this)">Negado</button>
+          </div>
+        </div>
 
         <div class="table-wrap">
           <table class="data-table">

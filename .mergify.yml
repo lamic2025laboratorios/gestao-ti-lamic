@@ -1,0 +1,33 @@
+pull_request_rules:
+
+  # Faz merge automático quando o PR for aprovado e não houver changes requested
+  - name: Merge automático após aprovação
+    conditions:
+      - base=main
+      - "#approved-reviews-by >= 1"
+      - "#changes-requested-reviews-by = 0"
+      - -conflict
+    actions:
+      merge:
+        method: merge
+        commit_message_template: |
+          {{ title }} (#{{ number }})
+
+          {{ body }}
+
+  # Avisa sobre conflitos no PR
+  - name: Comentar sobre conflitos
+    conditions:
+      - conflict
+    actions:
+      comment:
+        message: |
+          ⚠️ Este PR possui conflitos com a branch base. Por favor, resolva os conflitos antes de fazer o merge.
+
+  # Fecha PRs com o label "wontfix"
+  - name: Fechar PRs marcados como wontfix
+    conditions:
+      - label=wontfix
+    actions:
+      close:
+        message: Este PR foi fechado por estar marcado como **wontfix**.

@@ -22,7 +22,8 @@ const defaultModels = {
 const DB = {
   ref:    p => window._ref(window._db, p),
   set:    (p, d) => window._set(DB.ref(p), d),
-  listen: (p, cb) => window._onValue(DB.ref(p), s => cb(s.val()))
+  listen: (p, cb) => window._onValue(DB.ref(p), s => cb(s.val())),
+  remove: p => window._remove(DB.ref(p))
 };
 
 // Helper essencial para garantir que listas do Firebase venham sempre como Arrays manipuláveis
@@ -64,10 +65,66 @@ function iniciarConexaoFirebase() {
     globalAccessData = parseArray(data);
     renderAccesses();
   });
+
+  // Listas dinâmicas — listeners registrados após Firebase pronto
+  Object.entries(LISTAS_CONFIG).forEach(([key, cfg]) => {
+    DB.listen(cfg.path, data => {
+        const raw = data
+            ? (Array.isArray(data) ? data : Object.values(data)).filter(v => v && typeof v === 'string').sort()
+            : [];
+
+        if (raw.length) {
+            _listasData[key] = raw;
+        } else {
+            // Lista vazia: migra valores únicos dos equipamentos já cadastrados
+            const campoEquip = { fabricante: 'fabricante', fornecedor: 'fornecedor', tipo: 'tipo' }[key];
+            const doEquip = campoEquip
+                ? [...new Set(equipData.map(e => e[campoEquip]).filter(Boolean))].sort()
+                : [];
+
+            if (doEquip.length) {
+                _listasData[key] = doEquip;
+                DB.set(cfg.path, doEquip);
+            } else if (key === 'tipo') {
+                _listasData[key] = ['Equipamentos Analíticos'];
+                DB.set(cfg.path, _listasData[key]);
+            } else {
+                _listasData[key] = [];
+            }
+        }
+        _populateListSelect(key);
+        _renderListSettings(key);
+    });
+  });
+
+  // Escuta Categorias de Equipamentos
+  DB.listen('itCategoriasEquip', data => {
+    if (data && Object.keys(data).length > 0) {
+        categoriasEquip = data;
+    } else {
+        // Se não há no Firebase, usa defaults e persiste
+        categoriasEquip = { ...CATEGORIAS_DEFAULT };
+        DB.set('itCategoriasEquip', categoriasEquip);
+    }
+    _populateCategoriaSelect();
+    renderCategoriasSettings();
+  });
+
+  // Escuta Equipamentos — dentro de iniciarConexaoFirebase para garantir Firebase pronto
+  DB.listen('itEquipamentos', data => {
+    equipData = data ? Object.values(data).filter(Boolean) : [];
+    // Migra dados existentes para as listas se elas ainda estiverem vazias
+    _migrarDadosExistentes();
+    const ev = document.getElementById('equip-view');
+    if (ev && !ev.classList.contains('hidden')) {
+        renderEquipGrid();
+    }
+  });
 }
 
 // Orquestração de Boot controlado pelo Firebase
 document.addEventListener('DOMContentLoaded', () => {
+
   const boot = () => { iniciarConexaoFirebase(); };
   if (window._firebaseReady) boot();
   else document.addEventListener('firebaseReady', boot);
@@ -241,76 +298,80 @@ function updateDashboard() { renderDashboardCards(); }
 // =============================================
 
 function openInlineForm(type, index = null) {
-    document.getElementById('settings-main-view').classList.add('hidden');
-    const inlineView = document.getElementById('settings-inline-view');
-    inlineView.classList.remove('hidden');
-    
     const isEdit = index !== null;
-    let html = '';
-    
+
     if (type === 'mobile') {
         const m = isEdit ? modelSettings.mobile[index] : {name:'', rom:'', ram:'', cpu:''};
-        html = `
-            <h4 style="color:var(--primary-color); margin-bottom:15px; font-size:1.1rem;">
-                <i class="ph ph-device-mobile"></i> ${isEdit ? 'Editar Modelo de Celular' : 'Novo Modelo de Celular'}
-            </h4>
-            <input type="hidden" id="inline-type" value="mobile">
-            <input type="hidden" id="inline-index" value="${isEdit ? index : ''}">
-            
-            <div class="form-group"><label>Nome do Modelo (Ex: Samsung A54)</label><input type="text" id="inl-mob-name" value="${m.name}"></div>
-            <div class="grid-3-col">
-                <div class="form-group"><label>ROM (Armazenamento)</label><input type="text" id="inl-mob-rom" value="${m.rom || ''}"></div>
-                <div class="form-group"><label>RAM</label><input type="text" id="inl-mob-ram" value="${m.ram || ''}"></div>
-                <div class="form-group"><label>CPU (Processador)</label><input type="text" id="inl-mob-cpu" value="${m.cpu || ''}"></div>
-            </div>
-            
-            <div class="modal-actions" style="margin-top:20px;">
-                <button class="btn-secondary" onclick="closeInlineForm()">Voltar</button>
-                <button class="btn-primary" onclick="saveInlineForm()">Salvar Modelo</button>
-            </div>
-        `;
+        document.getElementById('mob-model-title').innerHTML = `<i class="ph ph-device-mobile"></i> ${isEdit ? 'Editar Modelo de Celular' : 'Novo Modelo de Celular'}`;
+        document.getElementById('inl-mob-name').value = m.name || '';
+        document.getElementById('inl-mob-rom').value  = m.rom  || '';
+        document.getElementById('inl-mob-ram').value  = m.ram  || '';
+        document.getElementById('inl-mob-cpu').value  = m.cpu  || '';
+        document.getElementById('inl-mob-index').value = isEdit ? index : '';
+        document.getElementById('mobile-model-modal').classList.remove('hidden');
+        setTimeout(() => document.getElementById('inl-mob-name').focus(), 80);
     } else if (type === 'compPreset') {
-        const t = isEdit ? modelSettings.compPresets[index] : {name:'', hw_model:'', hw_cpu:'', hw_mobo:'', hw_ram:'', hw_disk:'', hw_gpu:'', hw_monitor:'', os:'', os_arch:'x64'};
-        html = `
-            <h4 style="color:var(--primary-color); margin-bottom:15px; font-size:1.1rem;">
-                <i class="ph ph-desktop"></i> ${isEdit ? 'Editar Template de PC' : 'Novo Template de PC'}
-            </h4>
-            <input type="hidden" id="inline-type" value="compPreset">
-            <input type="hidden" id="inline-index" value="${isEdit ? index : ''}">
-            
-            <div class="form-group"><label>Nome do Template (Ex: Padrão Recepção)</label><input type="text" id="inl-pc-name" value="${t.name}"></div>
-            <div class="grid-3-col">
-                <div class="form-group"><label>Modelo Máquina</label><input type="text" id="inl-pc-model" value="${t.hw_model || ''}"></div>
-                <div class="form-group"><label>Processador</label><input type="text" id="inl-pc-cpu" value="${t.hw_cpu || ''}"></div>
-                <div class="form-group"><label>Placa Mãe</label><input type="text" id="inl-pc-mobo" value="${t.hw_mobo || ''}"></div>
-                <div class="form-group"><label>RAM</label><input type="text" id="inl-pc-ram" value="${t.hw_ram || ''}"></div>
-                <div class="form-group"><label>Armazenamento</label><input type="text" id="inl-pc-disk" value="${t.hw_disk || ''}"></div>
-                <div class="form-group"><label>Placa de Vídeo</label><input type="text" id="inl-pc-gpu" value="${t.hw_gpu || ''}"></div>
-                <div class="form-group"><label>Monitor</label><input type="text" id="inl-pc-monitor" value="${t.hw_monitor || ''}"></div>
-                
-                <div class="form-group"><label>Sistema (OS)</label>
-                    <select id="inl-pc-os">
-                        <option value="Windows 11" ${t.os==='Windows 11'?'selected':''}>Windows 11</option>
-                        <option value="Windows 10" ${t.os==='Windows 10'?'selected':''}>Windows 10</option>
-                        <option value="Windows 7" ${t.os==='Windows 7'?'selected':''}>Windows 7</option>
-                    </select>
-                </div>
-                <div class="form-group"><label>Arquitetura</label>
-                    <select id="inl-pc-arch">
-                        <option value="x64" ${t.os_arch==='x64'?'selected':''}>x64</option>
-                        <option value="x86" ${t.os_arch==='x86'?'selected':''}>x86</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="modal-actions" style="margin-top:20px;">
-                <button class="btn-secondary" onclick="closeInlineForm()">Voltar</button>
-                <button class="btn-primary" onclick="saveInlineForm()">Salvar Template</button>
-            </div>
-        `;
+        const t = isEdit ? modelSettings.compPresets[index] : {name:'', hw_model:'', hw_cpu:'', hw_mobo:'', hw_ram:'', hw_disk:'', hw_gpu:'', hw_monitor:'', os:'Windows 11', os_arch:'x64'};
+        document.getElementById('pc-preset-title').innerHTML = `<i class="ph ph-desktop"></i> ${isEdit ? 'Editar Template de PC' : 'Novo Template de PC'}`;
+        document.getElementById('inl-pc-name').value    = t.name       || '';
+        document.getElementById('inl-pc-model').value   = t.hw_model   || '';
+        document.getElementById('inl-pc-cpu').value     = t.hw_cpu     || '';
+        document.getElementById('inl-pc-mobo').value    = t.hw_mobo    || '';
+        document.getElementById('inl-pc-ram').value     = t.hw_ram     || '';
+        document.getElementById('inl-pc-disk').value    = t.hw_disk    || '';
+        document.getElementById('inl-pc-gpu').value     = t.hw_gpu     || '';
+        document.getElementById('inl-pc-monitor').value = t.hw_monitor || '';
+        document.getElementById('inl-pc-os').value      = t.os         || 'Windows 11';
+        document.getElementById('inl-pc-arch').value    = t.os_arch    || 'x64';
+        document.getElementById('inl-pc-index').value   = isEdit ? index : '';
+        document.getElementById('pc-preset-modal').classList.remove('hidden');
+        setTimeout(() => document.getElementById('inl-pc-name').focus(), 80);
     }
-    
-    inlineView.innerHTML = html;
+}
+
+function saveMobileModelModal() {
+    const indexVal = document.getElementById('inl-mob-index').value;
+    const isEdit   = indexVal !== '';
+    const index    = isEdit ? parseInt(indexVal) : null;
+    const name     = document.getElementById('inl-mob-name').value.trim();
+    if (!name) return alert('O Nome do Modelo é obrigatório!');
+    const data = {
+        name,
+        rom: document.getElementById('inl-mob-rom').value,
+        ram: document.getElementById('inl-mob-ram').value,
+        cpu: document.getElementById('inl-mob-cpu').value
+    };
+    if (!modelSettings.mobile) modelSettings.mobile = [];
+    if (isEdit) modelSettings.mobile[index] = data; else modelSettings.mobile.push(data);
+    saveSettings();
+    document.getElementById('mobile-model-modal').classList.add('hidden');
+    renderSettingsList();
+}
+
+function savePcPresetModal() {
+    const indexVal = document.getElementById('inl-pc-index').value;
+    const isEdit   = indexVal !== '';
+    const index    = isEdit ? parseInt(indexVal) : null;
+    const name     = document.getElementById('inl-pc-name').value.trim();
+    if (!name) return alert('O Nome do Template é obrigatório!');
+    const data = {
+        name,
+        hw_model:   document.getElementById('inl-pc-model').value,
+        hw_cpu:     document.getElementById('inl-pc-cpu').value,
+        hw_mobo:    document.getElementById('inl-pc-mobo').value,
+        hw_ram:     document.getElementById('inl-pc-ram').value,
+        hw_disk:    document.getElementById('inl-pc-disk').value,
+        hw_gpu:     document.getElementById('inl-pc-gpu').value,
+        hw_monitor: document.getElementById('inl-pc-monitor').value,
+        os:         document.getElementById('inl-pc-os').value,
+        os_arch:    document.getElementById('inl-pc-arch').value
+    };
+    if (!modelSettings.compPresets) modelSettings.compPresets = [];
+    if (isEdit) modelSettings.compPresets[index] = data; else modelSettings.compPresets.push(data);
+    saveSettings();
+    document.getElementById('pc-preset-modal').classList.add('hidden');
+    renderSettingsList();
+    if (typeof updateCompPresetSelect === 'function') updateCompPresetSelect();
 }
 // Fecha o formulário e volta para a grade
 function closeInlineForm() {
@@ -391,7 +452,7 @@ function addNewMobileModel() {
 }
 
 function renderSettingsList() {
-    renderCategoryList('printer', 'list-printer');
+    renderCategoryList('printer', 'list-printer', 'desc');
     renderCategoryList('label', 'list-label');
     renderCategoryList('thermal', 'list-thermal');
     renderCategoryList('webcam', 'list-webcam');
@@ -428,11 +489,16 @@ function renderSettingsList() {
     }
 }
 
-function renderCategoryList(category, listId) {
+function renderCategoryList(category, listId, sortDir = 'asc') {
     const list = document.getElementById(listId);
     if (!list) return;
     list.innerHTML = '';
-    (modelSettings[category] || []).sort().forEach((item, index) => {
+    if (!modelSettings[category]) modelSettings[category] = [];
+    modelSettings[category].sort((a, b) =>
+        sortDir === 'desc' ? b.localeCompare(a, 'pt', { sensitivity: 'base' })
+                           : a.localeCompare(b, 'pt', { sensitivity: 'base' })
+    );
+    modelSettings[category].forEach((item, index) => {
         const li = document.createElement('li');
         li.innerHTML = `
             <span>${item}</span>
@@ -446,13 +512,18 @@ function renderCategoryList(category, listId) {
 
 function editModel(category, index) {
     const oldName = modelSettings[category][index];
-    const newName = prompt("Editar nome:", oldName);
-    if (newName && newName.trim() !== "") {
-        modelSettings[category][index] = newName.trim();
-        saveSettings();
-        renderSettingsList();
-        renderModelOptions();
-    }
+    const labels = { printer:'Impressora', label:'Etiquetadora', thermal:'Térmica', webcam:'Webcam', tv:'TV' };
+    openModelModal(
+        `Editar Modelo — ${labels[category] || category}`,
+        'Nome do Modelo',
+        oldName,
+        (name) => {
+            modelSettings[category][index] = name;
+            saveSettings();
+            renderSettingsList();
+            renderModelOptions();
+        }
+    );
 }
 
 function deleteModel(category, index) {
@@ -569,8 +640,14 @@ function saveComputer() {
     };
     
     const u = inventoryData.find(x => x.id === currentUnitId);
+    if (!u) return alert('Unidade atual não encontrada.');
+
+    // ── SEGURANÇA ADICIONADA AQUI: Se a unidade não tiver nenhum computador, cria a lista vazia ──
+    if (!u.computers) u.computers = [];
+    
     if (id) { 
-        u.computers[u.computers.findIndex(c => c.id === id)] = d; 
+        const idx = u.computers.findIndex(c => c.id === id);
+        if (idx > -1) u.computers[idx] = d; 
     } else { 
         u.computers.push(d); 
     }
@@ -580,20 +657,12 @@ function saveComputer() {
     renderComputers(); 
     renderUnits();
 
-    // ==========================================
-    // NOVO: FLUXO DE LICENÇA AUTOMÁTICO
-    // ==========================================
     if (d.license === 'original') {
-        // Coloquei um confirm() para não te forçar a abrir a tela de licença toda
-        // vez que você for editar um PC antigo que já tenha licença cadastrada.
-        if (confirm(`Computador salvo com sucesso!\n\nComo o Windows é Original, deseja registrar a chave da licença do ${d.os} agora?`)) {
-            
-            openLicenseModal(); // Abre a aba de licenças
-            
-            // MÁGICA: Preenche os dados automaticamente para poupar tempo
-            document.getElementById('lic-software').value = d.os; // Puxa "Windows 11", "Windows 10", etc.
-            document.getElementById('lic-type').value = 'oem'; // Define OEM como padrão para Windows
-            document.getElementById('lic-computer').value = d.name; // Já seleciona o PC que você acabou de criar
+        if (confirm(`Computador saved com sucesso!\n\nComo o Windows é Original, deseja registrar a chave da licença do ${d.os} agora?`)) {
+            openLicenseModal(); 
+            document.getElementById('lic-software').value = d.os; 
+            document.getElementById('lic-type').value = 'oem'; 
+            document.getElementById('lic-computer').value = d.name; 
         }
     }
 }
@@ -1188,7 +1257,18 @@ function renderUnits() {
         if (acCount > 0) subInfo += `<div class="unit-sub-info unit-sub-ac"><i class="ph ph-thermometer"></i> ${acCount} AC(s)</div>`;
         if (licCount > 0) subInfo += `<div class="unit-sub-info unit-sub-lic"><i class="ph ph-certificate"></i> ${licCount} licença(s)</div>`;
         if (inativoCount > 0) subInfo += `<div class="unit-sub-info unit-sub-alert"><i class="ph ph-warning"></i> ${inativoCount} fora de operação</div>`;
-        card.innerHTML = `<div style="position:absolute; top:10px; right:10px; display:flex; gap:5px; z-index:2;"><button class="btn-icon" onclick="editUnit('${unit.id}')"><i class="ph ph-pencil-simple"></i></button><button class="btn-icon btn-delete" onclick="deleteUnit('${unit.id}')"><i class="ph ph-trash"></i></button></div><h3>${unit.name}</h3><p>${count} Equipamento(s)</p>${subInfo}`;
+        card.innerHTML = `
+            <div style="position:absolute;top:10px;right:10px;display:flex;gap:5px;z-index:2;">
+                <button class="btn-icon" onclick="editUnit('${unit.id}')"><i class="ph ph-pencil-simple"></i></button>
+                <button class="btn-icon btn-delete" onclick="deleteUnit('${unit.id}')"><i class="ph ph-trash"></i></button>
+            </div>
+            <div class="unit-card-inner">
+                <h3>${unit.name}</h3>
+                <div class="unit-card-meta">
+                    <span><i class="ph ph-desktop-tower"></i> ${count} equipamento${count !== 1 ? 's' : ''}</span>
+                    ${subInfo}
+                </div>
+            </div>`;
         grid.appendChild(card);
     });
 }
@@ -1456,48 +1536,117 @@ function renderModelOptions() {
     if (typeof updateCompPresetSelect === 'function') updateCompPresetSelect();
 }
 function populateSelect(elementId, items) { const select = document.getElementById(elementId); if (!select) return; const currentValue = select.value; select.innerHTML = '<option value="">Nenhuma</option>'; if (items) { items.sort().forEach(item => { const opt = document.createElement('option'); opt.value = item; opt.textContent = item; select.appendChild(opt); }); } select.value = currentValue; }
-function addNewModel(category) {
-    const name = prompt(`Digite o nome do novo modelo de ${category}:`);
-    if (!name || name.trim() === "") return;
+let _modelModalCallback = null;
 
-    if (!modelSettings[category]) modelSettings[category] = [];
-    modelSettings[category].push(name.trim());
-    
-    saveSettings();
-    renderSettingsList();
-    renderModelOptions(); // Atualiza os selects de escolha
+function openModelModal(title, label, defaultValue, callback) {
+    document.getElementById('model-modal-title').textContent = title;
+    document.getElementById('model-modal-label').textContent = label;
+    document.getElementById('model-modal-input').value = defaultValue || '';
+    _modelModalCallback = callback;
+    document.getElementById('model-name-modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('model-modal-input').select(), 80);
 }
-function openSettings() { document.getElementById('settings-modal').classList.remove('hidden'); renderSettingsList(); }
+
+function closeModelModal() {
+    document.getElementById('model-name-modal').classList.add('hidden');
+    _modelModalCallback = null;
+}
+
+function confirmModelModal() {
+    const val = document.getElementById('model-modal-input').value.trim();
+    if (!val) return;
+    if (_modelModalCallback) _modelModalCallback(val);
+    closeModelModal();
+}
+
+function addNewModel(category) {
+    const labels = { printer:'Impressora', label:'Etiquetadora', thermal:'Térmica', webcam:'Webcam', tv:'TV' };
+    openModelModal(
+        `Novo Modelo — ${labels[category] || category}`,
+        'Nome do Modelo',
+        '',
+        (name) => {
+            if (!modelSettings[category]) modelSettings[category] = [];
+            modelSettings[category].push(name);
+            saveSettings();
+            renderSettingsList();
+            renderModelOptions();
+        }
+    );
+}
+function openSettings() {
+    document.getElementById('settings-modal').classList.remove('hidden');
+    renderSettingsList();
+    renderCategoriasSettings();
+    _renderAllListSettings();
+}
 function checkAutoUnimed() { const webcamVal = document.getElementById('per-webcam').value; document.getElementById('plan-unimed').checked = !!(webcamVal && webcamVal !== ""); }
 // =============================================
 // SISTEMA DE BACKUP E RESTAURAÇÃO (COMPLETO)
 // =============================================
 
-function exportData() {
-    // 1. Reúne TODOS os dados da memória (Unidades, Ajustes/Templates e Acessos)
+async function exportData() {
+    if (!window._get || !window._ref || !window._db) {
+        alert('Firebase ainda não está pronto. Aguarde e tente novamente.');
+        return;
+    }
+
+    // Todos os paths do sistema
+    const paths = [
+        'itInventory', 'itSettings', 'itAccesses',
+        'itEquipamentos', 'itCategoriasEquip',
+        'itFabricantes', 'itFornecedores', 'itTiposEquip'
+    ];
+
+    const snaps = await Promise.all(
+        paths.map(p => window._get(window._ref(window._db, p)))
+    );
+
+    const dados = {};
+    paths.forEach((p, i) => { dados[p] = snaps[i].val(); });
+
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const ts  = `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
     const fullBackup = {
-        inventory: inventoryData,
-        settings: modelSettings,
-        accesses: globalAccessData
+        _meta: {
+            versao:   '3.0',
+            geradoEm: ts,
+            sistema:  'Inventário TI — LAMIC'
+        },
+        // Dados principais
+        inventory:        dados.itInventory        || inventoryData,
+        settings:         dados.itSettings         || modelSettings,
+        accesses:         dados.itAccesses         || globalAccessData,
+        // Equipamentos e suas listas de configuração
+        equipamentos:     dados.itEquipamentos     || {},
+        categoriasEquip:  dados.itCategoriasEquip  || {},
+        fabricantes:      dados.itFabricantes      || [],
+        fornecedores:     dados.itFornecedores     || [],
+        tiposEquip:       dados.itTiposEquip       || []
     };
 
-    // 2. Converte para arquivo JSON formatado
+    // Contagem para informação ao usuário
+    const totalEquip = Object.keys(fullBackup.equipamentos).length;
+    const totalUnid  = Array.isArray(fullBackup.inventory)
+        ? fullBackup.inventory.length
+        : Object.keys(fullBackup.inventory || {}).length;
+
+    console.log(`[Backup] ${totalUnid} unidades · ${totalEquip} equipamentos · ${fullBackup.fabricantes.length} fabricantes · ${fullBackup.fornecedores.length} fornecedores`);
+
     const dataStr = JSON.stringify(fullBackup, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    
-    // 3. Cria a data atual para o nome do arquivo
-    const date = new Date();
-    const formattedDate = `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
-    
-    // 4. Inicia o Download
+    const blob    = new Blob([dataStr], { type: 'application/json' });
+    const url     = URL.createObjectURL(blob);
+    const fmtDate = `${pad(now.getDate())}-${pad(now.getMonth()+1)}-${now.getFullYear()}`;
+
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `Backup_Sistema_TI_${formattedDate}.json`;
+    a.href     = url;
+    a.download = `Backup_Inventario_TI_${fmtDate}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url); // Limpa a memória do navegador
+    URL.revokeObjectURL(url);
 }
 
 function triggerImport() {
@@ -1510,25 +1659,65 @@ function importData(inputElement) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = function (ev) {
         try {
-            const importedData = JSON.parse(e.target.result);
-            if (confirm('Atenção: A restauração vai substituir todos os dados atuais na nuvem do Firebase. Deseja continuar?')) {
-                if (Array.isArray(importedData)) {
-                    DB.set('itInventory', importedData);
-                } else {
-                    if (importedData.inventory) DB.set('itInventory', importedData.inventory);
-                    if (importedData.settings)  DB.set('itSettings', importedData.settings);
-                    if (importedData.accesses)  DB.set('itAccesses', importedData.accesses);
-                }
-                alert('Backup restaurado com sucesso na nuvem do Firebase! O sistema será reiniciado.');
-                window.location.reload(); 
+            const d = JSON.parse(ev.target.result);
+
+            // Formato legado: array puro = só inventário
+            if (Array.isArray(d)) {
+                if (!confirm('Formato legado detectado.\nEsse backup contém apenas Unidades/Inventário.\nDeseja restaurar mesmo assim?')) return;
+                DB.set('itInventory', d);
+                alert('Inventário restaurado! O sistema será reiniciado.');
+                window.location.reload();
+                return;
             }
+
+            if (!d.inventory && !d.equipamentos && !d.accesses && !d.fabricantes) {
+                alert('Arquivo inválido: não é um backup reconhecido do sistema.');
+                return;
+            }
+
+            const meta   = d._meta ? `\nGerado em: ${d._meta.geradoEm} · Versão ${d._meta.versao}` : '';
+            const countInv  = Array.isArray(d.inventory)    ? d.inventory.length    : Object.keys(d.inventory    ||{}).length;
+            const countAcc  = Array.isArray(d.accesses)     ? d.accesses.length     : Object.keys(d.accesses     ||{}).length;
+            const countEquip= Object.keys(d.equipamentos    ||{}).length;
+            const countCat  = Object.keys(d.categoriasEquip ||{}).length;
+            const countFab  = (d.fabricantes  ||[]).length;
+            const countFor  = (d.fornecedores ||[]).length;
+            const countTip  = (d.tiposEquip   ||[]).length;
+
+            const resumo = [
+                d.inventory       ? `• ${countInv} unidades/computadores` : '',
+                d.settings        ? '• Modelos e Templates (impressoras, webcams, etc.)' : '',
+                d.accesses        ? `• ${countAcc} acessos corporativos` : '',
+                d.equipamentos    ? `• ${countEquip} equipamentos` : '',
+                d.categoriasEquip ? `• ${countCat} categorias de equipamentos` : '',
+                d.fabricantes     ? `• ${countFab} fabricantes` : '',
+                d.fornecedores    ? `• ${countFor} fornecedores` : '',
+                d.tiposEquip      ? `• ${countTip} tipos/subtipos` : ''
+            ].filter(Boolean).join('\n');
+
+            if (!confirm(`RESTAURAÇÃO DE BACKUP${meta}\n\nConteúdo:\n${resumo}\n\nTodos os dados atuais serão substituídos. Continuar?`)) return;
+
+            const ops = [];
+            if (d.inventory)       ops.push(DB.set('itInventory',       d.inventory));
+            if (d.settings)        ops.push(DB.set('itSettings',        d.settings));
+            if (d.accesses)        ops.push(DB.set('itAccesses',        d.accesses));
+            if (d.equipamentos)    ops.push(DB.set('itEquipamentos',    d.equipamentos));
+            if (d.categoriasEquip) ops.push(DB.set('itCategoriasEquip', d.categoriasEquip));
+            if (d.fabricantes)     ops.push(DB.set('itFabricantes',     d.fabricantes));
+            if (d.fornecedores)    ops.push(DB.set('itFornecedores',    d.fornecedores));
+            if (d.tiposEquip)      ops.push(DB.set('itTiposEquip',      d.tiposEquip));
+
+            Promise.all(ops)
+                .then(() => { alert('Backup restaurado com sucesso! O sistema será reiniciado.'); window.location.reload(); })
+                .catch(err => { alert('Erro ao restaurar: ' + err.message); console.error(err); });
+
         } catch (err) {
-            alert('Erro crítico: O arquivo selecionado não é um backup válido.');
+            alert('Erro critico: O arquivo nao e um backup valido.\n' + err.message);
             console.error(err);
         }
-        inputElement.value = ''; 
+        inputElement.value = '';
     };
     reader.readAsText(file);
 }
@@ -1542,24 +1731,31 @@ function showUnitsView() {
     document.getElementById('units-view').classList.add('active');
     
     // 3. Esconde as outras
-    document.getElementById('computers-view').classList.add('hidden');
-    document.getElementById('computers-view').classList.remove('active');
-    
+    ['computers-view','accesses-view','equip-view'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.classList.add('hidden'); el.classList.remove('active'); }
+    });
+
     document.getElementById('accesses-view').classList.add('hidden');
     document.getElementById('accesses-view').classList.remove('active');
-    
-    // 4. Atualiza botão lateral
+
+    const evH = document.getElementById('equip-view');
+    if (evH) { evH.classList.add('hidden'); evH.classList.remove('active'); }
+
+    // 4. Atualiza botão lateral (null-safe — .sidebar-menu não existe na versão atual)
     document.querySelectorAll('.side-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('.sidebar-menu button:nth-child(1)').classList.add('active'); 
+    const _sideFirst = document.querySelector('.sidebar-menu button:nth-child(1)');
+    if (_sideFirst) _sideFirst.classList.add('active');
     
     currentUnitId = null; 
     renderUnits(); 
     updateDashboard(); 
 }
-function showComputersView(unitId) { 
-    currentUnitId = unitId; 
-    const unit = inventoryData.find(u => u.id === unitId); 
-    if (!unit) return; 
+function showComputersView(unitId) {
+    closeModals(); // garante que nenhum modal fique com z-index > sidebar bloqueando o Home
+    currentUnitId = unitId;
+    const unit = inventoryData.find(u => u.id === unitId);
+    if (!unit) return;
     
     document.getElementById('current-unit-title').textContent = unit.name; 
     
@@ -1664,18 +1860,34 @@ function filterUnitItems() {
 
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
-        const openModals = document.querySelectorAll('.modal:not(.hidden)');
-        
-        if (openModals.length > 0) {
-            // 1. Se tem modal aberto, fecha o modal
-            closeModals();
-        } 
-        else if (!document.getElementById('accesses-view').classList.contains('hidden')) {
-            // 2. NOVO: Se estiver na tela de Acessos, volta para Unidades
-            showUnitsView();
-        } 
-        else if (currentUnitId !== null) {
-            // 3. Se estiver dentro de uma Unidade, volta para a lista de Unidades
+        // Prioridade 1: fecha sub-modais abertos sobre outros modais (um por vez)
+        const subModalIds = [
+            'nova-cat-modal',      // popup sobre equip-modal
+            'quick-add-modal',     // popup sobre equip-modal
+            'model-name-modal',    // popup de novo modelo de periférico
+            'mobile-model-modal',  // popup de modelo de celular
+            'pc-preset-modal'      // popup de template de PC
+        ];
+        for (const id of subModalIds) {
+            const el = document.getElementById(id);
+            if (el && !el.classList.contains('hidden')) {
+                el.classList.add('hidden');
+                return; // interrompe — não fecha o modal pai por baixo
+            }
+        }
+
+        // Prioridade 2: fecha modais principais (excluindo a página de Configurações)
+        const openPopups = [...document.querySelectorAll('.modal:not(.hidden)')]
+            .filter(m => m.id !== 'settings-modal');
+
+        if (openPopups.length > 0) {
+            openPopups.forEach(m => m.classList.add('hidden'));
+        } else {
+            // Fecha Configurações se estiver aberta e vai para o Dashboard
+            const settings = document.getElementById('settings-modal');
+            if (!settings.classList.contains('hidden')) {
+                settings.classList.add('hidden');
+            }
             showUnitsView();
         }
     }
@@ -1697,6 +1909,7 @@ function renderAccesses() {
     };
 
     globalAccessData.forEach(acc => {
+        if (!_accessPassesFilters(acc)) return; // aplica filtros ativos
         const cat = acc.categoria || 'Outros';
         if (!grouped[cat]) grouped[cat] = [];
         grouped[cat].push(acc);
@@ -1929,11 +2142,11 @@ function showAccessesView() {
 
     document.getElementById('accesses-view').classList.remove('hidden');
     document.getElementById('accesses-view').classList.add('active');
-    
-    document.getElementById('units-view').classList.add('hidden');
-    document.getElementById('units-view').classList.remove('active');
-    document.getElementById('computers-view').classList.add('hidden');
-    document.getElementById('computers-view').classList.remove('active');
+
+    ['units-view','computers-view','equip-view'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.classList.add('hidden'); el.classList.remove('active'); }
+    });
     
     document.querySelectorAll('.side-btn').forEach(b => b.classList.remove('active'));
     const btnAccess = document.getElementById('btn-nav-accesses');
@@ -2282,6 +2495,1370 @@ function sincronizarUsuarioLogado() {
 // Mantém a verificação contínua e limpa intervalos duplicados para não pesar
 clearInterval(window.invUserInterval);
 window.invUserInterval = setInterval(sincronizarUsuarioLogado, 500);
+
+// ============================================================
+// EQUIPAMENTOS
+// ============================================================
+
+let equipData       = [];
+let equipDetailId   = null;
+
+// ── Imagens do equipamento (array de Base64) ─────────────────
+let _equipImagens = []; // array de strings Base64 durante edição
+let _equipCarIdx  = 0;  // índice atual no carrossel do detalhe
+
+// ══════════════════════════════════════════════════════════════
+// LÓGICA DE CATEGORIA / CÓDIGO / CADEADO
+// ══════════════════════════════════════════════════════════════
+
+// ── Configuração das listas dinâmicas (GLOBAL) ────────────────
+const LISTAS_CONFIG = {
+    fabricante: { path: 'itFabricantes',  selectId: 'equip-fabricante', listId: 'list-fabricantes', inpId: 'inp-fabricante', label: 'Fabricante / Marca' },
+    fornecedor: { path: 'itFornecedores', selectId: 'equip-fornecedor', listId: 'list-fornecedores', inpId: 'inp-fornecedor', label: 'Fornecedor'          },
+    tipo:       { path: 'itTiposEquip',   selectId: 'equip-tipo',       listId: 'list-tipos',        inpId: 'inp-tipo',        label: 'Tipo / Subtipo'      }
+};
+const _listasData = { fabricante: [], fornecedor: [], tipo: [] };
+
+// Categorias: carregadas do Firebase + defaults hardcoded como fallback
+let categoriasEquip = {}; // { "Bioquímica": { nome, prefixo, subtipo }, ... }
+
+const CATEGORIAS_DEFAULT = {
+    'Bioquímica':      { nome: 'Bioquímica',      prefixo: 'BIO', subtipo: 'Equipamentos Analíticos' },
+    'Citologia':       { nome: 'Citologia',       prefixo: 'CIT', subtipo: 'Equipamentos Analíticos' },
+    'Hematologia':     { nome: 'Hematologia',     prefixo: 'HEM', subtipo: 'Equipamentos Analíticos' },
+    'Imuno-Hormônios': { nome: 'Imuno-Hormônios', prefixo: 'IMU', subtipo: 'Equipamentos Analíticos' },
+    'Microbiologia':   { nome: 'Microbiologia',   prefixo: 'MIC', subtipo: 'Equipamentos Analíticos' },
+    'Parasitologia':   { nome: 'Parasitologia',   prefixo: 'PAR', subtipo: 'Equipamentos Analíticos' },
+    'Urianálise':      { nome: 'Urianálise',      prefixo: 'URO', subtipo: 'Equipamentos Analíticos' }
+};
+
+// Helper retrocompatível: retorna prefixo da categoria
+function _getPrefixo(cat) {
+    return (categoriasEquip[cat] || CATEGORIAS_DEFAULT[cat] || {}).prefixo || '';
+}
+function _getSubtipo(cat) {
+    return (categoriasEquip[cat] || CATEGORIAS_DEFAULT[cat] || {}).subtipo || 'Equipamentos Analíticos';
+}
+
+// Mantém retrocompatibilidade com código que usa EQUIP_PREFIXOS diretamente
+const EQUIP_PREFIXOS = new Proxy({}, {
+    get(_, cat) { return _getPrefixo(cat); }
+});
+
+// ══════════════════════════════════════════════════════════════
+// LISTAS DINÂMICAS — Fabricante, Fornecedor, Tipo
+// ══════════════════════════════════════════════════════════════
+
+// Migra valores de fabricante/fornecedor/tipo dos equipamentos para as listas Firebase
+function _migrarDadosExistentes() {
+    const mapa = { fabricante: 'fabricante', fornecedor: 'fornecedor', tipo: 'tipo' };
+    Object.entries(mapa).forEach(([key, campo]) => {
+        if (_listasData[key].length) return; // já tem dados, não migra
+        const unicos = [...new Set(equipData.map(e => e[campo]).filter(Boolean))].sort();
+        if (!unicos.length) return;
+        _listasData[key] = unicos;
+        DB.set(LISTAS_CONFIG[key].path, unicos);
+        _populateListSelect(key);
+        _renderListSettings(key);
+    });
+}
+
+function _populateListSelect(key) {
+    const cfg  = LISTAS_CONFIG[key];
+    const sel  = document.getElementById(cfg.selectId);
+    if (!sel)  return;
+    const cur  = sel.value;
+    sel.innerHTML = '<option value="">— Selecione —</option>';
+    _listasData[key].forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = v;
+        if (v === cur) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    // Permite digitar valor livre se não estiver na lista
+    if (cur && !_listasData[key].includes(cur)) {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = cur;
+        opt.selected = true;
+        sel.appendChild(opt);
+    }
+}
+
+function _renderListSettings(key) {
+    const cfg  = LISTAS_CONFIG[key];
+    const list = document.getElementById(cfg.listId);
+    if (!list) return;
+    list.innerHTML = '';
+    if (!_listasData[key].length) {
+        list.innerHTML = `<li class="ecl-empty">Nenhum item cadastrado</li>`;
+        return;
+    }
+    _listasData[key].forEach(v => {
+        const safe = v.replace(/'/g, "\\'");
+        const li   = document.createElement('li');
+        li.innerHTML = `<span style="flex:1;">${v}</span>
+            <div class="list-actions">
+                <button class="btn-mini" onclick="editListItem('${key}','${safe}')" title="Editar">
+                    <i class="ph ph-pencil-simple"></i>
+                </button>
+                <button class="btn-mini red" onclick="deleteListItem('${key}','${safe}')" title="Remover">
+                    <i class="ph ph-trash"></i>
+                </button>
+            </div>`;
+        list.appendChild(li);
+    });
+}
+
+function addListItem(key) {
+    const cfg  = LISTAS_CONFIG[key];
+    const val  = (document.getElementById(cfg.inpId)?.value || '').trim();
+    if (!val) return;
+    if (_listasData[key].includes(val)) { alert(`"${val}" já está na lista.`); return; }
+    _listasData[key].push(val);
+    _listasData[key].sort();
+    DB.set(cfg.path, _listasData[key]);
+    document.getElementById(cfg.inpId).value = '';
+    _populateListSelect(key);
+    _renderListSettings(key);
+}
+
+function deleteListItem(key, val) {
+    if (!confirm(`Remover "${val}" da lista?`)) return;
+    _listasData[key] = _listasData[key].filter(v => v !== val);
+    DB.set(LISTAS_CONFIG[key].path, _listasData[key]);
+    _populateListSelect(key);
+    _renderListSettings(key);
+}
+
+// Editar item de lista simples (Fabricante, Fornecedor, Tipo)
+let _editListKey = null;
+let _editListOldVal = null;
+
+function editListItem(key, oldVal) {
+    _editListKey    = key;
+    _editListOldVal = oldVal;
+    _quickAddKey    = null; // garante que não conflita com quickAdd
+
+    const cfg   = LISTAS_CONFIG[key];
+    const labels = { fabricante: 'Fabricante / Marca', fornecedor: 'Fornecedor', tipo: 'Tipo / Subtipo' };
+    const titleEl = document.getElementById('quick-add-title');
+    const labelEl = document.getElementById('quick-add-label');
+    const inpEl   = document.getElementById('quick-add-input');
+    const confirmBtn = document.querySelector('#quick-add-modal .btn-primary');
+
+    if (titleEl) titleEl.innerHTML = `<i class="ph ph-pencil-simple"></i> Editar ${labels[key] || cfg.label}`;
+    if (labelEl) labelEl.textContent = 'Novo nome';
+    if (inpEl)   { inpEl.value = oldVal; }
+    if (confirmBtn) { confirmBtn.textContent = ''; confirmBtn.innerHTML = '<i class="ph ph-floppy-disk"></i> Salvar alteração'; }
+    if (confirmBtn) confirmBtn.onclick = confirmEditListItem;
+
+    document.getElementById('quick-add-modal').classList.remove('hidden');
+    setTimeout(() => { inpEl?.select(); }, 80);
+}
+
+function confirmEditListItem() {
+    if (!_editListKey || !_editListOldVal) return;
+    const val = (document.getElementById('quick-add-input')?.value || '').trim();
+    if (!val) return;
+    if (val !== _editListOldVal && _listasData[_editListKey].includes(val)) {
+        alert(`"${val}" já existe na lista.`); return;
+    }
+    // Substitui o valor antigo pelo novo
+    const idx = _listasData[_editListKey].indexOf(_editListOldVal);
+    if (idx !== -1) _listasData[_editListKey][idx] = val;
+    _listasData[_editListKey].sort();
+    DB.set(LISTAS_CONFIG[_editListKey].path, _listasData[_editListKey]);
+    _populateListSelect(_editListKey);
+    _renderListSettings(_editListKey);
+    // Atualiza select do form se o valor estava selecionado
+    const sel = document.getElementById(LISTAS_CONFIG[_editListKey].selectId);
+    if (sel && sel.value === _editListOldVal) sel.value = val;
+    _editListKey = null; _editListOldVal = null;
+    closeQuickAdd();
+    // Restaura comportamento padrão do botão confirmar
+    const confirmBtn = document.querySelector('#quick-add-modal .btn-primary');
+    if (confirmBtn) confirmBtn.onclick = confirmQuickAdd;
+}
+
+// Editar categoria de equipamento
+function editCategoriaEquip(nome) {
+    const cat = categoriasEquip[nome];
+    if (!cat) return;
+    const novoNome    = prompt('Nome da categoria:', cat.nome);
+    if (!novoNome || novoNome.trim() === cat.nome) return;
+    const n = novoNome.trim();
+    if (categoriasEquip[n] && n !== nome) { alert(`"${n}" já existe.`); return; }
+    // Recria com novo nome
+    categoriasEquip[n] = { ...cat, nome: n };
+    if (n !== nome) delete categoriasEquip[nome];
+    DB.set('itCategoriasEquip', categoriasEquip);
+    _populateCategoriaSelect();
+    renderCategoriasSettings();
+}
+
+// Quick-add: abre mini-modal estilizado
+let _quickAddKey = null;
+function quickAddItem(key) {
+    _quickAddKey = key;
+    const cfg     = LISTAS_CONFIG[key];
+    const labels  = { fabricante: 'Fabricante / Marca', fornecedor: 'Fornecedor', tipo: 'Tipo / Subtipo' };
+    const icons   = { fabricante: 'ph ph-buildings', fornecedor: 'ph ph-storefront', tipo: 'ph ph-tag' };
+    const titleEl = document.getElementById('quick-add-title');
+    const labelEl = document.getElementById('quick-add-label');
+    const inpEl   = document.getElementById('quick-add-input');
+    if (titleEl) titleEl.innerHTML = `<i class="${icons[key] || 'ph ph-plus-circle'}"></i> Novo ${labels[key] || cfg.label}`;
+    if (labelEl) labelEl.textContent = labels[key] || cfg.label;
+    if (inpEl)   { inpEl.value = ''; }
+    document.getElementById('quick-add-modal').classList.remove('hidden');
+    setTimeout(() => inpEl?.focus(), 80);
+}
+function closeQuickAdd() {
+    // Fecha SOMENTE o quick-add-modal, não os outros modais abertos
+    const m = document.getElementById('quick-add-modal');
+    if (m) m.classList.add('hidden');
+    _quickAddKey = null;
+}
+function confirmQuickAdd() {
+    if (!_quickAddKey) return;
+    const cfg = LISTAS_CONFIG[_quickAddKey];
+    const val = (document.getElementById('quick-add-input')?.value || '').trim();
+    if (!val) return;
+    if (_listasData[_quickAddKey].includes(val)) { alert(`"${val}" já existe na lista.`); return; }
+    _listasData[_quickAddKey].push(val);
+    _listasData[_quickAddKey].sort();
+    DB.set(cfg.path, _listasData[_quickAddKey]);
+    _populateListSelect(_quickAddKey);
+    _renderListSettings(_quickAddKey);
+    // Seleciona automaticamente o novo valor no select do form
+    const sel = document.getElementById(cfg.selectId);
+    if (sel) sel.value = val;
+    _checkEquipChanges();
+    closeQuickAdd();
+}
+
+// Chama renders das listas ao abrir configurações
+function _renderAllListSettings() {
+    Object.keys(LISTAS_CONFIG).forEach(k => _renderListSettings(k));
+}
+
+// ── Popula o select de categoria no form de equipamento ────────
+function _populateCategoriaSelect() {
+    const sel = document.getElementById('equip-categoria');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Selecione —</option>';
+    Object.keys(categoriasEquip).sort().forEach(nome => {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = nome;
+        if (nome === cur) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    // Também atualiza o select de filtros
+    _populateFilterCategoria();
+}
+
+// ── Atualiza chips de filtro de categoria ─────────────────────
+function _populateFilterCategoria() {
+    const panel = document.getElementById('equip-filter-panel');
+    if (!panel) return;
+    const group = panel.querySelector('[data-key="categoria"]')?.closest('.filter-chip-group');
+    if (!group) return;
+    // Remove chips de categoria (exceto "Todas")
+    [...group.querySelectorAll('.filter-chip:not([data-val=""])')].forEach(c => c.remove());
+    Object.keys(categoriasEquip).sort().forEach(nome => {
+        const btn = document.createElement('button');
+        btn.className = 'filter-chip';
+        btn.dataset.filter = 'equip';
+        btn.dataset.key    = 'categoria';
+        btn.dataset.val    = nome;
+        btn.onclick        = () => toggleEquipFilterChip(btn);
+        btn.textContent    = nome;
+        group.appendChild(btn);
+    });
+}
+
+// ── Renderiza lista de categorias em Configurações ─────────────
+function renderCategoriasSettings() {
+    const list = document.getElementById('list-categorias-equip');
+    if (!list) return;
+    list.innerHTML = '';
+    const cats = Object.entries(categoriasEquip).sort(([a],[b]) => a.localeCompare(b));
+    if (!cats.length) {
+        list.innerHTML = '<li class="ecl-empty">Nenhuma categoria cadastrada</li>';
+        return;
+    }
+    cats.forEach(([nome, cat]) => {
+        const li = document.createElement('li');
+        li.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:5px 4px;border-bottom:1px solid #f1f5f9;font-size:.78rem;gap:6px;';
+        const safe = nome.replace(/'/g, "\\'");
+        li.innerHTML = `
+            <span style="flex:1;">
+                <strong>${cat.nome}</strong>
+                <span style="color:var(--text-muted);margin-left:5px;">${cat.prefixo}</span>
+            </span>
+            <div class="list-actions">
+                <button class="btn-mini" onclick="editCategoriaEquip('${safe}')" title="Editar">
+                    <i class="ph ph-pencil-simple"></i>
+                </button>
+                <button class="btn-mini red" onclick="deleteCategoriaEquip('${safe}')" title="Remover">
+                    <i class="ph ph-trash"></i>
+                </button>
+            </div>`;
+        list.appendChild(li);
+    });
+}
+
+// ── Adicionar categoria via Configurações ──────────────────────
+function addCategoriaEquip() {
+    const nome    = (document.getElementById('inp-cat-nome')?.value    || '').trim();
+    const prefixo = (document.getElementById('inp-cat-prefixo')?.value || '').trim().toUpperCase();
+    if (!nome || !prefixo) return alert('Preencha o nome e a sigla da categoria.');
+    if (prefixo.length < 2 || prefixo.length > 4) return alert('A sigla deve ter 2 a 4 letras.');
+    if (categoriasEquip[nome]) return alert(`Categoria "${nome}" já existe.`);
+    if (Object.values(categoriasEquip).some(c => c.prefixo === prefixo)) return alert(`Sigla "${prefixo}" já está em uso.`);
+
+    categoriasEquip[nome] = { nome, prefixo, subtipo: 'Equipamentos Analíticos' };
+    DB.set('itCategoriasEquip', categoriasEquip);
+
+    const nomeEl = document.getElementById('inp-cat-nome');
+    const prefEl = document.getElementById('inp-cat-prefixo');
+    if (nomeEl) nomeEl.value = '';
+    if (prefEl) prefEl.value = '';
+
+    _populateCategoriaSelect();
+    renderCategoriasSettings();
+}
+
+function deleteCategoriaEquip(nome) {
+    // Verifica se há equipamentos usando essa categoria
+    const emUso = equipData.some(e => e.categoria === nome);
+    if (emUso && !confirm(`A categoria "${nome}" está em uso por equipamentos cadastrados.\nDeseja remover mesmo assim?`)) return;
+    if (!emUso && !confirm(`Remover a categoria "${nome}"?`)) return;
+    delete categoriasEquip[nome];
+    DB.set('itCategoriasEquip', categoriasEquip);
+    _populateCategoriaSelect();
+    renderCategoriasSettings();
+}
+
+// ── Nova categoria rápida (popup sobre o form de equipamento) ──────
+function abrirNovaCategoria() {
+    const modal = document.getElementById('nova-cat-modal');
+    if (!modal) return;
+    document.getElementById('nova-cat-nome').value    = '';
+    document.getElementById('nova-cat-prefixo').value = '';
+    document.getElementById('nova-cat-subtipo').value = 'Equipamentos Analíticos';
+    modal.classList.remove('hidden');
+    document.getElementById('nova-cat-nome')?.focus();
+}
+function fecharNovaCategoria() {
+    const modal = document.getElementById('nova-cat-modal');
+    if (modal) modal.classList.add('hidden');
+}
+function salvarNovaCategoria() {
+    const nome    = (document.getElementById('nova-cat-nome')?.value    || '').trim();
+    const prefixo = (document.getElementById('nova-cat-prefixo')?.value || '').trim().toUpperCase();
+    const subtipo = (document.getElementById('nova-cat-subtipo')?.value || '').trim() || 'Equipamentos Analíticos';
+    if (!nome || !prefixo) return alert('Preencha o nome e o prefixo.');
+    if (prefixo.length < 2 || prefixo.length > 4) return alert('Prefixo deve ter 2 a 4 letras.');
+    if (categoriasEquip[nome]) return alert(`Categoria "${nome}" já existe.`);
+    if (Object.values(categoriasEquip).some(c => c.prefixo === prefixo)) return alert(`Prefixo "${prefixo}" já em uso.`);
+
+    categoriasEquip[nome] = { nome, prefixo, subtipo };
+    DB.set('itCategoriasEquip', categoriasEquip);
+    _populateCategoriaSelect();
+    renderCategoriasSettings();
+
+    // Seleciona a nova categoria automaticamente
+    const sel = document.getElementById('equip-categoria');
+    if (sel) { sel.value = nome; onEquipCategoriaChange(nome); }
+    fecharNovaCategoria();
+}
+
+function _gerarCodigoEquip(categoria) {
+    const prefix = EQUIP_PREFIXOS[categoria];
+    if (!prefix) return '';
+    let max = 0;
+    equipData.forEach(e => {
+        if (e.codigo && e.codigo.startsWith(prefix + '-')) {
+            const n = parseInt(e.codigo.split('-')[1]) || 0;
+            if (n > max) max = n;
+        }
+    });
+    return `${prefix}-${String(max + 1).padStart(3, '0')}`;
+}
+
+function onEquipCategoriaChange(cat) {
+    // Somente o Código/Patrimônio segue a lógica da categoria
+    const codInp = document.getElementById('equip-codigo');
+    const isNew  = !(document.getElementById('equip-id')?.value);
+    if (codInp && isNew) {
+        codInp.value = cat ? _gerarCodigoEquip(cat) : '';
+    }
+    _checkEquipChanges();
+}
+
+// Cadeado do Tipo — agora habilita/desabilita o select
+let _tipoLocked = false;
+function toggleTipoLock() {
+    _tipoLocked = !_tipoLocked;
+    const sel = document.getElementById('equip-tipo');
+    if (sel) {
+        sel.disabled = _tipoLocked;
+        sel.style.opacity = _tipoLocked ? '.5' : '1';
+    }
+    _setTipoLockIcon(_tipoLocked);
+}
+function _setTipoLockIcon(locked) {
+    _tipoLocked = locked;
+    const btn  = document.getElementById('equip-tipo-lock');
+    const icon = document.getElementById('equip-tipo-lock-icon');
+    if (btn)  btn.classList.toggle('unlocked', !locked);
+    if (icon) icon.className = locked ? 'ph ph-lock-simple' : 'ph ph-lock-open';
+}
+
+// ══════════════════════════════════════════════════════════════
+
+function handleEquipImgUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+
+    if (file.size > 1 * 1024 * 1024) {
+        alert('⚠️ Imagem muito grande!\n\n' +
+              '"' + file.name + '" tem ' + (file.size / (1024*1024)).toFixed(2) + ' MB.\n\n' +
+              'O limite é 1 MB. Redimensione e tente novamente.');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = ev => {
+        _equipImagens.push(ev.target.result);
+        _renderEquipThumbs();
+    };
+    reader.readAsDataURL(file);
+}
+
+function _renderEquipThumbs() {
+    const grid = document.getElementById('equip-thumbs-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    _equipImagens.forEach((b64, i) => {
+        const item = document.createElement('div');
+        item.className = 'equip-thumb-item';
+        item.innerHTML = `<img src="${b64}" alt="img ${i+1}">
+            <button class="equip-thumb-del" onclick="_removeEquipImg(${i})" title="Remover">
+                <i class="ph ph-x"></i>
+            </button>`;
+        grid.appendChild(item);
+    });
+    // Botão "Adicionar"
+    const add = document.createElement('div');
+    add.className = 'equip-thumb-add';
+    add.onclick   = () => document.getElementById('equip-img-file').click();
+    add.innerHTML = '<i class="ph ph-plus"></i><span>Adicionar</span>';
+    grid.appendChild(add);
+}
+
+function _removeEquipImg(idx) {
+    _equipImagens.splice(idx, 1);
+    _renderEquipThumbs();
+}
+
+// ── Carrossel no detalhe ──────────────────────────────────────
+function _initEquipCarousel(imgs) {
+    _equipCarIdx = 0;
+    _equipImagens = []; // reset form state
+    const wrap    = document.getElementById('eqd-car-wrap');
+    const imgEl   = document.getElementById('eqd-car-img');
+    const prev    = document.getElementById('eqd-car-prev');
+    const next    = document.getElementById('eqd-car-next');
+    const dots    = document.getElementById('eqd-car-dots');
+    const counter = document.getElementById('eqd-car-counter');
+
+    if (!wrap) return;
+
+    if (!imgs || !imgs.length) {
+        wrap.style.display = 'none';
+        return;
+    }
+
+    wrap.style.display = 'block';
+    imgEl.src = imgs[0];
+
+    // Mostrar/ocultar navegação
+    const multi = imgs.length > 1;
+    if (prev) prev.style.display = multi ? 'flex' : 'none';
+    if (next) next.style.display = multi ? 'flex' : 'none';
+    if (counter) {
+        counter.style.display = multi ? 'block' : 'none';
+        counter.textContent   = '1 / ' + imgs.length;
+    }
+
+    // Dots
+    if (dots) {
+        dots.innerHTML = '';
+        imgs.forEach((_, i) => {
+            const d = document.createElement('button');
+            d.className = 'eqd-car-dot' + (i === 0 ? ' active' : '');
+            d.onclick   = () => equipCarGo(i, imgs);
+            dots.appendChild(d);
+        });
+    }
+
+    // Salva imgs no wrap para navegação
+    wrap._imgs = imgs;
+}
+
+function equipCarNav(dir) {
+    const wrap = document.getElementById('eqd-car-wrap');
+    if (!wrap || !wrap._imgs) return;
+    equipCarGo((_equipCarIdx + dir + wrap._imgs.length) % wrap._imgs.length, wrap._imgs);
+}
+
+function equipCarGo(idx, imgs) {
+    _equipCarIdx = idx;
+    const imgEl   = document.getElementById('eqd-car-img');
+    const dots    = document.getElementById('eqd-car-dots');
+    const counter = document.getElementById('eqd-car-counter');
+    if (imgEl)   imgEl.src = imgs[idx];
+    if (counter) counter.textContent = (idx + 1) + ' / ' + imgs.length;
+    if (dots) {
+        [...dots.children].forEach((d, i) => d.classList.toggle('active', i === idx));
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// FILTROS — EQUIPAMENTOS E ACESSOS
+// ══════════════════════════════════════════════════════════════
+
+// Estado dos filtros
+const _equipFilters  = { categoria: '', status: '' };
+const _accessFilters = { assinatura: '', '2fa': '', drive: '' };
+
+// Abre/fecha painel de filtros
+function toggleFilterPanel(panelId, btn) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    const isHidden = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !isHidden);
+    if (btn) btn.classList.toggle('active', isHidden);
+}
+
+// ── Filtros de Equipamentos ──────────────────────────────────
+function toggleEquipFilterChip(btn) {
+    const key = btn.dataset.key;
+    const val = btn.dataset.val;
+    // Marca ativo apenas o chip clicado no grupo
+    btn.closest('.filter-chip-group').querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    _equipFilters[key] = val;
+    renderEquipGrid();
+}
+
+function clearEquipFilters() {
+    _equipFilters.categoria = '';
+    _equipFilters.status    = '';
+    document.querySelectorAll('#equip-filter-panel .filter-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.val === '');
+    });
+    renderEquipGrid();
+}
+
+// ── Filtros de Acessos ───────────────────────────────────────
+function toggleAccessFilterChip(btn) {
+    const key = btn.dataset.key;
+    const val = btn.dataset.val;
+    btn.closest('.filter-chip-group').querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    _accessFilters[key] = val;
+    renderAccesses();
+}
+
+function clearAccessFilters() {
+    _accessFilters.assinatura = '';
+    _accessFilters['2fa']     = '';
+    _accessFilters.drive      = '';
+    document.querySelectorAll('#access-filter-panel .filter-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.val === '');
+    });
+    renderAccesses();
+}
+
+// Aplica filtros de acessos num item
+function _accessPassesFilters(item) {
+    if (_accessFilters.assinatura === 'com'  && !item.assinatura)  return false;
+    if (_accessFilters.assinatura === 'sem'  &&  item.assinatura)  return false;
+    if (_accessFilters['2fa']     === 'com'  && !item.twoFA)       return false;
+    if (_accessFilters['2fa']     === 'sem'  &&  item.twoFA)       return false;
+    if (_accessFilters.drive      === 'com'  && !item.linkDrive)   return false;
+    if (_accessFilters.drive      === 'sem'  &&  item.linkDrive)   return false;
+    return true;
+}
+
+function showEquipamentosView() {
+    closeModals();
+    ['units-view','computers-view','accesses-view'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.classList.add('hidden'); el.classList.remove('active'); }
+    });
+    currentUnitId = null;
+    const ev = document.getElementById('equip-view');
+    ev.classList.remove('hidden');
+    ev.classList.add('active');
+    renderEquipGrid();
+    _populateEquipUnidades();
+}
+
+function _populateEquipUnidades() {
+    const sel = document.getElementById('equip-unidade');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Selecione —</option>';
+    inventoryData.forEach(u => {
+        const o = document.createElement('option');
+        o.value = o.textContent = u.name;
+        if (u.name === cur) o.selected = true;
+        sel.appendChild(o);
+    });
+}
+
+function renderEquipGrid() {
+    const grid  = document.getElementById('equip-grid');
+    const query = (document.getElementById('equip-search-input')?.value || '').toLowerCase();
+    if (!grid) return;
+
+    const lista = equipData.filter(e => {
+        if (!_equipPassesFilters(e)) return false;
+        if (!query) return true;
+        return (e.nome||'').toLowerCase().includes(query)
+            || (e.fabricante||'').toLowerCase().includes(query)
+            || (e.modelo||'').toLowerCase().includes(query)
+            || (e.categoria||'').toLowerCase().includes(query)
+            || (e.unidade||'').toLowerCase().includes(query);
+    });
+
+    if (!lista.length) {
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-muted);">
+            <i class="ph ph-desktop-tower" style="font-size:3rem;display:block;margin-bottom:12px;opacity:.35;"></i>
+            <strong style="display:block;font-size:1.05rem;color:var(--navy);margin-bottom:4px;">Nenhum equipamento cadastrado</strong>
+            <span style="font-size:.85rem;">Clique em "+ Novo Equipamento" para começar</span>
+        </div>`;
+        return;
+    }
+
+    grid.innerHTML = '';
+    lista.forEach(e => {
+        // Todas as linhas pedidas pelo usuário
+        const fields = [
+            { lbl: 'CÓDIGO / PATRIMÔNIO', val: e.codigo     },
+            { lbl: 'MARCA',               val: e.fabricante },
+            { lbl: 'MODELO',              val: e.modelo     },
+            { lbl: 'Nº SÉRIE',            val: e.serie      },
+            { lbl: 'FORNECEDOR',          val: e.fornecedor },
+            { lbl: 'LOCALIZAÇÃO',         val: e.unidade    }
+        ];
+
+        const rows = fields.map(f => `
+            <div class="equip-row">
+                <span class="equip-row-lbl">${f.lbl}</span>
+                <span class="equip-row-val">${f.val || '—'}</span>
+            </div>`).join('');
+
+        const tags = [e.categoria, e.tipo].filter(Boolean)
+            .map(t => `<span class="equip-tag">${t}</span>`).join('');
+
+        const dotClass = e.status === 'Em Manutenção' ? 'dot-manut'
+                       : e.status === 'Inativo'       ? 'dot-inativo' : 'dot-uso';
+
+        const card = document.createElement('div');
+        card.className = 'equip-card';
+        const _snap = Object.assign({}, e);
+        card.onclick   = () => openEquipDetail(e.id, _snap);
+        card.innerHTML = `
+            <div class="equip-status-dot ${dotClass}"></div>
+            <div class="card-actions">
+                <button class="btn-icon" title="Editar" onclick="event.stopPropagation();openEquipModal('${e.id}')"><i class="ph ph-pencil-simple"></i></button>
+                <button class="btn-icon btn-delete" title="Excluir" onclick="event.stopPropagation();deleteEquip('${e.id}')"><i class="ph ph-trash"></i></button>
+            </div>
+            <div class="equip-card-body">
+                <div class="equip-card-top">
+                    <div class="equip-card-name" style="text-transform:uppercase;">${e.nome || '—'}</div>
+                </div>
+                <div class="equip-card-rows">${rows}</div>
+                ${tags ? `<div class="equip-card-tags">${tags}</div>` : ''}
+            </div>`;
+        grid.appendChild(card);
+    });
+}
+
+function filterEquipamentos() { renderEquipGrid(); }
+
+// Verifica se equipamento passa pelos filtros ativos
+function _equipPassesFilters(e) {
+    if (_equipFilters.categoria && e.categoria !== _equipFilters.categoria) return false;
+    if (_equipFilters.status    && e.status    !== _equipFilters.status)    return false;
+    return true;
+}
+
+// ── Abrir modal criar/editar ──────────────────────────────────
+function openEquipModal(id) {
+    _populateEquipUnidades();
+    const e      = id ? equipData.find(x => x.id === id) : null;
+    const titleEl = document.getElementById('equip-modal-title');
+    if (titleEl) titleEl.innerHTML = (e ? '<i class="ph ph-pencil-simple"></i> Editar' : '<i class="ph ph-desktop-tower"></i> Novo') + ' Equipamento';
+
+    document.getElementById('equip-id').value         = e?.id         || '';
+    document.getElementById('equip-nome').value       = (e?.nome || '').toUpperCase();
+    document.getElementById('equip-codigo').value     = e?.codigo     || '';
+    document.getElementById('equip-modelo').value     = e?.modelo || '';
+    document.getElementById('equip-serie').value      = e?.serie  || '';
+    document.getElementById('equip-unidade').value    = e?.unidade || '';
+    document.getElementById('equip-status').value     = e?.status  || 'Em Uso';
+
+    // Recarrega selects de listas (fabricante, fornecedor, tipo)
+    _populateListSelect('fabricante');
+    _populateListSelect('fornecedor');
+    _populateListSelect('tipo');
+    // Se o equipamento tem um valor que não está na lista, adiciona temporariamente
+    ['fabricante','fornecedor'].forEach(k => {
+        const val = k === 'fabricante' ? e?.fabricante : e?.fornecedor;
+        const sel = document.getElementById('equip-' + k);
+        if (val && sel && !_listasData[k].includes(val)) {
+            const opt = document.createElement('option');
+            opt.value = opt.textContent = val;
+            sel.appendChild(opt);
+        }
+        if (val && sel) sel.value = val;
+    });
+
+    // Categoria: select
+    document.getElementById('equip-categoria').value = e?.categoria || '';
+
+    // Tipo: select livre (sem auto-trave por categoria)
+    _populateListSelect('tipo');
+    const tipoSel = document.getElementById('equip-tipo');
+    if (tipoSel && e?.tipo) tipoSel.value = e.tipo;
+
+    // Código: sempre readonly (imutável)
+    const codInp = document.getElementById('equip-codigo');
+    if (codInp) codInp.readOnly = true;
+
+    // Carrega imagens existentes (array ou compat. com imagemB64)
+    if (e?.imagens && Array.isArray(e.imagens)) {
+        _equipImagens = [...e.imagens];
+    } else if (e?.imagemB64) {
+        _equipImagens = [e.imagemB64];
+    } else {
+        _equipImagens = [];
+    }
+    _renderEquipThumbs();
+
+    // Reseta estado de documentos
+    _docFilePending = null;
+    _removedDocIds  = [];
+    cancelarDocPendente();
+    _renderEquipDocsEdit();
+
+    // Captura snapshot e ativa detecção de mudanças
+    setTimeout(() => {
+        _captureEquipSnapshot();
+        const modal = document.getElementById('equip-modal');
+        modal.querySelectorAll('input,select,textarea').forEach(el => {
+            el.addEventListener('input',  _checkEquipChanges);
+            el.addEventListener('change', _checkEquipChanges);
+        });
+    }, 50);
+
+    document.getElementById('equip-modal').classList.remove('hidden');
+}
+
+
+// ── Salvar equipamento ────────────────────────────────────────
+function saveEquipamento() {
+    const nome = document.getElementById('equip-nome').value.trim().toUpperCase();
+    if (!nome) return alert('O nome do equipamento é obrigatório!');
+
+    const id   = document.getElementById('equip-id').value || Date.now().toString(36);
+    const data = {
+        id,
+        nome,
+        codigo     : document.getElementById('equip-codigo').value.trim(),
+        fabricante : document.getElementById('equip-fabricante').value.trim(),
+        modelo     : document.getElementById('equip-modelo').value.trim(),
+        fornecedor : document.getElementById('equip-fornecedor').value.trim(),
+        serie      : document.getElementById('equip-serie').value.trim(),
+        categoria  : document.getElementById('equip-categoria').value.trim(),
+        tipo       : document.getElementById('equip-tipo').value.trim(),
+        unidade    : document.getElementById('equip-unidade').value,
+        status     : document.getElementById('equip-status').value,
+        imagens    : [..._equipImagens],
+        // Preserva os anexos existentes — DB.set substitui o objeto inteiro
+        // sem isso, salvar o equipamento apagaria todos os anexos
+        anexos     : equipData.find(e => e.id === id)?.anexos || undefined
+    };
+    // Remove o campo se for undefined para não poluir o Firebase
+    if (!data.anexos) delete data.anexos;
+
+    // Atualiza o array local imediatamente (não espera o Firebase)
+    const idx = equipData.findIndex(e => e.id === id);
+    if (idx !== -1) equipData[idx] = { ...equipData[idx], ...data };
+    else            equipData.push(data);
+
+    // Fecha o modal
+    document.getElementById('equip-modal').classList.add('hidden');
+
+    // Garante que a view de equipamentos continua visível e re-renderiza
+    const ev = document.getElementById('equip-view');
+    if (ev) {
+        ev.classList.remove('hidden');
+        ev.classList.add('active');
+    }
+    renderEquipGrid();
+
+    // Envia docs pendentes e processa remoções ANTES de salvar o equipamento
+    const btnSalvar = document.getElementById('btn-salvar-equip');
+    if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.textContent = '⏳ Enviando...'; }
+
+    _flushDocChanges(id).then(() => {
+        // Persiste no Firebase
+        DB.set('itEquipamentos/' + id, data)
+            .catch(err => console.error('[Firebase] Erro ao salvar equipamento:', err))
+            .finally(() => {
+                if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerHTML = '<i class="ph ph-floppy-disk"></i> Salvar Equipamento'; }
+            });
+    });
+}
+
+// ── Excluir direto pelo card ──────────────────────────────────
+function deleteEquip(id) {
+    const e = equipData.find(x => x.id === id);
+    if (!e || !confirm(`Excluir permanentemente "${e.nome}"?`)) return;
+    DB.remove('itEquipamentos/' + id);
+}
+
+// ── Detalhe ao clicar no card ─────────────────────────────────
+function openEquipDetail(id, equipSnap) {
+    // Usa o snapshot passado pelo card, ou tenta buscar no array (fallback)
+    const e = equipSnap || equipData.find(x => x.id === id);
+    if (!e) { console.warn('[openEquipDetail] Equipamento não encontrado:', id); return; }
+    equipDetailId = id;
+
+    try {
+        const _set = (elId, val) => { const el = document.getElementById(elId); if (el) el.textContent = val; };
+
+        // Cabeçalho
+        _set('eqd-nome', e.nome || '—');
+        _set('eqd-sub',  [e.categoria, e.tipo].filter(Boolean).join(' · ') || e.unidade || '—');
+
+        // Carrossel de imagens (suporta array ou compat. com imagemB64)
+        const imgs = e.imagens && Array.isArray(e.imagens) && e.imagens.length
+            ? e.imagens
+            : (e.imagemB64 ? [e.imagemB64] : []);
+        _initEquipCarousel(imgs);
+
+        // Tags
+        const tagsWrap = document.getElementById('eqd-hero-tags');
+        if (tagsWrap) {
+            tagsWrap.innerHTML = '';
+            [e.categoria, e.tipo].filter(Boolean).forEach(t => {
+                const sp = document.createElement('span');
+                sp.className = 'eqd-tag'; sp.textContent = t;
+                tagsWrap.appendChild(sp);
+            });
+            if (e.status) {
+                const st = document.createElement('span');
+                const isMaint   = e.status.toLowerCase().includes('manut') || e.status.toLowerCase().includes('calibra');
+                const isInativo = e.status.toLowerCase().includes('inati');
+                st.className = 'eqd-status-tag' + (isMaint ? ' manut' : isInativo ? ' inativo' : '');
+                st.textContent = e.status;
+                tagsWrap.appendChild(st);
+            }
+        }
+
+        // Grid de informações
+        _set('eqd-fabricante', e.fabricante || '—');
+        _set('eqd-modelo',     e.modelo     || '—');
+        _set('eqd-serie',      e.serie      || '—');
+        _set('eqd-fornecedor', e.fornecedor || '—');
+        _set('eqd-unidade',    e.unidade    || '—');
+
+        // Documentos
+        renderEquipDocs(e.anexos || {});
+
+    } catch(err) {
+        console.error('[openEquipDetail] Erro ao preencher modal:', err);
+    }
+
+    // Abre o modal INDEPENDENTEMENTE de erros acima
+    const modal = document.getElementById('equip-detail-modal');
+    if (modal) modal.classList.remove('hidden');
+    else console.error('[openEquipDetail] Modal não encontrado no DOM');
+}
+
+function editEquipFromDetail() {
+    if (!equipDetailId) return;
+    _docFilePending = null; // limpa pendente ao fechar
+    closeModals();
+    setTimeout(() => openEquipModal(equipDetailId), 80);
+}
+
+function deleteEquipFromDetail() {
+    if (!equipDetailId) return;
+    const e = equipData.find(x => x.id === equipDetailId);
+    if (!e || !confirm(`Excluir permanentemente "${e.nome}"?`)) return;
+    DB.remove('itEquipamentos/' + equipDetailId);
+    closeModals();
+}
+
+// ============================================================
+// GOOGLE DRIVE VIA APPS SCRIPT — UPLOAD DE ANEXOS
+// ============================================================
+// Preencha com a URL do seu Apps Script após implantá-lo:
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx9a_URwrXRNITZ91rafz45MyD068dHoiuf6lG8KCkhKdyu4livvCXKe0BgN-GC70BQ/exec';   // ← cole aqui a URL do deployment
+
+// ══════════════════════════════════════════════════════════════
+// BLOCO LIMPO — ANEXOS + CONTROLE DO BOTÃO SALVAR
+// ══════════════════════════════════════════════════════════════
+
+// ── Controle do botão Salvar (habilitado só com alterações) ───
+let _equipFormSnapshot = '';
+function _captureEquipSnapshot() {
+    const ids = ['equip-nome','equip-codigo','equip-status','equip-fabricante',
+                 'equip-modelo','equip-fornecedor','equip-serie','equip-categoria',
+                 'equip-tipo','equip-unidade'];
+    _equipFormSnapshot = ids.map(id => document.getElementById(id)?.value || '').join('|');
+    _setEquipSaveBtn(false);
+}
+function _checkEquipChanges() {
+    const ids = ['equip-nome','equip-codigo','equip-status','equip-fabricante',
+                 'equip-modelo','equip-fornecedor','equip-serie','equip-categoria',
+                 'equip-tipo','equip-unidade'];
+    const current = ids.map(id => document.getElementById(id)?.value || '').join('|');
+    _setEquipSaveBtn(current !== _equipFormSnapshot || _equipImagens.length > 0);
+}
+function _setEquipSaveBtn(enabled) {
+    const btn = document.getElementById('btn-salvar-equip');
+    if (btn) btn.disabled = !enabled;
+}
+function _enableSaveDueToDoc() { _setEquipSaveBtn(true); }
+
+// ── Arquivo pendente para anexar (1 de cada vez) ──────────────
+let _docFilePending = null; // { file }
+let _removedDocIds  = [];
+
+function selecionarDocParaAnexar(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+    _docFilePending = file;
+
+    // Mostra painel de nome
+    const panel    = document.getElementById('equip-doc-name-panel');
+    const nameInp  = document.getElementById('equip-doc-display-name');
+    const fnLabel  = document.getElementById('equip-doc-panel-filename');
+    const iconEl   = document.getElementById('equip-doc-panel-icon');
+    const selectBtn= document.getElementById('equip-docs-select-btn');
+
+    // Nome padrão = nome do arquivo sem extensão
+    const defaultName = file.name.replace(/\.[^.]+$/, '');
+    if (nameInp)  { nameInp.value = defaultName; }
+    if (fnLabel)  { fnLabel.textContent = file.name + ' (' + (file.size > 1024*1024 ? (file.size/(1024*1024)).toFixed(1)+' MB' : Math.round(file.size/1024)+' KB') + ')'; }
+    if (iconEl)   { iconEl.className = _fileIcon(file.type); iconEl.style.fontSize = '1.5rem'; iconEl.style.color = 'var(--blue)'; }
+    if (panel)    panel.style.display = 'flex';
+    if (selectBtn) selectBtn.style.display = 'none';
+    toggleDocSendBtn();
+}
+
+function toggleDocSendBtn() {
+    const name = (document.getElementById('equip-doc-display-name')?.value || '').trim();
+    const btn  = document.getElementById('equip-doc-send-btn');
+    if (btn) btn.disabled = !name;
+}
+
+function cancelarDocPendente() {
+    _docFilePending = null;
+    const panel    = document.getElementById('equip-doc-name-panel');
+    const selectBtn= document.getElementById('equip-docs-select-btn');
+    if (panel)     panel.style.display = 'none';
+    if (selectBtn) selectBtn.style.display = 'inline-flex';
+}
+
+async function enviarDocPendente() {
+    if (!_docFilePending) return;
+    const displayName = (document.getElementById('equip-doc-display-name')?.value || '').trim();
+    if (!displayName) { alert('Digite um nome de exibição.'); return; }
+
+    const file    = _docFilePending;
+    const equipId = document.getElementById('equip-id')?.value || equipDetailId;
+    if (!equipId) { alert('Salve o equipamento primeiro antes de adicionar documentos.'); return; }
+
+    // Oculta painel, mostra progress
+    cancelarDocPendente();
+    const prog    = document.getElementById('equip-docs-progress');
+    const progLbl = document.getElementById('equip-docs-progress-label');
+    if (prog) prog.style.display = 'flex';
+    if (progLbl) progLbl.textContent = `Enviando "${displayName}"...`;
+
+    await _uploadViaScript(file, equipId, displayName);
+
+    if (prog) prog.style.display = 'none';
+    _renderEquipDocsEdit();
+    _enableSaveDueToDoc();
+}
+
+// Renderiza docs no modal de edição (salvos no Drive)
+function _renderEquipDocsEdit() {
+    const list = document.getElementById('equip-docs-edit-list');
+    if (!list) return;
+    const equipId = document.getElementById('equip-id')?.value || '';
+    const eq      = equipData.find(e => e.id === equipId);
+    const saved   = eq?.anexos ? Object.values(eq.anexos).filter(a => a && !_removedDocIds.includes(a.id)) : [];
+    list.innerHTML = '';
+
+    if (!saved.length) {
+        list.innerHTML = '<div style="font-size:.78rem;color:var(--text-muted);padding:8px 0;">Nenhum documento anexado</div>';
+        return;
+    }
+
+    saved.forEach(a => {
+        const item = document.createElement('div');
+        item.className = 'equip-docs-edit-item';
+        item.innerHTML = `<i class="ph ph-folder edc-icon"></i>
+            <span class="edc-name">${a.nomeExibicao || a.nome}</span>
+            <button class="btn-icon btn-delete" title="Remover" onclick="_markDocRemoved('${a.id}')"><i class="ph ph-x"></i></button>`;
+        list.appendChild(item);
+    });
+}
+
+function _markDocRemoved(id) {
+    _removedDocIds.push(id);
+    const equipId = document.getElementById('equip-id')?.value || equipDetailId;
+    const eq = equipData.find(e => e.id === equipId);
+    const driveId = eq?.anexos?.[id]?.driveId;
+    if (driveId && APPS_SCRIPT_URL) {
+        fetch(`${APPS_SCRIPT_URL}?action=delete&id=${driveId}`, { redirect: 'follow' }).catch(() => {});
+    }
+    DB.remove(`itEquipamentos/${equipId}/anexos/${id}`);
+    if (eq?.anexos) delete eq.anexos[id];
+    _renderEquipDocsEdit();
+    _enableSaveDueToDoc(); // ativa botão Salvar ao remover anexo
+}
+
+async function _flushDocChanges(equipId) { /* uploads feitos imediatamente ao clicar Enviar */ }
+
+function closeEquipModal() {
+    _docFilePending = null;
+    _removedDocIds  = [];
+    cancelarDocPendente();
+    closeModals();
+}
+
+function initGDriveAndUpload() {}
+async function enviarAnexosPendentes() {}
+
+function _uploadViaScript(file, targetEquipId, displayName) {
+    const eqId = targetEquipId || equipDetailId;
+    return new Promise((resolve) => {
+        const progressWrap = document.getElementById('equip-docs-progress');
+        const progressBar  = document.getElementById('equip-docs-progress-bar');
+        const progressLbl  = document.getElementById('equip-docs-progress-label');
+
+        if (progressWrap) progressWrap.style.display = 'flex';
+        if (progressLbl)  progressLbl.textContent = `Lendo "${file.name}"...`;
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = async () => {
+            const base64 = reader.result.split(',')[1];
+            if (progressLbl) progressLbl.textContent = `Enviando "${file.name}" para o Drive...`;
+            if (progressBar) progressBar.style.setProperty('--pct', '30%');
+
+            try {
+                const res = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST', redirect: 'follow',
+                    body: JSON.stringify({
+                        name:     file.name,
+                        mimeType: file.type || 'application/octet-stream',
+                        data:     base64
+                    })
+                });
+
+                // Lê como texto — Apps Script faz redirect e response pode não ser JSON puro
+                const text = await res.text();
+                console.log('[Apps Script] Resposta bruta:', text.slice(0, 400));
+
+                let result = {};
+
+                // Tentativa 1: parse direto
+                try {
+                    result = JSON.parse(text);
+                } catch(_) {
+                    // Tentativa 2: procura JSON com campo "id" dentro da resposta
+                    const m = text.match(/\{[^{}]*"id"\s*:\s*"([^"]{10,})"[^{}]*\}/);
+                    if (m) {
+                        try { result = JSON.parse(m[0]); }
+                        catch(_) { result = { id: m[1] }; }
+                    } else {
+                        // Tentativa 3: procura apenas o id isolado
+                        const idMatch = text.match(/"id"\s*:\s*"([A-Za-z0-9_\-]{10,})"/);
+                        if (idMatch) result = { id: idMatch[1] };
+                    }
+                }
+
+                console.log('[Apps Script] Resultado:', result);
+
+                // Ignora erros de permissão de sharing — arquivo foi criado com sucesso
+                const isShareError = result.error && (
+                    result.error.includes('Acesso negado') ||
+                    result.error.includes('setSharing') ||
+                    result.error.includes('Access denied') ||
+                    result.error.includes('DriveApp')
+                );
+                if (result.error && !isShareError) throw new Error(result.error);
+
+                if (progressBar) progressBar.style.setProperty('--pct', '100%');
+
+                const driveId = result.id || null;
+                if (!driveId) console.warn('[Apps Script] ID do arquivo não encontrado na resposta. Clique para abrir não funcionará.');
+                const id = driveId || (Date.now().toString(36) + Math.random().toString(36).slice(2,5));
+
+                const anexo = {
+                    id,
+                    nome:         file.name,
+                    nomeExibicao: displayName || file.name,
+                    mime:         file.type || 'application/octet-stream',
+                    driveId,
+                    viewUrl:    driveId ? `https://drive.google.com/file/d/${driveId}/view`    : '',
+                    previewUrl: driveId ? `https://drive.google.com/file/d/${driveId}/preview` : '',
+                    uploadAt:   new Date().toISOString()
+                };
+
+                // Persiste no Firebase
+                await DB.set(`itEquipamentos/${eqId}/anexos/${id}`, anexo);
+
+                // Atualiza em memória
+                const eq = equipData.find(e => e.id === eqId);
+                if (eq) {
+                    if (!eq.anexos) eq.anexos = {};
+                    eq.anexos[id] = anexo;
+                }
+
+            } catch(err) {
+                console.error('[Upload Drive]', err);
+                // Mostra erro somente para falhas reais de rede/upload
+                if (err.name !== 'SyntaxError' && err.message && !err.message.includes('JSON')) {
+                    alert('Erro ao enviar: ' + err.message);
+                }
+            } finally {
+                if (progressWrap) progressWrap.style.display = 'none';
+                resolve();
+            }
+        };
+        reader.onerror = () => {
+            alert('Erro ao ler o arquivo.');
+            if (progressWrap) progressWrap.style.display = 'none';
+            resolve();
+        };
+    }); // fecha new Promise
+}
+
+function renderEquipDocs(anexos) {
+    const list = document.getElementById('eqd-docs-list');
+    if (!list) return;
+    const uploaded = anexos ? Object.values(anexos).filter(Boolean) : [];
+    list.innerHTML  = '';
+
+    if (!uploaded.length) {
+        list.innerHTML = '<div class="eqd-docs-empty"><i class="ph ph-files"></i><span>Nenhum documento</span></div>';
+        return;
+    }
+
+    // Somente leitura — clique abre no Drive em nova aba
+    uploaded.forEach(a => {
+        const icon    = _fileIcon(a.mime);
+        const date    = a.uploadAt ? new Date(a.uploadAt).toLocaleDateString('pt-BR') : '';
+        const viewUrl = a.viewUrl || (a.driveId ? `https://drive.google.com/file/d/${a.driveId}/view` : '');
+        // Reconstrói viewUrl a partir de driveId se vier vazio
+        const finalUrl = viewUrl || (a.driveId ? `https://drive.google.com/file/d/${a.driveId}/view` : '');
+
+        const div = document.createElement('div');
+        div.className = 'eqd-doc-view-item';
+        div.title     = finalUrl ? 'Clique para abrir no Drive' : 'Arquivo sem link (ID não capturado)';
+        if (finalUrl) div.onclick = () => window.open(finalUrl, '_blank');
+        div.innerHTML = `
+            <i class="ph ph-folder-simple edc-icon" style="color:#f59e0b;font-size:1.6rem;"></i>
+            <div class="edc-info">
+                <div class="edc-name">${a.nomeExibicao || a.nome}</div>
+                <div class="edc-meta">${date}${finalUrl ? ' · Clique para abrir no Drive' : ' · Link indisponível'}</div>
+            </div>
+            ${finalUrl ? '<i class="ph ph-arrow-square-out" style="color:var(--blue);font-size:1rem;flex-shrink:0;"></i>' : '<i class="ph ph-warning" style="color:var(--amber);font-size:1rem;flex-shrink:0;"></i>'}`;
+        list.appendChild(div);
+    });
+}
+
+
+function _fileIcon(mime = '') {
+    if (mime.includes('pdf'))   return 'ph ph-file-pdf';
+    if (mime.includes('image')) return 'ph ph-image';
+    if (mime.includes('spreadsheet') || mime.includes('excel') || mime.includes('csv')) return 'ph ph-file-xls';
+    if (mime.includes('word') || mime.includes('document')) return 'ph ph-file-doc';
+    if (mime.includes('zip') || mime.includes('compressed')) return 'ph ph-file-zip';
+    return 'ph ph-file';
+}
+
+function openFilePreview(previewUrl, nome, viewUrl) {
+    const modal    = document.getElementById('file-preview-modal');
+    const iframe   = document.getElementById('file-preview-iframe');
+    const title    = document.getElementById('file-preview-title');
+    const openLink = document.getElementById('file-preview-open');
+
+    title.innerHTML = `<i class="ph ph-file"></i> ${nome}`;
+    openLink.href   = viewUrl || previewUrl;
+    // Usa a URL de preview do Google Drive — renderiza PDF, imagem, doc, etc.
+    iframe.src = previewUrl;
+    modal.classList.remove('hidden');
+}
+
+function deleteEquipDoc(id, driveId) {
+    if (!confirm('Remover este documento?')) return;
+
+    // Opcional: mover para lixeira do Drive via Apps Script
+    if (driveId && APPS_SCRIPT_URL) {
+        fetch(`${APPS_SCRIPT_URL}?action=delete&id=${driveId}`, { redirect: 'follow' })
+            .catch(() => {}); // fire-and-forget
+    }
+
+    // Remove do Firebase Database
+    DB.remove(`itEquipamentos/${equipDetailId}/anexos/${id}`);
+    const eq = equipData.find(e => e.id === equipDetailId);
+    if (eq?.anexos) {
+        delete eq.anexos[id];
+        renderEquipDocs(eq.anexos);
+    }
+}
+
+// ============================================================
+// CARROSSEL DE IMAGENS DO EQUIPAMENTO
+// ============================================================
+
+let _carImgs  = [];   // array de src (filename ou dataURL)
+let _carIdx   = 0;
+
+function _imgSrc(v) {
+    if (!v) return '';
+    if (v.startsWith('data:') || v.startsWith('http') || v.startsWith('blob:')) return v;
+    return 'img/' + v;
+}
+
+function initCarousel(imgs) {
+    _carImgs = Array.isArray(imgs) ? [...imgs] : [];
+    _carIdx  = 0;
+    _renderCarousel();
+}
+
+function _renderCarousel() {
+    const track = document.getElementById('eqd-car-track');
+    const dots  = document.getElementById('eqd-car-dots');
+    const prev  = document.getElementById('eqd-car-prev');
+    const next  = document.getElementById('eqd-car-next');
+    if (!track) return;
+
+    track.innerHTML = '';
+    dots.innerHTML  = '';
+
+    if (!_carImgs.length) {
+        track.innerHTML = `<div class="eqd-car-empty">
+            <i class="ph ph-image"></i>
+            <span>Clique <i class="ph ph-plus" style="font-size:.85rem;"></i> para adicionar imagem</span>
+        </div>`;
+        if (prev) prev.style.display = 'none';
+        if (next) next.style.display = 'none';
+        return;
+    }
+
+    const src = _imgSrc(_carImgs[_carIdx]);
+    track.innerHTML = `
+        <img src="${src}" class="eqd-car-img" onerror="this.style.display='none'">
+        <button class="eqd-car-del" title="Remover imagem" onclick="event.stopPropagation();removeCarouselImg(${_carIdx})">
+            <i class="ph ph-trash"></i>
+        </button>`;
+
+    // Dots
+    _carImgs.forEach((_, i) => {
+        const d = document.createElement('button');
+        d.className = 'eqd-car-dot' + (i === _carIdx ? ' active' : '');
+        d.onclick   = ev => { ev.stopPropagation(); _carIdx = i; _renderCarousel(); };
+        dots.appendChild(d);
+    });
+
+    if (prev) prev.style.display = _carImgs.length > 1 ? 'flex' : 'none';
+    if (next) next.style.display = _carImgs.length > 1 ? 'flex' : 'none';
+}
+
+function carouselPrev() {
+    _carIdx = (_carIdx - 1 + _carImgs.length) % _carImgs.length;
+    _renderCarousel();
+}
+function carouselNext() {
+    _carIdx = (_carIdx + 1) % _carImgs.length;
+    _renderCarousel();
+}
+
+function removeCarouselImg(idx) {
+    if (!confirm('Remover esta imagem?')) return;
+    _carImgs.splice(idx, 1);
+    _carIdx = Math.max(0, _carIdx - 1);
+    _saveCarouselImgs();
+    _renderCarousel();
+}
+
+function _saveCarouselImgs() {
+    const eq = equipData.find(e => e.id === equipDetailId);
+    if (eq) eq.imagens = [..._carImgs];
+    DB.set(`itEquipamentos/${equipDetailId}/imagens`, _carImgs.length ? _carImgs : null);
+}
+
+// Click no carrossel (área vazia) abre o painel
+function _onCarouselClick(ev) {
+    if (!ev.target.closest('.eqd-car-add') &&
+        !ev.target.closest('.eqd-car-del') &&
+        !ev.target.closest('.eqd-car-btn') &&
+        !ev.target.closest('.eqd-car-dot')) {
+        toggleImgPanel();
+    }
+}
+
+function toggleImgPanel() {
+    const panel = document.getElementById('eqd-img-panel');
+    if (panel) panel.classList.toggle('hidden');
+}
+
+function addImgFromFilename() {
+    const val = (document.getElementById('eqd-img-filename')?.value || '').trim();
+    if (!val) return;
+    _carImgs.push(val);
+    _carIdx = _carImgs.length - 1;
+    _saveCarouselImgs();
+    _renderCarousel();
+    document.getElementById('eqd-img-filename').value = '';
+    toggleImgPanel();
+}
+
+function uploadNewImg(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        const dataUrl = ev.target.result;
+        _carImgs.push(dataUrl);
+        _carIdx = _carImgs.length - 1;
+        _saveCarouselImgs();
+        _renderCarousel();
+        input.value = '';
+        toggleImgPanel();
+    };
+    reader.readAsDataURL(file);
+}
 
 // ── CONFIGURAÇÃO DO BOTÃO HAMBÚRGUER (Recolher / Expandir) ──
 window.App = {

@@ -52,6 +52,54 @@ function toast(msg, type='success') {
 ══════════════════════════════════════════════ */
 const App = {
 
+  reqSortDir: 'desc',
+  reqHiddenStatuses: new Set(),
+
+  setSortDate(dir, btn) {
+    App.reqSortDir = dir;
+    document.querySelectorAll('.btn-sort-req').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    App.renderRequests();
+  },
+
+  toggleAllStatus(btn) {
+    const chips = document.querySelectorAll('.req-status-chip');
+    const allActive = [...chips].every(c => c.classList.contains('active'));
+    if (allActive) {
+      // Desmarcar todos
+      chips.forEach(c => { c.classList.remove('active'); App.reqHiddenStatuses.add(c.dataset.status); });
+      btn.textContent = 'Todos ✕';
+      btn.classList.add('all-off');
+    } else {
+      // Marcar todos
+      chips.forEach(c => { c.classList.add('active'); App.reqHiddenStatuses.delete(c.dataset.status); });
+      btn.textContent = 'Todos ✓';
+      btn.classList.remove('all-off');
+    }
+    App.renderRequests();
+  },
+
+  toggleStatusFilter(btn) {
+    const st = btn?.dataset?.status;
+    if (!st) return;
+    if (App.reqHiddenStatuses.has(st)) {
+      App.reqHiddenStatuses.delete(st);
+      btn.classList.add('active');
+    } else {
+      App.reqHiddenStatuses.add(st);
+      btn.classList.remove('active');
+    }
+    // Sincroniza botão "Todos"
+    const allBtn = document.getElementById('btn-toggle-all-status');
+    if (allBtn) {
+      const chips = document.querySelectorAll('.req-status-chip');
+      const allActive = [...chips].every(c => c.classList.contains('active'));
+      allBtn.textContent = allActive ? 'Todos ✓' : 'Todos ✕';
+      allActive ? allBtn.classList.remove('all-off') : allBtn.classList.add('all-off');
+    }
+    App.renderRequests();
+  },
+
   goTo(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
@@ -476,8 +524,10 @@ const App = {
   clearDateRange() {
     const f = document.getElementById('filter-date-from');
     const t = document.getElementById('filter-date-to');
+    const y = document.getElementById('dash-year-select');
     if (f) f.value = '';
     if (t) t.value = '';
+    if (y) y.value = '';
     App.renderDashboard();
   },
 
@@ -496,9 +546,150 @@ const App = {
 
   renderDashboard() {
     App.populateDashFilters();
+    App.populateYearFilter();   // preenche select de ano e inicializa filtro se necessário
     const reqs = App.getFilteredReqs();
     App.updateKPIs(reqs);
     App.updateCharts(reqs);
+    App.updateCompareCard();
+  },
+
+  // Popula o select de ano com os anos presentes nos dados + ano atual
+  // Na primeira carga (sem datas definidas), aplica o ano atual automaticamente
+  populateYearFilter() {
+    const sel = document.getElementById('dash-year-select');
+    if (!sel) return;
+    const curYear = new Date().getFullYear().toString();
+    const years = new Set([curYear]);
+    Object.values(State.requests || {}).forEach(r => {
+      const y = (r.boughtAt || r.createdAt || '').substring(0, 4);
+      if (/^\d{4}$/.test(y)) years.add(y);
+    });
+    const prevVal = sel.value; // guarda seleção atual antes de recriar
+    sel.innerHTML = '<option value="">Todos os anos</option>';
+    [...years].sort().reverse().forEach(y => {
+      const o = document.createElement('option');
+      o.value = o.textContent = y;
+      sel.appendChild(o);
+    });
+    if (prevVal) {
+      sel.value = prevVal; // restaura seleção
+    } else {
+      const fFrom = document.getElementById('filter-date-from');
+      if (!fFrom?.value) {
+        // Primeira carga: padrão = ano atual
+        sel.value = curYear;
+        App.applyYearToDateInputs(curYear);
+      }
+    }
+  },
+
+  applyYearToDateInputs(year) {
+    const fFrom = document.getElementById('filter-date-from');
+    const fTo   = document.getElementById('filter-date-to');
+    if (year) {
+      if (fFrom) fFrom.value = year + '-01-01';
+      if (fTo)   fTo.value   = year + '-12-31';
+    } else {
+      if (fFrom) fFrom.value = '';
+      if (fTo)   fTo.value   = '';
+    }
+  },
+
+  onYearFilterChange(sel) {
+    App.applyYearToDateInputs(sel.value);
+    App.renderDashboard();
+  },
+
+  clearYearSelect() {
+    const sel = document.getElementById('dash-year-select');
+    if (sel) sel.value = '';
+  },
+
+  updateCompareCard() {
+    const curYear  = new Date().getFullYear();
+    const prevYear = curYear - 1;
+    const fmt = v => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const $   = id => document.getElementById(id);
+
+    let curSpend = 0, prevSpend = 0;
+    const curMonthsSet = new Set();
+
+    Object.values(State.requests || {})
+      .filter(r => r.status === 'Comprado')
+      .forEach(r => {
+        const isParceled = r.parcelas && r.parcelas.length > 0;
+        if (!isParceled) {
+          const bd = (r.boughtAt || '').substring(0, 10);
+          const yr = parseInt(bd.substring(0, 4));
+          const v  = parseFloat(r.valorTotal || 0);
+          if (yr === curYear)  { curSpend  += v; curMonthsSet.add(bd.substring(0, 7)); }
+          if (yr === prevYear)   prevSpend += v;
+        } else {
+          r.parcelas.forEach(p => {
+            const pd = (p.date || p.month + '-01').substring(0, 10);
+            const yr = parseInt(pd.substring(0, 4));
+            const v  = parseFloat(p.valor || 0);
+            if (yr === curYear)  { curSpend  += v; curMonthsSet.add(pd.substring(0, 7)); }
+            if (yr === prevYear)   prevSpend += v;
+          });
+        }
+      });
+
+    const monthsElapsed = Math.max(curMonthsSet.size, 1);
+    const avgMonth      = curSpend / monthsElapsed;
+    const projection    = avgMonth * 12;
+    const max           = Math.max(curSpend, prevSpend, 1);
+    const diffPct       = prevSpend > 0 ? ((curSpend - prevSpend) / prevSpend * 100) : null;
+
+    if ($('cmp-cur-year'))   $('cmp-cur-year').textContent   = curYear;
+    if ($('cmp-prev-year'))  $('cmp-prev-year').textContent  = prevYear;
+    if ($('cmp-cur-val'))    $('cmp-cur-val').textContent    = fmt(curSpend);
+    if ($('cmp-prev-val'))   $('cmp-prev-val').textContent   = fmt(prevSpend);
+    if ($('cmp-cur-bar'))    $('cmp-cur-bar').style.width    = (curSpend  / max * 100).toFixed(1) + '%';
+    if ($('cmp-prev-bar'))   $('cmp-prev-bar').style.width   = (prevSpend / max * 100).toFixed(1) + '%';
+    if ($('cmp-avg-month'))  $('cmp-avg-month').textContent  = fmt(avgMonth);
+    if ($('cmp-projection')) $('cmp-projection').textContent = fmt(projection);
+
+    // Variação %
+    const diffEl = $('cmp-diff-pct');
+    if (diffEl) {
+      if (diffPct !== null) {
+        diffEl.textContent = (diffPct >= 0 ? '+' : '') + diffPct.toFixed(1) + '%';
+        diffEl.style.color = diffPct > 0 ? 'var(--red)' : 'var(--status-com)';
+      } else { diffEl.textContent = '—'; diffEl.style.color = ''; }
+    }
+
+    // Badge tendência
+    const badge = $('compare-trend-badge');
+    if (badge) {
+      if (diffPct === null)      { badge.textContent = '';          badge.className = 'compare-trend-badge'; }
+      else if (diffPct >  10)    { badge.textContent = '↑ Acima';  badge.className = 'compare-trend-badge trend-up'; }
+      else if (diffPct < -10)    { badge.textContent = '↓ Abaixo'; badge.className = 'compare-trend-badge trend-down'; }
+      else                       { badge.textContent = '≈ Estável'; badge.className = 'compare-trend-badge trend-stable'; }
+    }
+
+    // Mensagem de meta
+    const msgEl  = $('cmp-status-msg');
+    const iconEl = $('cmp-status-icon');
+    const rowEl  = $('cmp-status-row');
+    if (!msgEl) return;
+
+    if (prevSpend === 0) {
+      if (iconEl) iconEl.textContent = 'ℹ️';
+      msgEl.textContent = 'Sem histórico de ' + prevYear + ' para comparar.';
+      msgEl.style.color = '';
+      if (rowEl) rowEl.style.borderColor = '';
+    } else if (projection > prevSpend) {
+      if (iconEl) iconEl.textContent = '⚠️';
+      msgEl.textContent = 'Projeção supera ' + prevYear + ' em ' + fmt(projection - prevSpend) + ' — ritmo acima da meta.';
+      msgEl.style.color = 'var(--orange)';
+      if (rowEl) rowEl.style.borderColor = 'rgba(232,131,10,.4)';
+    } else {
+      if (iconEl) iconEl.textContent = '✅';
+      msgEl.textContent = 'Projeção ' + fmt(prevSpend - projection) + ' abaixo de ' + prevYear + ' — dentro da meta.';
+      msgEl.style.color = 'var(--status-com)';
+      if (rowEl) rowEl.style.borderColor = 'rgba(29,184,122,.4)';
+    }
   },
 
   // Read all active dashboard filters (unit, group, date range)
@@ -672,8 +863,14 @@ const App = {
     let periodSpent = 0;
     const byUnitSpend = {};
 
-    // All Comprado requests (not pre-filtered by date — we apply range here on boughtAt/p.date)
-    Object.values(State.requests||{}).filter(r => r.status === 'Comprado').forEach(r => {
+    // All Comprado requests filtered by unit/group (date filter applied below on boughtAt/p.date)
+    const _ku = fUnit;
+    const _kg = document.getElementById('dash-filter-group')?.value || '';
+    Object.values(State.requests||{})
+      .filter(r => r.status === 'Comprado'
+        && (!_ku || r.unitName  === _ku)
+        && (!_kg || r.groupName === _kg))
+      .forEach(r => {
       const unit = r.unitName||'?';
       const isParceled = r.parcelas && r.parcelas.length > 0;
 
@@ -839,13 +1036,15 @@ const App = {
       }
     }
 
-    // Filter requests by unit if selected
+    // Filter requests by unit AND group
+    const _fGroup = document.getElementById('dash-filter-group')?.value || '';
     const _spendReqs = Object.values(State.requests||{}).filter(r => {
-      if (!_fUnit) return true;
-      return r.unitName === _fUnit;
+      if (_fUnit  && r.unitName  !== _fUnit)  return false;
+      if (_fGroup && r.groupName !== _fGroup) return false;
+      return true;
     });
 
-    const monthly = App._buildSpendMap(_spendReqs, _periodView, null);
+    const monthly = App._buildSpendMap(_spendReqs, _periodView, null, _fFrom, _fTo);
 
     // Update chart title dynamically
     const _chartTitleEl = document.querySelector('.spending-card .chart-card-header span');
@@ -954,36 +1153,41 @@ const App = {
    * Parcelada + year/all:       all installments in that year / overall.
    * À vista:                    valorTotal in the boughtAt period.
    * unitMap (optional): also accumulate { unit → spent } for the same logic. */
-  _buildSpendMap(reqs, periodView, unitMap) {
+  _buildSpendMap(reqs, periodView, unitMap, fFrom, fTo) {
     const map = {};
     const add = (key, val, unit) => {
       map[key] = (map[key]||0) + val;
       if (unitMap && unit) unitMap[unit] = (unitMap[unit]||0) + val;
     };
 
-    // Returns the grouping key — delegates to _dateToKey for consistency
     const keyOf = (dateStr) => App._dateToKey(dateStr, periodView);
+
+    // Only include dates within the selected range (when range is active)
+    const inRange = (d) => {
+      if (!fFrom && !fTo) return true;
+      const s = (d||'').substring(0,10);
+      if (fFrom && s < fFrom) return false;
+      if (fTo   && s > fTo)   return false;
+      return true;
+    };
 
     reqs.filter(r=>r.status==='Comprado'&&r.boughtAt).forEach(r => {
       const isParceled = r.parcelas && r.parcelas.length > 0;
       const unit = r.unitName||'?';
 
       if (!isParceled) {
-        // À vista — full amount on the purchase date
+        if (!inRange(r.boughtAt)) return; // fora do período selecionado
         const k = keyOf(r.boughtAt);
         if (k) add(k, parseFloat(r.valorTotal||0), unit);
       } else {
-        // Parcelada — each installment on its own date
         r.parcelas.forEach(p => {
-          // Use p.date (full YYYY-MM-DD) when available, fallback to p.month (legacy)
           const pDate = p.date || (p.month + '-01');
+          if (!inRange(pDate)) return; // parcela fora do período
 
           if (periodView==='year' || periodView==='all') {
-            // year: group by year; all: group by month
             const k = periodView==='year' ? pDate.substring(0,4) : pDate.substring(0,7);
             if (k) add(k, parseFloat(p.valor||0), unit);
           } else {
-            // day/week/month: use the installment's actual date for grouping
             const k = keyOf(pDate);
             if (k) add(k, parseFloat(p.valor||0), unit);
           }
@@ -1050,7 +1254,15 @@ const App = {
         return true;
       });
     }
-    reqs.sort(([,a],[,b]) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    // Filtro de status pelos chips (toggled off = oculto)
+    if (App.reqHiddenStatuses?.size) {
+      reqs = reqs.filter(([,r]) => !App.reqHiddenStatuses.has(r.status));
+    }
+    // Ordenação por data (asc ou desc)
+    reqs.sort(([,a],[,b]) => {
+      const cmp = (a.createdAt||'').localeCompare(b.createdAt||'');
+      return App.reqSortDir === 'asc' ? cmp : -cmp;
+    });
     if (!reqs.length) {
       tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray-500);padding:32px">Nenhuma solicitação encontrada.</td></tr>';
       return;
@@ -1913,7 +2125,11 @@ const App = {
 
 document.addEventListener('DOMContentLoaded', () => {
   App.init();
-  const boot = () => { App.initListeners(); App.seedDefaults(); };
+  const boot = () => {
+    App.initListeners();
+    App.seedDefaults();
+    if (State.adminUser) { App.goTo('screen-admin'); App.renderAdminPanels(); }
+  };
   if (window._firebaseReady) boot();
   else document.addEventListener('firebaseReady', boot);
 });

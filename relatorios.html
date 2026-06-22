@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAMIC — Dashboard de Atendimento</title>
+    <link rel="stylesheet" href="relatorios_style.css?v=5">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+      import { getDatabase, ref, set, get, onValue, remove }
+        from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+      const firebaseConfig = {
+        apiKey:            "AIzaSyB4UWL2_r9tnEw11gzUrJFbL48cmnRYNKA",
+        authDomain:        "lamicrelatoriosfinanceiros.firebaseapp.com",
+        databaseURL:       "https://lamicrelatoriosfinanceiros-default-rtdb.firebaseio.com",
+        projectId:         "lamicrelatoriosfinanceiros",
+        storageBucket:     "lamicrelatoriosfinanceiros.firebasestorage.app",
+        messagingSenderId: "771337563553",
+        appId:             "1:771337563553:web:1037d2f84b3ebf8c672fe0",
+        measurementId:     "G-SEK6PT60SH"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db  = getDatabase(app);
+
+      window._db       = db;
+      window._ref      = ref;
+      window._set      = set;
+      window._get      = get;
+      window._onValue  = onValue;
+      window._remove   = remove;
+      window._firebaseReady = true;
+      document.dispatchEvent(new Event('firebaseReady'));
+    </script>
+</head>
+<body>
+
+<div class="app">
+
+    <!-- ======================================================
+         SIDEBAR
+    ======================================================= -->
+    <nav class="sidebar" id="sidebar">
+
+        <!-- Hamburger + logo -->
+        <div class="sb-hamburger-row">
+            <div class="sb-brand-inline">
+                <img class="sb-logo-svg" src="img/LAMIC BRANCA.png" alt="LAMIC" onerror="this.style.display='none'" />
+            </div>
+            <button class="sidebar-hamburger" onclick="toggleSidebar()" title="Recolher/expandir menu">
+                <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+        </div>
+
+        <div class="sidebar-brand" style="display:none"></div>
+
+        <!-- Badge de identidade -->
+        <div class="sidebar-admin-badge" id="sidebar-admin-name">
+            <div class="sad-avatar" id="sad-avatar-letter">LA</div>
+            <div class="sb-user-info">
+                <div class="sad-name" id="sad-name-text">LAMIC</div>
+                <div class="sad-role">Administrador</div>
+            </div>
+            <div class="sad-status"></div>
+        </div>
+
+        <!-- Nav -->
+        <div class="sidebar-nav">
+            <div class="nav-section-label sb-txt">Dashboards</div>
+            <button class="nav-item active" id="nav-dashboard-cc" onclick="setDashTipo('cc')" data-tip="Dashboard CC">
+                <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>
+                <span class="ni-txt">Dashboard CC</span>
+                <span class="ni-tip">Dashboard CC</span>
+            </button>
+            <button class="nav-item" id="nav-dashboard-ia" onclick="setDashTipo('ia')" data-tip="Dashboard IA">
+                <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" stroke="currentColor" stroke-width="2"/><path d="M17 3l1.5 1.5M19 7h2M17 11l1.5-1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <span class="ni-txt">Dashboard IA</span>
+                <span class="ni-tip">Dashboard IA</span>
+            </button>
+
+            <div class="nav-section-label sb-txt">Dados</div>
+            <button class="nav-item" id="nav-entrada" onclick="showSection('entrada')" data-tip="Inserir Dados">
+                <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2"/></svg>
+                <span class="ni-txt">Inserir Dados</span>
+                <span class="ni-tip">Inserir Dados</span>
+            </button>
+
+            <div class="nav-section-label sb-txt">Ferramentas</div>
+            <button class="nav-item" id="nav-chatbot" onclick="window.open('https://app.capsula.tec.br/','_blank')" data-tip="Chat bot">
+                <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+                <span class="ni-txt">Chat bot</span>
+                <span class="ni-tip">Chat bot</span>
+            </button>
+        </div>
+
+        <!-- Botão Home -->
+        <button class="sidebar-exit" onclick="window.location.href='index.html'" data-tip="Home">
+            <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 22V12h6v10" stroke="currentColor" stroke-width="2"/></svg>
+            <span class="ni-txt">Home</span>
+            <span class="ni-tip">Home</span>
+        </button>
+
+    </nav>
+
+    <!-- ======================================================
+         MAIN CONTENT
+    ======================================================= -->
+    <div class="main-content" id="main-content">
+
+        <input type="file" id="import-xlsx" accept=".xlsx,.xls" style="display:none;" onchange="importarRelatorioXLSX(event)">
+
+        <div class="sections-wrap">
+
+            <!-- ==================================================
+                 SECTION: DASHBOARD
+            =================================================== -->
+            <section id="dashboard" class="section active">
+
+                <!-- FILTER BAR -->
+                <div class="filtro-bar">
+                    <span class="dash-tipo-badge" id="dash-tipo-badge">CC</span>
+                    <span class="filtro-label">Período:</span>
+
+                    <!-- Type tabs (somente Ano e Mês) -->
+                    <div class="filtro-tabs">
+                        <button class="filtro-tab" id="tab-ano" onclick="setFiltroTipo('ano',this)">Anual</button>
+                        <button class="filtro-tab active" id="tab-mes" onclick="setFiltroTipo('mes',this)">Mensal</button>
+                    </div>
+
+                    <!-- Ano (sempre visível) -->
+                    <div class="filtro-selects">
+                        <select class="filtro-select" id="f-ano" onchange="aplicarFiltro()">
+                            <option value="2026">2026</option>
+                        </select>
+                    </div>
+
+                    <!-- Mês (visível quando tipo=mes) -->
+                    <div class="filtro-selects" id="f-mes-wrap">
+                        <select class="filtro-select" id="f-mes" onchange="aplicarFiltro()">
+                            <option value="1">Janeiro</option>
+                            <option value="2">Fevereiro</option>
+                            <option value="3">Março</option>
+                            <option value="4">Abril</option>
+                            <option value="5">Maio</option>
+                            <option value="6">Junho</option>
+                            <option value="7">Julho</option>
+                            <option value="8">Agosto</option>
+                            <option value="9">Setembro</option>
+                            <option value="10">Outubro</option>
+                            <option value="11">Novembro</option>
+                            <option value="12">Dezembro</option>
+                        </select>
+                    </div>
+
+                    <div class="filtro-spacer"></div>
+
+                    <!-- Aviso sem dados -->
+                    <span class="filtro-no-data" id="sem-dados-aviso" style="display:none;">
+                        ⚠ Sem dados para este período
+                    </span>
+
+                    <!-- Botões direita -->
+                    <button class="btn-secondary" style="height:34px;font-size:0.82rem;" onclick="gerarRelatorio()">📄 Relatório</button>
+                </div>
+
+                <!-- ================= 1) CARDS — DADOS GERAIS ================= -->
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-label">Total de Atendimentos</div>
+                        <div class="kpi-value" id="kpi-total">—</div>
+                        <div class="kpi-sub" id="kpi-total-sub">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Atendimentos em Aberto</div>
+                        <div class="kpi-value" id="kpi-aberto">—</div>
+                        <div class="kpi-sub" id="kpi-aberto-sub">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Eficiência (atend./mil msgs)</div>
+                        <div class="kpi-value" id="kpi-eficiencia">—</div>
+                        <div class="kpi-sub" id="kpi-eficiencia-sub">—</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">Avaliação Média</div>
+                        <div class="kpi-value" id="kpi-avaliacao">—</div>
+                        <div class="kpi-sub" id="kpi-avaliacao-sub">—</div>
+                    </div>
+                </div>
+
+                <!-- ================= 2) DADOS GERAIS: gráfico + ranking + comparação ================= -->
+                <div class="chart-grid">
+                    <div class="chart-card chart-card-wide">
+                        <div class="chart-title">
+                            <span>Dados Gerais — Concluídos · Em Aberto · Mensagens</span>
+                            <button class="toggle-comp-btn" id="btn-comp" onclick="toggleComparacao()">📈 Comparar Eficiência (meses)</button>
+                        </div>
+
+                        <div class="dados-gerais-row">
+                            <div class="chart-body" style="height:210px;">
+                                <canvas id="chart-geral"></canvas>
+                            </div>
+                            <div class="ranking-col">
+                                <div class="chart-title" style="margin:0 0 6px;"><span>Ranking — Volume de Atendimentos</span></div>
+                                <div class="ranking-embed" id="rank-volume"></div>
+                            </div>
+                        </div>
+
+                        <div id="comparacao-wrap">
+                            <div class="chart-title" style="margin-top:14px;">
+                                <span>Evolução da Eficiência — <span id="comp-ano-label"></span></span>
+                                <span class="comp-legend" id="comp-resumo"></span>
+                            </div>
+                            <div class="chart-body" style="height:220px;">
+                                <canvas id="chart-comp"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= 3) POR QUE BUSCAM (PIZZA) + 4) DIAS DA SEMANA ================= -->
+                <div class="chart-grid">
+                    <div class="chart-card">
+                        <div class="chart-title"><span>Por Que Buscam o LAMIC</span></div>
+                        <div class="chart-body" style="height:280px;">
+                            <canvas id="chart-buscam"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-title"><span>Atendimentos por Dia da Semana — Maior Fluxo</span></div>
+                        <div class="chart-body" style="height:280px;">
+                            <canvas id="chart-dias"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= 5) HORÁRIO (HEATMAP) ================= -->
+                <div class="chart-grid">
+                    <div class="chart-card chart-card-wide">
+                        <div class="chart-title"><span>Atendimentos por Horário — Mapa de Calor (Dia × Faixa)</span></div>
+                        <div id="heat-horario" class="heatmap-wrap"></div>
+                    </div>
+                </div>
+
+                <!-- ================= 6) AVALIAÇÃO POR ATENDENTE (RANKING) + 7) STATUS (ROSCA) ================= -->
+                <div class="chart-grid">
+                    <div class="chart-card">
+                        <div class="chart-title"><span>Avaliação por Atendente — Ranking pela Média</span></div>
+                        <div class="ranking-embed ranking-aval" id="rank-avaliacao"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-title"><span>Status dos Clientes</span></div>
+                        <div class="chart-body" style="height:260px;">
+                            <canvas id="chart-clientes"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- ==================================================
+                 SECTION: INSERIR DADOS
+            =================================================== -->
+            <section id="entrada" class="section">
+
+                <div class="entry-tipo-grid">
+
+                    <!-- ── Card CC ── -->
+                    <div class="entry-tipo-card entry-card-cc">
+                        <div class="entry-tipo-header">
+                            <div class="entry-tipo-title">
+                                <span class="entry-tipo-badge badge-cc">CC</span>
+                                <span>Atendimento CC</span>
+                            </div>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                <button class="btn-secondary" onclick="exportarCSVTipo('cc')">⬇ CSV</button>
+                                <button class="btn-secondary" onclick="document.getElementById('import-xlsx-cc').click()">⬆ Subir Arquivo</button>
+                                <button class="btn-primary" onclick="abrirModalTipo('cc', null)">＋ Novo Período</button>
+                                <input type="file" id="import-xlsx-cc" accept=".xlsx,.xls" style="display:none;" onchange="importarXLSXTipo(event,'cc')">
+                            </div>
+                        </div>
+                        <div class="spreadsheet-wrap">
+                            <table class="spreadsheet" id="tabela-cc">
+                                <thead><tr>
+                                    <th>Nome</th><th>Tipo</th><th>Período</th><th>Atend.</th>
+                                    <th>Em Aberto</th><th>Msgs</th><th>Eficiência</th>
+                                    <th>Avaliação</th><th>Concluídos</th><th>Silenciosos</th><th>Ações</th>
+                                </tr></thead>
+                                <tbody id="tabela-cc-body">
+                                    <tr><td colspan="11"><div class="empty-state">
+                                        <div class="empty-state-icon">📂</div>
+                                        <div class="empty-state-text">Nenhum período CC registrado</div>
+                                        <div class="empty-state-sub">Clique em "Novo Período" para começar</div>
+                                    </div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div><!-- /card CC -->
+
+                    <!-- ── Card IA ── -->
+                    <div class="entry-tipo-card entry-card-ia">
+                        <div class="entry-tipo-header">
+                            <div class="entry-tipo-title">
+                                <span class="entry-tipo-badge badge-ia">IA</span>
+                                <span>Atendimento IA</span>
+                            </div>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                <button class="btn-secondary" onclick="exportarCSVTipo('ia')">⬇ CSV</button>
+                                <button class="btn-secondary" onclick="document.getElementById('import-xlsx-ia').click()">⬆ Subir Arquivo</button>
+                                <button class="btn-primary" onclick="abrirModalTipo('ia', null)">＋ Novo Período</button>
+                                <input type="file" id="import-xlsx-ia" accept=".xlsx,.xls" style="display:none;" onchange="importarXLSXTipo(event,'ia')">
+                            </div>
+                        </div>
+                        <div class="spreadsheet-wrap">
+                            <table class="spreadsheet" id="tabela-ia">
+                                <thead><tr>
+                                    <th>Nome</th><th>Tipo</th><th>Período</th><th>Atend.</th>
+                                    <th>Em Aberto</th><th>Msgs</th><th>Eficiência</th>
+                                    <th>Avaliação</th><th>Concluídos</th><th>Silenciosos</th><th>Ações</th>
+                                </tr></thead>
+                                <tbody id="tabela-ia-body">
+                                    <tr><td colspan="11"><div class="empty-state">
+                                        <div class="empty-state-icon">🤖</div>
+                                        <div class="empty-state-text">Nenhum período IA registrado</div>
+                                        <div class="empty-state-sub">Clique em "Novo Período" para começar</div>
+                                    </div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div><!-- /card IA -->
+
+                </div><!-- /entry-tipo-grid -->
+
+            </section>
+
+        </div><!-- /sections-wrap -->
+
+    </div><!-- /main-content -->
+
+    <!-- ======================================================
+         MODAL — Inserir / Editar Período
+    ======================================================= -->
+    <div class="modal-overlay" id="modal" style="display:none;" onclick="modalOverlayClick(event)">
+        <div class="modal-panel" onclick="event.stopPropagation()">
+
+            <!-- Campo oculto que guarda a qual dataset (cc/ia) este período pertence -->
+            <input type="hidden" id="m-dash-tipo" value="cc">
+
+            <div class="modal-header">
+                <span class="modal-header-title" id="modal-title">Inserir Período</span>
+                <span id="modal-tipo-badge" class="entry-tipo-badge badge-cc" style="font-size:.7rem;padding:3px 10px;">CC</span>
+                <button class="modal-close-btn" onclick="fecharModal()">✕</button>
+            </div>
+
+            <div class="modal-body">
+
+                <!-- IDENTIFICAÇÃO -->
+                <div class="card">
+                    <div class="card-title">Identificação</div>
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label for="m-tipo">Tipo de Período</label>
+                            <select id="m-tipo" onchange="onModalTipoChange()">
+                                <option value="mes">Mensal</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-ano">Ano</label>
+                            <input type="number" id="m-ano" min="2020" max="2099" value="2026">
+                        </div>
+
+                        <div class="form-group" id="m-mes-group">
+                            <label for="m-mes">Mês</label>
+                            <select id="m-mes">
+                                <option value="1">Janeiro</option>
+                                <option value="2">Fevereiro</option>
+                                <option value="3">Março</option>
+                                <option value="4">Abril</option>
+                                <option value="5">Maio</option>
+                                <option value="6">Junho</option>
+                                <option value="7">Julho</option>
+                                <option value="8">Agosto</option>
+                                <option value="9">Setembro</option>
+                                <option value="10">Outubro</option>
+                                <option value="11">Novembro</option>
+                                <option value="12">Dezembro</option>
+                            </select>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- DADOS GERAIS -->
+                <div class="card">
+                    <div class="card-title">Dados Gerais</div>
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label for="m-total">Total de Atendimentos</label>
+                            <input type="number" id="m-total" min="0" placeholder="0">
+                            <span class="field-hint">Número total de conversas iniciadas no período</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-mensagens">Total de Mensagens</label>
+                            <input type="number" id="m-mensagens" min="0" placeholder="0">
+                            <span class="field-hint">Soma de todas as mensagens trocadas — usado no cálculo da eficiência</span>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- QUALIDADE -->
+                <div class="card">
+                    <div class="card-title">Qualidade</div>
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label for="m-avaliacao">Avaliação Média (0–5)</label>
+                            <input type="number" id="m-avaliacao" min="0" max="5" step="0.1" placeholder="0.0">
+                            <span class="field-hint">Nota média dada pelos pacientes ao final do atendimento</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-silenciosos">Silenciosos</label>
+                            <input type="number" id="m-silenciosos" min="0" placeholder="0">
+                            <span class="field-hint">Clientes que não responderam após contato inicial</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-concluidos">Concluídos</label>
+                            <input type="number" id="m-concluidos" min="0" placeholder="0">
+                            <span class="field-hint">Atendimentos finalizados com sucesso</span>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- MOTIVOS (BUSCAM) -->
+                <div class="card">
+                    <div class="card-title">Por Que Buscam o LAMIC</div>
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label for="m-resultados">Resultados de Exames</label>
+                            <input type="number" id="m-resultados" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-coleta">Coleta Domiciliar</label>
+                            <input type="number" id="m-coleta" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-atendente">Falar com Atendente</label>
+                            <input type="number" id="m-atendente" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-info">Informações Gerais</label>
+                            <input type="number" id="m-info" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-orcamentos">Orçamentos</label>
+                            <input type="number" id="m-orcamentos" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-reclamacoes">Reclamações</label>
+                            <input type="number" id="m-reclamacoes" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-vacinas">Vacinas</label>
+                            <input type="number" id="m-vacinas" min="0" placeholder="0">
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- FLUXO POR DIA -->
+                <div class="card">
+                    <div class="card-title">Fluxo por Dia da Semana</div>
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label for="m-seg">Segunda-feira</label>
+                            <input type="number" id="m-seg" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-ter">Terça-feira</label>
+                            <input type="number" id="m-ter" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-qua">Quarta-feira</label>
+                            <input type="number" id="m-qua" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-qui">Quinta-feira</label>
+                            <input type="number" id="m-qui" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-sex">Sexta-feira</label>
+                            <input type="number" id="m-sex" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-sab">Sábado</label>
+                            <input type="number" id="m-sab" min="0" placeholder="0">
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- FLUXO POR HORÁRIO -->
+                <div class="card">
+                    <div class="card-title">Fluxo por Horário</div>
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label for="m-h07">07h – 09h</label>
+                            <input type="number" id="m-h07" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-h09">09h – 11h</label>
+                            <input type="number" id="m-h09" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-h11">11h – 13h</label>
+                            <input type="number" id="m-h11" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-h13">13h – 15h</label>
+                            <input type="number" id="m-h13" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-h15">15h – 17h</label>
+                            <input type="number" id="m-h15" min="0" placeholder="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="m-h17">17h – 19h</label>
+                            <input type="number" id="m-h17" min="0" placeholder="0">
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ATENDENTES -->
+                <div class="card">
+                    <div class="card-title">Atendentes</div>
+
+                    <div class="atendentes-header">
+                        <span>Nome</span>
+                        <span>Atendimentos</span>
+                        <span>Avaliação</span>
+                        <span></span>
+                    </div>
+
+                    <div id="modal-atendentes-inputs"></div>
+
+                    <button class="btn-add" onclick="adicionarAtendente()">＋ Adicionar Atendente</button>
+                </div>
+
+            </div><!-- /modal-body -->
+
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button class="btn-primary" onclick="salvarPeriodo()">💾 Salvar Período</button>
+            </div>
+
+        </div><!-- /modal-panel -->
+    </div><!-- /modal-overlay -->
+
+</div><!-- /app -->
+
+<script src="relatorios_script.js?v=5"></script>
+</body>
+</html>
