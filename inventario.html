@@ -10,9 +10,9 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-      import { getDatabase, ref, set, onValue } 
+      import { getDatabase, ref, set, get, onValue, remove }
         from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-      
+
       const firebaseConfig = {
         apiKey: "AIzaSyAgQvYFztH5UeEM5NxXj3IrB278250zdXQ",
         authDomain: "lamicdadostiinventario.firebaseapp.com",
@@ -23,17 +23,18 @@
         appId: "1:713587283065:web:67b44bbb8d3ced4cdfb0a8",
         measurementId: "G-3YRTKMRXH5"
       };
-      
+
       const app = initializeApp(firebaseConfig);
       const db  = getDatabase(app);
-      
-      // Disponibiliza referências globais seguras para o script externo
-      window._db = db; 
-      window._ref = ref; 
-      window._set = set; 
-      window._onValue = onValue;
+
+      window._db            = db;
+      window._ref           = ref;
+      window._set           = set;
+      window._get           = get;
+      window._onValue       = onValue;
+      window._remove        = remove;
       window._firebaseReady = true;
-      
+
       document.dispatchEvent(new Event("firebaseReady"));
     </script>
 </head>
@@ -67,35 +68,29 @@
 
       <button class="nav-item active" id="btn-nav-units" onclick="showUnitsView(); deativarNavs(this)">
         <i class="ph ph-squares-four ni-ico"></i>
-        <span class="ni-txt">Unidades</span>
+        <span class="ni-txt">Dashboard</span>
       </button>
       
       <button class="nav-item" id="btn-nav-accesses" onclick="showAccessesView(); deativarNavs(this)">
         <i class="ph ph-key ni-ico"></i>
         <span class="ni-txt">Acessos</span>
       </button>
+
+      <button class="nav-item" id="btn-nav-equip" onclick="showEquipamentosView(); deativarNavs(this)">
+        <i class="ph ph-desktop-tower ni-ico"></i>
+        <span class="ni-txt">Equipamentos</span>
+      </button>
       
       <button class="nav-item" id="btn-nav-settings" onclick="openSettings(); deativarNavs(this)">
         <i class="ph ph-gear ni-ico"></i>
-        <span class="ni-txt">Ajustes</span>
+        <span class="ni-txt">Configurações</span>
       </button>
     </nav>
 
-    <div style="padding: 0 14px; display: flex; flex-direction: column; gap: 8px; margin-top: auto;">
-        <button class="nav-item" onclick="window.parent.postMessage('fecharInventario', '*')" style="color: #ff6b6b; background: rgba(217,64,64,.06); border-bottom: 1px solid #1e3355; margin-bottom: 8px;">
-        <i class="ph ph-arrow-left ni-ico" style="color: #ff6b6b;"></i>
-        <span class="ni-txt">Voltar ao Compras</span>
-      </button>
-      <button class="sidebar-exit" onclick="exportData()" style="color: #9aaec8; border-color: #1e3355; margin: 0; width: 100%;">
-        <i class="ph ph-download-simple ni-ico"></i>
-        <span class="ni-txt">Backup</span>
-      </button>
-      <button class="sidebar-exit" onclick="triggerImport()" style="color: #9aaec8; border-color: #1e3355; margin: 0; width: 100%;">
-        <i class="ph ph-upload-simple ni-ico"></i>
-        <span class="ni-txt">Restaurar</span>
-      </button>
-      <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(this)">
-    </div>
+    <button class="sidebar-exit" onclick="(window.top||window).location.href='index.html'">
+        <i class="ph ph-house ni-ico"></i>
+        <span class="ni-txt">Home</span>
+    </button>
 </aside>
 
 <!-- ========== MAIN ========== -->
@@ -299,12 +294,90 @@
                     <i class="ph ph-magnifying-glass search-icon"></i>
                     <input type="text" id="access-search-input" placeholder="Buscar acessos..." oninput="filterAccesses()" class="search-input">
                 </div>
+                <button class="btn-filter-toggle" id="btn-access-filter" onclick="toggleFilterPanel('access-filter-panel', this)" title="Filtros">
+                    <i class="ph ph-funnel"></i> Filtros
+                </button>
                 <button class="btn-primary" onclick="openAccessModal()">
                     <i class="ph ph-plus"></i> Novo Acesso
                 </button>
             </div>
         </div>
+
+        <!-- Painel de filtros — Acessos -->
+        <div id="access-filter-panel" class="filter-panel hidden">
+            <div class="filter-panel-inner">
+                <div class="filter-chip-group">
+                    <span class="filter-chip-label">Assinatura</span>
+                    <button class="filter-chip active" data-filter="access" data-key="assinatura" data-val="" onclick="toggleAccessFilterChip(this)">Todos</button>
+                    <button class="filter-chip" data-filter="access" data-key="assinatura" data-val="com" onclick="toggleAccessFilterChip(this)"><i class="ph ph-check-circle"></i> Com assinatura</button>
+                    <button class="filter-chip" data-filter="access" data-key="assinatura" data-val="sem" onclick="toggleAccessFilterChip(this)"><i class="ph ph-x-circle"></i> Sem assinatura</button>
+                </div>
+                <div class="filter-chip-group">
+                    <span class="filter-chip-label">2FA</span>
+                    <button class="filter-chip active" data-filter="access" data-key="2fa" data-val="" onclick="toggleAccessFilterChip(this)">Todos</button>
+                    <button class="filter-chip" data-filter="access" data-key="2fa" data-val="com" onclick="toggleAccessFilterChip(this)"><i class="ph ph-shield-check"></i> Com 2FA</button>
+                    <button class="filter-chip" data-filter="access" data-key="2fa" data-val="sem" onclick="toggleAccessFilterChip(this)"><i class="ph ph-shield-slash"></i> Sem 2FA</button>
+                </div>
+                <div class="filter-chip-group">
+                    <span class="filter-chip-label">Link Drive</span>
+                    <button class="filter-chip active" data-filter="access" data-key="drive" data-val="" onclick="toggleAccessFilterChip(this)">Todos</button>
+                    <button class="filter-chip" data-filter="access" data-key="drive" data-val="com" onclick="toggleAccessFilterChip(this)"><i class="ph ph-google-drive"></i> Com link</button>
+                    <button class="filter-chip" data-filter="access" data-key="drive" data-val="sem" onclick="toggleAccessFilterChip(this)"><i class="ph ph-link-break"></i> Sem link</button>
+                </div>
+                <button class="filter-clear-btn" onclick="clearAccessFilters()"><i class="ph ph-arrow-counter-clockwise"></i> Limpar filtros</button>
+            </div>
+        </div>
+
         <div id="access-categories-container"></div>
+    </section>
+
+    <!-- ===== EQUIPAMENTOS VIEW ===== -->
+    <section id="equip-view" class="view hidden" style="padding:1.5rem;">
+        <div class="view-header">
+            <div class="view-title">
+                <i class="ph ph-desktop-tower" style="font-size:1.5rem;color:var(--blue);"></i>
+                <h2>Equipamentos</h2>
+            </div>
+            <div class="header-controls">
+                <div class="search-wrap">
+                    <i class="ph ph-magnifying-glass search-icon"></i>
+                    <input type="text" id="equip-search-input" placeholder="Buscar equipamento..." class="search-input" oninput="filterEquipamentos()">
+                </div>
+                <button class="btn-filter-toggle" id="btn-equip-filter" onclick="toggleFilterPanel('equip-filter-panel', this)" title="Filtros">
+                    <i class="ph ph-funnel"></i> Filtros
+                </button>
+                <button class="btn-primary" onclick="openEquipModal()">
+                    <i class="ph ph-plus"></i> Novo Equipamento
+                </button>
+            </div>
+        </div>
+
+        <!-- Painel de filtros — Equipamentos -->
+        <div id="equip-filter-panel" class="filter-panel hidden">
+            <div class="filter-panel-inner">
+                <div class="filter-chip-group">
+                    <span class="filter-chip-label">Categoria</span>
+                    <button class="filter-chip active" data-filter="equip" data-key="categoria" data-val="" onclick="toggleEquipFilterChip(this)">Todas</button>
+                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Bioquímica" onclick="toggleEquipFilterChip(this)">Bioquímica</button>
+                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Citologia" onclick="toggleEquipFilterChip(this)">Citologia</button>
+                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Hematologia" onclick="toggleEquipFilterChip(this)">Hematologia</button>
+                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Imuno-Hormônios" onclick="toggleEquipFilterChip(this)">Imuno-Hormônios</button>
+                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Microbiologia" onclick="toggleEquipFilterChip(this)">Microbiologia</button>
+                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Parasitologia" onclick="toggleEquipFilterChip(this)">Parasitologia</button>
+                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Urianálise" onclick="toggleEquipFilterChip(this)">Urianálise</button>
+                </div>
+                <div class="filter-chip-group">
+                    <span class="filter-chip-label">Status</span>
+                    <button class="filter-chip active" data-filter="equip" data-key="status" data-val="" onclick="toggleEquipFilterChip(this)">Todos</button>
+                    <button class="filter-chip" data-filter="equip" data-key="status" data-val="Em Uso" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-uso"></span> Em Uso</button>
+                    <button class="filter-chip" data-filter="equip" data-key="status" data-val="Em Manutenção" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-manut"></span> Em Manutenção</button>
+                    <button class="filter-chip" data-filter="equip" data-key="status" data-val="Inativo" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-inativo"></span> Inativo</button>
+                </div>
+                <button class="filter-clear-btn" onclick="clearEquipFilters()"><i class="ph ph-arrow-counter-clockwise"></i> Limpar filtros</button>
+            </div>
+        </div>
+
+        <div id="equip-grid" class="equip-grid"></div>
     </section>
 
 </main>
@@ -572,25 +645,139 @@
     </div>
 </div>
 
-<!-- Settings Modal -->
-<div id="settings-modal" class="modal hidden">
-    <div class="modal-content large-modal">
-        <div class="modal-header-row">
-            <h3><i class="ph ph-gear"></i> Gerenciar Modelos e Templates</h3>
-            <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+<!-- Settings — seção inline (não popup) -->
+<div id="settings-modal" class="modal hidden settings-page-mode">
+    <div class="modal-content">
+        <div class="config-page-header">
+            <div class="view-title">
+                <i class="ph ph-gear"></i>
+                <h2>Configurações</h2>
+            </div>
+            <button class="btn-icon" onclick="closeModals()" title="Fechar">
+                <i class="ph ph-arrow-left"></i>
+            </button>
         </div>
-        <div id="settings-main-view">
-            <div class="settings-grid">
-                <div class="settings-col"><h4><i class="ph ph-printer"></i> Impressoras <button class="btn-mini" onclick="addNewModel('printer')">+</button></h4><ul id="list-printer" class="manage-list"></ul></div>
-                <div class="settings-col"><h4><i class="ph ph-tag"></i> Etiquetadoras <button class="btn-mini" onclick="addNewModel('label')">+</button></h4><ul id="list-label" class="manage-list"></ul></div>
-                <div class="settings-col"><h4><i class="ph ph-scroll"></i> Térmicas <button class="btn-mini" onclick="addNewModel('thermal')">+</button></h4><ul id="list-thermal" class="manage-list"></ul></div>
-                <div class="settings-col"><h4><i class="ph ph-camera"></i> Webcams <button class="btn-mini" onclick="addNewModel('webcam')">+</button></h4><ul id="list-webcam" class="manage-list"></ul></div>
-                <div class="settings-col"><h4><i class="ph ph-television"></i> TVs <button class="btn-mini" onclick="addNewModel('tv')">+</button></h4><ul id="list-tv" class="manage-list"></ul></div>
-                <div class="settings-col"><h4><i class="ph ph-device-mobile"></i> Celulares <button class="btn-mini" onclick="openInlineForm('mobile')">+</button></h4><ul id="list-mobile" class="manage-list"></ul></div>
-                <div class="settings-col"><h4><i class="ph ph-desktop"></i> Templates PC <button class="btn-mini" onclick="openInlineForm('compPreset')">+</button></h4><ul id="list-comp-preset" class="manage-list"></ul></div>
+
+        <!-- Modelos e Templates -->
+        <div class="config-section">
+            <div class="config-section-header">
+                <i class="ph ph-package"></i>
+                <h4>Modelos e Templates</h4>
+            </div>
+            <div id="settings-main-view">
+                <div class="settings-grid">
+                    <div class="settings-col"><h4><i class="ph ph-printer"></i> Impressoras <button class="btn-mini" onclick="addNewModel('printer')">+</button></h4><ul id="list-printer" class="manage-list"></ul></div>
+                    <div class="settings-col"><h4><i class="ph ph-tag"></i> Etiquetadoras <button class="btn-mini" onclick="addNewModel('label')">+</button></h4><ul id="list-label" class="manage-list"></ul></div>
+                    <div class="settings-col"><h4><i class="ph ph-scroll"></i> Térmicas <button class="btn-mini" onclick="addNewModel('thermal')">+</button></h4><ul id="list-thermal" class="manage-list"></ul></div>
+                    <div class="settings-col"><h4><i class="ph ph-camera"></i> Webcams <button class="btn-mini" onclick="addNewModel('webcam')">+</button></h4><ul id="list-webcam" class="manage-list"></ul></div>
+                    <div class="settings-col"><h4><i class="ph ph-television"></i> TVs <button class="btn-mini" onclick="addNewModel('tv')">+</button></h4><ul id="list-tv" class="manage-list"></ul></div>
+                    <div class="settings-col"><h4><i class="ph ph-device-mobile"></i> Celulares <button class="btn-mini" onclick="openInlineForm('mobile')">+</button></h4><ul id="list-mobile" class="manage-list"></ul></div>
+                    <div class="settings-col"><h4><i class="ph ph-desktop"></i> Templates PC <button class="btn-mini" onclick="openInlineForm('compPreset')">+</button></h4><ul id="list-comp-preset" class="manage-list"></ul></div>
+                </div>
+            </div>
+            <div id="settings-inline-view" class="hidden settings-inline-box"></div>
+        </div>
+
+        <!-- 4 Cards de Cadastro: Fabricante, Fornecedor, Tipo, Categorias -->
+        <div class="equip-config-grid">
+
+            <!-- 1. Fabricante / Marca -->
+            <div class="equip-config-card">
+                <div class="equip-config-card-header">
+                    <i class="ph ph-buildings"></i>
+                    <span>Fabricante / Marca</span>
+                </div>
+                <ul id="list-fabricantes" class="equip-config-list"></ul>
+                <div class="equip-config-add">
+                    <input type="text" id="inp-fabricante" placeholder="Ex: Labtest Diagnóstica S/A" class="input-field" onkeydown="if(event.key==='Enter') addListItem('fabricante')">
+                    <button class="btn-primary" onclick="addListItem('fabricante')">
+                        <i class="ph ph-plus"></i> Adicionar
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. Fornecedor -->
+            <div class="equip-config-card">
+                <div class="equip-config-card-header">
+                    <i class="ph ph-storefront"></i>
+                    <span>Fornecedor</span>
+                </div>
+                <ul id="list-fornecedores" class="equip-config-list"></ul>
+                <div class="equip-config-add">
+                    <input type="text" id="inp-fornecedor" placeholder="Ex: ALA Engenharia" class="input-field" onkeydown="if(event.key==='Enter') addListItem('fornecedor')">
+                    <button class="btn-primary" onclick="addListItem('fornecedor')">
+                        <i class="ph ph-plus"></i> Adicionar
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. Tipo / Subtipo -->
+            <div class="equip-config-card">
+                <div class="equip-config-card-header">
+                    <i class="ph ph-tag"></i>
+                    <span>Tipo / Subtipo</span>
+                </div>
+                <ul id="list-tipos" class="equip-config-list"></ul>
+                <div class="equip-config-add">
+                    <input type="text" id="inp-tipo" placeholder="Ex: Equipamentos Analíticos" class="input-field" onkeydown="if(event.key==='Enter') addListItem('tipo')">
+                    <button class="btn-primary" onclick="addListItem('tipo')">
+                        <i class="ph ph-plus"></i> Adicionar
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. Categorias de Equipamentos -->
+            <div class="equip-config-card">
+                <div class="equip-config-card-header">
+                    <i class="ph ph-desktop-tower"></i>
+                    <span>Categorias</span>
+                </div>
+                <ul id="list-categorias-equip" class="equip-config-list"></ul>
+                <div class="equip-config-add" style="flex-direction:column;gap:6px;">
+                    <div style="display:flex;gap:6px;">
+                        <input type="text" id="inp-cat-nome" placeholder="Nome (ex: Sorologia)" class="input-field" style="flex:2;" onkeydown="if(event.key==='Enter') addCategoriaEquip()">
+                        <input type="text" id="inp-cat-prefixo" placeholder="Sigla" class="input-field" style="flex:1;text-transform:uppercase;" maxlength="4" onkeydown="if(event.key==='Enter') addCategoriaEquip()">
+                    </div>
+                    <button class="btn-primary" style="width:100%;" onclick="addCategoriaEquip()">
+                        <i class="ph ph-plus"></i> Adicionar Categoria
+                    </button>
+                    <small style="color:var(--text-muted);font-size:.7rem;line-height:1.4;">A sigla gera o código automático (ex: SOR-001)</small>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Backup e Restauração -->
+        <div class="config-section">
+            <div class="config-section-header">
+                <i class="ph ph-database"></i>
+                <h4>Backup e Restauração</h4>
+            </div>
+            <div class="backup-restore-area">
+                <div class="backup-card">
+                    <div class="backup-card-icon"><i class="ph ph-download-simple"></i></div>
+                    <div class="backup-card-info">
+                        <strong>Exportar Backup</strong>
+                        <span>Salve todos os dados do inventário em um arquivo JSON</span>
+                    </div>
+                    <button class="btn-primary" onclick="exportData()">
+                        <i class="ph ph-download-simple"></i> Fazer Backup
+                    </button>
+                </div>
+                <div class="backup-card">
+                    <div class="backup-card-icon backup-card-icon-restore"><i class="ph ph-upload-simple"></i></div>
+                    <div class="backup-card-info">
+                        <strong>Restaurar Dados</strong>
+                        <span>Importe um arquivo de backup JSON para restaurar o inventário</span>
+                    </div>
+                    <button class="btn-secondary" onclick="triggerImport()">
+                        <i class="ph ph-upload-simple"></i> Restaurar Dados
+                    </button>
+                </div>
+                <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(this)">
             </div>
         </div>
-        <div id="settings-inline-view" class="hidden settings-inline-box"></div>
+
     </div>
 </div>
 
@@ -668,6 +855,330 @@
                 </thead>
                 <tbody id="all-licenses-tbody"></tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Criar / Editar Modelo de Celular -->
+<div id="mobile-model-modal" class="modal hidden">
+    <div class="modal-content medium-modal">
+        <div class="modal-header-row">
+            <h3 id="mob-model-title"><i class="ph ph-device-mobile"></i> Novo Modelo de Celular</h3>
+            <button class="btn-icon" onclick="document.getElementById('mobile-model-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        </div>
+        <input type="hidden" id="inl-mob-index">
+        <div class="form-group"><label>Modelo / Marca</label><input type="text" id="inl-mob-name" placeholder="Ex: Samsung Galaxy A54"></div>
+        <div class="grid-3-col">
+            <div class="form-group"><label>ROM (Armazenamento)</label><input type="text" id="inl-mob-rom" placeholder="Ex: 128GB"></div>
+            <div class="form-group"><label>RAM</label><input type="text" id="inl-mob-ram" placeholder="Ex: 6GB"></div>
+            <div class="form-group"><label>CPU (Processador)</label><input type="text" id="inl-mob-cpu" placeholder="Ex: Exynos 1380"></div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="document.getElementById('mobile-model-modal').classList.add('hidden')">Cancelar</button>
+            <button class="btn-primary" onclick="saveMobileModelModal()"><i class="ph ph-floppy-disk"></i> Salvar Modelo</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Criar / Editar Template de PC -->
+<div id="pc-preset-modal" class="modal hidden">
+    <div class="modal-content large-modal">
+        <div class="modal-header-row">
+            <h3 id="pc-preset-title"><i class="ph ph-desktop"></i> Novo Template de PC</h3>
+            <button class="btn-icon" onclick="document.getElementById('pc-preset-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        </div>
+        <input type="hidden" id="inl-pc-index">
+        <div class="form-group"><label>Nome do Template</label><input type="text" id="inl-pc-name" placeholder="Ex: Padrão Recepção"></div>
+        <div class="grid-3-col">
+            <div class="form-group"><label>Modelo da Máquina</label><input type="text" id="inl-pc-model" placeholder="Ex: Dell Optiplex 5090"></div>
+            <div class="form-group"><label>Processador</label><input type="text" id="inl-pc-cpu" placeholder="Ex: Intel Core i5-10400"></div>
+            <div class="form-group"><label>Placa Mãe</label><input type="text" id="inl-pc-mobo" placeholder="Ex: Dell OEM"></div>
+            <div class="form-group"><label>RAM</label><input type="text" id="inl-pc-ram" placeholder="Ex: 8GB DDR4"></div>
+            <div class="form-group"><label>Armazenamento</label><input type="text" id="inl-pc-disk" placeholder="Ex: 256GB SSD"></div>
+            <div class="form-group"><label>Placa de Vídeo</label><input type="text" id="inl-pc-gpu" placeholder="Ex: Intel UHD 630"></div>
+            <div class="form-group"><label>Monitor</label><input type="text" id="inl-pc-monitor" placeholder="Ex: LG 21.5 FHD"></div>
+            <div class="form-group"><label>Sistema Operacional</label>
+                <select id="inl-pc-os">
+                    <option value="Windows 11">Windows 11</option>
+                    <option value="Windows 10">Windows 10</option>
+                    <option value="Windows 7">Windows 7</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Arquitetura</label>
+                <select id="inl-pc-arch">
+                    <option value="x64">x64</option>
+                    <option value="x86">x86</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="document.getElementById('pc-preset-modal').classList.add('hidden')">Cancelar</button>
+            <button class="btn-primary" onclick="savePcPresetModal()"><i class="ph ph-floppy-disk"></i> Salvar Template</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Criar / Editar Nome de Modelo -->
+<div id="model-name-modal" class="modal hidden">
+    <div class="modal-content small-modal">
+        <div class="modal-header-row">
+            <h3 id="model-modal-title">Novo Modelo</h3>
+            <button class="btn-icon" onclick="closeModelModal()"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="form-group" style="margin-bottom:1.5rem;">
+            <label id="model-modal-label" style="font-size:.8rem;font-weight:700;color:#475569;margin-bottom:.4rem;display:block;">Nome do Modelo</label>
+            <input type="text" id="model-modal-input" placeholder="Digite o nome do modelo..." onkeydown="if(event.key==='Enter') confirmModelModal()" />
+        </div>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeModelModal()">Cancelar</button>
+            <button class="btn-primary" onclick="confirmModelModal()">
+                <i class="ph ph-floppy-disk"></i> Salvar
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- Modal: Cadastrar / Editar Equipamento -->
+<div id="equip-modal" class="modal hidden">
+    <div class="modal-content equip-edit-modal">
+        <div class="modal-header-row">
+            <h3 id="equip-modal-title"><i class="ph ph-desktop-tower"></i> Novo Equipamento</h3>
+            <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+        </div>
+        <input type="hidden" id="equip-id">
+
+        <div class="grid-3-col">
+            <div class="form-group"><label>Nome do Equipamento *</label><input type="text" id="equip-nome" placeholder="Ex: LABMAX 400"></div>
+            <div class="form-group">
+                <label>Código / Patrimônio <span style="color:#94a3b8;font-weight:400;font-size:.72rem;">gerado automaticamente · imutável</span></label>
+                <input type="text" id="equip-codigo" placeholder="Selecione uma categoria" readonly style="background:var(--surface-2);cursor:default;">
+            </div>
+            <div class="form-group"><label>Status</label>
+                <select id="equip-status">
+                    <option value="Em Uso">Em Uso</option>
+                    <option value="Em Manutenção">Em Manutenção</option>
+                    <option value="Inativo">Inativo</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Fabricante / Marca</label>
+                <div style="display:flex;gap:6px;">
+                    <select id="equip-fabricante" style="flex:1;"><option value="">— Selecione —</option></select>
+                    <button type="button" class="equip-lock-btn" style="color:var(--blue);border-color:var(--blue);" title="Adicionar fabricante" onclick="quickAddItem('fabricante')"><i class="ph ph-plus"></i></button>
+                </div>
+            </div>
+            <div class="form-group"><label>Modelo</label><input type="text" id="equip-modelo" placeholder="Ex: Labmax 400 TS"></div>
+            <div class="form-group">
+                <label>Fornecedor</label>
+                <div style="display:flex;gap:6px;">
+                    <select id="equip-fornecedor" style="flex:1;"><option value="">— Selecione —</option></select>
+                    <button type="button" class="equip-lock-btn" style="color:var(--blue);border-color:var(--blue);" title="Adicionar fornecedor" onclick="quickAddItem('fornecedor')"><i class="ph ph-plus"></i></button>
+                </div>
+            </div>
+            <div class="form-group"><label>Número de Série</label><input type="text" id="equip-serie" placeholder="Ex: 2230.131.010"></div>
+            <div class="form-group">
+                <label>Categoria</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <select id="equip-categoria" onchange="onEquipCategoriaChange(this.value)" style="flex:1;">
+                        <option value="">— Selecione —</option>
+                    </select>
+                    <button type="button" class="equip-lock-btn" title="Nova categoria" onclick="abrirNovaCategoria()" style="color:var(--blue);border-color:var(--blue);">
+                        <i class="ph ph-plus"></i>
+                    </button>
+                </div>
+            </div>
+            <!-- Mini-painel nova categoria (dentro do form) -->
+            <div id="nova-cat-panel" class="nova-cat-panel hidden" style="grid-column:1/-1;">
+                <div class="nova-cat-title"><i class="ph ph-tag"></i> Nova Categoria</div>
+                <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+                    <div class="form-group" style="flex:2;margin:0;"><label>Nome</label><input type="text" id="nova-cat-nome" placeholder="Ex: Sorologia"></div>
+                    <div class="form-group" style="flex:1;margin:0;"><label>Prefixo</label><input type="text" id="nova-cat-prefixo" placeholder="SOR" maxlength="4" style="text-transform:uppercase;"></div>
+                    <div class="form-group" style="flex:2;margin:0;"><label>Subtipo padrão</label><input type="text" id="nova-cat-subtipo" placeholder="Equipamentos Analíticos" value="Equipamentos Analíticos"></div>
+                    <button class="btn-primary" onclick="salvarNovaCategoria()" style="padding:8px 16px;font-size:.83rem;">Salvar</button>
+                    <button class="btn-secondary" onclick="fecharNovaCategoria()" style="padding:8px 16px;font-size:.83rem;">Cancelar</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Tipo / Subtipo</label>
+                <div class="equip-tipo-wrap">
+                    <select id="equip-tipo" style="flex:1;"><option value="">— Selecione —</option></select>
+                    <button type="button" class="equip-lock-btn" id="equip-tipo-lock" onclick="toggleTipoLock()" title="Travar / Destravar">
+                        <i class="ph ph-lock-simple" id="equip-tipo-lock-icon"></i>
+                    </button>
+                    <button type="button" class="equip-lock-btn" style="color:var(--blue);border-color:var(--blue);" title="Adicionar tipo" onclick="quickAddItem('tipo')"><i class="ph ph-plus"></i></button>
+                </div>
+            </div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Localização</label>
+                <select id="equip-unidade"><option value="">— Selecione —</option></select>
+            </div>
+        </div>
+        <!-- ── IMAGENS ── -->
+        <div class="equip-section-divider">
+            <i class="ph ph-images"></i> Imagens do Equipamento
+            <span style="font-weight:400;font-size:.75rem;color:#94a3b8;">máx. 1MB · JPG, PNG, WEBP</span>
+        </div>
+        <div class="equip-thumbs-grid" id="equip-thumbs-grid">
+            <div class="equip-thumb-add" onclick="document.getElementById('equip-img-file').click()">
+                <i class="ph ph-plus"></i><span>Adicionar</span>
+            </div>
+        </div>
+        <input type="file" id="equip-img-file" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handleEquipImgUpload(this)">
+
+        <!-- ── DOCUMENTOS ── -->
+        <div class="equip-section-divider" style="margin-top:12px;">
+            <i class="ph ph-paperclip"></i> Documentos / Anexos
+            <span style="font-weight:400;font-size:.75rem;color:#94a3b8;">enviados ao Google Drive</span>
+        </div>
+        <!-- Lista de docs já salvos + pendentes -->
+        <div id="equip-docs-edit-list" class="equip-docs-edit-list"></div>
+
+        <!-- Painel de nome: aparece ao selecionar arquivo -->
+        <div id="equip-doc-name-panel" class="equip-doc-name-panel" style="display:none;">
+            <i class="ph ph-file" id="equip-doc-panel-icon" style="font-size:1.5rem;color:var(--blue);flex-shrink:0;"></i>
+            <div style="flex:1;min-width:0;">
+                <div id="equip-doc-panel-filename" style="font-size:.75rem;color:var(--text-muted);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+                <input type="text" id="equip-doc-display-name" placeholder="Nome de exibição (obrigatório)" class="equip-doc-name-input" oninput="toggleDocSendBtn()">
+            </div>
+            <button class="btn-primary" id="equip-doc-send-btn" onclick="enviarDocPendente()" disabled style="white-space:nowrap;padding:7px 14px;font-size:.8rem;">
+                <i class="ph ph-paper-plane-tilt"></i> Enviar
+            </button>
+            <button class="btn-icon" onclick="cancelarDocPendente()" title="Cancelar"><i class="ph ph-x"></i></button>
+        </div>
+
+        <!-- Progresso de upload -->
+        <div id="equip-docs-progress" class="attach-progress" style="display:none;">
+            <div class="attach-progress-bar" id="equip-docs-progress-bar"></div>
+            <span id="equip-docs-progress-label">Enviando...</span>
+        </div>
+
+        <!-- Botão selecionar -->
+        <button type="button" class="equip-docs-add-file-btn" id="equip-docs-select-btn" onclick="document.getElementById('equip-docs-file-input').click()">
+            <i class="ph ph-paperclip"></i> Selecionar arquivo
+        </button>
+        <input type="file" id="equip-docs-file-input" accept="*/*" style="display:none;" onchange="selecionarDocParaAnexar(this)">
+
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeEquipModal()">Cancelar</button>
+            <button class="btn-primary" id="btn-salvar-equip" onclick="saveEquipamento()" disabled>
+                <i class="ph ph-floppy-disk"></i> Salvar Equipamento
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Detalhe do Equipamento -->
+<div id="equip-detail-modal" class="modal hidden">
+    <div class="modal-content eqd-modal">
+
+        <!-- Cabeçalho escuro -->
+        <div class="eqd-header">
+            <div class="eqd-header-left">
+                <i class="ph ph-desktop-tower eqd-header-icon"></i>
+                <div>
+                    <div class="eqd-header-name" id="eqd-nome">—</div>
+                    <div class="eqd-header-sub" id="eqd-sub">—</div>
+                </div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn" title="Histórico" style="opacity:.5;cursor:default"><i class="ph ph-clock-clockwise"></i></button>
+                <button class="eqd-icon-btn" onclick="closeModals()"><i class="ph ph-x"></i></button>
+            </div>
+        </div>
+
+        <!-- Conteúdo -->
+        <div class="eqd-body">
+
+            <!-- Carrossel de imagens -->
+            <div class="eqd-car-wrap" id="eqd-car-wrap" style="display:none;">
+                <img id="eqd-car-img" class="eqd-car-img-el" src="" alt="">
+                <button class="eqd-car-nav prev" id="eqd-car-prev" onclick="equipCarNav(-1)">&#8249;</button>
+                <button class="eqd-car-nav next" id="eqd-car-next" onclick="equipCarNav(1)">&#8250;</button>
+                <div class="eqd-car-dots" id="eqd-car-dots"></div>
+                <div class="eqd-car-counter" id="eqd-car-counter" style="display:none;"></div>
+            </div>
+
+            <!-- Tags de status e categoria -->
+            <div class="eqd-tags-row" id="eqd-hero-tags"></div>
+
+            <!-- Grid de informações -->
+            <div class="eqd-info-grid">
+                <div class="eqd-info-card">
+                    <div class="eqd-info-lbl"><i class="ph ph-buildings"></i> MARCA</div>
+                    <div class="eqd-info-val" id="eqd-fabricante">—</div>
+                </div>
+                <div class="eqd-info-card">
+                    <div class="eqd-info-lbl"><i class="ph ph-package"></i> MODELO</div>
+                    <div class="eqd-info-val" id="eqd-modelo">—</div>
+                </div>
+                <div class="eqd-info-card">
+                    <div class="eqd-info-lbl"><i class="ph ph-barcode"></i> Nº DE SÉRIE</div>
+                    <div class="eqd-info-val" id="eqd-serie" style="font-family:monospace;">—</div>
+                </div>
+                <div class="eqd-info-card">
+                    <div class="eqd-info-lbl"><i class="ph ph-storefront"></i> FORNECEDOR</div>
+                    <div class="eqd-info-val" id="eqd-fornecedor">—</div>
+                </div>
+                <div class="eqd-info-card" style="grid-column:1/-1;">
+                    <div class="eqd-info-lbl"><i class="ph ph-map-pin"></i> LOCALIZAÇÃO</div>
+                    <div class="eqd-info-val" id="eqd-unidade">—</div>
+                </div>
+            </div>
+
+            <!-- Documentos — somente leitura no detalhe -->
+            <div class="eqd-docs-section" id="eqd-docs-section">
+                <div class="eqd-docs-header">
+                    <div class="eqd-info-lbl"><i class="ph ph-folder-open"></i> DOCUMENTOS</div>
+                    <span style="font-size:.72rem;color:var(--text-muted);">Adicione documentos no modo Editar</span>
+                </div>
+                <div id="eqd-docs-list" class="eqd-docs-list">
+                    <div class="eqd-docs-empty"><i class="ph ph-files"></i><span>Nenhum documento</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rodapé -->
+        <div class="eqd-footer">
+            <button class="btn-secondary" onclick="closeModals()">Fechar</button>
+            <button class="eqd-btn-delete" onclick="deleteEquipFromDetail()"><i class="ph ph-trash"></i> Excluir</button>
+            <button class="eqd-btn-edit" onclick="editEquipFromDetail()"><i class="ph ph-pencil-simple"></i> Editar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Preview de Arquivo -->
+<div id="file-preview-modal" class="modal hidden">
+    <div class="modal-content file-preview-content">
+        <div class="modal-header-row">
+            <h3 id="file-preview-title" style="font-size:.95rem;"><i class="ph ph-file"></i> —</h3>
+            <div style="display:flex;gap:8px;">
+                <a id="file-preview-open" href="#" target="_blank" class="btn-icon" title="Abrir no Drive"><i class="ph ph-arrow-square-out"></i></a>
+                <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+            </div>
+        </div>
+        <div class="file-preview-body">
+            <iframe id="file-preview-iframe" src="" frameborder="0" allowfullscreen></iframe>
+        </div>
+    </div>
+</div>
+
+<!-- Mini-Modal: Adicionar item às listas (DEVE ficar após equip-modal para z-index correto) -->
+<div id="quick-add-modal" class="modal hidden" style="z-index:3100;">
+    <div class="modal-content small-modal">
+        <div class="modal-header-row">
+            <h3 id="quick-add-title">Adicionar</h3>
+            <button class="btn-icon" onclick="closeQuickAdd()"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="form-group" style="margin-bottom:1.5rem;">
+            <label id="quick-add-label">Nome</label>
+            <input type="text" id="quick-add-input" class="input-field" onkeydown="if(event.key==='Enter') confirmQuickAdd()">
+        </div>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeQuickAdd()">Cancelar</button>
+            <button class="btn-primary" onclick="confirmQuickAdd()">
+                <i class="ph ph-floppy-disk"></i> Salvar e Selecionar
+            </button>
         </div>
     </div>
 </div>

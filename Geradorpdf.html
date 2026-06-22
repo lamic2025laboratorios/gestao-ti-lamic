@@ -19,9 +19,9 @@
         <div class="bg-circle circle-1"></div>
         <div class="bg-circle circle-2"></div>
         <div class="menu-card">
-            <div class="menu-top-label">LAMIC</div>
+            <div class="menu-top-label">LAMIC — T.I.</div>
             <h1 class="menu-title">Gerador de<br>Documentos</h1>
-            <p class="menu-subtitle">Sistema de Orçamentos — T.I.</p>
+            <p class="menu-subtitle">Crie documentos profissionais padronizados</p>
             <div class="menu-divider">
                 <div class="line"></div>
                 <div class="diamonds">
@@ -31,34 +31,368 @@
                 </div>
                 <div class="line"></div>
             </div>
-            <button class="btn-menu" onclick="abrirFormulario()">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                </svg>
-                CRIAR ORÇAMENTO DE T.I.
-            </button>
 
-            <button onclick="window.parent.postMessage('fecharGeradorPDF', '*')" style="margin-top: 15px; width: 100%; max-width: 320px; background: rgba(255, 107, 107, 0.15); color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.3); padding: 12px; font-weight: 700; border-radius: 8px; cursor: pointer; text-transform: uppercase; font-size: 11px; transition: 0.2s;" onmouseover="this.style.background='rgba(255, 107, 107, 0.25)'" onmouseout="this.style.background='rgba(255, 107, 107, 0.15)'">
-                ← Voltar ao Dashboard
+            <div class="menu-doc-grid">
+                <button class="btn-doc btn-doc-orc" onclick="abrirFormulario()">
+                    <div class="btn-doc-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </div>
+                    <div class="btn-doc-info">
+                        <span class="btn-doc-title">Orçamento de T.I.</span>
+                        <span class="btn-doc-sub">Solicitação de compra com valores e opções de pagamento</span>
+                    </div>
+                </button>
+
+                <button class="btn-doc btn-doc-com" onclick="abrirComunicado()">
+                    <div class="btn-doc-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </div>
+                    <div class="btn-doc-info">
+                        <span class="btn-doc-title">Comunicado Interno</span>
+                        <span class="btn-doc-sub">Avisos e comunicações formais para colaboradores</span>
+                    </div>
+                </button>
+
+                <button class="btn-doc btn-doc-rel" onclick="abrirRelatorio()">
+                    <div class="btn-doc-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    </div>
+                    <div class="btn-doc-info">
+                        <span class="btn-doc-title">Relatório de T.I.</span>
+                        <span class="btn-doc-sub">Relatório periódico de atividades e infraestrutura</span>
+                    </div>
+                </button>
+
+                <button class="btn-doc btn-doc-os" onclick="abrirOS()">
+                    <div class="btn-doc-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    </div>
+                    <div class="btn-doc-info">
+                        <span class="btn-doc-title">Ordem de Serviço</span>
+                        <span class="btn-doc-sub">Registro formal de serviços técnicos executados</span>
+                    </div>
+                </button>
+            </div>
+
+            <button onclick="(window.top||window).location.href='index.html'" class="btn-menu-home">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                Dashboard
             </button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         FORM: COMUNICADO INTERNO
+    ═══════════════════════════════════════════════════════ -->
+    <div id="tela-comunicado" style="display:none; width:100%;">
+        <div class="top-bar">
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn-top-voltar" onclick="voltarMenuDe('tela-comunicado')">⬅ Voltar ao Menu</button>
+                <button class="btn-top-home" onclick="(window.top||window).location.href='index.html'" title="Dashboard">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Dashboard
+                </button>
+            </div>
+            <button class="btn-top-limpar" onclick="limparComunicado()">🗑️ Limpar Dados</button>
+        </div>
+        <div class="form-wrapper">
+            <div class="header-form"><h2>Preencher Comunicado</h2></div>
+            <div class="form-container">
+                <div class="form-section">
+                    <h3>Identificação</h3>
+                    <div class="grid-2">
+                        <div><label>Nº do Comunicado</label><input type="text" id="com-numero" placeholder="Ex: COM-001/2026"></div>
+                        <div><label>Data</label><input type="date" id="com-data"></div>
+                        <div><label>De (Remetente)</label><input type="text" id="com-de" placeholder="Ex: Setor de T.I."></div>
+                        <div><label>Para (Destinatário)</label><input type="text" id="com-para" placeholder="Ex: Todos os colaboradores"></div>
+                    </div>
+                    <div style="margin-top:12px"><label>Assunto</label><input type="text" id="com-assunto" placeholder="Ex: Manutenção programada dos sistemas"></div>
+                </div>
+                <div class="form-section">
+                    <h3>Conteúdo</h3>
+                    <label>Corpo do Comunicado</label>
+                    <textarea id="com-corpo" rows="8" placeholder="Escreva o texto completo do comunicado aqui..."></textarea>
+                </div>
+                <div class="form-section">
+                    <h3>Rodapé</h3>
+                    <div class="grid-2">
+                        <div><label>Responsável / Assinatura</label><input type="text" id="com-assinatura" placeholder="Ex: Felipe — Analista de T.I."></div>
+                        <div><label>Urgência</label>
+                            <select id="com-urgencia">
+                                <option value="Informativo">📋 Informativo</option>
+                                <option value="Atenção">⚠️ Atenção</option>
+                                <option value="Urgente">🚨 Urgente</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn-gerar-pdf btn-preview" onclick="abrirJanelaComunicado()">🖨 Abrir / Imprimir</button>
+                <button class="btn-gerar-pdf" id="btn-gerar-comunicado" onclick="gerarPDFComunicado()">📄 Baixar PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF: COMUNICADO -->
+    <div id="template-comunicado" style="display:none;">
+        <div class="pdf-page pdf-com-page">
+            <div class="pdf-doc-inner pdf-com-inner">
+                <div class="pdf-com-header">
+                    <img src="img/lamicpdflogo.png" alt="LAMIC" style="height:40px;object-fit:contain;" onerror="this.style.display='none'">
+                    <div class="pdf-com-badge" id="pdf-com-urgencia-badge">Informativo</div>
+                </div>
+                <div class="pdf-com-title-block">
+                    <div class="pdf-com-type">COMUNICADO INTERNO</div>
+                    <div class="pdf-com-num" id="pdf-com-numero">COM-000/2026</div>
+                </div>
+                <div class="pdf-com-meta">
+                    <div class="pdf-com-meta-row"><span class="pdf-com-lbl">DATA:</span><span id="pdf-com-data">—</span></div>
+                    <div class="pdf-com-meta-row"><span class="pdf-com-lbl">DE:</span><span id="pdf-com-de">—</span></div>
+                    <div class="pdf-com-meta-row"><span class="pdf-com-lbl">PARA:</span><span id="pdf-com-para">—</span></div>
+                    <div class="pdf-com-meta-row"><span class="pdf-com-lbl">ASSUNTO:</span><span id="pdf-com-assunto" style="font-weight:700">—</span></div>
+                </div>
+                <div class="pdf-com-divider"></div>
+                <div class="pdf-com-body" id="pdf-com-corpo"></div>
+                <div class="pdf-com-footer">
+                    <div class="pdf-com-sign-area">
+                        <div class="pdf-com-sign-line"></div>
+                        <div class="pdf-com-sign-name" id="pdf-com-assinatura">—</div>
+                        <div class="pdf-com-sign-sub">Responsável</div>
+                    </div>
+                    <img src="img/lamicpdfrodape.png" alt="" style="height:28px;object-fit:contain;opacity:.5;" onerror="this.style.display='none'">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         FORM: RELATÓRIO DE T.I.
+    ═══════════════════════════════════════════════════════ -->
+    <div id="tela-relatorio" style="display:none; width:100%;">
+        <div class="top-bar">
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn-top-voltar" onclick="voltarMenuDe('tela-relatorio')">⬅ Voltar ao Menu</button>
+                <button class="btn-top-home" onclick="(window.top||window).location.href='index.html'" title="Dashboard">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Dashboard
+                </button>
+            </div>
+            <button class="btn-top-limpar" onclick="limparRelatorio()">🗑️ Limpar Dados</button>
+        </div>
+        <div class="form-wrapper">
+            <div class="header-form"><h2>Preencher Relatório</h2></div>
+            <div class="form-container">
+                <div class="form-section">
+                    <h3>Cabeçalho</h3>
+                    <div class="grid-2">
+                        <div><label>Título do Relatório</label><input type="text" id="rel-titulo" placeholder="Ex: Relatório Mensal de T.I. — Junho/2026"></div>
+                        <div><label>Período de Referência</label><input type="text" id="rel-periodo" placeholder="Ex: 01/06/2026 a 30/06/2026"></div>
+                        <div><label>Responsável</label><input type="text" id="rel-responsavel" placeholder="Ex: Felipe — Analista de T.I."></div>
+                        <div><label>Data de Emissão</label><input type="date" id="rel-data"></div>
+                    </div>
+                </div>
+                <div class="form-section">
+                    <h3>Sumário Executivo</h3>
+                    <textarea id="rel-sumario" rows="4" placeholder="Resumo geral das atividades e principais pontos do período..."></textarea>
+                </div>
+                <div class="form-section">
+                    <h3>Seções do Relatório</h3>
+                    <div id="rel-secoes-lista"></div>
+                    <button class="btn-add" onclick="adicionarSecaoRel()">+ Adicionar Seção</button>
+                </div>
+                <div class="form-section">
+                    <h3>Métricas do Período</h3>
+                    <div class="grid-3">
+                        <div><label>Chamados Atendidos</label><input type="number" id="rel-chamados" placeholder="0" min="0"></div>
+                        <div><label>Equipamentos Manutenidos</label><input type="number" id="rel-equip" placeholder="0" min="0"></div>
+                        <div><label>Uptime dos Sistemas</label><input type="text" id="rel-uptime" placeholder="Ex: 99,5%"></div>
+                    </div>
+                </div>
+                <div class="form-section">
+                    <h3>Próximas Ações</h3>
+                    <textarea id="rel-proximas" rows="3" placeholder="Liste as ações planejadas para o próximo período..."></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn-gerar-pdf btn-preview" onclick="abrirJanelaRelatorio()">🖨 Abrir / Imprimir</button>
+                <button class="btn-gerar-pdf" id="btn-gerar-relatorio" onclick="gerarPDFRelatorio()">📄 Baixar PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF: RELATÓRIO -->
+    <div id="template-relatorio" style="display:none;">
+        <div class="pdf-page pdf-rel-page">
+            <div class="pdf-doc-inner pdf-rel-inner">
+                <div class="pdf-rel-header">
+                    <img src="img/lamicpdflogo.png" alt="LAMIC" style="height:40px;object-fit:contain;" onerror="this.style.display='none'">
+                    <div class="pdf-rel-header-info">
+                        <div class="pdf-rel-header-type">RELATÓRIO DE TECNOLOGIA DA INFORMAÇÃO</div>
+                        <div class="pdf-rel-header-periodo" id="pdf-rel-periodo">—</div>
+                    </div>
+                </div>
+                <div class="pdf-rel-title-bar">
+                    <span id="pdf-rel-titulo">Relatório de T.I.</span>
+                </div>
+                <div class="pdf-rel-meta-row">
+                    <span><strong>Responsável:</strong> <span id="pdf-rel-responsavel">—</span></span>
+                    <span><strong>Emissão:</strong> <span id="pdf-rel-data">—</span></span>
+                </div>
+                <div class="pdf-rel-section">
+                    <div class="pdf-rel-section-title">SUMÁRIO EXECUTIVO</div>
+                    <div class="pdf-rel-section-body" id="pdf-rel-sumario"></div>
+                </div>
+                <div class="pdf-rel-metrics">
+                    <div class="pdf-rel-metric-box"><div class="pdf-rel-metric-val" id="pdf-rel-chamados">0</div><div class="pdf-rel-metric-lbl">Chamados Atendidos</div></div>
+                    <div class="pdf-rel-metric-box"><div class="pdf-rel-metric-val" id="pdf-rel-equip">0</div><div class="pdf-rel-metric-lbl">Equip. Manutenidos</div></div>
+                    <div class="pdf-rel-metric-box"><div class="pdf-rel-metric-val" id="pdf-rel-uptime">—</div><div class="pdf-rel-metric-lbl">Uptime Sistemas</div></div>
+                </div>
+                <div id="pdf-rel-secoes-wrap"></div>
+                <div class="pdf-rel-section">
+                    <div class="pdf-rel-section-title">PRÓXIMAS AÇÕES</div>
+                    <div class="pdf-rel-section-body" id="pdf-rel-proximas"></div>
+                </div>
+                <div class="pdf-rel-footer">
+                    <div class="pdf-rel-sign-area">
+                        <div class="pdf-rel-sign-line"></div>
+                        <div class="pdf-rel-sign-name" id="pdf-rel-resp-foot">—</div>
+                        <div class="pdf-rel-sign-sub">Responsável pelo Relatório</div>
+                    </div>
+                    <img src="img/lamicpdfrodape.png" alt="" style="height:28px;object-fit:contain;opacity:.5;" onerror="this.style.display='none'">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         FORM: ORDEM DE SERVIÇO
+    ═══════════════════════════════════════════════════════ -->
+    <div id="tela-os" style="display:none; width:100%;">
+        <div class="top-bar">
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn-top-voltar" onclick="voltarMenuDe('tela-os')">⬅ Voltar ao Menu</button>
+                <button class="btn-top-home" onclick="(window.top||window).location.href='index.html'" title="Dashboard">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Dashboard
+                </button>
+            </div>
+            <button class="btn-top-limpar" onclick="limparOS()">🗑️ Limpar Dados</button>
+        </div>
+        <div class="form-wrapper">
+            <div class="header-form"><h2>Preencher Ordem de Serviço</h2></div>
+            <div class="form-container">
+                <div class="form-section">
+                    <h3>Identificação</h3>
+                    <div class="grid-2">
+                        <div><label>Nº da O.S.</label><input type="text" id="os-numero" placeholder="Ex: OS-042/2026"></div>
+                        <div><label>Data de Abertura</label><input type="date" id="os-data"></div>
+                        <div><label>Unidade / Cliente</label><input type="text" id="os-cliente" placeholder="Ex: Unidade Centro"></div>
+                        <div><label>Solicitante</label><input type="text" id="os-solicitante" placeholder="Ex: Maria — Recepção"></div>
+                        <div><label>Técnico Responsável</label><input type="text" id="os-tecnico" placeholder="Ex: Felipe — T.I."></div>
+                        <div><label>Tipo de Serviço</label>
+                            <select id="os-tipo">
+                                <option>Manutenção Corretiva</option>
+                                <option>Manutenção Preventiva</option>
+                                <option>Instalação / Configuração</option>
+                                <option>Suporte Técnico</option>
+                                <option>Substituição de Equipamento</option>
+                                <option>Outros</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-section">
+                    <h3>Descrição do Problema / Solicitação</h3>
+                    <textarea id="os-descricao" rows="4" placeholder="Descreva o problema relatado ou o serviço solicitado..."></textarea>
+                </div>
+                <div class="form-section">
+                    <h3>Serviços Realizados</h3>
+                    <div id="os-servicos-lista"></div>
+                    <button class="btn-add" onclick="adicionarServicoOS()">+ Adicionar Serviço</button>
+                </div>
+                <div class="form-section">
+                    <h3>Conclusão</h3>
+                    <div class="grid-2">
+                        <div><label>Status Final</label>
+                            <select id="os-status">
+                                <option value="Concluído">✅ Concluído</option>
+                                <option value="Pendente">⏳ Pendente — aguardando peça/aprovação</option>
+                                <option value="Em andamento">🔧 Em andamento</option>
+                            </select>
+                        </div>
+                        <div><label>Data de Encerramento</label><input type="date" id="os-data-fim"></div>
+                    </div>
+                    <div style="margin-top:12px"><label>Observações Finais</label><textarea id="os-obs" rows="3" placeholder="Observações adicionais, recomendações, peças utilizadas..."></textarea></div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn-gerar-pdf btn-preview" onclick="abrirJanelaOS()">🖨 Abrir / Imprimir</button>
+                <button class="btn-gerar-pdf" id="btn-gerar-os" onclick="gerarPDFOS()">📄 Baixar PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF: ORDEM DE SERVIÇO -->
+    <div id="template-os" style="display:none;">
+        <div class="pdf-page pdf-os-page">
+            <div class="pdf-doc-inner pdf-os-inner">
+                <div class="pdf-os-header">
+                    <img src="img/lamicpdflogo.png" alt="LAMIC" style="height:40px;object-fit:contain;" onerror="this.style.display='none'">
+                    <div class="pdf-os-header-right">
+                        <div class="pdf-os-type">ORDEM DE SERVIÇO</div>
+                        <div class="pdf-os-num" id="pdf-os-numero">OS-000/2026</div>
+                    </div>
+                </div>
+                <div class="pdf-os-info-grid">
+                    <div class="pdf-os-info-box"><div class="pdf-os-info-lbl">UNIDADE / CLIENTE</div><div id="pdf-os-cliente">—</div></div>
+                    <div class="pdf-os-info-box"><div class="pdf-os-info-lbl">SOLICITANTE</div><div id="pdf-os-solicitante">—</div></div>
+                    <div class="pdf-os-info-box"><div class="pdf-os-info-lbl">TÉCNICO</div><div id="pdf-os-tecnico">—</div></div>
+                    <div class="pdf-os-info-box"><div class="pdf-os-info-lbl">TIPO DE SERVIÇO</div><div id="pdf-os-tipo">—</div></div>
+                    <div class="pdf-os-info-box"><div class="pdf-os-info-lbl">DATA ABERTURA</div><div id="pdf-os-data">—</div></div>
+                    <div class="pdf-os-info-box"><div class="pdf-os-info-lbl">DATA ENCERRAMENTO</div><div id="pdf-os-data-fim">—</div></div>
+                </div>
+                <div class="pdf-os-section">
+                    <div class="pdf-os-section-title">DESCRIÇÃO DO PROBLEMA / SOLICITAÇÃO</div>
+                    <div class="pdf-os-section-body" id="pdf-os-descricao"></div>
+                </div>
+                <div class="pdf-os-section">
+                    <div class="pdf-os-section-title">SERVIÇOS REALIZADOS</div>
+                    <div id="pdf-os-servicos"></div>
+                </div>
+                <div class="pdf-os-section">
+                    <div class="pdf-os-section-title">OBSERVAÇÕES FINAIS</div>
+                    <div class="pdf-os-section-body" id="pdf-os-obs"></div>
+                </div>
+                <div class="pdf-os-status-bar" id="pdf-os-status-bar">
+                    <span id="pdf-os-status">Concluído</span>
+                </div>
+                <div class="pdf-os-footer">
+                    <div class="pdf-os-sign-col">
+                        <div class="pdf-os-sign-line"></div>
+                        <div class="pdf-os-sign-lbl">Técnico Responsável</div>
+                        <div class="pdf-os-sign-name" id="pdf-os-tecnico-foot">—</div>
+                    </div>
+                    <div class="pdf-os-sign-col">
+                        <div class="pdf-os-sign-line"></div>
+                        <div class="pdf-os-sign-lbl">Solicitante / Aprovação</div>
+                        <div class="pdf-os-sign-name" id="pdf-os-sol-foot">—</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="tela-formulario">
         <div class="top-bar">
-            <div>
+            <div style="display:flex;gap:8px;align-items:center;">
                 <button class="btn-top-voltar" onclick="voltarMenu()">⬅ Voltar ao Menu</button>
-                <button onclick="window.parent.postMessage('fecharGeradorPDF', '*')" style="cursor: pointer; padding: 8px 16px; background: #f8f7f7; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 13px; transition: 0.2s; text-transform: uppercase;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-                 🏠
-            </button>
+                <button class="btn-top-home" onclick="(window.top||window).location.href='index.html'" title="Dashboard">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Dashboard
+                </button>
             </div>
-
-                            <button class="btn-top-limpar" onclick="limparDados()" style="margin-left: 10px;">🗑️ Limpar Dados</button>
-
+            <button class="btn-top-limpar" onclick="limparDados()">🗑️ Limpar Dados</button>
         </div>
 
         <div class="form-wrapper">
@@ -145,8 +479,8 @@
                 </div>
                 
                 <div class="form-footer">
-                    <button class="btn-preview" onclick="abrirPreview()">👁️ Pré-visualizar PDF</button>
-                    <button class="btn-gerar-final" onclick="gerarPDF(false)" id="btn-gerar-direto">📄 Baixar Direto</button>
+                    <button class="btn-preview" onclick="abrirJanelaOrcamento(false)">👁️ Pré-visualizar</button>
+                    <button class="btn-gerar-final" onclick="abrirJanelaOrcamento('pdf')" id="btn-gerar-direto">📄 Baixar PDF</button>
                 </div>
             </div>
         </div>
