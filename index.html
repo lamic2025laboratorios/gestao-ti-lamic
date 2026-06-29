@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, set, push, onValue, update, remove, get }
+    import { getDatabase, ref, set, push, onValue, update, remove, get, runTransaction }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
     const firebaseConfig = {
       apiKey: "AIzaSyDH2gCOq5hbKTzaNVgaAZfKs0MvSTI2QkA",
@@ -23,6 +23,7 @@
     const db  = getDatabase(app);
     window._db=db; window._ref=ref; window._set=set; window._push=push;
     window._onValue=onValue; window._update=update; window._remove=remove; window._get=get;
+    window._runTransaction=runTransaction;
     window._firebaseReady=true;
     document.dispatchEvent(new Event("firebaseReady"));
   </script>
@@ -290,7 +291,7 @@
         <div class="sad-status"></div>
       </div>
       <nav class="sidebar-nav">
-        <div class="nav-section-label sb-txt">Principal</div>
+        <div class="nav-section-label sb-txt">Estoque</div>
         <button class="nav-item active" data-tab="tab-dashboard" onclick="App.adminTab(this)" data-tip="Dashboard">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>
           <span class="ni-txt">Dashboard</span>
@@ -301,17 +302,22 @@
           <span class="ni-txt">Calendário</span>
           <span class="ni-tip">Calendário</span>
         </button>
-        <div class="nav-section-label sb-txt">Gestão</div>
-        <button class="nav-item" data-tab="tab-inventario" onclick="App.adminTab(this)" data-tip="Inventário TI">
-          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/><polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="currentColor" stroke-width="2"/><line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2"/></svg>
-          <span class="ni-txt">Inventário TI</span>
-          <span class="ni-tip">Inventário TI</span>
-        </button>
         <button class="nav-item" data-tab="tab-requests" onclick="App.adminTab(this)" data-tip="Solicitações">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg>
           <span class="ni-txt">Solicitações</span>
           <span class="nav-badge" id="nav-badge-pending">0</span>
           <span class="ni-tip">Solicitações <span class="ni-tip-badge" id="ni-tip-badge">0</span></span>
+        </button>
+        <button class="nav-item" data-tab="tab-estoque" onclick="App.adminTab(this)" data-tip="Estoque">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="ni-txt">Estoque</span>
+          <span class="ni-tip">Estoque</span>
+        </button>
+        <div class="nav-section-label sb-txt">Gestão</div>
+        <button class="nav-item" data-tab="tab-inventario" onclick="App.adminTab(this)" data-tip="Inventário TI">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/><polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="currentColor" stroke-width="2"/><line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="ni-txt">Inventário TI</span>
+          <span class="ni-tip">Inventário TI</span>
         </button>
         <button class="nav-item" onclick="window.location.href='relatorios.html'" data-tip="Relatórios">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><line x1="18" y1="20" x2="18" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -358,6 +364,10 @@
               <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
               <input type="text" id="dash-search" placeholder="Buscar..." oninput="App.dashSearch(this.value)" />
             </div>
+            <button class="btn-dash-print" onclick="App.printDashboard()" title="Imprimir ou salvar em PDF">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Imprimir / PDF
+            </button>
           </div>
         </div>
 
@@ -457,7 +467,9 @@
           <!-- Row 1+2 Col 2: Status card spans both rows -->
           <div class="dash-col-right">
             <div class="chart-card status-big-card">
-              <div class="chart-card-header"><span>Status das Solicitações</span></div>
+              <div class="chart-card-header">
+                <span id="status-card-title">Status das Solicitações</span>
+              </div>
               <canvas id="chart-status" height="220" style="max-height:220px"></canvas>
               <div id="status-legend" class="status-legend-list"></div>
             </div>
@@ -526,6 +538,408 @@
             <div id="unit-spending-list" class="unit-spending-list"></div>
           </div>
         </div>
+
+        <!-- ── Cards de Consumo: Tintas e Pilhas/Baterias ── -->
+        <div class="consumo-grid">
+
+          <!-- Card Tintas -->
+          <div class="chart-card consumo-card">
+            <div class="consumo-card-head">
+              <div class="consumo-card-title">
+                <span class="consumo-ico consumo-ico-ink">🖨️</span>
+                <span>Tintas Compradas</span>
+              </div>
+              <div class="consumo-head-controls">
+                <select id="ink-year"  class="cons-year-sel"  onchange="App.setConsYear('ink',this.value)"></select>
+                <select id="ink-month" class="cons-month-sel hidden" onchange="App.setConsMonth('ink',this.value)"></select>
+                <div class="consumo-period-toggle">
+                  <button class="cons-per-btn"        data-kind="ink" data-period="week"  onclick="App.setConsPeriod('ink','week',this)">Semana</button>
+                  <button class="cons-per-btn"        data-kind="ink" data-period="month" onclick="App.setConsPeriod('ink','month',this)">Mês</button>
+                  <button class="cons-per-btn active" data-kind="ink" data-period="year"  onclick="App.setConsPeriod('ink','year',this)">Ano</button>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-body">
+              <div class="consumo-main">
+                <div class="consumo-big" id="ink-count">0</div>
+                <div class="consumo-big-lbl">tintas no período</div>
+                <span class="consumo-trend" id="ink-trend">—</span>
+              </div>
+              <div class="consumo-stats">
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Gasto total</span>
+                  <span class="consumo-stat-val" id="ink-spent">R$ 0,00</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Cor mais comprada</span>
+                  <span class="consumo-stat-val" id="ink-top-color">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Unidade que mais pediu</span>
+                  <span class="consumo-stat-val" id="ink-top-unit">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl" id="ink-prev-lbl">Período anterior</span>
+                  <span class="consumo-stat-val consumo-stat-muted" id="ink-prev">0 · R$ 0,00</span>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-breakdown" id="ink-breakdown"></div>
+          </div>
+
+          <!-- Card Pilhas/Baterias -->
+          <div class="chart-card consumo-card">
+            <div class="consumo-card-head">
+              <div class="consumo-card-title">
+                <span class="consumo-ico consumo-ico-bat">🔋</span>
+                <span>Pilhas &amp; Baterias</span>
+              </div>
+              <div class="consumo-head-controls">
+                <select id="bat-year"  class="cons-year-sel"  onchange="App.setConsYear('bat',this.value)"></select>
+                <select id="bat-month" class="cons-month-sel hidden" onchange="App.setConsMonth('bat',this.value)"></select>
+                <div class="consumo-period-toggle">
+                  <button class="cons-per-btn"        data-kind="bat" data-period="week"  onclick="App.setConsPeriod('bat','week',this)">Semana</button>
+                  <button class="cons-per-btn"        data-kind="bat" data-period="month" onclick="App.setConsPeriod('bat','month',this)">Mês</button>
+                  <button class="cons-per-btn active" data-kind="bat" data-period="year"  onclick="App.setConsPeriod('bat','year',this)">Ano</button>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-body">
+              <div class="consumo-main">
+                <div class="consumo-big" id="bat-count">0</div>
+                <div class="consumo-big-lbl">unidades no período</div>
+                <span class="consumo-trend" id="bat-trend">—</span>
+              </div>
+              <div class="consumo-stats">
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Gasto total</span>
+                  <span class="consumo-stat-val" id="bat-spent">R$ 0,00</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Modelo mais comprado</span>
+                  <span class="consumo-stat-val" id="bat-top-model">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Unidade que mais pediu</span>
+                  <span class="consumo-stat-val" id="bat-top-unit">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl" id="bat-prev-lbl">Período anterior</span>
+                  <span class="consumo-stat-val consumo-stat-muted" id="bat-prev">0 · R$ 0,00</span>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-breakdown" id="bat-breakdown"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── ESTOQUE ── -->
+      <div id="tab-estoque" class="tab-panel">
+        <div class="tab-header">
+          <div>
+            <h2>Gestão de Estoque</h2>
+            <p class="tab-subtitle">Controle itens disponíveis para retirada nas solicitações</p>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn-ghost" id="btn-limpar-mov" onclick="App.limparMovimentacoes()" title="Apaga entradas/saídas geradas por compras (preserva itens e movimentos manuais)" style="color:#d94040;border-color:#fca5a5">
+              <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:4px"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke="currentColor" stroke-width="2"/></svg>
+              Limpar Entr./Saí.
+            </button>
+            <button class="btn-ghost" id="btn-importar-compras" onclick="App.backfillEstoqueCompras()" title="Importa todas as compras já registradas para o estoque (entrada/saída)">
+              <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:4px"><path d="M21 12a9 9 0 11-9-9c2.5 0 4.8 1 6.5 2.7L21 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M21 3v5h-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Importar Compras
+            </button>
+            <button class="btn-primary" onclick="App.openEstoqueForm()">
+              <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:4px"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Novo Item
+            </button>
+          </div>
+        </div>
+
+        <!-- Filtro rápido -->
+        <div class="estoque-filter-row">
+          <select id="estoque-filter-grupo" class="filter-select" onchange="App.estoquePagina=1;App.renderEstoque()">
+            <option value="">Todos os grupos</option>
+          </select>
+          <input type="text" id="estoque-search" class="req-search-input" placeholder="Buscar produto..." oninput="App.estoquePagina=1;App.renderEstoque()" style="max-width:260px">
+        </div>
+
+        <!-- Estado vazio geral -->
+        <div id="estoque-empty-all" class="estoque-empty-all hidden">
+          <svg viewBox="0 0 24 24" fill="none" style="width:38px;opacity:.4"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+          <p>Nenhum item em estoque. Clique em <strong>Novo Item</strong> para adicionar.</p>
+        </div>
+
+        <!-- Card resumo de movimentação -->
+        <div id="estoque-resumo-card" class="estoque-resumo-card hidden">
+          <div class="resumo-box resumo-ent">
+            <div class="resumo-ico">↓</div>
+            <div><div class="resumo-val" id="resumo-entradas">0</div><div class="resumo-lbl">Entradas</div></div>
+          </div>
+          <div class="resumo-box resumo-sai">
+            <div class="resumo-ico">↑</div>
+            <div><div class="resumo-val" id="resumo-saidas">0</div><div class="resumo-lbl">Saídas</div></div>
+          </div>
+          <div class="resumo-box resumo-sld">
+            <div class="resumo-ico">∑</div>
+            <div><div class="resumo-val" id="resumo-saldo">0</div><div class="resumo-lbl">Saldo Total</div></div>
+          </div>
+          <div class="resumo-box resumo-zer">
+            <div class="resumo-ico">⚠</div>
+            <div><div class="resumo-val" id="resumo-zerados">0</div><div class="resumo-lbl">Zerados</div></div>
+          </div>
+        </div>
+
+        <!-- Tabela de itens -->
+        <div id="estoque-inv-section" class="hidden">
+          <div class="estoque-sec-title">
+            Itens em Estoque
+            <button id="btn-ver-zerados" class="btn-ver-zerados hidden" onclick="App.toggleVerZerados(this)">Ver zerados</button>
+          </div>
+          <div class="table-wrap" style="margin-top:8px">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Produto</th>
+                  <th>Grupo</th>
+                  <th>Subgrupo</th>
+                  <th>Quantidade</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="estoque-tbody"></tbody>
+            </table>
+          </div>
+          <div id="estoque-pager" class="estoque-pager hidden">
+            <button id="estoque-prev" class="estoque-pager-btn" onclick="App.estoquePage('prev')">‹ Anterior</button>
+            <span id="estoque-pager-info" class="estoque-pager-info">1 / 1</span>
+            <button id="estoque-next" class="estoque-pager-btn" onclick="App.estoquePage('next')">Próximo ›</button>
+          </div>
+        </div>
+
+        <!-- Cards Entrada / Saída (preview 5 itens + scroll) -->
+        <div id="estoque-cards-grid" class="estoque-cards-grid hidden">
+
+          <!-- Card Entradas -->
+          <div class="estoque-mov-card">
+            <div class="estoque-mov-card-head">
+              <div class="emc-title"><span class="sec-dot dot-ent"></span> Entradas
+                <span id="estoque-entradas-count" class="estoque-sec-badge" style="background:#1db87a">0</span>
+              </div>
+              <div class="emc-actions">
+                <div class="emc-sort">
+                  <button class="emc-sort-btn active" id="sort-ent-desc" onclick="App.setMovSort('entrada','desc',this)" title="Mais recente">↓</button>
+                  <button class="emc-sort-btn" id="sort-ent-asc" onclick="App.setMovSort('entrada','asc',this)" title="Mais antiga">↑</button>
+                </div>
+                <button class="emc-ver-btn" onclick="App.openMovHist('entrada')">Histórico</button>
+              </div>
+            </div>
+            <input type="text" id="estoque-entradas-search" class="emc-search" placeholder="Buscar produto, lote, origem..." oninput="App.setMovSearch('entrada', this.value)">
+            <div id="estoque-entradas-list" class="estoque-mov-list"></div>
+          </div>
+
+          <!-- Card Saídas -->
+          <div class="estoque-mov-card">
+            <div class="estoque-mov-card-head">
+              <div class="emc-title"><span class="sec-dot dot-sai"></span> Saídas
+                <span id="estoque-saidas-count" class="estoque-sec-badge" style="background:#e8830a">0</span>
+              </div>
+              <div class="emc-actions">
+                <div class="emc-sort">
+                  <button class="emc-sort-btn active" id="sort-sai-desc" onclick="App.setMovSort('saida','desc',this)" title="Mais recente">↓</button>
+                  <button class="emc-sort-btn" id="sort-sai-asc" onclick="App.setMovSort('saida','asc',this)" title="Mais antiga">↑</button>
+                </div>
+                <button class="emc-ver-btn" onclick="App.openMovHist('saida')">Histórico</button>
+              </div>
+            </div>
+            <input type="text" id="estoque-saidas-search" class="emc-search" placeholder="Buscar produto, destino, origem..." oninput="App.setMovSearch('saida', this.value)">
+            <div id="estoque-saidas-list" class="estoque-mov-list"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Modal: Histórico completo de movimentações -->
+      <div id="mov-hist-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:880px">
+          <div class="modal-header">
+            <h3 id="mov-hist-title">Histórico</h3>
+            <button class="modal-close" onclick="App.closeMovHist()">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" id="mov-hist-search" class="req-search-input" placeholder="Buscar..." oninput="App.setMovHistSearch(this.value)" style="max-width:100%;margin-bottom:10px">
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead id="mov-hist-thead"></thead>
+                <tbody id="mov-hist-tbody"></tbody>
+              </table>
+            </div>
+            <div class="estoque-pager" style="margin-top:14px">
+              <button id="mov-hist-prev" class="estoque-pager-btn" onclick="App.movHistPage('prev')">‹ Anterior</button>
+              <span id="mov-hist-pager-info" class="estoque-pager-info">1 / 1</span>
+              <button id="mov-hist-next" class="estoque-pager-btn" onclick="App.movHistPage('next')">Próximo ›</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Detalhe de uma movimentação -->
+      <div id="mov-detail-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:520px">
+          <div class="modal-header">
+            <h3 id="mov-detail-title">Detalhe da Movimentação</h3>
+            <button class="modal-close" onclick="App.closeMovDetail()">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+          <div class="modal-body" id="mov-detail-body"></div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="App.closeMovDetail()">Fechar</button>
+            <button class="btn-delete" id="mov-detail-del-btn" onclick="App.deleteMovimento()">Apagar movimento</button>
+            <button class="btn-primary" id="mov-detail-date-btn" onclick="App.movDetailEditDate()">Alterar Data</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Editar data da movimentação -->
+      <div id="mov-date-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:400px">
+          <div class="modal-header">
+            <h3>Alterar Data da Movimentação</h3>
+            <button class="modal-close" onclick="App.closeMovDate()">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="mov-date-id">
+            <div class="form-group">
+              <label class="form-label">Data</label>
+              <input type="date" id="mov-date-input" class="input-field">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="App.closeMovDate()">Cancelar</button>
+            <button class="btn-primary" onclick="App.saveMovDate()">Salvar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Novo/Editar Item de Estoque -->
+      <div id="estoque-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:620px">
+          <div class="modal-header">
+            <h3 id="estoque-form-title">Novo Item em Estoque</h3>
+            <button class="modal-close" onclick="App.closeEstoqueForm()">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="estoque-edit-id">
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label">Grupo *</label>
+                <select id="estoque-grupo" class="input-field select-styled" onchange="App.onEstoqueGrupoChange()">
+                  <option value="">— Selecione —</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Subgrupo</label>
+                <select id="estoque-subgrupo" class="input-field select-styled">
+                  <option value="">— Selecione —</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:10px">
+              <label class="form-label">Produto / Descrição *</label>
+              <input type="text" id="estoque-produto" class="input-field" list="estoque-produto-list" placeholder="Ex: Tinta Ciano HP 122">
+              <datalist id="estoque-produto-list"></datalist>
+            </div>
+            <div class="form-row-2" style="margin-top:10px">
+              <div class="form-group">
+                <label class="form-label">Fornecedor</label>
+                <select id="estoque-fornecedor" class="input-field select-styled">
+                  <option value="">— Selecione —</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Quantidade *</label>
+                <input type="number" id="estoque-qtd" class="input-field" min="0" placeholder="0">
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:10px">
+              <label class="form-label">Data da movimentação</label>
+              <input type="date" id="estoque-data" class="input-field">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="App.closeEstoqueForm()">Cancelar</button>
+            <button class="btn-primary" onclick="App.saveEstoqueItem()">
+              <svg viewBox="0 0 24 24" fill="none" style="width:14px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8" stroke="currentColor" stroke-width="2"/></svg>
+              Salvar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: COMPRA COMBINADA ── -->
+      <div id="compra-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:680px">
+          <div class="modal-header">
+            <h3>Compra Combinada</h3>
+            <button class="modal-close" onclick="App.closeCompraModal()">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p class="tab-subtitle" style="margin:0 0 12px">Compre vários pedidos juntos num só pagamento (parcelado ou à vista). Cada pedido guarda sua fatia do valor.</p>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label">Fornecedor</label>
+                <select id="compra-fornecedor" class="input-field select-styled">
+                  <option value="">— Selecione —</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Data da Compra</label>
+                <input type="date" id="compra-data" class="input-field">
+              </div>
+            </div>
+            <div class="form-row-2" style="margin-top:8px">
+              <div class="form-group">
+                <label class="form-label">Valor Total da Compra (R$)</label>
+                <input type="number" id="compra-total" class="input-field" min="0" step="0.01" placeholder="0,00" oninput="App.calcCompraResumo()">
+              </div>
+              <div class="form-group">
+                <label class="toggle-label" style="margin-top:24px">
+                  <input type="checkbox" id="chk-compra-parcelas" onchange="App.toggleCompraParcelas()" />
+                  <span class="toggle-switch"></span>
+                  Parcelar
+                </label>
+              </div>
+            </div>
+            <div id="compra-parcelas-wrap" class="hidden form-group" style="margin-top:4px">
+              <label class="form-label">Nº de Parcelas</label>
+              <input type="number" id="compra-parcelas-n" class="input-field" min="2" placeholder="Ex.: 3" style="max-width:160px">
+            </div>
+
+            <div class="form-group" style="margin-top:12px">
+              <label class="form-label">Solicitações desta compra</label>
+              <input type="text" id="compra-search" class="req-search-input" placeholder="Buscar por #, unidade, grupo..." oninput="App.renderCompraReqList()" style="max-width:100%;margin-bottom:8px">
+              <div id="compra-req-list" class="compra-req-list"></div>
+            </div>
+
+            <div id="compra-resumo" class="compra-resumo"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="App.closeCompraModal()">Cancelar</button>
+            <button class="btn-primary" id="btn-salvar-compra" onclick="App.saveCompraCombinada()">Registrar Compra</button>
+          </div>
+        </div>
       </div>
 
       <!-- ── CALENDÁRIO ── -->
@@ -578,31 +992,12 @@
             <p class="tab-subtitle">Gerencie e atualize o status de cada pedido</p>
           </div>
           <div class="filter-row" style="flex-wrap:wrap;gap:8px;align-items:center">
-            <!-- Busca ao vivo unificada -->
+            <!-- Busca ao vivo -->
             <div class="req-search-wrap">
               <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
               <input type="text" id="req-live-search" class="req-search-input" placeholder="Buscar por unidade, grupo, status, fornecedor, resumo..." oninput="App.renderRequests()" />
             </div>
-            <!-- Filtro período -->
-            <div class="date-range-bar" style="margin:0;padding:8px 14px;flex:none">
-              <div class="date-range-label">
-                <svg viewBox="0 0 24 24" fill="none" style="width:13px"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>
-                Período
-              </div>
-              <div class="date-range-inputs">
-                <label class="date-range-field">
-                  <span>De</span>
-                  <input type="date" id="req-date-from" class="input-field" onchange="App.renderRequests()" />
-                </label>
-                <span class="date-range-sep">→</span>
-                <label class="date-range-field">
-                  <span>Até</span>
-                  <input type="date" id="req-date-to" class="input-field" onchange="App.renderRequests()" />
-                </label>
-                <button class="btn-date-clear" onclick="App.clearReqDateRange()">✕</button>
-              </div>
-            </div>
-            <!-- Selects originais ocultos (lógica do script.js intacta) -->
+            <!-- Selects ocultos (usados pelo renderRequests) -->
             <select id="filter-status" style="display:none" onchange="App.renderRequests()">
               <option value="">Todos os status</option>
               <option value="Solicitado">Solicitado</option>
@@ -611,13 +1006,12 @@
               <option value="Estoque">Estoque</option>
               <option value="Negado">Negado</option>
             </select>
-            <select id="filter-unit-req" style="display:none" onchange="App.renderRequests()">
-              <option value="">Todas as unidades</option>
-            </select>
-            <select id="filter-group-req" style="display:none" onchange="App.renderRequests()">
-              <option value="">Todos os grupos</option>
-            </select>
+            <select id="filter-unit-req" style="display:none" onchange="App.renderRequests()"></select>
+            <select id="filter-group-req" style="display:none" onchange="App.renderRequests()"></select>
+            <button id="btn-numerar-seq" class="btn-secondary" onclick="App.backfillSeq()" title="Atribui número (#) às solicitações que ainda não têm">Numerar</button>
+            <button id="btn-compra-combinada" class="btn-secondary" onclick="App.openCompraModal()" title="Comprar vários pedidos juntos (parcelado ou à vista)">Compra combinada</button>
           </div>
+
         </div>
 
         <!-- ── Mini-KPIs (4 cards) ── -->
@@ -702,30 +1096,85 @@
         </div>
         <!-- fim mini-KPIs -->
 
-        <!-- ── Barra de Ordenação e Filtro de Status ── -->
-        <div class="req-filter-bar">
-          <div class="req-filter-group">
-            <span class="req-filter-lbl">Ordenar por data:</span>
-            <button class="btn-sort-req active" id="sort-req-desc" onclick="App.setSortDate('desc',this)" title="Mais recentes primeiro">
-              <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Mais recente
-            </button>
-            <button class="btn-sort-req" id="sort-req-asc" onclick="App.setSortDate('asc',this)" title="Mais antigos primeiro">
-              <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Mais antigo
-            </button>
-          </div>
-          <div class="req-filter-sep"></div>
-          <div class="req-filter-group">
-            <span class="req-filter-lbl">Status:</span>
-            <button class="btn-toggle-all-status" id="btn-toggle-all-status" onclick="App.toggleAllStatus(this)" title="Marcar/Desmarcar todos">Todos ✓</button>
-            <button class="req-status-chip chip-sol active" data-status="Solicitado"  onclick="App.toggleStatusFilter(this)">Solicitado</button>
-            <button class="req-status-chip chip-agu active" data-status="Aguardando" onclick="App.toggleStatusFilter(this)">Aguardando</button>
-            <button class="req-status-chip chip-com active" data-status="Comprado"   onclick="App.toggleStatusFilter(this)">Comprado</button>
-            <button class="req-status-chip chip-est active" data-status="Estoque"    onclick="App.toggleStatusFilter(this)">Estoque</button>
-            <button class="req-status-chip chip-neg active" data-status="Negado"     onclick="App.toggleStatusFilter(this)">Negado</button>
+        <!-- Toggle filtro -->
+        <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+          <button class="btn-req-filter-toggle" id="btn-req-filter-toggle" onclick="App.toggleReqFilterPanel()">
+            <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span id="btn-filter-label">Mostrar Filtros</span>
+          </button>
+        </div>
+
+        <!-- ── Filtro completo ── -->
+        <div id="req-filter-panel" class="req-filter-panel hidden">
+          <div class="req-filter-panel-inner">
+            <!-- Status chips -->
+            <div class="req-filter-group">
+              <span class="req-filter-label">Status</span>
+              <button class="btn-toggle-all-status" id="btn-toggle-all-status" onclick="App.toggleAllStatus(this)">Todos ✓</button>
+              <button class="req-status-chip chip-sol active" data-status="Solicitado" onclick="App.toggleStatusFilter(this)">Solicitado</button>
+              <button class="req-status-chip chip-agu active" data-status="Aguardando" onclick="App.toggleStatusFilter(this)">Aguardando</button>
+              <button class="req-status-chip chip-com active" data-status="Comprado"   onclick="App.toggleStatusFilter(this)">Comprado</button>
+              <button class="req-status-chip chip-est active" data-status="Estoque"    onclick="App.toggleStatusFilter(this)">Estoque</button>
+              <button class="req-status-chip chip-neg active" data-status="Negado"     onclick="App.toggleStatusFilter(this)">Negado</button>
+              <select id="filter-parcelado" class="req-filter-select" onchange="App.renderRequests()" title="Filtrar compras parceladas" style="margin-left:8px">
+                <option value="">Parcelamento: todos</option>
+                <option value="parcelado">Só parceladas</option>
+                <option value="parcelado-antigo">Parceladas antigas (migrar)</option>
+                <option value="combinada">Compra combinada</option>
+              </select>
+            </div>
+            <!-- Unidade + Grupo -->
+            <div class="req-filter-group">
+              <span class="req-filter-label">Unidade</span>
+              <select id="req-filter-unit-vis" class="req-filter-select" onchange="document.getElementById('filter-unit-req').value=this.value; App.renderRequests()">
+                <option value="">Todas</option>
+              </select>
+              <span class="req-filter-label" style="margin-left:12px">Grupo</span>
+              <select id="req-filter-group-vis" class="req-filter-select" onchange="document.getElementById('filter-group-req').value=this.value; App.renderRequests()">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <!-- Ordenação por data de solicitação -->
+            <div class="req-filter-group">
+              <span class="req-filter-label">Ord. Solicitação</span>
+              <button class="req-sort-btn active" id="sort-req-desc" onclick="App.setReqSort('createdAt','desc',this)">
+                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                Mais recente
+              </button>
+              <button class="req-sort-btn" id="sort-req-asc" onclick="App.setReqSort('createdAt','asc',this)">
+                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                Mais antiga
+              </button>
+              <span class="req-filter-label" style="margin-left:12px">Ord. Envio</span>
+              <button class="req-sort-btn" id="sort-sent-desc" onclick="App.setReqSort('shippedAt','desc',this)">
+                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                Mais recente
+              </button>
+              <button class="req-sort-btn" id="sort-sent-asc" onclick="App.setReqSort('shippedAt','asc',this)">
+                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                Mais antiga
+              </button>
+            </div>
+            <!-- Datas de intervalo -->
+            <div class="req-filter-group">
+              <span class="req-filter-label">Data solicitação</span>
+              <input type="date" id="req-date-from" class="req-filter-date" onchange="App.renderRequests()">
+              <span style="color:#8898b8">→</span>
+              <input type="date" id="req-date-to" class="req-filter-date" onchange="App.renderRequests()">
+              <span class="req-filter-label" style="margin-left:12px">Data envio</span>
+              <input type="date" id="req-sent-from" class="req-filter-date" onchange="App.renderRequests()">
+              <span style="color:#8898b8">→</span>
+              <input type="date" id="req-sent-to" class="req-filter-date" onchange="App.renderRequests()">
+              <button class="btn-req-clear-all" onclick="App.clearAllReqFilters()" style="margin-left:8px">
+                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                Limpar
+              </button>
+            </div>
           </div>
         </div>
+
+        <div id="dash-stats-bar" class="req-stats-bar"></div>
+        <div id="dash-negados-bar" class="req-negados-bar" style="display:none"></div>
 
         <div class="table-wrap">
           <table class="data-table">
@@ -1030,6 +1479,34 @@
           </div>
         </div>
       </div>
+      <!-- Painel Estoque — aparece só quando status = Estoque -->
+      <div id="modal-estoque-panel" class="modal-section hidden">
+        <div class="modal-section-title">
+          <svg viewBox="0 0 24 24" fill="none" style="width:16px"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+          Retirada do Estoque
+        </div>
+        <div id="modal-estoque-lista" class="estoque-modal-lista">
+          <div class="estoque-modal-empty">Nenhum item em estoque para este grupo/subgrupo.</div>
+        </div>
+        <div class="form-group" style="margin-top:8px">
+          <label class="form-label">Item selecionado</label>
+          <select id="modal-estoque-sel" class="input-field select-styled" onchange="App.onEstoqueSelChange()">
+            <option value="">— Selecione o item —</option>
+          </select>
+        </div>
+        <div class="form-row-2" style="margin-top:8px">
+          <div class="form-group">
+            <label class="form-label">Disponível em estoque</label>
+            <input type="text" id="modal-estoque-disp" class="input-field" readonly style="background:var(--surface-2)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantidade a retirar</label>
+            <input type="number" id="modal-estoque-qty" class="input-field" min="1" placeholder="1" oninput="App.validateRetiradaQty()">
+          </div>
+        </div>
+        <div id="estoque-retirada-warn" class="hidden" style="margin-top:6px;font-size:.78rem;font-weight:700;color:#d94040"></div>
+      </div>
+
       <div id="modal-shipping-fields" class="modal-section hidden">
         <div class="modal-section-title">
           <svg viewBox="0 0 24 24" fill="none"><rect x="1" y="3" width="15" height="13" stroke="currentColor" stroke-width="2"/><path d="M16 8h4l3 3v5h-7V8zM5.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" stroke="currentColor" stroke-width="2"/></svg>
@@ -1046,6 +1523,44 @@
           <div class="form-group" id="ship-date-wrap">
             <label class="form-label">Data do Envio</label>
             <input type="date" id="modal-ship-date" class="input-field" />
+          </div>
+        </div>
+        <!-- Quantidade enviada vs. comprada (só Comprado) -->
+        <div id="modal-qty-enviada-wrap" class="form-row-2 hidden" style="margin-top:8px">
+          <div class="form-group">
+            <label class="form-label">Quantidade Enviada</label>
+            <input type="number" id="modal-qty-enviada" class="input-field" min="0" placeholder="0" oninput="App.calcRestoEstoque()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Vai p/ Estoque</label>
+            <input type="text" id="modal-qty-resto" class="input-field" readonly style="background:var(--surface-2)" />
+          </div>
+        </div>
+        <!-- Combo: também enviar itens do estoque (só Comprado) -->
+        <div id="modal-combo-estoque-wrap" class="hidden" style="margin-top:10px">
+          <label class="toggle-label">
+            <input type="checkbox" id="chk-combo-estoque" onchange="App.toggleComboEstoque()" />
+            <span class="toggle-switch"></span>
+            Também enviar itens do estoque
+          </label>
+          <div id="combo-estoque-fields" class="hidden" style="margin-top:8px">
+            <div class="form-group">
+              <label class="form-label">Item do estoque</label>
+              <select id="modal-combo-estoque-sel" class="input-field select-styled" onchange="App.onComboEstoqueSelChange()">
+                <option value="">— Selecione —</option>
+              </select>
+            </div>
+            <div class="form-row-2" style="margin-top:8px">
+              <div class="form-group">
+                <label class="form-label">Disponível em estoque</label>
+                <input type="text" id="modal-combo-estoque-disp" class="input-field" readonly style="background:var(--surface-2)" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Qtd retirada do estoque</label>
+                <input type="number" id="modal-combo-estoque-qty" class="input-field" min="0" placeholder="0" oninput="App.validateComboQty()" />
+              </div>
+            </div>
+            <div id="combo-estoque-warn" class="hidden" style="margin-top:6px;font-size:.78rem;font-weight:700;color:#d94040"></div>
           </div>
         </div>
       </div>
