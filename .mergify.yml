@@ -1,35 +1,59 @@
 pull_request_rules:
 
-  # Faz merge automático quando o PR for aprovado e não houver changes requested
   - name: Merge automático após aprovação
     conditions:
       - base=main
       - "#approved-reviews-by >= 1"
       - "#changes-requested-reviews-by = 0"
       - -conflict
+      - -label=blocked
     actions:
       merge:
-        method: merge
+        method: squash
         commit_message_template: |
           {{ title }} (#{{ number }})
 
           {{ body }}
 
-  # Avisa sobre conflitos no PR
+  - name: Deletar branch após merge
+    conditions:
+      - merged
+    actions:
+      delete_head_branch: {}
+
   - name: Comentar sobre conflitos
     conditions:
       - conflict
     actions:
       comment:
         message: |
-          ⚠️ Este PR possui conflitos com a branch base. Por favor, resolva os conflitos antes de fazer o merge.
+          Este PR possui conflitos com a branch base. Por favor, resolva os conflitos antes de fazer o merge.
+      label:
+        add:
+          - conflito
 
-  # Fecha PRs com o label "wontfix"
+  - name: Auto-label feature
+    conditions:
+      - head~=^feature/
+    actions:
+      label:
+        add:
+          - feature
+
+  - name: Auto-label hotfix
+    conditions:
+      - head~=^hotfix/
+    actions:
+      label:
+        add:
+          - hotfix
+
   - name: Fechar PRs marcados como wontfix
     conditions:
       - label=wontfix
     actions:
       close:
-        message: Este PR foi fechado por estar marcado como **wontfix**.
+        message: Este PR foi fechado por estar marcado como wontfix.
+
 merge_protections_settings:
   reporting_method: check-runs

@@ -1154,16 +1154,12 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   padding: 0 6px; letter-spacing: .02em; width: fit-content;
 }
 
-/* Tag de compra combinada na lista (lilás) */
+/* Tag de compra combinada na lista */
 .compra-codigo-tag {
   display: inline-block; margin-top: 3px; margin-left: 4px;
-  font-size: .68rem; font-weight: 800; color: #6d28d9;
-  background: #f3edff; border: 1px solid #ddd0fb; border-radius: 4px; padding: 1px 7px;
-  letter-spacing: .02em;
+  font-size: .68rem; font-weight: 700; color: #b45309;
+  background: #fff7ed; border: 1px solid #fed7aa; border-radius: 4px; padding: 1px 7px;
 }
-/* Linha de pedido pertencente a uma compra combinada */
-.row-compra td:first-child { position: relative; }
-.row-compra:hover { filter: brightness(.985); }
 
 /* Modal Compra Combinada */
 .compra-req-list {
