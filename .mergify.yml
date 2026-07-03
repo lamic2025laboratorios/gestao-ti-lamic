@@ -53,7 +53,6 @@ pull_request_rules:
       - label=wontfix
     actions:
       close:
-        message: Este PR foi fechado por estar marcado como wontfix.
-
+        message: Este PR foi fechado por estar marcado como **wontfix**.
 merge_protections_settings:
   reporting_method: check-runs
