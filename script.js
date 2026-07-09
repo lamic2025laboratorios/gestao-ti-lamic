@@ -162,7 +162,9 @@ const App = {
     const user = document.getElementById('admin-user').value.trim();
     const pass = document.getElementById('admin-pass').value;
     const err  = document.getElementById('login-error');
-    if (State.admins && State.admins[user] === pass) {
+    const rec = State.admins && State.admins[user];
+    const senhaOk = typeof rec === 'string' ? rec === pass : (rec && rec.pass === pass);
+    if (senhaOk) {
       err.classList.add('hidden');
       State.adminUser = user;
       LS.save('adminUser', user);
@@ -960,22 +962,23 @@ const App = {
     }
     const grandTotal = itemsData.reduce((s, it) => s + parseFloat(it.valorTotal), 0);
 
+    // Snapshot ANTES (só na edição) — para o log mostrar de → para por item.
+    const antes = manageCodigo ? ids.reduce((o, id) => {
+      const r = (State.requests || {})[id] || {};
+      o[id] = { valor: r.valor, shippedAt: r.shippedAt, fornecedor: r.fornecedor, boughtAt: r.boughtAt, seq: r.seq };
+      return o;
+    }, {}) : null;
+
     const btn = document.getElementById('btn-salvar-compra');
     const orig = btn ? btn.innerHTML : '';
     if (btn) { btn.innerHTML = 'Salvando…'; btn.disabled = true; }
     try {
       let codigo, compraId;
       if (manageCodigo) {
-        // EDIÇÃO: mantém código e node compras existentes
+        // EDIÇÃO: mantém o código; localiza o node compras (pode não existir)
         codigo = manageCodigo;
         const entry = Object.entries(State.compras || {}).find(([, c]) => c.codigo === manageCodigo);
         compraId = entry?.[0] || null;
-        if (compraId) {
-          await DB.update(`compras/${compraId}`, {
-            fornecedor, boughtAt: data, valorTotal: grandTotal.toFixed(2),
-            parcelas: parcelar ? App._buildParcelas(data, n, grandTotal) : null
-          });
-        }
       } else {
         // CRIAÇÃO: novo código sequencial + node compras
         const txr = await DB.tx('meta/lastCompra', cur => (cur || 0) + 1);
@@ -990,6 +993,7 @@ const App = {
         compraId = compraRef.key;
       }
 
+      // 1) Grava os requests PRIMEIRO — é a fonte de verdade da compra combinada.
       const ops = [];
       itemsData.forEach(it => {
         const upd = {
@@ -1004,25 +1008,62 @@ const App = {
           subgrupo: it.subgrupo,
           solicitante: it.solicitante,
           formaPagamento,
-          compraId, compraCodigo: codigo,
+          compraId: compraId || null, compraCodigo: codigo,
           parcelas: parcelar ? App._buildParcelas(data, n, parseFloat(it.valorTotal)) : null,
-          shippedStatus: 'Não',
-          shippedAt: it.envio
+          // Rastreabilidade do Envio: se há data, marca como enviado (assim a data
+          // aparece na solicitação — antes ficava 'Não' e a data nunca era exibida).
+          shippedStatus: it.envio ? 'Sim' : 'Não',
+          shippedAt: it.envio || null
         };
         ops.push(DB.update(`requests/${it.id}`, upd));
       });
       await Promise.all(ops);
 
+      // 2) Atualiza o node compras (na edição) — NÃO fatal: se falhar, os requests
+      //    já foram salvos, então a alteração não se perde.
+      if (manageCodigo && compraId) {
+        try {
+          await DB.update(`compras/${compraId}`, {
+            fornecedor, boughtAt: data, valorTotal: grandTotal.toFixed(2),
+            parcelas: parcelar ? App._buildParcelas(data, n, grandTotal) : null
+          });
+        } catch (e2) { console.warn('[saveCompraCombinada] falha ao atualizar node compras (requests já salvos):', e2); }
+      }
+
       toast(manageCodigo
         ? `✓ Compra ${codigo} atualizada · ${ids.length} pedido(s).`
         : `✓ Compra ${codigo} registrada · ${ids.length} pedido(s).`);
-      App._logActivity('Solicitações', manageCodigo ? 'Compra combinada atualizada' : 'Compra combinada registrada', `${codigo} · ${ids.length} pedido(s)`);
+
+      // Monta o de → para (o que mudou) para o detalhe do log.
+      const mudancas = [];
+      if (manageCodigo && antes) {
+        const fmtR = v => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const fmtD = s => s ? (() => { const [y,m,d] = s.substring(0,10).split('-'); return `${d}/${m}/${y}`; })() : '—';
+        const p0 = antes[ids[0]] || {};
+        if ((p0.fornecedor || '') !== (fornecedor || ''))
+          mudancas.push({ campo: 'Fornecedor', de: p0.fornecedor || '—', para: fornecedor || '—' });
+        if ((p0.boughtAt || '').substring(0,10) !== data)
+          mudancas.push({ campo: 'Data da compra', de: fmtD(p0.boughtAt), para: fmtD(data) });
+        itemsData.forEach(it => {
+          const a = antes[it.id] || {};
+          const sl = a.seq != null ? 'SL-' + a.seq : it.id;
+          if (parseFloat(a.valor || 0) !== it.val)
+            mudancas.push({ campo: `${sl} · Valor`, de: fmtR(a.valor), para: fmtR(it.val) });
+          if ((a.shippedAt || '').substring(0,10) !== (it.envio || ''))
+            mudancas.push({ campo: `${sl} · Data de envio`, de: fmtD(a.shippedAt), para: fmtD(it.envio) });
+        });
+      }
+      const resumoMud = mudancas.length ? mudancas.map(m => m.campo).join(', ') : (manageCodigo ? 'sem alterações de valor/envio' : '');
+      App._logActivity('Solicitações',
+        manageCodigo ? `Compra combinada ${codigo} atualizada` : `Compra combinada ${codigo} registrada`,
+        `${ids.length} pedido(s)${resumoMud ? ' · ' + resumoMud : ''}`,
+        { alvo: codigo, mudancas });
       App._compraManageCodigo = null;
       App.closeCompraModal();
       App.renderRequests(); App.renderDashboard(); App.updatePendingBadge();
     } catch (e) {
       console.error('[saveCompraCombinada] erro', e);
-      toast('Erro ao registrar compra. Veja o console.', 'error');
+      toast('Erro ao salvar: ' + (e?.message || e || 'desconhecido'), 'error');
     } finally {
       if (btn) { btn.innerHTML = orig; btn.disabled = false; }
     }
@@ -1288,13 +1329,19 @@ const App = {
   },
 
   setReqSort(field, dir, btn) {
+    // Toggle: clicar no botão já ativo desmarca e volta ao padrão (mais recente por solicitação)
+    if (btn && btn.classList.contains('active')) {
+      App.reqSortField = 'createdAt';
+      App.reqSortDir   = 'desc';
+      document.querySelectorAll('.req-sort-btn').forEach(b => b.classList.remove('active'));
+      App.renderRequests();
+      return;
+    }
     App.reqSortField = field;
     App.reqSortDir   = dir;
-    // Destaca botão ativo no grupo correto
-    const prefix = field === 'shippedAt' ? 'sort-sent-' : 'sort-req-';
-    ['asc','desc'].forEach(d => {
-      document.getElementById(prefix+d)?.classList.toggle('active', d === dir);
-    });
+    // Só um botão ativo por vez (limpa os dois pares e marca o clicado)
+    document.querySelectorAll('.req-sort-btn').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
     App.renderRequests();
   },
 
@@ -1680,19 +1727,41 @@ const App = {
       'Solicitações': '<svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2"/></svg>'
     };
     const icoDefault = '<svg viewBox="0 0 24 24" fill="none" width="13" height="13"><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg>';
-    const TOP = 12;
-    el.innerHTML = logs.slice(0, TOP).map(l => {
+    const TOP = 15;
+    // Agrupado por DIA: cabeçalho de dia (Hoje/Ontem/data) + itens daquele dia.
+    let html = '';
+    let ultimoDia = null;
+    logs.slice(0, TOP).forEach(l => {
+      const dia = (l.ts || '').substring(0, 10);
+      if (dia !== ultimoDia) {
+        ultimoDia = dia;
+        const nDia = logs.filter(x => (x.ts || '').substring(0, 10) === dia).length;
+        html += `<div class="log-dia-header"><span>${App._labelDia(dia)}</span><span class="log-dia-count">${nDia}</span></div>`;
+      }
       const quem = l.ator + (l.unitName ? ` (${l.unitName})` : (l.atorTipo === 'admin' ? ' (Admin)' : ''));
-      return `
+      const hora = l.ts && l.ts.length > 10 ? l.ts.substring(11, 16) : '';
+      html += `
       <div class="mgmt-item" onclick="App.showActivityDetail('${l.id}')" title="Clique para ver o que foi feito/modificado">
         <span class="mgmt-item-badge mgmt-log-ico" title="${l.modulo || '—'}">${icones[l.modulo] || icoDefault}</span>
         <div class="mgmt-item-body">
           <div class="mgmt-item-title"><strong>${quem}</strong> — ${l.acao || '—'}</div>
           ${l.detalhe ? `<div class="mgmt-item-sub">${l.detalhe}</div>` : ''}
         </div>
-        <span class="mgmt-item-date">${App._fmtDataHora(l.ts)}</span>
+        <span class="mgmt-item-date">${hora}</span>
       </div>`;
-    }).join('');
+    });
+    el.innerHTML = html;
+  },
+
+  // Rótulo amigável do dia para os cabeçalhos do log: Hoje / Ontem / DD/MM/AAAA.
+  _labelDia(dateStr) {
+    if (!dateStr) return '—';
+    const hoje = new Date(); const ontem = new Date(); ontem.setDate(hoje.getDate() - 1);
+    const iso = d => d.toISOString().substring(0, 10);
+    if (dateStr === iso(hoje))  return 'Hoje';
+    if (dateStr === iso(ontem)) return 'Ontem';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
   },
 
   // Detalhe completo de 1 registro do log — mostra o que foi feito (ação) e o
@@ -1705,15 +1774,29 @@ const App = {
     const quem = l.ator + (l.unitName ? ` (${l.unitName})` : (l.atorTipo === 'admin' ? ' (Admin)' : ''));
     const dataCompleta = l.ts ? new Date(l.ts).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' }) : '—';
     const linha = (lbl, val) => `<div class="parc-modal-parcela"><span>${lbl}</span><span style="font-weight:700;color:#1a3050">${val}</span></div>`;
+    // Lista de mudanças de → para (quando o log tiver)
+    let mudHtml = '';
+    if (Array.isArray(l.mudancas) && l.mudancas.length) {
+      mudHtml = `<div style="margin-top:10px;padding:10px 12px;background:var(--surf-1);border-radius:var(--r-sm)">
+        <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#8898b8;margin-bottom:6px">O que foi modificado${l.alvo ? ` — ${l.alvo}` : ''}</div>
+        ${l.mudancas.map(m => `
+          <div class="activity-mud-row">
+            <span class="activity-mud-campo">${m.campo}</span>
+            <span class="activity-mud-vals"><span class="activity-mud-de">${m.de}</span><span class="activity-mud-seta">→</span><span class="activity-mud-para">${m.para}</span></span>
+          </div>`).join('')}
+      </div>`;
+    } else if (l.detalhe) {
+      mudHtml = `<div style="margin-top:10px;padding:10px 12px;background:var(--surf-1);border-radius:var(--r-sm);font-size:.84rem;color:#4a6080">
+        <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#8898b8;margin-bottom:4px">O que foi modificado</div>
+        ${l.detalhe}
+      </div>`;
+    }
     body.innerHTML = `
       ${linha('Quem', quem)}
       ${linha('Módulo', l.modulo || '—')}
       ${linha('Ação', l.acao || '—')}
       ${linha('Quando', dataCompleta)}
-      ${l.detalhe ? `<div style="margin-top:10px;padding:10px 12px;background:var(--surf-1);border-radius:var(--r-sm);font-size:.84rem;color:#4a6080">
-        <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#8898b8;margin-bottom:4px">O que foi modificado</div>
-        ${l.detalhe}
-      </div>` : ''}
+      ${mudHtml}
     `;
     modal.classList.remove('hidden');
   },
@@ -2227,19 +2310,8 @@ const App = {
     if ($('cmp-prev-val'))   $('cmp-prev-val').textContent   = fmt(prevSpend);
     if ($('cmp-cur-bar'))    $('cmp-cur-bar').style.width    = (curSpend  / max * 100).toFixed(1) + '%';
     if ($('cmp-prev-bar'))   $('cmp-prev-bar').style.width   = (prevSpend / max * 100).toFixed(1) + '%';
-    if ($('cmp-avg-month'))  $('cmp-avg-month').textContent  = fmt(avgMonth);
-    if ($('cmp-projection')) $('cmp-projection').textContent = fmt(projection);
 
-    // Variação %
-    const diffEl = $('cmp-diff-pct');
-    if (diffEl) {
-      if (diffPct !== null) {
-        diffEl.textContent = (diffPct >= 0 ? '+' : '') + diffPct.toFixed(1) + '%';
-        diffEl.style.color = diffPct > 0 ? 'var(--red)' : 'var(--status-com)';
-      } else { diffEl.textContent = '—'; diffEl.style.color = ''; }
-    }
-
-    // Badge tendência
+    // Badge tendência (YoY: atual vs anterior)
     const badge = $('compare-trend-badge');
     if (badge) {
       if (diffPct === null)      { badge.textContent = '';          badge.className = 'compare-trend-badge'; }
@@ -2248,59 +2320,67 @@ const App = {
       else                       { badge.textContent = '≈ Estável'; badge.className = 'compare-trend-badge trend-stable'; }
     }
 
-    // ── Barra de meta (só quando há meta configurada) ──
-    const metaLine = $('cmp-meta-line');
-    if (metaLine) {
-      if (meta && metaTarget > 0) {
-        metaLine.style.display = '';
-        if ($('cmp-meta-year')) $('cmp-meta-year').textContent = curYear;
-        if ($('cmp-meta-val'))  $('cmp-meta-val').textContent  = fmt(metaTarget);
-        // barra: quanto do orçamento (meta) já foi consumido
-        const usedPct = Math.min(curSpend / metaTarget * 100, 100);
-        const st = App._metaStatus(projection, metaTarget);
-        const barColor = st.key === 'over' ? 'var(--red)' : st.key === 'warn' ? 'var(--orange)' : 'var(--status-com)';
-        const bar = $('cmp-meta-bar');
-        if (bar) { bar.style.width = usedPct.toFixed(1) + '%'; bar.style.background = barColor; }
-        const perMonth = metaTarget / 12;
-        if ($('cmp-meta-sub')) $('cmp-meta-sub').textContent = `Pode gastar ${fmt(perMonth)}/mês · gasto atual ${fmt(curSpend)}`;
+    // ── Indicador único: usa a meta configurada como referência; sem meta,
+    // usa o gasto do ano anterior — o velocímetro e a tag sempre têm algo pra
+    // mostrar, e a lógica de cor (verde/amarelo/vermelho) fica num só lugar.
+    const hasMeta   = meta && metaTarget > 0;
+    const refTarget = hasMeta ? metaTarget : prevSpend;
+    const hasRef    = refTarget > 0;
+    const st        = hasRef ? App._metaStatus(projection, refTarget) : { key: 'none', color: '', icon: 'ℹ️' };
+    const ratio     = hasRef ? Math.min(curSpend / refTarget, 1) : 0;
+
+    App._drawCmpGauge(ratio, st.key);
+
+    const pctEl = $('cmp-gauge-pct');
+    if (pctEl) pctEl.textContent = hasRef ? Math.round(curSpend / refTarget * 100) + '%' : '—';
+    const gaugeLblEl = $('cmp-gauge-lbl');
+    if (gaugeLblEl) gaugeLblEl.textContent = hasMeta ? 'da meta' : 'do ano anterior';
+
+    const tagEl     = $('cmp-status-tag');
+    const tagTxtEl  = $('cmp-status-tag-txt');
+    const iconEl    = $('cmp-status-icon');
+    const metricsEl = $('cmp-status-metrics');
+    if (!tagEl) return;
+
+    if (iconEl) iconEl.textContent = st.icon;
+    tagEl.className = 'cmp-status-tag cmp-status-tag--' + st.key;
+    if (tagTxtEl) tagTxtEl.textContent = !hasRef
+      ? 'Sem dados para comparar'
+      : st.key === 'ok'   ? (hasMeta ? 'Dentro da meta' : 'Abaixo do ano anterior')
+      : st.key === 'warn' ? 'Quase estourando'
+      :                      (hasMeta ? 'Meta estourada' : 'Acima do ano anterior');
+
+    const metric = (lbl, val, cls) => `<div class="cmp-status-metric"><span class="cmp-status-metric-lbl">${lbl}</span><strong class="${cls||''}">${val}</strong></div>`;
+    if (metricsEl) {
+      if (!hasRef) {
+        metricsEl.innerHTML = `<div class="cmp-status-metric-full">Sem histórico de ${prevYear} para comparar. Defina uma meta.</div>`;
       } else {
-        metaLine.style.display = 'none';
+        const deltaLbl = st.key === 'ok' ? (hasMeta ? 'Folga' : 'Folga vs ' + prevYear) : (hasMeta ? 'Excedente' : 'Excedente vs ' + prevYear);
+        const deltaVal = fmt(Math.abs(refTarget - projection));
+        metricsEl.innerHTML = metric('Projeção', fmt(projection))
+          + metric('Média/mês', fmt(avgMonth))
+          + metric(deltaLbl, deltaVal, st.key === 'ok' ? 'cmp-status-good' : 'cmp-status-bad');
       }
     }
+  },
 
-    // Mensagem de status/meta
-    const msgEl  = $('cmp-status-msg');
-    const iconEl = $('cmp-status-icon');
-    const rowEl  = $('cmp-status-row');
-    if (!msgEl) return;
-
-    if (meta && metaTarget > 0) {
-      // Usa a meta configurada (verde/amarelo/vermelho)
-      const st = App._metaStatus(projection, metaTarget);
-      if (iconEl) iconEl.textContent = st.icon;
-      let extra;
-      if (st.key === 'ok')        extra = `Projeção ${fmt(projection)} — ${fmt(Math.max(metaTarget - projection, 0))} de folga.`;
-      else if (st.key === 'warn') extra = `Projeção ${fmt(projection)} — perto do limite de ${fmt(metaTarget)}.`;
-      else                        extra = `Projeção ${fmt(projection)} — ${fmt(projection - metaTarget)} acima da meta.`;
-      msgEl.textContent = st.txt + ' ' + extra;
-      msgEl.style.color = st.color;
-      if (rowEl) rowEl.style.borderColor = st.color;
-    } else if (prevSpend === 0) {
-      if (iconEl) iconEl.textContent = 'ℹ️';
-      msgEl.textContent = 'Sem histórico de ' + prevYear + ' para comparar. Defina uma meta.';
-      msgEl.style.color = '';
-      if (rowEl) rowEl.style.borderColor = '';
-    } else if (projection > prevSpend) {
-      if (iconEl) iconEl.textContent = '⚠️';
-      msgEl.textContent = 'Projeção supera ' + prevYear + ' em ' + fmt(projection - prevSpend) + ' — ritmo acima do ano anterior.';
-      msgEl.style.color = 'var(--orange)';
-      if (rowEl) rowEl.style.borderColor = 'rgba(232,131,10,.4)';
-    } else {
-      if (iconEl) iconEl.textContent = '✅';
-      msgEl.textContent = 'Projeção ' + fmt(prevSpend - projection) + ' abaixo de ' + prevYear + '.';
-      msgEl.style.color = 'var(--status-com)';
-      if (rowEl) rowEl.style.borderColor = 'rgba(29,184,122,.4)';
-    }
+  // Velocímetro (donut quase-completo) do card Comparativo: fatia de progresso
+  // (ratio 0-1) colorida pelo status da meta + trilho cinza pro restante.
+  _drawCmpGauge(ratio, statusKey) {
+    const canvas = document.getElementById('chart-cmp-gauge'); if (!canvas) return;
+    App._destroyChart('chart-cmp-gauge');
+    const colors = { ok: '#1db87a', warn: '#e8830a', over: '#d94040', none: '#c8d4e8' };
+    const color = colors[statusKey] || colors.none;
+    State.charts['chart-cmp-gauge'] = new Chart(canvas, {
+      type: 'doughnut',
+      data: { datasets: [{ data: [ratio, 1 - ratio], backgroundColor: [color, '#eef2f8'], borderWidth: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '76%',
+        rotation: -90, circumference: 360,
+        animation: { duration: 600 },
+        plugins: { legend: { display: false }, tooltip: { enabled: false } }
+      }
+    });
   },
 
   // Read all active dashboard filters (unit, group, date range)
@@ -2380,6 +2460,88 @@ const App = {
       </tr>`;
     }
     modal.classList.remove('hidden');
+  },
+
+  /* ── Extrato de Compras (estilo extrato de banco) ─────────── */
+  _extratoPeriodo: 'tudo',
+
+  showExtrato() {
+    App._extratoPeriodo = 'tudo';
+    document.querySelectorAll('.extrato-per-btn').forEach(b => b.classList.toggle('active', b.dataset.per === 'tudo'));
+    App._renderExtrato();
+    document.getElementById('extrato-modal').classList.remove('hidden');
+  },
+
+  setExtratoPeriodo(per, btn) {
+    App._extratoPeriodo = per;
+    document.querySelectorAll('.extrato-per-btn').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+    App._renderExtrato();
+  },
+
+  // Monta os lançamentos: cada compra (combinada = 1 linha por CMP; avulsa = SL),
+  // ordenadas por data, com saldo corrente antes/depois (acumulado de gastos).
+  _extratoEventos() {
+    const cmpMap = {};
+    const eventos = [];
+    Object.values(State.requests || {}).filter(r => r.status === 'Comprado').forEach(r => {
+      const v = parseFloat(r.valorTotal || 0);
+      const dt = (r.boughtAt || '').substring(0, 10);
+      if (r.compraCodigo) {
+        if (!cmpMap[r.compraCodigo]) {
+          cmpMap[r.compraCodigo] = { codigo: r.compraCodigo, data: dt, valor: 0, itens: 0 };
+          eventos.push(cmpMap[r.compraCodigo]);
+        }
+        const e = cmpMap[r.compraCodigo];
+        e.valor += v; e.itens++;
+        if (dt && (!e.data || dt < e.data)) e.data = dt;   // data mais antiga do grupo
+      } else {
+        eventos.push({ codigo: r.seq != null ? 'SL-' + r.seq : '—', data: dt, valor: v, itens: 1 });
+      }
+    });
+    eventos.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+    let saldo = 0;
+    eventos.forEach(e => { e.antes = saldo; saldo += e.valor; e.depois = saldo; });
+    return eventos;
+  },
+
+  _extratoNoPeriodo(dataStr) {
+    if (App._extratoPeriodo === 'tudo' || !dataStr) return true;
+    const hoje = new Date(); const d = new Date(dataStr + 'T00:00:00');
+    if (App._extratoPeriodo === 'ano')  return d.getFullYear() === hoje.getFullYear();
+    if (App._extratoPeriodo === 'mes')  return d.getFullYear() === hoje.getFullYear() && d.getMonth() === hoje.getMonth();
+    if (App._extratoPeriodo === 'semana') {
+      const ini = new Date(hoje); ini.setDate(hoje.getDate() - 6); ini.setHours(0,0,0,0);
+      return d >= ini && d <= hoje;
+    }
+    return true;
+  },
+
+  _renderExtrato() {
+    const tbody = document.getElementById('extrato-tbody'); if (!tbody) return;
+    const fmt = v => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtD = s => { if (!s) return '—'; const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; };
+    const todos = App._extratoEventos();
+    const evs = todos.filter(e => App._extratoNoPeriodo(e.data));
+
+    const resumo = document.getElementById('extrato-resumo');
+    const gastoPeriodo = evs.reduce((s, e) => s + e.valor, 0);
+    if (resumo) resumo.innerHTML = `${evs.length} compra(s) · <strong>${fmt(gastoPeriodo)}</strong>`;
+
+    if (!evs.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8898b8;padding:24px">Nenhuma compra no período.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = evs.map(e => {
+      const isCmp = e.codigo.startsWith('CMP');
+      return `<tr>
+        <td>${fmtD(e.data)}</td>
+        <td><span class="extrato-cod ${isCmp ? 'cod-cmp' : 'cod-sl'}">${e.codigo}</span>${e.itens > 1 ? ` <span class="extrato-itens">${e.itens} itens</span>` : ''}</td>
+        <td style="font-weight:700;color:#d94040">− ${fmt(e.valor)}</td>
+        <td style="color:#8898b8">${fmt(e.antes)}</td>
+        <td style="font-weight:700;color:#1a3a6b">${fmt(e.depois)}</td>
+      </tr>`;
+    }).join('');
   },
 
   showKpiList(status) {
@@ -2511,17 +2673,9 @@ const App = {
       ? ` · ${fUnit}: ${fmt(byUnitSpend[fUnit])}`
       : topUnit ? ` · Top: ${topUnit[0]}` : '';
 
-    // Period label for range
+    // Card minimalista: sem o intervalo de datas no sub-rótulo
     const sub = document.getElementById('kpi-period-sub');
-    if (sub) {
-      if (fFrom || fTo) {
-        const fmt2 = d => { const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; };
-        const rl = [fFrom&&fmt2(fFrom), fTo&&fmt2(fTo)].filter(Boolean).join(' → ');
-        sub.textContent = rl ? `(${rl})` : unitBreakdown;
-      } else {
-        sub.textContent = unitBreakdown;
-      }
-    }
+    if (sub) sub.textContent = '';
 
     document.getElementById('kpi-total').textContent = reqs.length;
     document.getElementById('kpi-negado').textContent = reqs.filter(r=>r.status==='Negado').length;
@@ -2837,9 +2991,13 @@ const App = {
     });
 
     if (moreLine) {
-      moreLine.innerHTML = resto.length
-        ? `<div class="subopt-more" onclick="App.showSuboptsAll()" title="Ver todas as sub-opções">+${resto.length} outras · ${restoTotal} un. →</div>`
-        : (entries.length > 0 ? `<div class="subopt-more" onclick="App.showSuboptsAll()" title="Ver todas as sub-opções">Ver detalhes →</div>` : '');
+      moreLine.innerHTML = entries.length
+        ? `<button class="subopt-vermais" onclick="App.showSuboptsAll()" title="Ver todas as sub-opções">
+             <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+             Ver todas as sub-opções
+             <span class="subopt-vermais-badge">${entries.length}</span>
+           </button>`
+        : '';
     }
   },
 
@@ -3119,18 +3277,35 @@ const App = {
         return txt.includes(qLive);
       });
     }
-    // Ordenação por campo + direção
+    // Ordenação por DIA + direção; no mesmo dia, desempata por SL crescente
+    // (ex.: 30/06 com SL-119 e SL-120 → sempre 119 depois 120, nunca invertido).
     const sortField = App.reqSortField || 'createdAt';
     reqs.sort(([,a],[,b]) => {
-      const cmp = (a[sortField]||'').localeCompare(b[sortField]||'');
-      return App.reqSortDir === 'asc' ? cmp : -cmp;
+      const da = (a[sortField]||'').substring(0,10);
+      const db = (b[sortField]||'').substring(0,10);
+      const cmp = da.localeCompare(db);
+      if (cmp !== 0) return App.reqSortDir === 'asc' ? cmp : -cmp;
+      return (parseInt(a.seq)||0) - (parseInt(b.seq)||0);   // mesmo dia → SL crescente
     });
-    // No filtro "Compra combinada", agrupa membros da mesma compra juntos
-    if (fParc === 'combinada') {
-      reqs.sort(([,a],[,b]) => {
-        const c = (a.compraCodigo||'').localeCompare(b.compraCodigo||'');
-        return c !== 0 ? c : (parseInt(a.seq)||0) - (parseInt(b.seq)||0);
-      });
+    // Compra combinada SEMPRE junta: independente da data/ordenação, os membros
+    // da mesma compra ficam adjacentes, ancorados na posição do 1º membro que
+    // aparece na ordenação (mantém o resto na ordem escolhida).
+    {
+      const emitidos = new Set();
+      const agrupados = [];
+      for (const item of reqs) {
+        const cod = item[1].compraCodigo;
+        if (cod) {
+          if (emitidos.has(cod)) continue;      // já saiu junto com o grupo
+          emitidos.add(cod);
+          agrupados.push(...reqs
+            .filter(([, rr]) => rr.compraCodigo === cod)
+            .sort((x, y) => (parseInt(x[1].seq)||0) - (parseInt(y[1].seq)||0)));
+        } else {
+          agrupados.push(item);
+        }
+      }
+      reqs.length = 0; reqs.push(...agrupados);
     }
     // Barra "De N pedidos" — reflete o conjunto já filtrado/pesquisado acima
     App._renderReqStats(reqs, 'dash-stats-bar', 'dash-negados-bar');
@@ -3768,7 +3943,16 @@ const App = {
       .then(() => {
         toast('✓ Solicitação atualizada!');
         const quem = `${prevR.unitName || '—'} · ${prevR.groupName || '—'}${prevR.seq!=null?' · SL-'+prevR.seq:''}`;
-        App._logActivity('Solicitações', st !== prevStatus ? `Status alterado: ${prevStatus||'—'} → ${st}` : 'Solicitação editada', quem);
+        // Detecta troca de valor do produto (na compra/edição) e registra antes → depois.
+        const fmtR = v => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const antV = parseFloat(prevR.valor ?? prevR.valorTotal ?? 0);
+        const novV = parseFloat(upd.valor ?? upd.valorTotal ?? prevR.valor ?? prevR.valorTotal ?? 0);
+        let acaoLog, detLog = quem;
+        if (st !== prevStatus) { acaoLog = `Status alterado: ${prevStatus||'—'} → ${st}`; }
+        else if (!isNaN(antV) && !isNaN(novV) && novV !== antV && (antV > 0 || novV > 0)) {
+          acaoLog = 'Valor do produto alterado'; detLog = `${quem} · ${fmtR(antV)} → ${fmtR(novV)}`;
+        } else { acaoLog = 'Solicitação editada'; }
+        App._logActivity('Solicitações', acaoLog, detLog);
         App.closeModal(); App.renderRequests(); App.renderDashboard(); App.updatePendingBadge();
       })
       .catch(() => toast('Erro ao salvar.','error'));
@@ -4680,19 +4864,24 @@ const App = {
 
   // ADMINS cards
   renderAdminsCards() {
+    // Atualiza o contador de logs no card de Ferramentas (mesma aba)
+    const logCountEl = document.getElementById('config-logs-count');
+    if (logCountEl) { const n = Object.keys(State.activityLog || {}).length; logCountEl.textContent = n ? `${n} registro${n!==1?'s':''} no total` : ''; }
     const wrap=document.getElementById('admin-cards-grid'); wrap.innerHTML='';
     const admins=State.admins||{};
     if (!Object.keys(admins).length) { wrap.innerHTML='<p style="color:var(--gray-500);font-size:.82rem">Nenhum administrador cadastrado.</p>'; return; }
     Object.keys(admins).forEach(user => {
-      const letter=user[0].toUpperCase();
+      const rec = admins[user];
+      const nome = (rec && typeof rec === 'object' ? rec.nome : '') || '';
+      const letter=(nome || user)[0].toUpperCase();
       const isCurrent = user===State.adminUser;
       const card=document.createElement('div');
       card.className=`admin-card${isCurrent?' current-user':''}`;
       card.innerHTML=`
         ${isCurrent ? '<div class="current-badge">Você</div>' : ''}
         <div class="admin-card-avatar">${letter}</div>
-        <div class="admin-card-name">${user}</div>
-        <div class="admin-card-role">Administrador</div>
+        <div class="admin-card-name">${nome || user}</div>
+        <div class="admin-card-role">@${user}</div>
         <div class="admin-card-actions">
           ${!isCurrent ? `<button class="btn-icon-sm" title="Remover" onclick="App.removeAdmin('${user}')">
             <svg viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2"/></svg>
@@ -4703,10 +4892,17 @@ const App = {
   },
 
   addAdmin() {
+    const nome=document.getElementById('inp-admin-nome')?.value.trim() || '';
     const user=document.getElementById('inp-admin-user').value.trim();
     const pass=document.getElementById('inp-admin-pass').value;
     if (!user||!pass) { toast('Preencha usuário e senha.','error'); return; }
-    DB.set(`admins/${user}`,pass).then(()=>{ document.getElementById('inp-admin-user').value=''; document.getElementById('inp-admin-pass').value=''; toast('✓ Administrador cadastrado!'); App._logActivity('Configurações', 'Administrador cadastrado', user); });
+    DB.set(`admins/${user}`, { pass, nome }).then(()=>{
+      const n=document.getElementById('inp-admin-nome'); if(n) n.value='';
+      document.getElementById('inp-admin-user').value='';
+      document.getElementById('inp-admin-pass').value='';
+      toast('✓ Administrador cadastrado!');
+      App._logActivity('Configurações', 'Administrador cadastrado', nome ? `${nome} (${user})` : user);
+    });
   },
 
   removeAdmin(user) {
@@ -5428,7 +5624,10 @@ const App = {
         App._logMov('saida', itemBase, Math.abs(delta), novaQtd, { origem: 'Ajuste manual', destino: 'Ajuste interno', data: dataMov, estoqueId });
       }
       toast('Item salvo!'); App.closeEstoqueForm();
-      App._logActivity('Estoque', id ? 'Item de estoque editado' : 'Item de estoque criado', produto);
+      const detMov = delta > 0 ? `${produto} · +${delta} un. (total ${novaQtd})`
+                   : delta < 0 ? `${produto} · ${delta} un. (total ${novaQtd})`
+                   : produto;
+      App._logActivity('Estoque', id ? 'Item de estoque editado' : 'Item de estoque criado', detMov);
     }).catch(() => toast('Erro ao salvar.', 'error'));
   },
 
@@ -5908,7 +6107,7 @@ const App = {
 
   // Registra uma ação no log de auditoria (Estoque/Configurações/Calendário/Solicitações).
   // Nunca deixa a auditoria quebrar a ação principal — erro aqui só vai pro console.
-  async _logActivity(modulo, acao, detalhe = '') {
+  async _logActivity(modulo, acao, detalhe = '', extra = null) {
     try {
       const isAdmin = !!State.adminUser;
       const unitName = !isAdmin ? (State.units?.[State.currentUnit] || null) : null;
@@ -5916,9 +6115,141 @@ const App = {
       await DB.push('activityLog', {
         ts: new Date().toISOString(),
         ator, atorTipo: isAdmin ? 'admin' : 'unidade', unitName,
-        modulo, acao, detalhe
+        modulo, acao, detalhe,
+        ...(extra || {})   // ex.: { alvo, mudancas: [{campo, de, para}] }
       });
     } catch (e) { console.error('[_logActivity] erro', e); }
+  },
+
+  /* ── Backup do sistema inteiro (export / import) ──────────── */
+  _BACKUP_COLS: ['requests','estoque','estoqueMov','compras','units','groups','subOpts','subgroups','admins','suppliers','activityLog','metas'],
+
+  async exportBackupSistema() {
+    try {
+      const dados = { app: 'ti-compras', versao: 1, ts: new Date().toISOString() };
+      App._BACKUP_COLS.forEach(c => { dados[c] = State[c] || {}; });
+      dados.meta = (await DB.get('meta')) || {};   // lastSeq / lastCompra
+      const blob = new Blob([JSON.stringify(dados)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `backup-ti-compras-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      toast('Backup baixado.');
+    } catch (e) { console.error(e); toast('Erro ao gerar backup.', 'error'); }
+  },
+
+  importBackupSistema(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!confirm('Restaurar vai SUBSTITUIR todos os dados atuais pelos do backup.\n\nDeseja continuar?')) { event.target.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const d = JSON.parse(e.target.result);
+        if (d.app && d.app !== 'ti-compras') {
+          if (!confirm('Este arquivo não parece ser um backup deste sistema. Restaurar mesmo assim?')) { event.target.value=''; return; }
+        }
+        const ops = [];
+        App._BACKUP_COLS.forEach(c => { if (d[c] !== undefined) ops.push(DB.set(c, d[c] || {})); });
+        if (d.meta !== undefined) ops.push(DB.set('meta', d.meta || {}));
+        await Promise.all(ops);
+        App._logActivity('Configurações', 'Backup restaurado', file.name);
+        toast('Backup restaurado. Os dados vão recarregar.');
+      } catch (err) { console.error(err); toast('Arquivo de backup inválido.', 'error'); }
+      finally { event.target.value = ''; }
+    };
+    reader.readAsText(file);
+  },
+
+  // Baixa todos os logs num arquivo CSV (abre no Excel).
+  baixarLogs() {
+    const logs = Object.values(State.activityLog || {}).sort((a, b) => (a.ts || '').localeCompare(b.ts || ''));
+    if (!logs.length) { toast('Nenhum log para baixar.', 'error'); return; }
+    const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const linhas = [['Data/Hora', 'Quem', 'Tipo', 'Módulo', 'Ação', 'Detalhe'].join(';')];
+    logs.forEach(l => {
+      const dh = l.ts ? new Date(l.ts).toLocaleString('pt-BR') : '';
+      const quem = l.ator + (l.unitName ? ` (${l.unitName})` : (l.atorTipo === 'admin' ? ' (Admin)' : ''));
+      let det = l.detalhe || '';
+      if (Array.isArray(l.mudancas) && l.mudancas.length) det += ' || ' + l.mudancas.map(m => `${m.campo}: ${m.de} -> ${m.para}`).join(' ; ');
+      linhas.push([dh, quem, l.atorTipo || '', l.modulo || '', l.acao || '', det].map(esc).join(';'));
+    });
+    const csv = '﻿' + linhas.join('\r\n');   // BOM p/ acentos no Excel
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `logs-atividade-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast('Logs baixados.');
+  },
+
+  // Modal de logs com NAVEGAÇÃO POR DIA (setas), sem scroll longo.
+  _logsPorDia: {},
+  _logsDias: [],
+  _logsDiaIdx: 0,
+
+  showLogsCompletos() {
+    const porDia = {};
+    Object.entries(State.activityLog || {}).forEach(([id, l]) => {
+      const dia = (l.ts || '').substring(0, 10);
+      (porDia[dia] = porDia[dia] || []).push({ id, ...l });
+    });
+    Object.values(porDia).forEach(arr => arr.sort((a, b) => (b.ts || '').localeCompare(a.ts || '')));
+    App._logsPorDia = porDia;
+    App._logsDias = Object.keys(porDia).sort((a, b) => b.localeCompare(a));   // mais recente primeiro
+    App._logsDiaIdx = 0;
+    App._renderLogsDia();
+    const foot = document.getElementById('logs-full-footer');
+    if (foot) foot.style.display = State.adminUser ? 'flex' : 'none';   // apagar só p/ admin
+    document.getElementById('logs-full-modal').classList.remove('hidden');
+  },
+
+  apagarLogs() {
+    if (!State.adminUser) { toast('Apenas administradores podem apagar os logs.', 'error'); return; }
+    const n = Object.keys(State.activityLog || {}).length;
+    if (!n) { toast('Nenhum log para apagar.', 'error'); return; }
+    if (!confirm(`Apagar TODOS os ${n} registro(s) de log? Esta ação não pode ser desfeita.`)) return;
+    DB.remove('activityLog').then(() => {
+      toast('Logs apagados.');
+      document.getElementById('logs-full-modal').classList.add('hidden');
+    }).catch(() => toast('Erro ao apagar logs.', 'error'));
+  },
+
+  navLogsDia(dir) {
+    const max = App._logsDias.length - 1;
+    App._logsDiaIdx = Math.max(0, Math.min(max, App._logsDiaIdx + dir));
+    App._renderLogsDia();
+  },
+
+  _renderLogsDia() {
+    const body = document.getElementById('logs-full-body'); if (!body) return;
+    const dias = App._logsDias;
+    if (!dias.length) { body.innerHTML = '<div class="mgmt-empty" style="padding:30px">Nenhum registro ainda.</div>'; return; }
+    const idx = App._logsDiaIdx;
+    const dia = dias[idx];
+    const itens = App._logsPorDia[dia] || [];
+    const icones = { 'Estoque': '📦', 'Configurações': '⚙️', 'Calendário': '📅', 'Solicitações': '🧾' };
+    body.innerHTML = `
+      <div class="logs-nav">
+        <button class="logs-nav-btn" ${idx >= dias.length - 1 ? 'disabled' : ''} onclick="App.navLogsDia(1)" title="Dia anterior">‹</button>
+        <div class="logs-nav-dia">${App._labelDia(dia)} <span class="log-dia-count">${itens.length}</span></div>
+        <button class="logs-nav-btn" ${idx <= 0 ? 'disabled' : ''} onclick="App.navLogsDia(-1)" title="Dia seguinte">›</button>
+      </div>
+      <div class="logs-nav-pos">${idx + 1} de ${dias.length} dia(s)</div>
+      <div class="logs-dia-lista">
+        ${itens.map(l => {
+          const quem = l.ator + (l.unitName ? ` (${l.unitName})` : (l.atorTipo === 'admin' ? ' (Admin)' : ''));
+          const hora = l.ts && l.ts.length > 10 ? l.ts.substring(11, 16) : '';
+          return `<div class="logf-item logf-click" onclick="App.showActivityDetail('${l.id}')" title="Clique para o detalhamento completo">
+            <span class="logf-ico" title="${l.modulo || '—'}">${icones[l.modulo] || '•'}</span>
+            <div class="logf-body">
+              <div class="logf-title"><strong>${quem}</strong> — ${l.acao || '—'}</div>
+              ${l.detalhe ? `<div class="logf-sub">${l.detalhe}</div>` : ''}
+            </div>
+            <span class="logf-hora">${hora}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
   },
 
   _setConnStatus(ok, msg) {
@@ -5965,8 +6296,8 @@ const App = {
     // ESC fecha qualquer card/modal aberto
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;
-      // 0. Modais simples do dashboard (parcelas, meta) — fecham direto
-      for (const mid of ['parcelas-modal', 'meta-modal', 'activity-detail-modal']) {
+      // 0. Modais simples do dashboard (parcelas, meta, extrato, sub-opções) — fecham direto
+      for (const mid of ['parcelas-modal', 'meta-modal', 'activity-detail-modal', 'extrato-modal', 'subopts-all-modal', 'logs-full-modal']) {
         const m = document.getElementById(mid);
         if (m && !m.classList.contains('hidden')) { m.classList.add('hidden'); return; }
       }
