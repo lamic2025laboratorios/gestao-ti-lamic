@@ -59,30 +59,72 @@ function _fbInitListeners() {
     _fbListen('ia');
 }
 
-// ── Heatmap (dia × faixa de horário) ──────────────────────────
-const _DIAS_ORD   = ['Seg','Ter','Qua','Qui','Sex','Sab'];
-const _FAIXAS_ORD = ['07-09','09-11','11-13','13-15','15-17','17-19'];
+// ── Planilha base (linhas cruas) no Firebase ────────────────────
+// Guarda o arquivo importado (linhas) para permitir REPROCESSAR sem re-anexar
+// sempre que o código ganhar campos novos.
+function _fbSaveRaw(tipo, linhas, nome) {
+    if (!window._db || !window._ref || !window._set) return;
+    const r = window._ref(window._db, FB_PATH + '/' + tipo + '_raw');
+    window._set(r, { rows: linhas, nome: nome || '', ts: Date.now() })
+        .catch(e => console.warn('[Firebase] Erro ao salvar planilha base:', e));
+}
+function _fbLoadRaw(tipo) {
+    return new Promise((resolve, reject) => {
+        if (!window._db || !window._ref || !window._get) return reject(new Error('Firebase indisponível'));
+        window._get(window._ref(window._db, FB_PATH + '/' + tipo + '_raw'))
+            .then(snap => resolve(snap.val())).catch(reject);
+    });
+}
+// Firebase pode devolver arrays como objetos {0:..,1:..}; normaliza para matriz.
+function _coerceLinhas(rows) {
+    const arr = Array.isArray(rows) ? rows : Object.values(rows || {});
+    return arr.map(r => Array.isArray(r) ? r : Object.values(r || {}));
+}
+
+// ── Heatmap (dia × faixa de 2h, 06h–24h, incluindo domingo) ────
+const _HEAT_DIAS   = ['Sáb','Sex','Qui','Qua','Ter','Seg','Dom']; // ordem de exibição (topo→base)
+const _HEAT_FAIXAS = ['06-08','08-10','10-12','12-14','14-16','16-18','18-20','20-22','22-24'];
+const _DOW_HEAT    = { 0:'Dom', 1:'Seg', 2:'Ter', 3:'Qua', 4:'Qui', 5:'Sex', 6:'Sáb' };
+// Hora cheia → faixa de 2h do heatmap (só das 06h às 24h; antes disso não conta).
+function _faixaHeat(h) {
+    if (h < 6 || h >= 24) return null;
+    const ini = Math.floor(h / 2) * 2;          // 6,8,10,...,22
+    return String(ini).padStart(2,'0') + '-' + String(ini + 2).padStart(2,'0');
+}
 function _heatVazio() {
     const h = {};
-    for (const d of _DIAS_ORD) {
+    for (const d of _HEAT_DIAS) {
         h[d] = {};
-        for (const f of _FAIXAS_ORD) h[d][f] = 0;
+        for (const f of _HEAT_FAIXAS) h[d][f] = 0;
     }
     return h;
 }
+// Legado: usado só pelos gráficos "por dia da semana" (Seg–Sáb) — mantido intacto.
+const _DIAS_ORD   = ['Seg','Ter','Qua','Qui','Sex','Sab'];
+const _FAIXAS_ORD = ['07-09','09-11','11-13','13-15','15-17','17-19'];
 
 // ── Estado Global ─────────────────────────────────────────────
 let periodos         = [];
 let editandoId       = null;
 let filtro           = {
-    tipo:     'mes',
-    ano:      new Date().getFullYear(),
+    tipo:     'mes',                       // 'mes' (1 mês) | 'range' (vários meses) — derivado do intervalo
+    ano:      new Date().getFullYear(),    // representativo (mês do "Até") p/ comparação/chart
     mes:      new Date().getMonth() + 1,
-    quinzena: 1
+    quinzena: 1,
+    de:       null,                        // 'YYYY-MM-DD'
+    ate:      null                         // 'YYYY-MM-DD'
 };
+
+// Chave comparável ano*100+mes a partir de uma data 'YYYY-MM-DD'
+function _mesKeyFromDate(str) {
+    if (!str) return null;
+    const [y, m] = str.split('-').map(Number);
+    if (!y || !m) return null;
+    return y * 100 + m;
+}
 let atendentesForm   = [];
 let charts           = {};
-let mostrarComparacao = false;
+let mostrarComparacao = false;   // inicia fechado; abre só ao clicar
 
 // ── Seed ──────────────────────────────────────────────────────
 const SEED = [];
@@ -265,6 +307,64 @@ function importarXLSXTipo(event, tipo) {
     importarRelatorioXLSX(event);
 }
 
+// ── Backup / Restauração dos dados ──────────────────────────────
+// Baixa um .json com CC, IA e as planilhas base (raw) do Firebase.
+function baixarBackup() {
+    Promise.all([
+        _fbLoadRaw('cc').catch(() => null),
+        _fbLoadRaw('ia').catch(() => null)
+    ]).then(([ccRaw, iaRaw]) => {
+        const dados = {
+            app: 'lamic-relatorios', versao: 1, ts: new Date().toISOString(),
+            cc: periodos_cc || [], ia: periodos_ia || [],
+            cc_raw: ccRaw || null, ia_raw: iaRaw || null
+        };
+        const blob = new Blob([JSON.stringify(dados)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `backup-lamic-relatorios-${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+    }).catch(e => { console.error(e); alert('Erro ao gerar o backup.'); });
+}
+
+// Restaura um backup .json → grava CC, IA e as bases de volta no Firebase.
+function restaurarBackup(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!confirm('Restaurar vai SUBSTITUIR os dados atuais (CC e IA) pelos do arquivo de backup.\n\nDeseja continuar?')) {
+        event.target.value = ''; return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const d = JSON.parse(e.target.result);
+            if (d.app && d.app !== 'lamic-relatorios') {
+                if (!confirm('Este arquivo não parece ser um backup deste sistema. Restaurar mesmo assim?')) { event.target.value=''; return; }
+            }
+            if (Array.isArray(d.cc)) _fbSave('cc', d.cc);
+            if (Array.isArray(d.ia)) _fbSave('ia', d.ia);
+            if (d.cc_raw && d.cc_raw.rows) _fbSaveRaw('cc', d.cc_raw.rows, d.cc_raw.nome);
+            if (d.ia_raw && d.ia_raw.rows) _fbSaveRaw('ia', d.ia_raw.rows, d.ia_raw.nome);
+            alert('Backup restaurado. Os dados vão recarregar do Firebase.');
+        } catch (err) {
+            console.error(err); alert('Arquivo de backup inválido.');
+        } finally { event.target.value = ''; }
+    };
+    reader.readAsText(file);
+}
+
+// Reprocessa a planilha base salva no Firebase para o tipo (cc/ia).
+function reprocessarBaseTipo(tipo) {
+    if (dashTipo !== tipo) {
+        salvarStorage();
+        dashTipo = tipo;
+        carregarStorage();
+    }
+    reprocessarBase();
+}
+
 // ── Exportar CSV para o tipo correto ──────────────────────────
 function exportarCSVTipo(tipo) {
     if (dashTipo !== tipo) {
@@ -300,59 +400,89 @@ function showSection(id) {
 // FILTRO
 // ============================================================
 
-function setFiltroTipo(tipo, btn) {
-    filtro.tipo = tipo;
+// Define os limites (min/max) dos inputs de data e um intervalo default.
+// Default = mês mais recente com dados (De = 1º dia, Até = último dia).
+function atualizarFiltroSelects() {
+    const fDe  = document.getElementById('f-de');
+    const fAte = document.getElementById('f-ate');
+    if (!fDe || !fAte) return;
 
-    // tabs
-    document.querySelectorAll('.filtro-tab').forEach(t => t.classList.remove('active'));
-    if (btn) btn.classList.add('active');
+    const meses = periodos.filter(p => p.tipo === 'mes')
+        .map(p => p.ano * 100 + p.mes).sort((a, b) => a - b);
 
-    // mostrar/ocultar mês
-    const mesWrap = document.getElementById('f-mes-wrap');
-    if (mesWrap) mesWrap.style.display = (tipo === 'ano') ? 'none' : '';
+    // Limites (min/max) conforme os dados do tipo atual — não travam o valor,
+    // só ajudam o seletor. (Não usados quando não há dados.)
+    if (meses.length) {
+        const minK = meses[0], maxK = meses[meses.length - 1];
+        const maxAno = Math.floor(maxK/100), maxMes = maxK % 100;
+        fDe.min = fAte.min = `${Math.floor(minK/100)}-${String(minK%100).padStart(2,'0')}-01`;
+        fDe.max = fAte.max = `${maxAno}-${String(maxMes).padStart(2,'0')}-${String(new Date(maxAno, maxMes, 0).getDate()).padStart(2,'0')}`;
+    } else {
+        fDe.removeAttribute('min'); fDe.removeAttribute('max');
+        fAte.removeAttribute('min'); fAte.removeAttribute('max');
+    }
 
-    atualizarFiltroSelects();
-    aplicarFiltro();
+    // PERÍODO PERSISTE: se já há um filtro escolhido, mantém — mesmo trocando de
+    // aba/dashboard ou se o tipo atual não tiver dados. Só define default quando
+    // ainda não há filtro nenhum.
+    if (filtro.de && filtro.ate) {
+        fDe.value = filtro.de; fAte.value = filtro.ate;
+    } else if (meses.length) {
+        const maxK = meses[meses.length - 1];
+        const maxAno = Math.floor(maxK/100), maxMes = maxK % 100;
+        fDe.value  = `${maxAno}-${String(maxMes).padStart(2,'0')}-01`;
+        fAte.value = `${maxAno}-${String(maxMes).padStart(2,'0')}-${String(new Date(maxAno, maxMes, 0).getDate()).padStart(2,'0')}`;
+    } else {
+        const now = new Date(), y = now.getFullYear(), m = now.getMonth() + 1;
+        fDe.value  = `${y}-${String(m).padStart(2,'0')}-01`;
+        fAte.value = `${y}-${String(m).padStart(2,'0')}-${String(new Date(y, m, 0).getDate()).padStart(2,'0')}`;
+    }
+    _syncFiltroFromInputs();
 }
 
-function atualizarFiltroSelects() {
-    const fAno = document.getElementById('f-ano');
-    const fMes = document.getElementById('f-mes');
+// Lê os inputs, garante De ≤ Até, e deriva tipo/ano/mes representativos.
+function _syncFiltroFromInputs() {
+    const fDe  = document.getElementById('f-de');
+    const fAte = document.getElementById('f-ate');
+    if (!fDe || !fAte) return;
+    let de = fDe.value, ate = fAte.value;
+    if (de && ate && de > ate) { const t = de; de = ate; ate = t; fDe.value = de; fAte.value = ate; }
+    filtro.de = de || null;
+    filtro.ate = ate || null;
 
-    // Anos disponíveis
-    const anos = [...new Set(periodos.map(p => p.ano))].sort((a,b) => b - a);
-    fAno.innerHTML = anos.map(a => `<option value="${a}"${a === filtro.ano ? ' selected' : ''}>${a}</option>`).join('');
-
-    // Meses disponíveis para o ano selecionado
-    let mesesDisponiveis = [];
-    if (filtro.tipo === 'mes') {
-        mesesDisponiveis = [...new Set(
-            periodos.filter(p => p.tipo === 'mes' && p.ano === filtro.ano).map(p => p.mes)
-        )].sort((a,b) => a - b);
+    const deK  = _mesKeyFromDate(de);
+    const ateK = _mesKeyFromDate(ate) || deK;
+    if (ateK) { filtro.ano = Math.floor(ateK / 100); filtro.mes = ateK % 100; }
+    // 'mes' só quando o intervalo é exatamente 1 mês calendário inteiro (1º → último dia);
+    // qualquer recorte por dia vira 'range' (sem comparação "mês anterior").
+    let mesInteiro = false;
+    if (de && ate && deK === ateK && de.endsWith('-01')) {
+        const [y, m] = ate.split('-').map(Number);
+        mesInteiro = (Number(ate.split('-')[2]) === new Date(y, m, 0).getDate());
     }
-
-    if (mesesDisponiveis.length) {
-        fMes.innerHTML = mesesDisponiveis.map(m =>
-            `<option value="${m}"${m === filtro.mes ? ' selected' : ''}>${MESES_PT[m-1]}</option>`
-        ).join('');
-        if (!mesesDisponiveis.includes(filtro.mes)) {
-            filtro.mes = mesesDisponiveis[mesesDisponiveis.length - 1];
-            fMes.value = filtro.mes;
-        }
-    } else {
-        fMes.innerHTML = MESES_PT.map((m, i) =>
-            `<option value="${i+1}"${(i+1) === filtro.mes ? ' selected' : ''}>${m}</option>`
-        ).join('');
-    }
+    filtro.tipo = mesInteiro ? 'mes' : 'range';
 }
 
 function aplicarFiltro() {
-    const fAno = document.getElementById('f-ano');
-    const fMes = document.getElementById('f-mes');
+    _syncFiltroFromInputs();
+    renderDashboard();
+}
 
-    filtro.ano = parseInt(fAno.value) || filtro.ano;
-    filtro.mes = parseInt(fMes.value) || filtro.mes;
+// Seleciona todo o histórico disponível de uma vez.
+function filtroPeriodoTudo() {
+    const fDe = document.getElementById('f-de');
+    const fAte = document.getElementById('f-ate');
+    if (fDe && fAte && fDe.min && fAte.max) {
+        fDe.value = fDe.min; fAte.value = fAte.max;
+        aplicarFiltro();
+    }
+}
 
+// Limpa o filtro → volta ao padrão (mês mais recente com dados).
+function limparFiltroPeriodo() {
+    filtro.de = null;
+    filtro.ate = null;
+    atualizarFiltroSelects();   // reaplica o default (último mês)
     renderDashboard();
 }
 
@@ -360,31 +490,69 @@ function aplicarFiltro() {
 // OBTENÇÃO DE PERÍODOS
 // ============================================================
 
+function _fmtDataBR(str) {
+    if (!str) return '';
+    const [y, m, d] = str.split('-');
+    return `${d}/${m}/${y}`;
+}
+
+// Retorna o período a exibir, respeitando o intervalo [de, ate] em nível de DIA.
+// - Mês totalmente dentro do range  → usa o período mensal inteiro (mantém "mensagens").
+// - Mês parcialmente dentro         → soma só os dias (byDay) dentro do range.
 function getPeriodoAtual() {
-    if (filtro.tipo === 'ano') {
-        return agregarAno(filtro.ano);
+    const de = filtro.de, ate = filtro.ate;
+    if (!de || !ate) return null;
+
+    const contribs = [];
+    for (const p of periodos) {
+        if (p.tipo !== 'mes') continue;
+        const mm = String(p.mes).padStart(2, '0');
+        const ultimoDia = new Date(p.ano, p.mes, 0).getDate();
+        const mesIni = `${p.ano}-${mm}-01`;
+        const mesFim = `${p.ano}-${mm}-${String(ultimoDia).padStart(2, '0')}`;
+        if (mesFim < de || mesIni > ate) continue;                 // não intersecta
+
+        if ((de <= mesIni && ate >= mesFim) || !p.byDay) {
+            contribs.push(p);                                       // mês inteiro
+        } else {
+            for (const [dataStr, dObj] of Object.entries(p.byDay)) {
+                if (dataStr >= de && dataStr <= ate) contribs.push(dObj);
+            }
+        }
     }
-    if (filtro.tipo === 'mes') {
-        return periodos.find(p => p.tipo === 'mes' && p.ano === filtro.ano && p.mes === filtro.mes) || null;
-    }
-    return null;
+
+    if (!contribs.length) return null;
+    if (contribs.length === 1 && contribs[0].tipo === 'mes') return contribs[0];
+
+    const ateK = _mesKeyFromDate(ate);
+    const nome = (de === ate) ? _fmtDataBR(de) : `${_fmtDataBR(de)} – ${_fmtDataBR(ate)}`;
+    return agregarLista(contribs, { tipo: (de === ate ? 'dia' : 'range'), ano: Math.floor(ateK / 100), nome });
 }
 
 function agregarAno(ano) {
     const lista = periodos.filter(p => p.ano === ano);
-    if (!lista.length) return null;
+    return agregarLista(lista, { tipo: 'ano', ano, nome: `Ano ${ano}` });
+}
+
+// Agrega uma lista de períodos mensais num único período sintético.
+function agregarLista(lista, meta) {
+    if (!lista || !lista.length) return null;
+    const ano = meta.ano;
 
     const base = {
-        tipo: 'ano', ano, mes: null, quinzena: null,
-        nome: `Ano ${ano}`,
+        tipo: meta.tipo, ano, mes: null, quinzena: null,
+        nome: meta.nome,
         total: 0, contatos: 0, mensagens: 0,
-        avaliacao: 0, silenciosos: 0, concluidos: 0,
-        avalRespondidas: 0, avalPendentes: 0,
+        avaliacao: 0, silenciosos: 0, concluidos: 0, clienteEncerrou: 0,
+        avalEnviadas: 0, avalRespondidas: 0, avalPendentes: 0,
+        avalEnviadas: 0,
         resultados: 0, coleta: 0, atendente: 0, info: 0,
         orcamentos: 0, reclamacoes: 0, vacinas: 0,
         dias: { Seg:0, Ter:0, Qua:0, Qui:0, Sex:0, Sab:0 },
         horarios: { '07-09':0, '09-11':0, '11-13':0, '13-15':0, '15-17':0, '17-19':0 },
         heat: _heatVazio(),
+        canais: { whatsapp:0, instagram:0, outros:0 },
+        motivosCanal: { whatsapp: _motivosVazio(), instagram: _motivosVazio(), outros: _motivosVazio() },
         atendentes: []
     };
 
@@ -400,6 +568,8 @@ function agregarAno(ano) {
         base.mensagens   += p.mensagens   || 0;
         base.silenciosos += p.silenciosos || 0;
         base.concluidos  += p.concluidos  || 0;
+        base.clienteEncerrou += p.clienteEncerrou || 0;
+        base.avalEnviadas    += p.avalEnviadas    || 0;
         base.avalRespondidas += p.avalRespondidas || 0;
         base.avalPendentes   += p.avalPendentes   || 0;
         base.resultados  += p.resultados  || 0;
@@ -418,10 +588,23 @@ function agregarAno(ano) {
         for (const h of Object.keys(base.horarios)) {
             base.horarios[h] += (p.horarios?.[h] || 0);
         }
-        // heatmap dia × faixa
+        // canais (WhatsApp / Instagram / Outros)
+        if (p.canais) {
+            base.canais.whatsapp  += p.canais.whatsapp  || 0;
+            base.canais.instagram += p.canais.instagram || 0;
+            base.canais.outros    += p.canais.outros    || 0;
+        }
+        // motivos por canal
+        if (p.motivosCanal) {
+            for (const ch of ['whatsapp', 'instagram', 'outros']) {
+                const src = p.motivosCanal[ch]; if (!src) continue;
+                for (const k of Object.keys(base.motivosCanal[ch])) base.motivosCanal[ch][k] += src[k] || 0;
+            }
+        }
+        // heatmap dia × faixa de 2h
         if (p.heat) {
-            for (const d of _DIAS_ORD) {
-                for (const f of _FAIXAS_ORD) {
+            for (const d of _HEAT_DIAS) {
+                for (const f of _HEAT_FAIXAS) {
                     base.heat[d][f] += (p.heat?.[d]?.[f] || 0);
                 }
             }
@@ -431,13 +614,20 @@ function agregarAno(ano) {
         somaAvaliacao    += (p.avaliacao || 0) * peso;
         totalPesoPeriodo += peso;
 
-        // atendentes
+        // atendentes: média ponderada pelo Nº DE AVALIAÇÕES quando existir; senão
+        // cai no fallback ponderado por atendimentos (dado antigo sem 'avaliacoes').
         if (p.atendentes) {
             for (const at of p.atendentes) {
-                if (!atMap[at.nome]) atMap[at.nome] = { atendimentos: 0, somaAval: 0, peso: 0 };
-                atMap[at.nome].atendimentos += at.atendimentos || 0;
-                atMap[at.nome].somaAval     += (at.avaliacao || 0) * (at.atendimentos || 1);
-                atMap[at.nome].peso         += at.atendimentos || 1;
+                if (!atMap[at.nome]) atMap[at.nome] = { atendimentos: 0, somaQ: 0, qtdAval: 0, somaA: 0, pesoA: 0, env: 0, resp: 0 };
+                const q = at.avaliacoes || 0;
+                const a = at.atendimentos || 0;
+                atMap[at.nome].atendimentos += a;
+                atMap[at.nome].somaQ        += (at.avaliacao || 0) * q;   // por nº avaliações
+                atMap[at.nome].qtdAval      += q;
+                atMap[at.nome].somaA        += (at.avaliacao || 0) * a;   // fallback por atendimentos
+                atMap[at.nome].pesoA        += a;
+                atMap[at.nome].env          += at.avalEnviadas || 0;
+                atMap[at.nome].resp         += at.avalRespondidas || 0;
             }
         }
     }
@@ -446,14 +636,18 @@ function agregarAno(ano) {
     base.atendentes = Object.entries(atMap).map(([nome, v]) => ({
         nome,
         atendimentos: v.atendimentos,
-        avaliacao:    v.peso ? v.somaAval / v.peso : 0
+        avaliacoes:   v.qtdAval,
+        avalEnviadas: v.env, avalRespondidas: v.resp,
+        avaliacao:    v.qtdAval ? +(v.somaQ / v.qtdAval).toFixed(2)
+                     : v.pesoA  ? +(v.somaA / v.pesoA).toFixed(2)
+                     : 0
     }));
 
     return base;
 }
 
 function getPeriodoAnterior() {
-    if (filtro.tipo === 'ano') return null; // agregado não tem anterior
+    if (filtro.tipo !== 'mes') return null; // só mês único tem "anterior"
 
     const sorted = [...periodos]
         .filter(p => p.tipo === 'mes')
@@ -479,10 +673,10 @@ function getPeriodsForMesComparacao(ano) {
 // ============================================================
 
 function calcEficiencia(p) {
-    // Índice de eficiência = atendimentos por 1.000 mensagens (quanto MAIOR, melhor).
-    // Mais atendimentos com menos mensagens = mais eficiente.
+    // Eficiência = MENSAGENS por atendimento (quanto MENOR, melhor — menos msgs
+    // gastas por atendimento = mais eficiente/barato, já que paga-se por mensagem).
     if (!p || !p.total || !p.mensagens) return { index: null, hasData: false };
-    const index = (p.total / p.mensagens) * 1000;
+    const index = p.mensagens / p.total;
     return { index, hasData: true };
 }
 
@@ -541,12 +735,12 @@ function atualizarKPIs(p) {
     // Total de Atendimentos
     document.getElementById('kpi-total').textContent = fNum(p.total);
     const subTotal = document.getElementById('kpi-total-sub');
-    if (anterior && filtro.tipo !== 'ano') {
+    if (anterior && filtro.tipo === 'mes') {
         const m = calcMelhora(p, anterior);
         if (m) { subTotal.textContent = m.texto; subTotal.className = 'kpi-sub ' + (m.diff >= 0 ? 'up' : 'down'); }
         else  { subTotal.textContent = 'Sem mês anterior'; subTotal.className = 'kpi-sub'; }
     } else {
-        subTotal.textContent = p.tipo === 'ano' ? 'Total anual agregado' : 'Sem mês anterior';
+        subTotal.textContent = filtro.tipo !== 'mes' ? 'Total do período agregado' : 'Sem mês anterior';
         subTotal.className = 'kpi-sub';
     }
 
@@ -561,7 +755,7 @@ function atualizarKPIs(p) {
         subAberto.textContent = '—'; subAberto.className = 'kpi-sub';
     }
 
-    // Eficiência (atend. por mil mensagens — maior = melhor)
+    // Eficiência (mensagens por atendimento — MENOR = melhor)
     const ef = calcEficiencia(p);
     const elEf  = document.getElementById('kpi-eficiencia');
     const subEf = document.getElementById('kpi-eficiencia-sub');
@@ -571,15 +765,15 @@ function atualizarKPIs(p) {
         subEf.className = 'kpi-sub warn';
     } else {
         elEf.textContent = fNum(ef.index, 1);
-        if (anterior && filtro.tipo !== 'ano') {
+        if (anterior && filtro.tipo === 'mes') {
             const efAnt = calcEficiencia(anterior);
             if (efAnt.hasData) {
-                const diff = ((ef.index - efAnt.index) / efAnt.index) * 100;
-                if (diff >= 0) { subEf.textContent = `▲ ${diff.toFixed(1)}% evolução`;          subEf.className = 'kpi-sub up'; }
-                else           { subEf.textContent = `▼ ${Math.abs(diff).toFixed(1)}% regressão`; subEf.className = 'kpi-sub down'; }
-            } else { subEf.textContent = 'atend. por mil msgs'; subEf.className = 'kpi-sub'; }
+                const diff = ((ef.index - efAnt.index) / efAnt.index) * 100;   // <0 = menos msgs/atend = melhorou
+                if (diff <= 0) { subEf.textContent = `▼ ${Math.abs(diff).toFixed(1)}% mais eficiente`; subEf.className = 'kpi-sub up'; }
+                else           { subEf.textContent = `▲ ${diff.toFixed(1)}% menos eficiente`;          subEf.className = 'kpi-sub down'; }
+            } else { subEf.textContent = 'msgs por atendimento'; subEf.className = 'kpi-sub'; }
         } else {
-            subEf.textContent = filtro.tipo === 'ano' ? 'Índice anual (atend./mil msgs)' : 'atend. por mil msgs';
+            subEf.textContent = 'msgs por atendimento (menor = melhor)';
             subEf.className = 'kpi-sub';
         }
     }
@@ -620,25 +814,141 @@ function renderRankings(p) {
         </div>
     `).join('');
 
-    // Ranking por MÉDIA de avaliação (regra 6): ordena pela nota média, cor por faixa
-    const porMedia = [...p.atendentes].sort((a,b) => (b.avaliacao || 0) - (a.avaliacao || 0));
-    if (raEl) raEl.innerHTML = porMedia.map((at, i) => {
-        const v = at.avaliacao || 0;
-        const cls = v >= 4 ? 'aval-verde' : v >= 3 ? 'aval-amarela' : 'aval-vermelha';
-        const pct = Math.max(0, Math.min(100, (v / 5) * 100));
-        return `
-        <div class="rank-item rank-aval-item">
-            <div class="rank-pos ${posClass(i)}">${i+1}</div>
-            <div class="rank-aval-main">
-                <div class="rank-aval-top">
-                    <span class="rank-name">${escHtml(at.nome)}</span>
-                    <span class="aval-badge ${cls}">${fAval(v)}</span>
+    // Ranking de QUALIDADE: score composto (média bayesiana × volume). Assim quem
+    // atende mais pessoas sobe mesmo com menos avaliações, e 1 nota ruim entre
+    // muitas não derruba a posição.
+    const porQualidade = [...p.atendentes]
+        .map(at => ({ ...at, score: _scoreQualidade(at) }))
+        .sort((a,b) => b.score - a.score);
+    if (raEl) {
+        raEl.innerHTML = porQualidade.map((at, i) => {
+            const v = at.avaliacao || 0;
+            const cls = v >= 4 ? 'aval-verde' : v >= 3 ? 'aval-amarela' : 'aval-vermelha';
+            const pct = Math.max(0, Math.min(100, (v / 5) * 100));
+            const nAval = at.avaliacoes || 0;
+            const sel = (avalAtendenteSel === at.nome) ? ' sel' : '';
+            return `
+            <div class="rank-item rank-aval-item${sel}" data-nome="${escHtml(at.nome)}" title="Clique para ver a resposta às avaliações deste atendente">
+                <div class="rank-pos ${posClass(i)}">${i+1}</div>
+                <div class="rank-aval-main">
+                    <div class="rank-aval-top">
+                        <span class="rank-name">${escHtml(at.nome)}</span>
+                        <span class="aval-badge ${cls}">${fAval(v)}</span>
+                    </div>
+                    <div class="aval-bar"><div class="aval-bar-fill ${cls}" style="width:${pct}%;"></div></div>
+                    <div class="rank-aval-sub">${fNum(at.atendimentos)} atend. · ${fNum(nAval)} avaliaç${nAval===1?'ão':'ões'}</div>
                 </div>
-                <div class="aval-bar"><div class="aval-bar-fill ${cls}" style="width:${pct}%;"></div></div>
-                <div class="rank-aval-sub">${fNum(at.atendimentos)} atend. no período</div>
-            </div>
-        </div>`;
-    }).join('');
+            </div>`;
+        }).join('');
+        // Liga o clique uma única vez (delegação no container, sobrevive ao re-render)
+        if (!raEl._avalBound) {
+            raEl._avalBound = true;
+            raEl.addEventListener('click', (e) => {
+                const item = e.target.closest('.rank-aval-item');
+                if (item && item.dataset.nome != null) selecionarAtendenteAval(item.dataset.nome);
+            });
+        }
+    }
+}
+
+// Seleciona/desseleciona um atendente → o card "Resposta às Avaliações" mostra os dados dele.
+function selecionarAtendenteAval(nome) {
+    avalAtendenteSel = (avalAtendenteSel === nome) ? null : nome;
+    const p = getPeriodoAtual();
+    renderRankings(p);
+    renderAvalResumo(p);
+}
+
+// Card "Resposta às Avaliações" — agregado do período. Gauge 0–100% da taxa de
+// resposta + contagem de enviadas / respondidas / não respondidas.
+function renderAvalResumo(p) {
+    destroyChart('avalGauge');
+    const ctx = getCtx('chart-aval-gauge');
+    const resumoEl = document.getElementById('aval-resumo');
+    const pctEl = document.getElementById('aval-gauge-pct');
+    const tituloEl = document.getElementById('aval-resumo-titulo');
+    if (!p) return;
+
+    // Se um atendente estiver selecionado no ranking, usa os dados dele; senão, o geral.
+    let enviadas, respondidas, titulo, selecionado = false;
+    if (avalAtendenteSel) {
+        const at = (p.atendentes || []).find(a => a.nome === avalAtendenteSel);
+        enviadas = at?.avalEnviadas || 0;
+        respondidas = at?.avalRespondidas || 0;
+        titulo = avalAtendenteSel;
+        selecionado = true;
+    } else {
+        enviadas = p.avalEnviadas || 0;
+        respondidas = p.avalRespondidas || 0;
+        titulo = 'Geral · todos os atendentes';
+    }
+    const naoResp = Math.max(0, enviadas - respondidas);
+    const pct     = enviadas ? Math.round(respondidas / enviadas * 100) : 0;
+
+    if (tituloEl) {
+        tituloEl.innerHTML = selecionado
+            ? `<span class="aval-res-sel">${escHtml(titulo)}</span> <button class="aval-res-clear" type="button" onclick="selecionarAtendenteAval('')">✕ ver geral</button>`
+            : titulo;
+    }
+    if (pctEl) pctEl.textContent = pct + '%';
+
+    if (ctx) {
+        charts['avalGauge'] = new Chart(ctx, {
+            type: 'doughnut',
+            data: { datasets: [{ data: [respondidas, naoResp], backgroundColor: ['#059669', '#e2e8f0'], borderWidth: 0 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '78%',
+                rotation: -90, circumference: 360,
+                plugins: { legend: { display: false }, tooltip: { enabled: false } }
+            }
+        });
+    }
+
+    if (resumoEl) resumoEl.innerHTML = `
+        <div class="aval-res-row"><span class="aval-det-dot" style="background:#64748b"></span>Avaliações enviadas <strong>${fNum(enviadas)}</strong></div>
+        <div class="aval-res-row"><span class="aval-det-dot" style="background:#059669"></span>Respondida <strong>${fNum(respondidas)}</strong></div>
+        <div class="aval-res-row"><span class="aval-det-dot" style="background:#dc2626"></span>Avaliação não respondida <strong>${fNum(naoResp)}</strong></div>`;
+}
+
+// Score de qualidade do atendente. Combina:
+//  • média bayesiana da nota — poucas avaliações puxam para um prior neutro,
+//    então 1 nota ruim isolada não desqualifica a % de qualidade;
+//  • fator de volume (log dos atendimentos) — quem atendeu mais pessoas sobe.
+const _QUAL_PRIOR = 4.5;   // nota "neutra" quando há poucas avaliações
+const _QUAL_C     = 20;    // peso do prior (nº de avaliações "virtuais")
+function _scoreQualidade(at) {
+    const q   = at.avaliacoes || 0;
+    const avg = at.avaliacao  || 0;
+    const notaAj   = (_QUAL_C * _QUAL_PRIOR + q * avg) / (_QUAL_C + q);
+    const volBoost = Math.log10(1 + (at.atendimentos || 0));
+    return notaAj * volBoost;
+}
+
+// Ao passar o mouse sobre o "i", ancora o popover à esquerda ou à direita
+// conforme o espaço até a borda da tela (evita corte).
+document.addEventListener('mouseover', (e) => {
+    const w = e.target.closest && e.target.closest('.info-wrap');
+    if (!w) return;
+    const r = w.getBoundingClientRect();
+    w.classList.toggle('info-right', (window.innerWidth - r.left) < 270);
+});
+
+// Abre/fecha o popover de informação do card (clique — útil no toque).
+function toggleInfo(ev, btn) {
+    ev.stopPropagation();
+    const abrir = !btn.classList.contains('info-open');
+    document.querySelectorAll('.info-btn.info-open').forEach(b => b.classList.remove('info-open'));
+    if (abrir) {
+        const wrap = btn.parentElement;
+        // ancora à direita se o card estiver perto da borda direita da tela
+        const r = wrap.getBoundingClientRect();
+        wrap.classList.toggle('info-right', (window.innerWidth - r.left) < 270);
+        btn.classList.add('info-open');
+        const fechar = (e) => {
+            if (!wrap.contains(e.target)) { btn.classList.remove('info-open'); document.removeEventListener('click', fechar); }
+        };
+        setTimeout(() => document.addEventListener('click', fechar), 0);
+    }
 }
 
 function toggleComparacao() {
@@ -665,8 +975,52 @@ function renderCharts(p) {
     chartBuscam(p);
     chartDias(p);
     renderHeatmap(p);
+    chartCanais(p);
     chartClientes(p);
+    renderAvalResumo(p);
     if (mostrarComparacao) chartComparacao(filtro.ano);
+}
+
+function chartCanais(p) {
+    destroyChart('canais');
+    const ctx = getCtx('chart-canais');
+    const legEl = document.getElementById('canais-legenda');
+    if (!ctx || !p) return;
+
+    const c = p.canais || { whatsapp:0, instagram:0, outros:0 };
+    const itens = [
+        { nome: 'WhatsApp',  v: c.whatsapp  || 0, cor: '#25D366' },
+        { nome: 'Instagram', v: c.instagram || 0, cor: '#E1306C' },
+        { nome: 'Outros',    v: c.outros    || 0, cor: '#94a3b8' }
+    ].filter(x => x.v > 0);
+    const soma = itens.reduce((a, b) => a + b.v, 0);
+
+    if (!soma) {
+        if (legEl) legEl.innerHTML = '<div class="canais-vazio">Sem coluna <strong>Conexão</strong> na planilha.<br>Reimporte um relatório que tenha essa coluna (WhatsApp / Instagram).</div>';
+        return;
+    }
+
+    charts['canais'] = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: itens.map(x => x.nome),
+            datasets: [{ data: itens.map(x => x.v), backgroundColor: itens.map(x => x.cor), borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fNum(ctx.raw)} (${((ctx.raw/soma)*100).toFixed(1)}%)` } }
+            }
+        }
+    });
+
+    if (legEl) legEl.innerHTML = itens.map(x => `
+        <div class="canal-leg-item">
+            <span class="canal-leg-dot" style="background:${x.cor}"></span>
+            <span class="canal-leg-nome">${x.nome}</span>
+            <span class="canal-leg-val">${fNum(x.v)} <em>(${((x.v/soma)*100).toFixed(1)}%)</em></span>
+        </div>`).join('');
 }
 
 function destroyChart(key) {
@@ -739,26 +1093,26 @@ function chartComparacao(ano) {
         return ef.hasData ? parseFloat(ef.index.toFixed(1)) : null;
     });
 
-    // Cor de cada ponto: verde se evoluiu vs mês anterior com dados, vermelho se regrediu
+    // Cor de cada ponto: MENOR msgs/atend = melhorou (verde); maior = piorou (vermelho)
     let ultimoValido = null;
     const pointColors = efData.map(v => {
         if (v == null) return '#94a3b8';
         let cor = '#2563eb';
-        if (ultimoValido != null) cor = v >= ultimoValido ? '#059669' : '#dc2626';
+        if (ultimoValido != null) cor = v <= ultimoValido ? '#059669' : '#dc2626';
         ultimoValido = v;
         return cor;
     });
 
-    // Resumo evolução/regressão (primeiro vs último mês com dados)
+    // Resumo evolução/regressão (primeiro vs último mês com dados) — queda = melhora
     if (resumoEl) {
         const validos = efData.filter(v => v != null);
         if (validos.length >= 2) {
             const ini = validos[0], fim = validos[validos.length - 1];
             const diff = ((fim - ini) / ini) * 100;
-            resumoEl.textContent = diff >= 0
-                ? `▲ Evolução de ${diff.toFixed(1)}% no período`
-                : `▼ Regressão de ${Math.abs(diff).toFixed(1)}% no período`;
-            resumoEl.style.color = diff >= 0 ? '#059669' : '#dc2626';
+            resumoEl.textContent = diff <= 0
+                ? `▼ ${Math.abs(diff).toFixed(1)}% mais eficiente no período`
+                : `▲ ${diff.toFixed(1)}% menos eficiente no período`;
+            resumoEl.style.color = diff <= 0 ? '#059669' : '#dc2626';
         } else {
             resumoEl.textContent = 'Informe as mensagens dos meses para comparar';
             resumoEl.style.color = '#94a3b8';
@@ -770,7 +1124,7 @@ function chartComparacao(ano) {
         data: {
             labels: lista.map(item => MESES_ABR[item.mes - 1]),
             datasets: [{
-                label: 'Eficiência (atend./mil msgs)',
+                label: 'Eficiência (msgs/atendimento)',
                 data: efData,
                 borderColor: '#2563eb',
                 backgroundColor: 'rgba(37,99,235,0.08)',
@@ -792,28 +1146,57 @@ function chartComparacao(ano) {
                     callbacks: {
                         label: ctx => ctx.raw == null
                             ? ' sem dados de mensagens'
-                            : ` ${ctx.raw} atend. por mil msgs`
+                            : ` ${ctx.raw} msgs por atendimento`
                     }
                 }
             },
             scales: {
                 y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b' }, beginAtZero: true,
-                     title: { display: true, text: 'Eficiência (maior = melhor)', color: '#94a3b8', font: { size: 10 } } },
+                     title: { display: true, text: 'Msgs/atendimento (menor = melhor)', color: '#94a3b8', font: { size: 10 } } },
                 x: { grid: { display: false }, ticks: { color: '#475569' } }
             }
         }
     });
 }
 
+// Canal selecionado no card "Por Que Buscam" ('todos' | 'whatsapp' | 'instagram')
+let avalAtendenteSel = null;   // atendente selecionado no card Resposta às Avaliações
+let buscamCanal = 'todos';
+const _BUSCAM_CANAIS = ['todos', 'whatsapp', 'instagram'];
+const _BUSCAM_CANAL_LBL = { todos: 'Todos os canais', whatsapp: 'WhatsApp', instagram: 'Instagram' };
+
+function ciclarBuscamCanal(dir) {
+    const i = _BUSCAM_CANAIS.indexOf(buscamCanal);
+    buscamCanal = _BUSCAM_CANAIS[(i + dir + _BUSCAM_CANAIS.length) % _BUSCAM_CANAIS.length];
+    chartBuscam(getPeriodoAtual());   // respeita o filtro atual
+}
+
 function chartBuscam(p) {
     destroyChart('buscam');
     const ctx = getCtx('chart-buscam');
+    const lblEl = document.getElementById('buscam-canal-label');
+    if (lblEl) lblEl.textContent = _BUSCAM_CANAL_LBL[buscamCanal];
     if (!ctx || !p) return;
 
     const labels = ['Resultados', 'Coleta Dom.', 'Falar Atend.', 'Info Gerais', 'Orçamentos', 'Reclamações', 'Vacinas'];
-    const data   = [p.resultados, p.coleta, p.atendente, p.info, p.orcamentos, p.reclamacoes, p.vacinas]
-                   .map(v => v || 0);
-    const colors = ['#2563eb','#059669','#d97706','#8b5cf6','#0891b2','#dc2626','#16a34a'];
+    const colors = ['#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899'];
+
+    // Fonte dos dados conforme o canal selecionado
+    let cats, totalCanal;
+    if (buscamCanal === 'todos') {
+        cats = [p.resultados, p.coleta, p.atendente, p.info, p.orcamentos, p.reclamacoes, p.vacinas].map(v => v || 0);
+        totalCanal = p.total || 0;
+    } else {
+        const m = p.motivosCanal?.[buscamCanal] || {};
+        cats = [m.resultados, m.coleta, m.atendente, m.info, m.orcamentos, m.reclamacoes, m.vacinas].map(v => v || 0);
+        totalCanal = p.canais?.[buscamCanal] || 0;
+    }
+    const data = cats.slice();
+
+    // Fatia "Sem fila (paciente)" = total do canal − categorias (fecha a soma).
+    const somaCat = data.reduce((a, b) => a + b, 0);
+    const outros  = Math.max(0, totalCanal - somaCat);
+    if (outros > 0) { labels.push('Sem fila (paciente)'); data.push(outros); colors.push('#94a3b8'); }
 
     charts['buscam'] = new Chart(ctx, {
         type: 'pie',
@@ -827,7 +1210,19 @@ function chartBuscam(p) {
             plugins: {
                 legend: {
                     position: 'right',
-                    labels: { color: '#475569', font: { size: 11 }, padding: 10, boxWidth: 12 }
+                    labels: {
+                        color: '#475569', font: { size: 11 }, padding: 8, boxWidth: 12,
+                        // Mostra quantidade + % ao lado de cada categoria (sempre visível)
+                        generateLabels: (chart) => {
+                            const d = chart.data.datasets[0].data;
+                            const tot = d.reduce((a, b) => a + b, 0) || 1;
+                            return chart.data.labels.map((lab, i) => ({
+                                text: `${lab}: ${fNum(d[i] || 0)} (${((d[i] || 0) / tot * 100).toFixed(1)}%)`,
+                                fillStyle: colors[i], strokeStyle: colors[i], lineWidth: 0, index: i,
+                                hidden: !chart.getDataVisibility(i)   // risca + some ao clicar
+                            }));
+                        }
+                    }
                 },
                 tooltip: {
                     callbacks: {
@@ -847,7 +1242,9 @@ function chartDias(p) {
     const dias  = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
     const vals  = dias.map(d => p.dias?.[d] || 0);
     const maxV  = Math.max(...vals);
-    const cores = vals.map(v => v === maxV ? 'rgba(217,119,6,0.85)' : 'rgba(37,99,235,0.7)');
+    // Cores sólidas: dia de maior fluxo em âmbar, demais em azul. Só destaca se houver dado.
+    const cores  = vals.map(v => (maxV > 0 && v === maxV) ? '#d97706' : '#2563eb');
+    const bordas = vals.map(v => (maxV > 0 && v === maxV) ? '#b45309' : '#1d4ed8');
 
     charts['dias'] = new Chart(ctx, {
         type: 'bar',
@@ -857,6 +1254,8 @@ function chartDias(p) {
                 label: 'Atendimentos',
                 data: vals,
                 backgroundColor: cores,
+                borderColor: bordas,
+                borderWidth: 1,
                 borderRadius: 6,
                 borderSkipped: false
             }]
@@ -873,47 +1272,54 @@ function chartDias(p) {
     });
 }
 
+// Faixas fixas de volume (independem do máximo do período — mesma contagem vira
+// sempre a mesma cor, comparável entre dias/horas/meses).
+const _HEAT_BANDS = [
+    { min: 0,  max: 5,        rgb: [58, 169, 129], label: '0-5'   },
+    { min: 6,  max: 15,       rgb: [140, 193, 82], label: '6-15'  },
+    { min: 16, max: 30,       rgb: [240, 164, 78], label: '16-30' },
+    { min: 31, max: 60,       rgb: [239, 125, 87], label: '31-60' },
+    { min: 61, max: Infinity, rgb: [226, 64, 46],  label: '61+'   }
+];
+function _heatBand(v) {
+    return _HEAT_BANDS.find(b => v >= b.min && v <= b.max) || _HEAT_BANDS[_HEAT_BANDS.length - 1];
+}
+
 function renderHeatmap(p) {
     const wrap = document.getElementById('heat-horario');
     if (!wrap) return;
     if (!p) { wrap.innerHTML = ''; return; }
 
-    const faixas = _FAIXAS_ORD;
-    const faixaLabel = s => s.replace('-', 'h–') + 'h';
+    const faixas = _HEAT_FAIXAS;
+    const faixaLabel = f => f.replace('-', 'h–') + 'h';
+    const linhas = _HEAT_DIAS.map(d => ({
+        rotulo: d,
+        valores: faixas.map(f => p.heat?.[d]?.[f] || 0)
+    }));
 
-    // Monta a matriz: usa p.heat (dia×faixa) quando existir; senão, cai para p.horarios (1 linha)
-    let linhas;   // [{ rotulo, valores:[...] }]
-    if (p.heat) {
-        linhas = _DIAS_ORD.map(d => ({
-            rotulo: d,
-            valores: faixas.map(f => p.heat?.[d]?.[f] || 0)
-        }));
-    } else {
-        linhas = [{ rotulo: 'Total', valores: faixas.map(f => p.horarios?.[f] || 0) }];
-    }
-
-    // Máximo global para escalar a intensidade da cor
-    let maxV = 0;
-    linhas.forEach(l => l.valores.forEach(v => { if (v > maxV) maxV = v; }));
-
-    const cell = (v) => {
-        const ratio = maxV ? v / maxV : 0;
-        // de cinza-claro (frio) a azul forte (quente)
-        const bg = v === 0 ? '#f1f5f9' : `rgba(37,99,235,${(0.12 + ratio * 0.78).toFixed(3)})`;
-        const cor = ratio > 0.55 ? '#fff' : '#1e293b';
-        const quente = v === maxV && maxV > 0 ? ' heat-max' : '';
-        return `<div class="heat-cell${quente}" style="background:${bg};color:${cor};" title="${v} atendimentos">${v ? fNum(v) : ''}</div>`;
+    const cell = (v, dia, faixa) => {
+        const [r, g, b] = _heatBand(v).rgb;
+        const lum = (0.299 * r + 0.587 * g + 0.114 * b);
+        const cor = lum > 150 ? '#1e293b' : '#fff';
+        return `<div class="heat-cell" style="background:rgb(${r},${g},${b});color:${cor};" title="${dia} ${faixaLabel(faixa)} — ${fNum(v)} atendimento${v===1?'':'s'}">${v ? fNum(v) : ''}</div>`;
     };
 
-    let html = '<div class="heat-grid" style="grid-template-columns: 60px repeat(' + faixas.length + ', 1fr);">';
+    // Legenda (índice de faixas) no topo
+    let html = '<div class="heat-legend heat-legend-bands heat-legend-top">';
+    _HEAT_BANDS.forEach(b => {
+        html += `<span class="heat-legend-item"><span class="heat-legend-swatch" style="background:rgb(${b.rgb.join(',')})"></span>${b.label}</span>`;
+    });
+    html += '</div>';
+
+    // Grade: 1 col de rótulo + 9 colunas de faixa de 2h
+    html += '<div class="heat-scroll"><div class="heat-grid heat-grid-hora" style="grid-template-columns: 46px repeat(' + faixas.length + ', minmax(40px,1fr));">';
     html += '<div class="heat-corner"></div>';
     faixas.forEach(f => { html += `<div class="heat-colhead">${faixaLabel(f)}</div>`; });
     linhas.forEach(l => {
         html += `<div class="heat-rowhead">${l.rotulo}</div>`;
-        l.valores.forEach(v => { html += cell(v); });
+        l.valores.forEach((v, i) => { html += cell(v, l.rotulo, faixas[i]); });
     });
-    html += '</div>';
-    html += '<div class="heat-legend"><span>Menor fluxo</span><div class="heat-legend-bar"></div><span>Maior fluxo</span></div>';
+    html += '</div></div>';
 
     wrap.innerHTML = html;
 }
@@ -925,15 +1331,16 @@ function chartClientes(p) {
 
     const concluidos  = p.concluidos  || 0;
     const silenciosos = p.silenciosos || 0;
-    const emAberto    = Math.max(0, (p.total || 0) - concluidos - silenciosos);
+    const cliente     = p.clienteEncerrou || 0;
+    const emAberto    = Math.max(0, (p.total || 0) - concluidos - silenciosos - cliente);
 
     charts['clientes'] = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['Resolvidos', 'Silenciosos', 'Em andamento'],
+            labels: ['Resolvidos', 'Silenciosos', 'Em andamento', 'Cliente encerrou'],
             datasets: [{
-                data: [concluidos, silenciosos, emAberto],
-                backgroundColor: ['rgba(5,150,105,0.8)', 'rgba(220,38,38,0.8)', 'rgba(217,119,6,0.8)'],
+                data: [concluidos, silenciosos, emAberto, cliente],
+                backgroundColor: ['rgba(5,150,105,0.8)', 'rgba(220,38,38,0.8)', 'rgba(217,119,6,0.8)', 'rgba(100,116,139,0.85)'],
                 borderWidth: 2,
                 borderColor: '#fff',
                 hoverOffset: 6
@@ -1254,7 +1661,7 @@ function _renderSpreadsheetTipo(tipo, tbodyId) {
 
     const calcEf = p => {
         if (!p.mensagens || !p.total) return '—';
-        return ((p.total / p.mensagens) * 1000).toFixed(1);
+        return (p.mensagens / p.total).toFixed(1);   // msgs por atendimento (menor = melhor)
     };
     const aberto = p => Math.max(0, (p.total || 0) - (p.concluidos || 0) - (p.silenciosos || 0));
     const fAv = v => v != null && v > 0 ? Number(v).toFixed(1) + ' ★' : '—';
@@ -1445,6 +1852,11 @@ function gerarRelatorio() {
 
     const ef   = calcEficiencia(p);
     const data = new Date().toLocaleDateString('pt-BR');
+    const emAberto = Math.max(0, (p.total||0) - (p.concluidos||0) - (p.silenciosos||0) - (p.clienteEncerrou||0));
+    const avalEnv  = p.avalEnviadas || 0;
+    const avalResp = p.avalRespondidas || 0;
+    const avalNao  = Math.max(0, avalEnv - avalResp);
+    const c        = p.canais || { whatsapp:0, instagram:0, outros:0 };
 
     const atendentesHtml = (p.atendentes || []).map((at, i) => `
         <tr>
@@ -1452,6 +1864,8 @@ function gerarRelatorio() {
             <td>${escHtml(at.nome)}</td>
             <td>${fNum(at.atendimentos)}</td>
             <td>${fAval(at.avaliacao)}</td>
+            <td>${fNum(at.avalEnviadas || 0)}</td>
+            <td>${fNum(at.avalRespondidas || 0)}</td>
         </tr>`).join('');
 
     const html = `<!DOCTYPE html>
@@ -1483,20 +1897,36 @@ function gerarRelatorio() {
     <h3>Indicadores Gerais</h3>
     <div class="kpi-row">
         <div class="kpi" style="border-top-color:#2563eb;"><div class="kpi-l">Total Atendimentos</div><div class="kpi-v">${fNum(p.total)}</div></div>
-        <div class="kpi" style="border-top-color:#d97706;"><div class="kpi-l">Atendimentos em Aberto</div><div class="kpi-v">${fNum(Math.max(0,(p.total||0)-(p.concluidos||0)-(p.silenciosos||0)))}</div></div>
+        <div class="kpi" style="border-top-color:#d97706;"><div class="kpi-l">Atendimentos em Aberto</div><div class="kpi-v">${fNum(emAberto)}</div></div>
         <div class="kpi" style="border-top-color:#059669;"><div class="kpi-l">Avaliação Média</div><div class="kpi-v">${fAval(p.avaliacao)}</div></div>
-        <div class="kpi" style="border-top-color:#8b5cf6;"><div class="kpi-l">Eficiência (atend./mil msgs)</div><div class="kpi-v">${ef.hasData ? fNum(ef.index, 1) : '—'}</div></div>
+        <div class="kpi" style="border-top-color:#8b5cf6;"><div class="kpi-l">Eficiência (msgs/atend.)</div><div class="kpi-v">${ef.hasData ? fNum(ef.index, 1) : '—'}</div></div>
     </div>
 
-    <h3>Qualidade</h3>
+    <h3>Status dos Clientes</h3>
+    <table>
+        <tr><th>Situação</th><th>Quantidade</th></tr>
+        <tr><td>Resolvidos (finalizados)</td><td>${fNum(p.concluidos)}</td></tr>
+        <tr><td>Silenciosos (não responderam)</td><td>${fNum(p.silenciosos)}</td></tr>
+        <tr><td>Em andamento (status Aberto)</td><td>${fNum(emAberto)}</td></tr>
+        <tr><td>Cliente encerrou (fila vazia, sem usuário)</td><td>${fNum(p.clienteEncerrou || 0)}</td></tr>
+    </table>
+
+    <h3>Resposta às Avaliações</h3>
     <table>
         <tr><th>Indicador</th><th>Valor</th></tr>
-        <tr><td>Resolvidos (atendidos e resolvidos)</td><td>${fNum(p.concluidos)}</td></tr>
-        <tr><td>Silenciosos (não responderam)</td><td>${fNum(p.silenciosos)}</td></tr>
-        <tr><td>Em andamento (status Aberto)</td><td>${fNum(Math.max(0,(p.total||0)-(p.concluidos||0)-(p.silenciosos||0)))}</td></tr>
-        <tr><td>Avaliações respondidas</td><td>${fNum(p.avalRespondidas || 0)}</td></tr>
-        <tr><td>Avaliações pendentes</td><td>${fNum(p.avalPendentes || 0)}</td></tr>
+        <tr><td>Avaliações enviadas</td><td>${fNum(avalEnv)}</td></tr>
+        <tr><td>Respondida</td><td>${fNum(avalResp)}</td></tr>
+        <tr><td>Avaliação não respondida</td><td>${fNum(avalNao)}</td></tr>
+        <tr><td>Taxa de resposta</td><td>${avalEnv ? Math.round(avalResp/avalEnv*100) : 0}%</td></tr>
         <tr><td>Total de Mensagens</td><td>${fNum(p.mensagens)}</td></tr>
+    </table>
+
+    <h3>Volume por Canal (Conexão)</h3>
+    <table>
+        <tr><th>Canal</th><th>Atendimentos</th></tr>
+        <tr><td>WhatsApp</td><td>${fNum(c.whatsapp || 0)}</td></tr>
+        <tr><td>Instagram</td><td>${fNum(c.instagram || 0)}</td></tr>
+        <tr><td>Outros</td><td>${fNum(c.outros || 0)}</td></tr>
     </table>
 
     <h3>Por Que Buscam o LAMIC</h3>
@@ -1526,7 +1956,7 @@ function gerarRelatorio() {
     ${p.atendentes?.length ? `
     <h3>Desempenho por Atendente</h3>
     <table>
-        <tr><th>#</th><th>Nome</th><th>Atendimentos</th><th>Avaliação</th></tr>
+        <tr><th>#</th><th>Nome</th><th>Atendimentos</th><th>Avaliação</th><th>Aval. enviadas</th><th>Respondidas</th></tr>
         ${atendentesHtml}
     </table>` : ''}
 
@@ -1558,19 +1988,25 @@ function _norm(v) {
         .toLowerCase().trim();
 }
 
-// Converte "dd/mm/aaaa hh:mm" (ou Date/serial do Excel) em objeto Date.
+// Converte a "Data Abertura" (dd/mm/aaaa hh:mm, ISO, Date ou serial Excel) em
+// Date de hora LOCAL — a hora é a base do heatmap, não pode deslocar por timezone.
 function _parseDataAbertura(v) {
     if (v == null || v === '') return null;
     if (v instanceof Date && !isNaN(v)) return v;
-    // Serial numérico do Excel
+    // Serial numérico do Excel: ancora em meia-noite LOCAL de 1899-12-30 e soma o
+    // total (dias + fração de dia). Usar epoch UTC deslocaria getHours() pelo fuso.
     if (typeof v === 'number' && isFinite(v)) {
-        const epoch = new Date(Date.UTC(1899, 11, 30));
-        return new Date(epoch.getTime() + Math.round(v * 86400000));
+        const base = new Date(1899, 11, 30, 0, 0, 0, 0);
+        return new Date(base.getTime() + Math.round(v * 86400000));
     }
     const s = String(v).trim();
-    const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T]+(\d{1,2}):(\d{2}))?/);
-    if (!m) return null;
-    return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0));
+    // dd/mm/aaaa [hh:mm(:ss)]
+    let m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T]+(\d{1,2}):(\d{2}))?/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0));
+    // aaaa-mm-dd [hh:mm(:ss)]  (ISO)
+    m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T]+(\d{1,2}):(\d{2}))?/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0));
+    return null;
 }
 
 // Classifica a coluna "Fila" em um dos motivos do dashboard.
@@ -1610,22 +2046,103 @@ function _faixaHorario(h) {
     return null;
 }
 
-function _novoAgregado(ano, mes) {
+// Classifica o canal de origem do atendimento (coluna Canal/Origem/Plataforma).
+function _classificarCanal(v) {
+    const n = _norm(v);
+    if (!n) return 'outros';
+    if (n.includes('whats') || n.includes('wpp') || n.includes('zap')) return 'whatsapp';
+    if (n.includes('insta') || n.includes('direct') || n.includes(' ig')) return 'instagram';
+    return 'outros';
+}
+
+// Categorias de "Por Que Buscam" zeradas (usado por canal).
+function _motivosVazio() {
+    return { resultados:0, coleta:0, atendente:0, info:0, orcamentos:0, reclamacoes:0, vacinas:0 };
+}
+
+// Balde de contagens reutilizável (mês inteiro OU um único dia).
+function _novoBucket() {
     return {
-        tipo:'mes', ano, mes, quinzena:null,
-        total:0, contatos:0, mensagens:0,
-        avaliacao:0, silenciosos:0, concluidos:0,
-        avalRespondidas:0, avalPendentes:0,
+        total:0, mensagens:0,
+        avaliacao:0, silenciosos:0, concluidos:0, clienteEncerrou:0,
+        avalEnviadas:0, avalRespondidas:0, avalPendentes:0,
         resultados:0, coleta:0, atendente:0, info:0,
         orcamentos:0, reclamacoes:0, vacinas:0,
         dias:    { Seg:0, Ter:0, Qua:0, Qui:0, Sex:0, Sab:0 },
         horarios:{ '07-09':0, '09-11':0, '11-13':0, '13-15':0, '15-17':0, '17-19':0 },
         heat:    _heatVazio(),
-        atendentes:[],
-        _avalSoma:   0,           // soma das notas numéricas (para a média)
-        _avalQtd:    0,
-        _atend:      {}           // nome → { at, avalSoma, avalQtd }
+        canais:  { whatsapp:0, instagram:0, outros:0 },
+        motivosCanal: { whatsapp: _motivosVazio(), instagram: _motivosVazio(), outros: _motivosVazio() },
+        _avalSoma: 0, _avalQtd: 0,
+        _atend:    {}             // nome → { at, avalSoma, avalQtd }
     };
+}
+
+// Aplica uma linha (já derivada) a um balde. Usado tanto no mês quanto no dia.
+function _applyToBucket(b, d) {
+    b.total++;
+    if (!isNaN(d.av) && d.av > 0) { b._avalSoma += d.av; b._avalQtd++; }
+    // Avaliações: "enviada" = status de avaliação (respondida OU pendente).
+    // Dentro das enviadas: "respondida" = status respondida OU tem nota; senão "não respondida".
+    const temStatusAval = d.status.includes('respondida') || d.status.includes('pendente');
+    const respondeu     = d.status.includes('respondida') || (!isNaN(d.av) && d.av > 0);
+    if (temStatusAval) {
+        b.avalEnviadas++;
+        if (respondeu) b.avalRespondidas++;
+        else           b.avalPendentes++;
+    }
+    // Fila vazia + sem usuário = paciente encerrou (categoria própria, exclusiva)
+    if (d.filaVazia && !d.usuario) {
+        b.clienteEncerrou++;
+    } else if (d.motivo.includes('silencioso')) {
+        b.silenciosos++;
+    } else if (d.status === 'aberto') {
+        /* em andamento → derivado */
+    } else {
+        b.concluidos++;
+    }
+    const canalKey = (d.canal && b.canais[d.canal] != null) ? d.canal : 'outros';
+    if (d.cat) {
+        b[d.cat]++;
+        if (b.motivosCanal[canalKey]) b.motivosCanal[canalKey][d.cat]++;   // categoria por canal
+    }
+    if (d.canal && b.canais[d.canal] != null) b.canais[d.canal]++;
+    if (d.diaSemana)  b.dias[d.diaSemana]++;
+    if (d.faixaOld)   b.horarios[d.faixaOld]++;
+    if (d.diaHeat && d.faixaHeat && b.heat[d.diaHeat]) b.heat[d.diaHeat][d.faixaHeat]++;
+    if (d.usuario) {
+        const a = b._atend[d.usuario] || (b._atend[d.usuario] = { at:0, avalSoma:0, avalQtd:0, env:0, resp:0 });
+        a.at++;
+        if (!isNaN(d.av) && d.av > 0) { a.avalSoma += d.av; a.avalQtd++; }
+        if (temStatusAval) { a.env++; if (respondeu) a.resp++; }
+    }
+}
+
+// Converte um balde (com campos _) num objeto período/dia pronto pra render.
+function _finalizarBucket(b, extra) {
+    return Object.assign({
+        total: b.total, contatos: b.total, mensagens: b.mensagens || 0,
+        avaliacao: b._avalQtd ? +(b._avalSoma / b._avalQtd).toFixed(2) : 0,
+        avalEnviadas: b.avalEnviadas, avalRespondidas: b.avalRespondidas, avalPendentes: b.avalPendentes,
+        silenciosos: b.silenciosos, concluidos: b.concluidos, clienteEncerrou: b.clienteEncerrou,
+        resultados: b.resultados, coleta: b.coleta, atendente: b.atendente, info: b.info,
+        orcamentos: b.orcamentos, reclamacoes: b.reclamacoes, vacinas: b.vacinas,
+        dias: b.dias, horarios: b.horarios, heat: b.heat,
+        canais: b.canais, motivosCanal: b.motivosCanal,
+        atendentes: Object.entries(b._atend).map(([n, v]) => ({
+            nome: n, atendimentos: v.at,
+            avaliacoes: v.avalQtd,                                   // nº de quem deu nota
+            avalEnviadas: v.env || 0, avalRespondidas: v.resp || 0,  // resposta às avaliações
+            avaliacao: v.avalQtd ? +(v.avalSoma / v.avalQtd).toFixed(2) : 0
+        })).sort((a, c) => c.atendimentos - a.atendimentos)
+    }, extra || {});
+}
+
+function _novoAgregado(ano, mes) {
+    return Object.assign(_novoBucket(), {
+        tipo:'mes', ano, mes, quinzena:null,
+        _byDay: {}                // 'YYYY-MM-DD' → balde do dia
+    });
 }
 
 function importarRelatorioXLSX(event) {
@@ -1644,13 +2161,45 @@ function importarRelatorioXLSX(event) {
             const wb    = XLSX.read(e.target.result, { type: 'array' });
             const sheet = wb.Sheets[wb.SheetNames[0]];
             const linhas = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+            _fbSaveRaw(dashTipo, linhas, file.name);   // guarda a base no Firebase
+            _processarLinhas(linhas, { silencioso: false });
+        } catch (err) {
+            console.error('LAMIC: erro ao importar relatório', err);
+            alert('Ocorreu um erro ao ler o arquivo. Confirme que é um .xlsx válido do relatório de atendimentos.');
+        } finally {
+            event.target.value = ''; // permite reimportar o mesmo arquivo
+        }
+    };
+    reader.onerror = () => {
+        alert('Não foi possível ler o arquivo.');
+        event.target.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+}
 
+// Recalcula tudo a partir da planilha base salva no Firebase (sem re-anexar).
+function reprocessarBase() {
+    _fbLoadRaw(dashTipo).then(raw => {
+        const rows = raw && raw.rows ? _coerceLinhas(raw.rows) : null;
+        if (!rows || !rows.length) {
+            alert(`Nenhuma planilha base salva para "${dashTipo.toUpperCase()}".\nImporte uma planilha uma vez — depois é só reprocessar.`);
+            return;
+        }
+        _processarLinhas(rows, { silencioso: true });
+    }).catch(e => { console.error(e); alert('Erro ao carregar a planilha base do Firebase.'); });
+}
+
+// Processa as linhas cruas (do arquivo OU da base salva) → agrega e grava períodos.
+// silencioso=true: reprocesso da base (sobrescreve meses sem perguntar, aviso curto).
+function _processarLinhas(linhas, opts = {}) {
+    const silencioso = !!opts.silencioso;
+    try {
             // Localiza a linha de cabeçalho: a que tem "Data Abertura" + uma das colunas-chave.
             // Funciona tanto no relatório completo quanto no enxuto (Status, Contato, Usuário,
             // Fila, Data Abertura, Avaliação, Motivo de conclusão).
             let hIdx = -1;
             for (let i = 0; i < Math.min(linhas.length, 10); i++) {
-                const linhaNorm = linhas[i].map(_norm);
+                const linhaNorm = (linhas[i] || []).map(_norm);
                 const temData  = linhaNorm.includes('data abertura');
                 const temChave = linhaNorm.includes('fila') || linhaNorm.includes('status') ||
                                  linhaNorm.includes('motivo de conclusao') || linhaNorm.includes('usuario');
@@ -1658,89 +2207,75 @@ function importarRelatorioXLSX(event) {
             }
             if (hIdx === -1) {
                 alert('Não consegui identificar o cabeçalho do relatório.\n\nO arquivo precisa ter uma linha de títulos com as colunas: Status, Contato, Usuário, Fila, Data Abertura, Avaliação e Motivo de conclusão.');
-                event.target.value = '';
                 return;
             }
 
             // Índices das colunas que interessam
             const head = linhas[hIdx].map(_norm);
+            const _idxAny = (...nomes) => { for (const n of nomes) { const k = head.indexOf(n); if (k !== -1) return k; } return -1; };
             const col = {
                 status:  head.indexOf('status'),
                 data:    head.indexOf('data abertura'),
                 fila:    head.indexOf('fila'),
                 usuario: head.indexOf('usuario'),
                 aval:    head.indexOf('avaliacao'),
-                motivo:  head.indexOf('motivo de conclusao')
+                motivo:  head.indexOf('motivo de conclusao'),
+                canal:   _idxAny('conexao', 'canal', 'origem', 'plataforma', 'canal de origem')
             };
             if (col.data === -1) {
                 alert('O relatório não tem a coluna "Data Abertura". Não é possível agrupar por período.');
-                event.target.value = '';
                 return;
             }
 
             // Agrega por (ano, mês)
             const meses = {};
             let ignoradas = 0;
+            let descartadas = 0;   // Fila BOT (não houve atendimento humano)
             for (let i = hIdx + 1; i < linhas.length; i++) {
                 const row = linhas[i];
-                if (!row || row.every(c => c === '' || c == null)) continue;
+                if (!row || !row.length || row.every(c => c === '' || c == null)) continue;
 
                 const dt = _parseDataAbertura(row[col.data]);
                 if (!dt || isNaN(dt)) { ignoradas++; continue; }
 
+                // Fila "BOT" = atendimento não chegou a um atendente humano
+                // (encerrado no bot) → NÃO contabiliza como nada. Fila vazia continua contando.
+                const filaNorm = col.fila !== -1 ? _norm(row[col.fila]) : '';
+                if (filaNorm.includes('bot')) { descartadas++; continue; }
+
                 const ano = dt.getFullYear();
                 const mes = dt.getMonth() + 1;
+                const dia = dt.getDate();
                 const key = ano + '-' + mes;
                 const ag  = meses[key] || (meses[key] = _novoAgregado(ano, mes));
 
-                ag.total++;
-
+                // Deriva os campos da linha UMA vez
                 const status = col.status !== -1 ? _norm(row[col.status]) : '';
                 const motivo = col.motivo !== -1 ? _norm(row[col.motivo]) : '';
-
-                // Avaliação (nota numérica → média) + status de avaliação (regra 4)
-                const av = parseFloat(row[col.aval]);
-                if (col.aval !== -1 && !isNaN(av) && av > 0) { ag._avalSoma += av; ag._avalQtd++; }
-                if (status.includes('respondida'))    ag.avalRespondidas++;
-                else if (status.includes('pendente')) ag.avalPendentes++;
-
-                // Status do cliente (regras 1 e 5):
-                //  • Silencioso  → motivo "Cliente silencioso" (não respondeu)
-                //  • Em andamento → status "Aberto" (ainda não finalizado)
-                //  • Resolvido (concluído) → finalizado (Fechado / Aval. Pendente / Aval. Respondida)
-                if (motivo.includes('silencioso'))   ag.silenciosos++;
-                else if (status === 'aberto')        { /* em andamento → derivado (total - concluidos - silenciosos) */ }
-                else                                  ag.concluidos++;
-
-                // Fila → motivo de busca
-                const filaNorm = col.fila !== -1 ? _norm(row[col.fila]) : '';
-                const cat = _classificarFila(filaNorm);
-                if (cat) ag[cat]++;
-
-                // Dia da semana
-                const diaKey = _DOW_MAP[dt.getDay()];
-                if (diaKey) ag.dias[diaKey]++;
-
-                // Faixa de horário (somente Data Abertura — regra 3 anterior)
-                const faixa = _faixaHorario(dt.getHours());
-                if (faixa) ag.horarios[faixa]++;
-
-                // Heatmap: cruzamento dia × faixa
-                if (diaKey && faixa) ag.heat[diaKey][faixa]++;
-
-                // Atendente: somente usuários humanos (BOT não é contabilizado)
+                const av     = parseFloat(row[col.aval]);
                 const u = col.usuario !== -1 ? String(row[col.usuario] || '').trim() : '';
-                if (u && !_usuarioIgnorado(u)) {
-                    const a = ag._atend[u] || (ag._atend[u] = { at:0, avalSoma:0, avalQtd:0 });
-                    a.at++;
-                    if (!isNaN(av) && av > 0) { a.avalSoma += av; a.avalQtd++; }
-                }
+                const derivada = {
+                    status, motivo, av,
+                    cat:       _classificarFila(filaNorm),
+                    filaVazia: (col.fila !== -1 && !filaNorm),   // coluna Fila existe e está vazia
+                    canal:     col.canal !== -1 ? _classificarCanal(row[col.canal]) : null,
+                    diaSemana: _DOW_MAP[dt.getDay()],   // Seg–Sáb (gráficos por dia)
+                    faixaOld:  _faixaHorario(dt.getHours()),
+                    diaHeat:   _DOW_HEAT[dt.getDay()],  // inclui Dom (heatmap)
+                    faixaHeat: _faixaHeat(dt.getHours()),
+                    usuario:   (u && !_usuarioIgnorado(u)) ? u : null
+                };
+
+                // Aplica no balde do mês E no balde do dia
+                _applyToBucket(ag, derivada);
+                const dataStr = `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+                const bDia = ag._byDay[dataStr] || (ag._byDay[dataStr] = _novoBucket());
+                _applyToBucket(bDia, derivada);
             }
 
             const chaves = Object.keys(meses);
             if (!chaves.length) {
                 alert('Nenhuma linha com data válida foi encontrada no relatório.');
-                event.target.value = '';
                 return;
             }
 
@@ -1755,7 +2290,7 @@ function importarRelatorioXLSX(event) {
                 const existente = periodos.find(p => p.tipo === 'mes' && p.ano === ag.ano && p.mes === ag.mes);
                 const nome = gerarNome('mes', ag.ano, ag.mes, null);
 
-                if (existente) {
+                if (existente && !silencioso) {
                     const ok = confirm(
                         `Já existe um período registrado para "${nome}".\n\n` +
                         `Deseja SUBSTITUIR os dados desse mês pelos do relatório?\n\n` +
@@ -1764,37 +2299,20 @@ function importarRelatorioXLSX(event) {
                     if (!ok) { resumo.push(`• ${nome}: mantido (não substituído)`); continue; }
                 }
 
+                // Detalhe por dia (permite o filtro fatiar por data específica)
+                const byDay = {};
+                for (const [dataStr, bDia] of Object.entries(ag._byDay)) {
+                    byDay[dataStr] = _finalizarBucket(bDia);
+                }
+
                 // Monta o objeto de período no formato do dashboard
-                const periodo = {
+                const periodo = _finalizarBucket(ag, {
                     tipo:'mes', ano: ag.ano, mes: ag.mes, quinzena:null,
                     nome,
-                    total:       ag.total,
-                    contatos:    ag.total,
                     // "Mensagens" não existe no relatório → preserva valor manual se houver
-                    mensagens:   existente ? (existente.mensagens || 0) : 0,
-                    avaliacao:   ag._avalQtd ? +(ag._avalSoma / ag._avalQtd).toFixed(2) : 0,
-                    avalRespondidas: ag.avalRespondidas,
-                    avalPendentes:   ag.avalPendentes,
-                    silenciosos: ag.silenciosos,
-                    concluidos:  ag.concluidos,
-                    resultados:  ag.resultados,
-                    coleta:      ag.coleta,
-                    atendente:   ag.atendente,
-                    info:        ag.info,
-                    orcamentos:  ag.orcamentos,
-                    reclamacoes: ag.reclamacoes,
-                    vacinas:     ag.vacinas,
-                    dias:        ag.dias,
-                    horarios:    ag.horarios,
-                    heat:        ag.heat,
-                    atendentes:  Object.entries(ag._atend)
-                                    .map(([n, v]) => ({
-                                        nome: n,
-                                        atendimentos: v.at,
-                                        avaliacao: v.avalQtd ? +(v.avalSoma / v.avalQtd).toFixed(2) : 0
-                                    }))
-                                    .sort((a, b) => b.atendimentos - a.atendimentos)
-                };
+                    mensagens: existente ? (existente.mensagens || 0) : 0,
+                    byDay
+                });
 
                 if (existente) {
                     periodo.id = existente.id;
@@ -1811,39 +2329,36 @@ function importarRelatorioXLSX(event) {
 
             salvarStorage();
 
-            // Posiciona o dashboard no mês importado mais recente
-            if (ultimoImportado) {
+            // Posiciona o dashboard no mês importado mais recente — SÓ na importação
+            // manual. No reprocesso (silencioso) preserva o filtro que o usuário escolheu.
+            if (ultimoImportado && !silencioso) {
+                const y = ultimoImportado.ano, m = ultimoImportado.mes;
+                const mm = String(m).padStart(2, '0');
                 filtro.tipo = 'mes';
-                filtro.ano  = ultimoImportado.ano;
-                filtro.mes  = ultimoImportado.mes;
-                document.querySelectorAll('.filtro-tab').forEach(t => t.classList.remove('active'));
-                const tabMes = document.getElementById('tab-mes');
-                if (tabMes) tabMes.classList.add('active');
-                const mesWrap = document.getElementById('f-mes-wrap');
-                if (mesWrap) mesWrap.style.display = '';
+                filtro.ano  = y;
+                filtro.mes  = m;
+                filtro.de   = `${y}-${mm}-01`;
+                filtro.ate  = `${y}-${mm}-${String(new Date(y, m, 0).getDate()).padStart(2,'0')}`;
             }
 
             atualizarFiltroSelects();
             renderDashboard();
             renderSpreadsheet();
 
-            let msg = `Relatório importado com sucesso!\n\n${resumo.join('\n')}`;
-            if (ignoradas) msg += `\n\n(${ignoradas} linha(s) sem data válida foram ignoradas.)`;
-            msg += `\n\nObs.: "Total de Mensagens" não consta neste relatório — preencha manualmente (✏ Editar) se quiser acompanhar a Eficiência.`;
-            alert(msg);
+            if (silencioso) {
+                let m2 = `Base reprocessada (${dashTipo.toUpperCase()}): ${resumo.length} período(s) recalculado(s).`;
+                if (descartadas) m2 += `\n${descartadas} linha(s) com Fila BOT ignoradas.`;
+                alert(m2);
+            } else {
+                let msg = `Relatório importado com sucesso!\n\n${resumo.join('\n')}`;
+                if (descartadas) msg += `\n\n(${descartadas} linha(s) com Fila BOT não foram contabilizadas — atendimento não chegou a um atendente.)`;
+                if (ignoradas) msg += `\n\n(${ignoradas} linha(s) sem data válida foram ignoradas.)`;
+                msg += `\n\nObs.: "Total de Mensagens" não consta neste relatório — preencha manualmente (✏ Editar) se quiser acompanhar a Eficiência.`;
+                alert(msg);
+            }
 
         } catch (err) {
-            console.error('LAMIC: erro ao importar relatório', err);
-            alert('Ocorreu um erro ao ler o arquivo. Confirme que é um .xlsx válido do relatório de atendimentos.');
-        } finally {
-            event.target.value = ''; // permite reimportar o mesmo arquivo
+            console.error('LAMIC: erro ao processar linhas', err);
+            alert('Ocorreu um erro ao processar os dados. Confirme que o arquivo/base é um relatório de atendimentos válido.');
         }
-    };
-
-    reader.onerror = () => {
-        alert('Não foi possível ler o arquivo.');
-        event.target.value = '';
-    };
-
-    reader.readAsArrayBuffer(file);
 }

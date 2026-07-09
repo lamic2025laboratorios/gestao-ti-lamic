@@ -326,6 +326,8 @@ body {
 
 .filtro-tab:not(:last-child) { border-right: 1px solid var(--gray-2); }
 .filtro-tab:hover { background: var(--gray-1); color: var(--text); }
+.filtro-limpar { color: var(--muted); }
+.filtro-limpar:hover { background: #fef2f2; color: var(--red, #dc2626); border-color: #fecaca; }
 .filtro-tab.active { background: var(--blue-v); color: #fff; font-weight: 600; }
 
 .filtro-selects { display: flex; gap: 8px; align-items: center; }
@@ -344,6 +346,27 @@ body {
 }
 
 .filtro-select:focus {
+    outline: none;
+    border-color: var(--blue-v);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+}
+
+.filtro-datas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.filtro-data-item { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+.filtro-data-sep { color: var(--gray-2); font-weight: 700; }
+.filtro-date {
+    padding: 7px 9px;
+    border: 1px solid var(--gray-2);
+    border-radius: 7px;
+    font-size: 0.84rem;
+    color: var(--text);
+    background: var(--white);
+    height: 36px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.filtro-date:focus {
     outline: none;
     border-color: var(--blue-v);
     box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
@@ -436,6 +459,21 @@ body {
 
 .chart-card-full { grid-column: 1 / -1; }
 
+/* Heatmap (largo) + Volume por Canal (estreito) lado a lado */
+.grid-heat-canal { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); }
+@media (max-width: 900px) { .grid-heat-canal { grid-template-columns: 1fr; } }
+
+/* 3 cards lado a lado (Ranking / Resposta / Status) */
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr; } }
+
+/* Configuração / Backup */
+.config-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .config-wrap { grid-template-columns: 1fr; } }
+.config-desc { font-size: 0.86rem; color: var(--muted); line-height: 1.5; margin: 4px 0 14px; }
+.config-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.config-warn { font-size: 0.78rem; color: var(--amber, #b45309); margin-top: 12px; font-weight: 600; }
+
 .chart-title {
     font-size: 0.73rem;
     font-weight: 700;
@@ -451,6 +489,75 @@ body {
 }
 
 .chart-body { position: relative; flex: 1; }
+
+/* ── Botão de informação (i) + popover ─────────────────────── */
+.info-wrap { position: relative; display: inline-flex; vertical-align: middle; margin-left: 6px; text-transform: none; }
+.info-btn {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 1px solid var(--gray-3, #cbd5e1); background: var(--white);
+    color: var(--muted); font-size: 0.68rem; font-weight: 800; font-family: Georgia, 'Times New Roman', serif;
+    font-style: italic; line-height: 1; cursor: pointer; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+}
+.info-wrap:hover { z-index: 70; }
+.info-btn:hover, .info-btn:focus, .info-btn.info-open { background: var(--blue-v); color: #fff; border-color: var(--blue-v); }
+.info-pop {
+    display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 70;
+    width: 250px; max-width: 78vw;
+    background: #1e293b; color: #e2e8f0;
+    font-size: 0.72rem; font-weight: 500; line-height: 1.45; letter-spacing: 0;
+    text-transform: none; text-align: left;
+    padding: 10px 12px; border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(15,23,42,0.28);
+    white-space: normal;
+}
+.info-pop::before {
+    content: ''; position: absolute; top: -5px; left: 8px;
+    width: 10px; height: 10px; background: #1e293b; transform: rotate(45deg);
+}
+/* Mostra ao PASSAR O MOUSE (hover/focus); clique também funciona no toque */
+.info-wrap:hover .info-pop,
+.info-btn:focus + .info-pop,
+.info-btn.info-open + .info-pop { display: block; }
+.info-pop strong { color: #fff; }
+
+/* ── Alternador de canal (setas) ── */
+.canal-switch { display: inline-flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; }
+.canal-arrow {
+    width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--gray-2);
+    background: var(--white); color: var(--muted); font-size: 1rem; line-height: 1;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+}
+.canal-arrow:hover { background: var(--blue-v); color: #fff; border-color: var(--blue-v); }
+.canal-switch-lbl { font-size: 0.74rem; font-weight: 700; color: var(--text); min-width: 92px; text-align: center; }
+
+/* Badges de canal (WhatsApp/Instagram) abaixo dos gráficos */
+.canal-badges { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px; justify-content: center; }
+.canal-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.76rem; color: var(--muted); font-weight: 600; }
+.canal-badge strong { color: var(--text); font-weight: 800; }
+.canal-badge-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Volume por Canal ── */
+.canais-legenda { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.canal-leg-item { display: flex; align-items: center; gap: 9px; font-size: 0.82rem; color: var(--text); }
+.canal-leg-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+.canal-leg-nome { font-weight: 600; }
+.canal-leg-val { margin-left: auto; font-weight: 700; }
+.canal-leg-val em { font-style: normal; color: var(--muted); font-weight: 500; }
+.canais-vazio { font-size: 0.78rem; color: var(--muted); text-align: center; padding: 24px 8px; line-height: 1.5; }
+.info-pop-note {
+    display: block; margin-top: 7px; padding-top: 6px;
+    border-top: 1px solid rgba(148,163,184,0.25);
+    color: #94a3b8; font-size: 0.68rem; font-style: italic;
+}
+/* Perto da borda direita, ancora o popover à direita do botão */
+.info-wrap.info-right .info-pop { left: auto; right: 0; }
+.info-wrap.info-right .info-pop::before { left: auto; right: 8px; }
+
+/* Não deixar o card recortar o popover */
+.kpi-card, .chart-card { overflow: visible; }
 
 /* ── Badges ────────────────────────────────────────────────── */
 .badge {
@@ -1057,6 +1164,11 @@ select:focus {
     min-width: 520px;
     margin-top: 4px;
 }
+/* Variante faixas de 2h (9 colunas) — rola horizontal em telas estreitas */
+.heat-scroll { width: 100%; overflow-x: auto; padding-bottom: 4px; }
+.heat-grid-hora { gap: 4px; min-width: 560px; }
+.heat-grid-hora .heat-cell { height: 34px; border-radius: 5px; font-size: 0.72rem; }
+.heat-grid-hora .heat-colhead { font-size: 0.64rem; letter-spacing: 0; }
 
 .heat-corner { background: transparent; }
 
@@ -1104,13 +1216,31 @@ select:focus {
     color: var(--muted);
     font-weight: 600;
 }
-.heat-legend-bar {
-    flex: 1;
-    max-width: 240px;
-    height: 10px;
-    border-radius: 6px;
-    background: linear-gradient(90deg, #f1f5f9, rgba(37,99,235,0.9));
-    border: 1px solid var(--gray-2);
+.heat-legend-bands {
+    flex-wrap: wrap;
+    row-gap: 8px;
+}
+.heat-legend-top {
+    margin-top: 0;
+    margin-bottom: 14px;
+    justify-content: center;
+}
+.heat-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.heat-legend-item em {
+    font-style: normal;
+    color: var(--muted);
+    font-weight: 500;
+}
+.heat-legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.08);
+    flex-shrink: 0;
 }
 
 /* ── Ranking de Avaliação por Atendente (por média, colorido) ── */
@@ -1151,3 +1281,21 @@ select:focus {
 .aval-bar-fill.aval-vermelha { background: var(--red); }
 
 .rank-aval-sub { font-size: 0.74rem; color: var(--muted); font-weight: 500; }
+.aval-det-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+/* Card Resposta às Avaliações — gauge 0–100% + resumo */
+.aval-gauge-wrap { position: relative; width: 100%; height: 190px; }
+.aval-gauge-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+.aval-gauge-pct { font-size: 2.2rem; font-weight: 800; color: var(--text); line-height: 1; }
+.aval-gauge-lbl { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+.aval-resumo { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.aval-res-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text); }
+.aval-res-row strong { margin-left: auto; font-weight: 700; }
+.aval-resumo-titulo { text-align: center; font-size: 0.8rem; font-weight: 700; color: var(--text); margin: 2px 0 8px; min-height: 20px; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.aval-res-sel { color: var(--blue-v); }
+.aval-res-clear { border: none; background: none; color: var(--muted); font-size: 0.72rem; font-weight: 600; cursor: pointer; padding: 2px 4px; }
+.aval-res-clear:hover { color: var(--red); }
+/* Item do ranking selecionado */
+.rank-aval-item { cursor: pointer; border-radius: 8px; transition: background 0.15s; }
+.rank-aval-item:hover { background: var(--gray-1, #f1f5f9); }
+.rank-aval-item.sel { background: rgba(37,99,235,0.09); box-shadow: inset 0 0 0 1.5px var(--blue-v); }
