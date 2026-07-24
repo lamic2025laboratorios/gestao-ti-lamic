@@ -52,15 +52,6 @@
         </button>
       </div>
     
-    <div class="sidebar-admin-badge">
-      <div class="sad-avatar" id="inv-sad-avatar"><i class="ph ph-hard-drives" style="font-size: 1.25rem; color: #fff;"></i></div>
-      <div class="sb-user-info">
-        <div class="sad-name" id="inv-sad-name">Inventário TI</div>
-        <div class="sad-role" id="inv-sad-role">Painel de Controle</div>
-      </div>
-      <div class="sad-status"></div>
-</div>
-
     <nav class="sidebar-nav">
       <div class="nav-section-label sb-txt">Navegação</div>
       
@@ -80,17 +71,39 @@
         <i class="ph ph-desktop-tower ni-ico"></i>
         <span class="ni-txt">Equipamentos</span>
       </button>
-      
+
+      <button class="nav-item" id="btn-nav-estoque" onclick="showEstoqueView(); deativarNavs(this)">
+        <i class="ph ph-package ni-ico"></i>
+        <span class="ni-txt">Estoque</span>
+      </button>
+
       <button class="nav-item" id="btn-nav-settings" onclick="openSettings(); deativarNavs(this)">
         <i class="ph ph-gear ni-ico"></i>
         <span class="ni-txt">Configurações</span>
       </button>
     </nav>
 
-    <button class="sidebar-exit" onclick="(window.top||window).location.href='index.html'">
-        <i class="ph ph-house ni-ico"></i>
-        <span class="ni-txt">Home</span>
-    </button>
+    <div class="sidebar-account">
+      <div class="sb-user-menu hidden" id="sb-user-menu">
+        <button class="sb-user-menu-item" onclick="invBackToMenu()">
+          <i class="ph ph-arrow-u-up-left"></i>
+          Voltar ao menu principal
+        </button>
+        <button class="sb-user-menu-item danger" onclick="invLogout()">
+          <i class="ph ph-sign-out"></i>
+          Sair do sistema
+        </button>
+      </div>
+      <div class="sidebar-user" onclick="toggleInvUserMenu(event)" data-tip="Conta">
+        <div class="sad-avatar" id="inv-sad-avatar"><i class="ph ph-hard-drives" style="font-size:1.05rem;color:#fff"></i></div>
+        <div class="sb-user-info">
+          <div class="sad-name" id="inv-sad-name">Inventário TI</div>
+          <div class="sad-role" id="inv-sad-role">Painel de Controle</div>
+        </div>
+        <i class="ph ph-caret-up sb-user-caret"></i>
+        <span class="ni-tip">Conta</span>
+      </div>
+    </div>
 </aside>
 
 <!-- ========== MAIN ========== -->
@@ -136,11 +149,8 @@
                 <button class="btn-wifi" onclick="openWifiInfoModal()">
                     <i class="ph ph-wifi-high"></i> Wi-Fi
                 </button>
-                <button class="btn-primary" onclick="openMobileModal()">
-                    <i class="ph ph-device-mobile"></i> Novo Celular
-                </button>
                 <button class="btn-primary" onclick="openComputerModal()">
-                    <i class="ph ph-plus"></i> Novo Computador
+                    <i class="ph ph-plus"></i> Novo Guichê
                 </button>
             </div>
         </div>
@@ -198,7 +208,10 @@
         <div class="section-collapsible">
             <div class="collapsible-header" onclick="toggleSection('wrap-mobiles', this)">
                 <h3><i class="ph ph-device-mobile"></i> Celulares</h3>
-                <i class="ph ph-caret-up toggle-icon"></i>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <button class="btn-primary btn-mini" onclick="openMobileModal(); event.stopPropagation()"><i class="ph ph-plus"></i> Novo Celular</button>
+                    <i class="ph ph-caret-up toggle-icon"></i>
+                </div>
             </div>
             <div id="wrap-mobiles" class="collapsible-body">
                 <div class="table-container">
@@ -221,9 +234,8 @@
         <!-- Licenças de Software -->
         <div class="section-collapsible">
             <div class="collapsible-header" onclick="toggleSection('wrap-licenses', this)">
-                <h3><i class="ph ph-certificate"></i> Licenças de Software</h3>
+                <h3><i class="ph ph-certificate"></i> Licenças de Software <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(licenças novas entram pela aba Estoque)</span></h3>
                 <div style="display:flex;gap:10px;align-items:center;">
-                    <button class="btn-primary btn-mini" onclick="openLicenseModal(); event.stopPropagation()"><i class="ph ph-plus"></i> Nova Licença</button>
                     <i class="ph ph-caret-up toggle-icon"></i>
                 </div>
             </div>
@@ -295,7 +307,7 @@
                     <input type="text" id="access-search-input" placeholder="Buscar acessos..." oninput="filterAccesses()" class="search-input">
                 </div>
                 <button class="btn-filter-toggle" id="btn-access-filter" onclick="toggleFilterPanel('access-filter-panel', this)" title="Filtros">
-                    <i class="ph ph-funnel"></i> Filtros
+                    <i class="ph ph-faders"></i>
                 </button>
                 <button class="btn-primary" onclick="openAccessModal()">
                     <i class="ph ph-plus"></i> Novo Acesso
@@ -332,7 +344,7 @@
     </section>
 
     <!-- ===== EQUIPAMENTOS VIEW ===== -->
-    <section id="equip-view" class="view hidden" style="padding:1.5rem;">
+    <section id="equip-view" class="view hidden">
         <div class="view-header">
             <div class="view-title">
                 <i class="ph ph-desktop-tower" style="font-size:1.5rem;color:var(--blue);"></i>
@@ -344,7 +356,7 @@
                     <input type="text" id="equip-search-input" placeholder="Buscar equipamento..." class="search-input" oninput="filterEquipamentos()">
                 </div>
                 <button class="btn-filter-toggle" id="btn-equip-filter" onclick="toggleFilterPanel('equip-filter-panel', this)" title="Filtros">
-                    <i class="ph ph-funnel"></i> Filtros
+                    <i class="ph ph-faders"></i>
                 </button>
                 <button class="btn-primary" onclick="openEquipModal()">
                     <i class="ph ph-plus"></i> Novo Equipamento
@@ -380,6 +392,95 @@
         <div id="equip-grid" class="equip-grid"></div>
     </section>
 
+    <!-- ===== ESTOQUE VIEW ===== -->
+    <section id="estoque-view" class="view hidden">
+        <div class="view-header">
+            <div class="view-title">
+                <i class="ph ph-package"></i>
+                <h2>Estoque de Hardware</h2>
+            </div>
+            <div class="header-controls">
+                <div class="filter-popover-wrap">
+                    <button class="btn-filter-toggle hidden" id="estoque-filter-btn" onclick="toggleEstoqueFilterPanel()" title="Filtros">
+                        <i class="ph ph-funnel"></i>
+                    </button>
+                    <div class="filter-popover" id="estoque-filter-panel">
+                        <div class="filter-popover-row">
+                            <span class="filter-chip-label">Tipo</span>
+                            <div class="filter-chip-group">
+                                <button class="filter-chip active" data-key="tipo" data-val="todos" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-squares-four"></i> Todos</button>
+                                <button class="filter-chip chip-tipo-pc" data-key="tipo" data-val="pc" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-desktop-tower"></i> PCs</button>
+                                <button class="filter-chip chip-tipo-peca hidden" data-key="tipo" data-val="model" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-desktop-tower"></i> Modelo da Máquina</button>
+                                <button class="filter-chip chip-tipo-peca hidden" data-key="tipo" data-val="cpu" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-cpu"></i> Processador</button>
+                                <button class="filter-chip chip-tipo-peca hidden" data-key="tipo" data-val="mobo" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-circuitry"></i> Placa Mãe</button>
+                                <button class="filter-chip chip-tipo-peca hidden" data-key="tipo" data-val="ram" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-database"></i> RAM</button>
+                                <button class="filter-chip chip-tipo-peca hidden" data-key="tipo" data-val="disk" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-hard-drives"></i> Armazenamento</button>
+                                <button class="filter-chip chip-tipo-peca hidden" data-key="tipo" data-val="gpu" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-cube"></i> Placa de Vídeo</button>
+                                <button class="filter-chip chip-tipo-peca hidden" data-key="tipo" data-val="monitor" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-monitor"></i> Monitor</button>
+                                <button class="filter-chip" data-key="tipo" data-val="printer" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-printer"></i> Impressoras</button>
+                                <button class="filter-chip" data-key="tipo" data-val="label" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-tag"></i> Etiquetadoras</button>
+                                <button class="filter-chip" data-key="tipo" data-val="thermal" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-scroll"></i> Imp. Térmicas</button>
+                                <button class="filter-chip" data-key="tipo" data-val="webcam" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-camera"></i> Webcams</button>
+                                <button class="filter-chip" data-key="tipo" data-val="tv" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-television"></i> TVs</button>
+                                <button class="filter-chip" data-key="tipo" data-val="mobile" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-device-mobile"></i> Celulares</button>
+                                <button class="filter-chip" data-key="tipo" data-val="ac" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-snowflake"></i> Ar-Condicionados</button>
+                                <button class="filter-chip" data-key="tipo" data-val="licenca" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-certificate"></i> Licenças</button>
+                            </div>
+                        </div>
+                        <div class="filter-popover-row">
+                            <span class="filter-chip-label">Status</span>
+                            <div class="filter-chip-group">
+                                <button class="filter-chip active" data-key="status" data-val="todos" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-list"></i> Todos</button>
+                                <button class="filter-chip" data-key="status" data-val="azul" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-package"></i> Disponíveis</button>
+                                <button class="filter-chip" data-key="status" data-val="verde" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-check-circle"></i> Em uso</button>
+                                <button class="filter-chip" data-key="status" data-val="amarelo" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-wrench"></i> Manutenção</button>
+                                <button class="filter-chip" data-key="status" data-val="vermelho" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-warning-octagon"></i> Danificados</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="estoque-mode-toggle">
+                    <button class="estoque-mode-btn" id="estoque-mode-btn-catalogo" onclick="setEstoqueMode('catalogo')">
+                        <i class="ph ph-cube"></i> Estoque
+                    </button>
+                    <button class="estoque-mode-btn active" id="estoque-mode-btn-unidades" onclick="setEstoqueMode('unidades')">
+                        <i class="ph ph-buildings"></i> Unidades
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="estoque-catalog-subbar hidden" id="estoque-catalog-view-toggle">
+            <div class="estoque-mode-toggle estoque-mode-toggle-sm">
+                <button class="estoque-mode-btn active" id="estoque-catalog-view-btn-grafico" onclick="setEstoqueCatalogView('grafico')">
+                    <i class="ph ph-squares-four"></i> Gráfico
+                </button>
+                <button class="estoque-mode-btn" id="estoque-catalog-view-btn-lista" onclick="setEstoqueCatalogView('lista')">
+                    <i class="ph ph-table"></i> Lista
+                </button>
+            </div>
+            <div class="estoque-lista-search" id="estoque-grafico-search-wrap">
+                <i class="ph ph-magnifying-glass"></i>
+                <input type="text" id="estoque-catalog-search-input" placeholder="Buscar por código ou modelo..." oninput="_onEstoqueBusca(this.value)">
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn-primary" id="estoque-add-equip-btn" onclick="abrirEscolhaNovoEquipamento()">
+                    <i class="ph ph-plus"></i> Adicionar Equipamento
+                </button>
+                <button class="btn-icon" id="estoque-trash-btn" onclick="abrirLixeira()" title="Lixeira — itens apagados ficam 30 dias aqui antes de sumir de vez">
+                    <i class="ph ph-trash"></i>
+                </button>
+            </div>
+        </div>
+        <div class="estoque-layout" id="estoque-layout">
+            <aside class="estoque-units-col" id="estoque-units-col">
+                <div class="estoque-units-list" id="estoque-units-list"></div>
+            </aside>
+            <div class="estoque-comps-panel" id="estoque-comps-panel">
+                <div class="estoque-empty"><i class="ph ph-arrow-left"></i> Selecione uma unidade ao lado.</div>
+            </div>
+        </div>
+    </section>
+
 </main>
 
 <!-- ============================================================
@@ -399,33 +500,30 @@
     </div>
 </div>
 
-<!-- Computer Modal — BUG FIX: template bar agora está dentro do modal-content -->
+<!-- Computer Modal ("Guichê") — Hardware/Periféricos/Acessos/Software agora vêm
+     do Estoque via seletor; os campos originais continuam existindo (ocultos)
+     porque saveComputer() e o restante do app já leem esses IDs. -->
 <div id="computer-modal" class="modal hidden">
     <div class="modal-content large-modal">
         <div class="modal-header-row">
-            <h3 id="comp-modal-title">Novo Computador</h3>
-            <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
-        </div>
-        <input type="hidden" id="comp-id">
-
-        <!-- Template bar -->
-        <div class="form-group template-bar">
-            <label>Usar Configuração Salva (Template)</label>
-            <div class="input-group">
-                <select id="comp-preset-select" onchange="fillComputerFromPreset()" style="flex:1;">
-                    <option value="">Selecione um modelo...</option>
-                </select>
-                <button class="btn-primary" onclick="saveCurrentAsTemplate()" title="Salvar estes dados como novo modelo" style="border-radius:0 4px 4px 0;">
-                    <i class="ph ph-floppy-disk"></i>
-                </button>
+            <h3 id="comp-modal-title">Novo Guichê</h3>
+            <div style="display:flex;gap:8px;">
+                <button class="btn-icon btn-delete hidden" id="btn-delete-guiche" onclick="deleteGuicheDoModal()" title="Apagar guichê (apaga com os dados dentro — desvincule antes se quiser salvar os equipamentos)"><i class="ph ph-trash"></i></button>
+                <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
             </div>
         </div>
+        <input type="hidden" id="comp-id">
+        <input type="hidden" id="hw-preset-idx">
+        <input type="hidden" id="picked-printer-id">
+        <input type="hidden" id="picked-label-id">
+        <input type="hidden" id="picked-thermal-id">
+        <input type="hidden" id="picked-webcam-id">
+        <input type="hidden" id="picked-tv-id">
 
         <div class="form-section">
-            <h4>Identificação & Acessos</h4>
+            <h4>Identificação</h4>
             <div class="grid-3-col">
                 <div class="form-group"><label>Nome / Guichê</label><input type="text" id="comp-name"></div>
-                <div class="form-group"><label>Tipo</label><select id="comp-type"><option value="desktop">Desktop</option><option value="notebook">Notebook</option><option value="aio">All In One</option></select></div>
                 <div class="form-group"><label>Status do Equipamento</label>
                     <select id="comp-status">
                         <option value="ativo">✅ Ativo</option>
@@ -433,13 +531,6 @@
                         <option value="manutencao">🔧 Em Manutenção</option>
                     </select>
                 </div>
-            </div>
-            <div class="grid-3-col access-fields-box">
-                <div class="form-group"><label>Senha Guichê</label><input type="text" id="acc-pc-pass"></div>
-                <div class="form-group"><label>AnyDesk ID</label><input type="text" id="acc-any-id"></div>
-                <div class="form-group"><label>Senha AnyDesk</label><input type="text" id="acc-any-pass"></div>
-                <div class="form-group"><label>User RDP</label><input type="text" id="acc-rdp-user"></div>
-                <div class="form-group"><label>Senha RDP</label><input type="text" id="acc-rdp-pass"></div>
             </div>
             <div class="form-group" style="margin-top:15px;">
                 <label>Autorizações</label>
@@ -452,39 +543,86 @@
         </div>
 
         <div class="form-section">
-            <h4>Hardware</h4>
-            <div class="grid-2-col">
-                <div class="form-group full-width"><label>Modelo</label><input type="text" id="hw-model"></div>
-                <div class="form-group full-width"><label>CPU</label><input type="text" id="hw-cpu"></div>
-                <div class="form-group"><label>Placa Mãe</label><input type="text" id="hw-mobo"></div>
-                <div class="form-group"><label>RAM</label><input type="text" id="hw-ram"></div>
-                <div class="form-group"><label>Disco</label><input type="text" id="hw-disk"></div>
-                <div class="form-group"><label>Vídeo</label><input type="text" id="hw-gpu"></div>
-                <div class="form-group full-width"><label>Monitor</label><input type="text" id="hw-monitor"></div>
+            <div class="hw-section-head">
+                <h4>Hardware, Acessos & Software</h4>
+                <button type="button" class="btn-secondary" onclick="abrirSeletorHardware()"><i class="ph ph-list-magnifying-glass"></i> Selecionar do Estoque</button>
+            </div>
+            <div id="hw-preview-box" class="hw-preview-box"><span class="hw-preview-empty">Nenhum hardware selecionado ainda.</span></div>
+            <!-- Campos originais — ocultos, preenchidos pelo seletor (Licença SO e
+                 Tipo vêm do Template: o Tipo sai do Modelo da Máquina escolhido) -->
+            <div class="hidden">
+                <select id="comp-type"><option value="desktop">Desktop</option><option value="notebook">Notebook</option><option value="aio">All In One</option></select>
+                <select id="comp-license"><option value="original">Original</option><option value="pirata">Não Genuíno</option></select>
+                <input type="text" id="hw-model"><input type="text" id="hw-cpu"><input type="text" id="hw-mobo">
+                <input type="text" id="hw-ram"><input type="text" id="hw-disk"><input type="text" id="hw-gpu"><input type="text" id="hw-monitor">
+                <select id="comp-os"><option value="Windows 11">Windows 11</option><option value="Windows 10">Windows 10</option><option value="Windows 7">Windows 7</option></select>
+                <select id="comp-arch"><option value="x64">x64</option><option value="x86">x86</option></select>
+                <input type="text" id="acc-pc-pass"><input type="text" id="acc-any-id"><input type="text" id="acc-any-pass">
+                <input type="text" id="acc-rdp-user"><input type="text" id="acc-rdp-pass">
             </div>
         </div>
 
         <div class="form-section">
             <h4>Periféricos</h4>
-            <div class="grid-peripherals">
-                <div class="form-group"><label>Impressora</label><div class="input-group"><select id="per-printer" class="model-select" onchange="onPeripheralModelChange(this,'per-printer-type','ip-printer','host-printer')"><option value="">Nenhuma</option></select><button class="btn-add-model" onclick="addNewModel('printer')">+</button><select id="per-printer-type" class="conn-select" onchange="togglePeripheralInputs(this,'ip-printer','host-printer')"><option value="usb">Local</option><option value="network">Rede</option><option value="shared">Compartilhada</option></select></div><input type="text" id="ip-printer" class="ip-input hidden" placeholder="IP"><select id="host-printer" class="host-select hidden"></select></div>
-                <div class="form-group"><label>Etiquetadora</label><div class="input-group"><select id="per-label" class="model-select" onchange="onPeripheralModelChange(this,'per-label-type','ip-label','host-label')"><option value="">Nenhuma</option></select><button class="btn-add-model" onclick="addNewModel('label')">+</button><select id="per-label-type" class="conn-select" onchange="togglePeripheralInputs(this,'ip-label','host-label')"><option value="usb">Local</option><option value="network">Rede</option><option value="shared">Compartilhada</option></select></div><input type="text" id="ip-label" class="ip-input hidden" placeholder="IP"><select id="host-label" class="host-select hidden"></select></div>
-                <div class="form-group"><label>Térmica</label><div class="input-group"><select id="per-thermal" class="model-select" onchange="onPeripheralModelChange(this,'per-thermal-type','ip-thermal','host-thermal')"><option value="">Nenhuma</option></select><button class="btn-add-model" onclick="addNewModel('thermal')">+</button><select id="per-thermal-type" class="conn-select" onchange="togglePeripheralInputs(this,'ip-thermal','host-thermal')"><option value="usb">Local</option><option value="network">Rede</option><option value="shared">Compartilhada</option></select></div><input type="text" id="ip-thermal" class="ip-input hidden" placeholder="IP"><select id="host-thermal" class="host-select hidden"></select></div>
-                <div class="form-group"><label>Webcam</label><div class="input-group"><select id="per-webcam" class="model-select" onchange="checkAutoUnimed(); onPeripheralModelChange(this,'per-webcam-type','ip-webcam','host-webcam')"><option value="">Nenhuma</option></select><button class="btn-add-model" onclick="addNewModel('webcam')">+</button><select id="per-webcam-type" class="conn-select" onchange="togglePeripheralInputs(this,'ip-webcam','host-webcam')"><option value="usb">Local</option><option value="network">Rede</option><option value="shared">Compartilhada</option></select></div><input type="text" id="ip-webcam" class="ip-input hidden" placeholder="IP"><select id="host-webcam" class="host-select hidden"></select></div>
-                <div class="form-group"><label>TV</label><div class="input-group"><select id="per-tv" class="model-select" onchange="onPeripheralModelChange(this,'per-tv-type','ip-tv','host-tv')"><option value="">Nenhuma</option></select><button class="btn-add-model" onclick="addNewModel('tv')">+</button><select id="per-tv-type" class="conn-select" onchange="togglePeripheralInputs(this,'ip-tv','host-tv')"><option value="hdmi">HDMI</option><option value="vga">VGA</option><option value="chromecast">Chromecast</option><option value="network">Smart</option></select></div><input type="text" id="ip-tv" class="ip-input hidden" placeholder="IP"><select id="host-tv" class="host-select hidden"></select></div>
+            <div class="grid-peripherals" id="periph-preview-grid">
+                <div class="periph-preview-item"><label>Impressora</label><div class="periph-preview-box" id="periph-preview-printer"><span class="hw-preview-empty">Nenhuma</span></div>
+                    <div class="periph-conn-row" id="periph-conn-printer"><select id="per-printer-type" class="conn-select" onchange="_onConnChange('printer')"><option value="usb">Local (USB)</option><option value="network">Rede</option><option value="shared">Compartilhada</option></select><input type="text" id="ip-printer" class="ip-input hidden" placeholder="IP"><select id="host-printer" class="host-select hidden" onchange="_onHostCompartilhadoChange('printer')"></select></div>
+                    <button type="button" class="btn-secondary" onclick="abrirSeletorPeriferico('printer')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
+                <div class="periph-preview-item"><label>Etiquetadora</label><div class="periph-preview-box" id="periph-preview-label"><span class="hw-preview-empty">Nenhuma</span></div>
+                    <div class="periph-conn-row" id="periph-conn-label"><select id="per-label-type" class="conn-select" onchange="_onConnChange('label')"><option value="usb">Local (USB)</option><option value="network">Rede</option><option value="shared">Compartilhada</option></select><input type="text" id="ip-label" class="ip-input hidden" placeholder="IP"><select id="host-label" class="host-select hidden" onchange="_onHostCompartilhadoChange('label')"></select></div>
+                    <button type="button" class="btn-secondary" onclick="abrirSeletorPeriferico('label')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
+                <div class="periph-preview-item"><label>Térmica</label><div class="periph-preview-box" id="periph-preview-thermal"><span class="hw-preview-empty">Nenhuma</span></div>
+                    <div class="periph-conn-row" id="periph-conn-thermal"><select id="per-thermal-type" class="conn-select" onchange="_onConnChange('thermal')"><option value="usb">Local (USB)</option><option value="network">Rede</option><option value="shared">Compartilhada</option></select><input type="text" id="ip-thermal" class="ip-input hidden" placeholder="IP"><select id="host-thermal" class="host-select hidden" onchange="_onHostCompartilhadoChange('thermal')"></select></div>
+                    <button type="button" class="btn-secondary" onclick="abrirSeletorPeriferico('thermal')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
+                <div class="periph-preview-item"><label>Webcam</label><div class="periph-preview-box" id="periph-preview-webcam"><span class="hw-preview-empty">Nenhuma</span></div>
+                    <div class="periph-conn-row" id="periph-conn-webcam"><select id="per-webcam-type" class="conn-select" onchange="_onConnChange('webcam')"><option value="usb">Local (USB)</option><option value="network">Rede</option><option value="shared">Compartilhada</option></select><input type="text" id="ip-webcam" class="ip-input hidden" placeholder="IP"><select id="host-webcam" class="host-select hidden" onchange="_onHostCompartilhadoChange('webcam')"></select></div>
+                    <button type="button" class="btn-secondary" onclick="abrirSeletorPeriferico('webcam')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
+                <div class="periph-preview-item"><label>TV</label><div class="periph-preview-box" id="periph-preview-tv"><span class="hw-preview-empty">Nenhuma</span></div>
+                    <div class="periph-conn-row" id="periph-conn-tv"><select id="per-tv-type" class="conn-select" onchange="_onConnChange('tv')"><option value="hdmi">HDMI</option><option value="vga">VGA</option><option value="chromecast">Chromecast</option><option value="network">Smart</option></select><input type="text" id="ip-tv" class="ip-input hidden" placeholder="IP"><select id="host-tv" class="host-select hidden" onchange="_onHostCompartilhadoChange('tv')"></select></div>
+                    <button type="button" class="btn-secondary" onclick="abrirSeletorPeriferico('tv')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
             </div>
-        </div>
-
-        <div class="form-section">
-            <h4>Software</h4>
-            <div class="grid-3-col">
-                <div class="form-group"><label>SO</label><select id="comp-os"><option value="Windows 11">Windows 11</option><option value="Windows 10">Windows 10</option><option value="Windows 7">Windows 7</option></select></div>
-                <div class="form-group"><label>Arquitetura</label><select id="comp-arch"><option value="x64">x64</option><option value="x86">x86</option></select></div>
-                <div class="form-group"><label>Licença SO</label><select id="comp-license"><option value="original">Original</option><option value="pirata">Não Genuíno</option></select></div>
+            <!-- Campos originais — ocultos, preenchidos pelo seletor (inputs
+                 pra aceitar qualquer modelo vindo do estoque) -->
+            <div class="hidden">
+                <input type="text" id="per-printer">
+                <input type="text" id="per-label">
+                <input type="text" id="per-thermal">
+                <input type="text" id="per-webcam">
+                <input type="text" id="per-tv">
             </div>
         </div>
 
         <div class="modal-actions"><button class="btn-secondary" onclick="closeModals()">Cancelar</button><button class="btn-primary" onclick="saveComputer()">Salvar</button></div>
+    </div>
+</div>
+
+<!-- Modal: Selecionar Hardware do Estoque -->
+<div id="hw-picker-modal" class="modal hidden">
+    <div class="modal-content medium-modal">
+        <div class="modal-header-row">
+            <h3><i class="ph ph-desktop-tower"></i> Selecionar Hardware do Estoque</h3>
+            <button class="btn-icon" onclick="document.getElementById('hw-picker-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        </div>
+        <div class="hw-picker-toolbar">
+            <div class="estoque-mode-toggle estoque-mode-toggle-sm">
+                <button type="button" class="estoque-mode-btn active" id="hw-picker-mode-disp" onclick="_setHwPickerMode('disp')"><i class="ph ph-package"></i> Disponíveis</button>
+                <button type="button" class="estoque-mode-btn" id="hw-picker-mode-uso" onclick="_setHwPickerMode('uso')"><i class="ph ph-check-circle"></i> Em uso</button>
+            </div>
+            <button type="button" class="filter-clear-btn" onclick="_limparHardwareSelecionado()"><i class="ph ph-x-circle"></i> Remover seleção</button>
+        </div>
+        <div id="hw-picker-list" class="picker-list"></div>
+    </div>
+</div>
+
+<!-- Modal: Selecionar Periférico do Estoque (reaproveitado pros 5 tipos) -->
+<div id="periph-picker-modal" class="modal hidden">
+    <div class="modal-content medium-modal">
+        <div class="modal-header-row">
+            <h3 id="periph-picker-title"><i class="ph ph-printer"></i> Selecionar do Estoque</h3>
+            <button class="btn-icon" onclick="document.getElementById('periph-picker-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        </div>
+        <button type="button" class="filter-clear-btn" onclick="_limparPerifericoSelecionado()"><i class="ph ph-x-circle"></i> Remover seleção</button>
+        <div id="periph-picker-list" class="picker-list"></div>
     </div>
 </div>
 
@@ -493,15 +631,18 @@
     <div class="modal-content medium-modal">
         <div class="modal-header-row">
             <h3 id="mob-modal-title">Novo Celular</h3>
-            <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+            <div style="display:flex;gap:8px;">
+                <button class="btn-icon hidden" id="mob-edit-btn" onclick="_editarMobileModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+            </div>
         </div>
         <input type="hidden" id="mob-id">
-        <div class="form-group preset-bar">
-            <label>Modelo Pré-Cadastrado</label>
-            <select id="mob-preset-select" onchange="fillMobileFromPreset()" style="width:100%;"><option value="">Selecione...</option></select>
+        <div class="form-group preset-bar" id="mob-preset-bar">
+            <label>Modelo Pré-Cadastrado <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerenciados em Configurações)</span></label>
+            <select id="mob-preset-select" onchange="fillMobileFromPreset()" style="width:100%;"><option value="">Preencher manualmente...</option></select>
         </div>
         <div class="form-group"><label>Modelo / Marca</label><input type="text" id="mob-model"></div>
-        <div class="grid-2-col">
+        <div class="grid-2-col" id="mob-user-group">
             <div class="form-group"><label>Número (Chip)</label><input type="text" id="mob-number"></div>
             <div class="form-group"><label>Usuário</label><input type="text" id="mob-user"></div>
         </div>
@@ -512,10 +653,23 @@
                 <div class="form-group"><label>CPU</label><input type="text" id="mob-cpu"></div>
             </div>
         </div>
-        <div class="form-group"><label>Apps</label>
-            <div class="checkbox-group"><label class="chk-item"><input type="checkbox" id="mob-wa-temp"> WhatsApp 90 Dias</label></div>
+        <div class="grid-2-col">
+            <div class="form-group" id="mob-apps-group"><label>Apps</label>
+                <div class="checkbox-group"><label class="chk-item"><input type="checkbox" id="mob-wa-temp"> WhatsApp 90 Dias</label></div>
+            </div>
+            <div class="form-group" id="mob-status-group"><label>Status</label>
+                <select id="mob-status" onchange="_toggleMotivoMobile()">
+                    <option value="disponivel">🔵 Disponível</option>
+                    <option value="em_uso">🟢 Em Uso</option>
+                    <option value="manutencao">🟡 Manutenção</option>
+                    <option value="danificado">🔴 Danificado</option>
+                </select>
+            </div>
         </div>
-        <div class="modal-actions"><button class="btn-secondary" onclick="closeModals()">Cancelar</button><button class="btn-primary" onclick="saveMobile()">Salvar</button></div>
+        <div class="form-group hidden" id="mob-motivo-group"><label>Motivo (dano / manutenção)</label><textarea id="mob-motivo" rows="2" placeholder="Descreva o que aconteceu com o aparelho..." style="width:100%;font-family:inherit;font-size:.85rem;padding:8px;border:1px solid var(--border);border-radius:var(--r);"></textarea></div>
+        <button type="button" class="btn-consertado hidden" id="mob-consertado-btn" onclick="_consertarMobile()" style="margin-bottom:10px;"><i class="ph ph-wrench"></i> Consertado — volta pra Em Uso / Disponível</button>
+        <p class="tpl-link-box" id="mob-loc-info" style="display:none;"></p>
+        <div class="modal-actions"><button class="btn-secondary" onclick="closeModals()">Cancelar</button><button class="btn-primary" id="mob-save-btn" onclick="saveMobile()">Salvar</button></div>
     </div>
 </div>
 
@@ -592,39 +746,45 @@
     <div class="modal-content medium-modal">
         <div class="modal-header-row">
             <h3 id="ac-modal-title">Novo Ar-Condicionado</h3>
-            <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+            <div style="display:flex;gap:8px;">
+                <button class="btn-icon hidden" id="ac-edit-btn" onclick="_editarAcModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+            </div>
         </div>
         <input type="hidden" id="ac-id">
+        <div class="form-group preset-bar" id="ac-preset-bar">
+            <label>Modelo Pré-Cadastrado <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerenciados em Configurações)</span></label>
+            <select id="ac-preset-select" onchange="fillAcFromPreset()" style="width:100%;"><option value="">Preencher manualmente...</option></select>
+        </div>
         <div class="grid-2-col">
             <div class="form-group"><label>Marca</label><input type="text" id="ac-brand" placeholder="Ex: Daikin, Springer, LG"></div>
             <div class="form-group"><label>Modelo</label><input type="text" id="ac-model" placeholder="Ex: Split Inverter"></div>
         </div>
         <div class="grid-3-col">
             <div class="form-group"><label>Capacidade (BTU)</label>
-                <select id="ac-btu">
-                    <option value="7500">7.500 BTU</option><option value="9000">9.000 BTU</option>
-                    <option value="12000" selected>12.000 BTU</option><option value="18000">18.000 BTU</option>
-                    <option value="24000">24.000 BTU</option><option value="30000">30.000 BTU</option>
-                    <option value="36000">36.000 BTU</option><option value="48000">48.000 BTU</option>
-                    <option value="60000">60.000 BTU</option>
-                </select>
+                <div class="input-group">
+                    <select id="ac-btu" style="flex:1;"></select>
+                    <button type="button" class="btn-add-model" id="ac-btu-add" onclick="addAcBtu()" title="Adicionar nova capacidade">+</button>
+                    <button type="button" class="btn-add-model" id="ac-btu-del" onclick="delAcBtu()" title="Excluir a capacidade selecionada">−</button>
+                </div>
             </div>
             <div class="form-group"><label>Nº de Série</label><input type="text" id="ac-serial" placeholder="Número de série"></div>
             <div class="form-group"><label>Status</label>
-                <select id="ac-status">
-                    <option value="ativo">✅ Ativo</option>
-                    <option value="inativo">❌ Inativo</option>
-                    <option value="manutencao">🔧 Em Manutenção</option>
+                <select id="ac-status" onchange="_acToggleLocation(); _toggleMotivoAc()">
+                    <option value="disponivel">🔵 Disponível</option>
+                    <option value="ativo">🟢 Em Uso</option>
+                    <option value="manutencao">🟡 Manutenção</option>
+                    <option value="danificado">🔴 Danificado</option>
                 </select>
             </div>
         </div>
-        <div class="form-group"><label>Localização</label><input type="text" id="ac-location" placeholder="Ex: Sala de Espera, Recepção..."></div>
-        <div class="grid-2-col">
-            <div class="form-group"><label>Data de Instalação</label><input type="date" id="ac-install-date"></div>
-            <div class="form-group"><label>Última Manutenção / Higienização</label><input type="date" id="ac-last-maint"></div>
-        </div>
+        <div class="form-group hidden" id="ac-motivo-group"><label>Motivo (dano / manutenção)</label><textarea id="ac-motivo" rows="2" placeholder="Descreva o que aconteceu com o equipamento..." style="width:100%;font-family:inherit;font-size:.85rem;padding:8px;border:1px solid var(--border);border-radius:var(--r);"></textarea></div>
+        <button type="button" class="btn-consertado hidden" id="ac-consertado-btn" onclick="_consertarAc()" style="margin-bottom:10px;"><i class="ph ph-wrench"></i> Consertado — volta pra Em Uso / Disponível</button>
+        <div class="form-group" id="ac-location-group"><label>Localização</label><input type="text" id="ac-location" placeholder="Ex: Sala de Espera, Recepção..."></div>
         <div class="form-group"><label>Observações</label><input type="text" id="ac-notes" placeholder="Ex: Filtro higienizado jun/2024..."></div>
-        <div class="modal-actions"><button class="btn-secondary" onclick="closeModals()">Cancelar</button><button class="btn-primary" onclick="saveAc()">Salvar</button></div>
+        <input type="hidden" id="ac-install-date"><input type="hidden" id="ac-last-maint">
+        <p class="tpl-link-box" id="ac-loc-info" style="display:none;"></p>
+        <div class="modal-actions"><button class="btn-secondary" onclick="closeModals()">Cancelar</button><button class="btn-primary" id="ac-save-btn" onclick="saveAc()">Salvar</button></div>
     </div>
 </div>
 
@@ -653,99 +813,61 @@
                 <i class="ph ph-gear"></i>
                 <h2>Configurações</h2>
             </div>
-            <button class="btn-icon" onclick="closeModals()" title="Fechar">
-                <i class="ph ph-arrow-left"></i>
-            </button>
         </div>
 
+        <div class="cfg-two-col">
         <!-- Modelos e Templates -->
         <div class="config-section">
             <div class="config-section-header">
                 <i class="ph ph-package"></i>
                 <h4>Modelos e Templates</h4>
+                <button class="cfg-md-fab-header" onclick="addSelectedModel()" title="Adicionar">
+                    <i class="ph ph-plus"></i>
+                </button>
             </div>
             <div id="settings-main-view">
-                <div class="settings-grid">
-                    <div class="settings-col"><h4><i class="ph ph-printer"></i> Impressoras <button class="btn-mini" onclick="addNewModel('printer')">+</button></h4><ul id="list-printer" class="manage-list"></ul></div>
-                    <div class="settings-col"><h4><i class="ph ph-tag"></i> Etiquetadoras <button class="btn-mini" onclick="addNewModel('label')">+</button></h4><ul id="list-label" class="manage-list"></ul></div>
-                    <div class="settings-col"><h4><i class="ph ph-scroll"></i> Térmicas <button class="btn-mini" onclick="addNewModel('thermal')">+</button></h4><ul id="list-thermal" class="manage-list"></ul></div>
-                    <div class="settings-col"><h4><i class="ph ph-camera"></i> Webcams <button class="btn-mini" onclick="addNewModel('webcam')">+</button></h4><ul id="list-webcam" class="manage-list"></ul></div>
-                    <div class="settings-col"><h4><i class="ph ph-television"></i> TVs <button class="btn-mini" onclick="addNewModel('tv')">+</button></h4><ul id="list-tv" class="manage-list"></ul></div>
-                    <div class="settings-col"><h4><i class="ph ph-device-mobile"></i> Celulares <button class="btn-mini" onclick="openInlineForm('mobile')">+</button></h4><ul id="list-mobile" class="manage-list"></ul></div>
-                    <div class="settings-col"><h4><i class="ph ph-desktop"></i> Templates PC <button class="btn-mini" onclick="openInlineForm('compPreset')">+</button></h4><ul id="list-comp-preset" class="manage-list"></ul></div>
+                <div class="cfg-md-layout">
+                    <div class="cfg-md-master">
+                        <button class="cfg-md-tab active" data-mt="printer"    onclick="selectModelType('printer',this)"><i class="ph ph-printer"></i> Impressoras</button>
+                        <button class="cfg-md-tab"        data-mt="label"      onclick="selectModelType('label',this)"><i class="ph ph-tag"></i> Etiquetadoras</button>
+                        <button class="cfg-md-tab"        data-mt="thermal"    onclick="selectModelType('thermal',this)"><i class="ph ph-scroll"></i> Térmicas</button>
+                        <button class="cfg-md-tab"        data-mt="webcam"     onclick="selectModelType('webcam',this)"><i class="ph ph-camera"></i> Webcams</button>
+                        <button class="cfg-md-tab"        data-mt="tv"         onclick="selectModelType('tv',this)"><i class="ph ph-television"></i> TVs</button>
+                        <button class="cfg-md-tab"        data-mt="mobile"     onclick="selectModelType('mobile',this)"><i class="ph ph-device-mobile"></i> Celulares</button>
+                        <button class="cfg-md-tab"        data-mt="ac"         onclick="selectModelType('ac',this)"><i class="ph ph-snowflake"></i> Ar-Condicionados</button>
+                    </div>
+                    <div class="cfg-md-detail">
+                        <div class="cfg-md-detail-head">
+                            <span id="md-detail-title">Impressoras</span>
+                        </div>
+                        <ul id="list-printer"     class="manage-list md-list"></ul>
+                        <ul id="list-label"       class="manage-list md-list hidden"></ul>
+                        <ul id="list-thermal"     class="manage-list md-list hidden"></ul>
+                        <ul id="list-webcam"      class="manage-list md-list hidden"></ul>
+                        <ul id="list-tv"          class="manage-list md-list hidden"></ul>
+                        <ul id="list-mobile"      class="manage-list md-list hidden"></ul>
+                        <ul id="md-list-ac"       class="manage-list md-list hidden"></ul>
+                    </div>
                 </div>
             </div>
             <div id="settings-inline-view" class="hidden settings-inline-box"></div>
         </div>
 
-        <!-- 4 Cards de Cadastro: Fabricante, Fornecedor, Tipo, Categorias -->
-        <div class="equip-config-grid">
-
-            <!-- 1. Fabricante / Marca -->
-            <div class="equip-config-card">
-                <div class="equip-config-card-header">
-                    <i class="ph ph-buildings"></i>
-                    <span>Fabricante / Marca</span>
-                </div>
-                <ul id="list-fabricantes" class="equip-config-list"></ul>
-                <div class="equip-config-add">
-                    <input type="text" id="inp-fabricante" placeholder="Ex: Labtest Diagnóstica S/A" class="input-field" onkeydown="if(event.key==='Enter') addListItem('fabricante')">
-                    <button class="btn-primary" onclick="addListItem('fabricante')">
-                        <i class="ph ph-plus"></i> Adicionar
-                    </button>
-                </div>
+        <!-- Card único: Informações dos Equipamentos (Categorias) -->
+        <div class="config-section">
+            <div class="config-section-header">
+                <i class="ph ph-desktop-tower"></i>
+                <h4>Informações dos Equipamentos</h4>
+                <button class="cfg-md-fab-header" onclick="abrirNovaCategoria(true)" title="Adicionar categoria">
+                    <i class="ph ph-plus"></i>
+                </button>
             </div>
-
-            <!-- 2. Fornecedor -->
-            <div class="equip-config-card">
-                <div class="equip-config-card-header">
-                    <i class="ph ph-storefront"></i>
-                    <span>Fornecedor</span>
-                </div>
-                <ul id="list-fornecedores" class="equip-config-list"></ul>
-                <div class="equip-config-add">
-                    <input type="text" id="inp-fornecedor" placeholder="Ex: ALA Engenharia" class="input-field" onkeydown="if(event.key==='Enter') addListItem('fornecedor')">
-                    <button class="btn-primary" onclick="addListItem('fornecedor')">
-                        <i class="ph ph-plus"></i> Adicionar
-                    </button>
-                </div>
-            </div>
-
-            <!-- 3. Tipo / Subtipo -->
-            <div class="equip-config-card">
-                <div class="equip-config-card-header">
-                    <i class="ph ph-tag"></i>
-                    <span>Tipo / Subtipo</span>
-                </div>
-                <ul id="list-tipos" class="equip-config-list"></ul>
-                <div class="equip-config-add">
-                    <input type="text" id="inp-tipo" placeholder="Ex: Equipamentos Analíticos" class="input-field" onkeydown="if(event.key==='Enter') addListItem('tipo')">
-                    <button class="btn-primary" onclick="addListItem('tipo')">
-                        <i class="ph ph-plus"></i> Adicionar
-                    </button>
-                </div>
-            </div>
-
-            <!-- 4. Categorias de Equipamentos -->
-            <div class="equip-config-card">
-                <div class="equip-config-card-header">
-                    <i class="ph ph-desktop-tower"></i>
-                    <span>Categorias</span>
-                </div>
+            <div class="cfg-eq-single">
+                <p class="cfg-eq-hint">Clique numa categoria para editar seu Tipo/Subtipo, Fabricante/Marca e Fornecedor.</p>
                 <ul id="list-categorias-equip" class="equip-config-list"></ul>
-                <div class="equip-config-add" style="flex-direction:column;gap:6px;">
-                    <div style="display:flex;gap:6px;">
-                        <input type="text" id="inp-cat-nome" placeholder="Nome (ex: Sorologia)" class="input-field" style="flex:2;" onkeydown="if(event.key==='Enter') addCategoriaEquip()">
-                        <input type="text" id="inp-cat-prefixo" placeholder="Sigla" class="input-field" style="flex:1;text-transform:uppercase;" maxlength="4" onkeydown="if(event.key==='Enter') addCategoriaEquip()">
-                    </div>
-                    <button class="btn-primary" style="width:100%;" onclick="addCategoriaEquip()">
-                        <i class="ph ph-plus"></i> Adicionar Categoria
-                    </button>
-                    <small style="color:var(--text-muted);font-size:.7rem;line-height:1.4;">A sigla gera o código automático (ex: SOR-001)</small>
-                </div>
             </div>
-
         </div>
+        </div><!-- /cfg-two-col -->
 
         <!-- Backup e Restauração -->
         <div class="config-section">
@@ -775,9 +897,62 @@
                     </button>
                 </div>
                 <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(this)">
+                <div class="backup-card">
+                    <div class="backup-card-icon"><i class="ph ph-clock-counter-clockwise"></i></div>
+                    <div class="backup-card-info">
+                        <strong>Logs do Inventário</strong>
+                        <span>Rastreabilidade: veja todas as modificações, quem fez e quando</span>
+                    </div>
+                    <button class="btn-secondary" onclick="abrirLogsEquipamento(null)">
+                        <i class="ph ph-clock-counter-clockwise"></i> Ver Logs
+                    </button>
+                </div>
             </div>
         </div>
 
+    </div>
+</div>
+
+<!-- Modal: informações da categoria (Tipo/Subtipo · Fabricante/Marca · Fornecedor) -->
+<!-- Fica FORA do settings-modal de propósito: settings-modal tem backdrop-filter,
+     que cria um containing block e quebra o position:fixed deste popup se aninhado. -->
+<div id="cat-info-modal" class="modal hidden">
+    <div class="modal-content">
+        <div class="config-page-header" style="margin:-28px -32px 18px;height:auto;padding:18px 32px;">
+            <div class="view-title"><i class="ph ph-desktop-tower"></i><h2 id="cat-info-title">Categoria</h2></div>
+            <button class="btn-icon" onclick="closeCatInfo()"><i class="ph ph-x"></i></button>
+        </div>
+        <p class="cfg-eq-hint">Cadastre aqui os tipos, fabricantes e fornecedores que vão aparecer no formulário de equipamentos desta categoria.</p>
+        <div class="cfg-eq-detail">
+            <div class="cfg-eq-block">
+                <div class="cfg-eq-coltitle"><i class="ph ph-tag"></i> Tipo / Subtipo</div>
+                <ul id="list-cat-tipos" class="equip-config-list"></ul>
+                <div class="equip-config-add">
+                    <input type="text" id="inp-cat-tipo" placeholder="Ex: Equipamentos Analíticos" class="input-field" onkeydown="if(event.key==='Enter') addCatSubItem('tipo')">
+                    <button class="btn-primary" onclick="addCatSubItem('tipo')" title="Adicionar tipo"><i class="ph ph-plus"></i></button>
+                </div>
+            </div>
+            <div class="cfg-eq-block">
+                <div class="cfg-eq-coltitle"><i class="ph ph-buildings"></i> Fabricante / Marca</div>
+                <ul id="list-cat-fabricantes" class="equip-config-list"></ul>
+                <div class="equip-config-add">
+                    <input type="text" id="inp-cat-fabricante" placeholder="Ex: Labtest Diagnóstica S/A" class="input-field" onkeydown="if(event.key==='Enter') addCatSubItem('fabricante')">
+                    <button class="btn-primary" onclick="addCatSubItem('fabricante')" title="Adicionar fabricante"><i class="ph ph-plus"></i></button>
+                </div>
+            </div>
+            <div class="cfg-eq-block">
+                <div class="cfg-eq-coltitle"><i class="ph ph-storefront"></i> Fornecedor</div>
+                <ul id="list-cat-fornecedores" class="equip-config-list"></ul>
+                <div class="equip-config-add">
+                    <input type="text" id="inp-cat-fornecedor" placeholder="Ex: ALA Engenharia" class="input-field" onkeydown="if(event.key==='Enter') addCatSubItem('fornecedor')">
+                    <button class="btn-primary" onclick="addCatSubItem('fornecedor')" title="Adicionar fornecedor"><i class="ph ph-plus"></i></button>
+                </div>
+            </div>
+        </div>
+        <div class="cat-info-actions">
+            <button class="btn-small" onclick="_catInfoEdit()"><i class="ph ph-pencil-simple"></i> Editar categoria</button>
+            <button class="btn-small red" onclick="_catInfoDelete()"><i class="ph ph-trash"></i> Excluir categoria</button>
+        </div>
     </div>
 </div>
 
@@ -812,6 +987,10 @@
             <div class="form-group"><label>Senha Cpanel</label><input type="text" id="acc-pass-cpanel"></div>
             <div class="form-group"><label>E-mail Redir (Gmail)</label><input type="text" id="acc-email-redir"></div>
             <div class="form-group"><label>Senha Gmail</label><input type="text" id="acc-pass-gmail"></div>
+        </div>
+        <div class="form-group">
+            <label>Informação <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(opcional — pra que serve esse acesso; vira um ícone "i" em Ações)</span></label>
+            <textarea id="acc-info" rows="2" placeholder="Ex: Login usado para emitir boletos no sistema X..."></textarea>
         </div>
         <div class="form-section" style="margin-top:15px;border-top:1px solid #eee;padding-top:15px;">
             <h4><i class="ph ph-shield-check"></i> Segurança & Extras</h4>
@@ -888,32 +1067,295 @@
             <button class="btn-icon" onclick="document.getElementById('pc-preset-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
         </div>
         <input type="hidden" id="inl-pc-index">
-        <div class="form-group"><label>Nome do Template</label><input type="text" id="inl-pc-name" placeholder="Ex: Padrão Recepção"></div>
-        <div class="grid-3-col">
-            <div class="form-group"><label>Modelo da Máquina</label><input type="text" id="inl-pc-model" placeholder="Ex: Dell Optiplex 5090"></div>
-            <div class="form-group"><label>Processador</label><input type="text" id="inl-pc-cpu" placeholder="Ex: Intel Core i5-10400"></div>
-            <div class="form-group"><label>Placa Mãe</label><input type="text" id="inl-pc-mobo" placeholder="Ex: Dell OEM"></div>
-            <div class="form-group"><label>RAM</label><input type="text" id="inl-pc-ram" placeholder="Ex: 8GB DDR4"></div>
-            <div class="form-group"><label>Armazenamento</label><input type="text" id="inl-pc-disk" placeholder="Ex: 256GB SSD"></div>
-            <div class="form-group"><label>Placa de Vídeo</label><input type="text" id="inl-pc-gpu" placeholder="Ex: Intel UHD 630"></div>
-            <div class="form-group"><label>Monitor</label><input type="text" id="inl-pc-monitor" placeholder="Ex: LG 21.5 FHD"></div>
-            <div class="form-group"><label>Sistema Operacional</label>
-                <select id="inl-pc-os">
-                    <option value="Windows 11">Windows 11</option>
-                    <option value="Windows 10">Windows 10</option>
-                    <option value="Windows 7">Windows 7</option>
+        <input type="hidden" id="inl-pc-orig-unitid">
+        <input type="hidden" id="inl-pc-orig-compid">
+        <div class="grid-2-col">
+            <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="inl-pc-name" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
+            <div class="form-group" id="pc-preset-status-group" style="display:none;"><label>Status</label>
+                <select id="inl-pc-status">
+                    <option value="ativo">✅ Ativo</option>
+                    <option value="inativo">❌ Inativo</option>
+                    <option value="manutencao">🔧 Em Manutenção</option>
                 </select>
             </div>
-            <div class="form-group"><label>Arquitetura</label>
-                <select id="inl-pc-arch">
-                    <option value="x64">x64</option>
-                    <option value="x86">x86</option>
-                </select>
+        </div>
+        <div class="form-section pc-preset-loc-highlight" id="pc-preset-location-section" style="display:none;">
+            <h4><i class="ph ph-map-pin"></i> Localização <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(pra qual Guichê já cadastrado este Hardware vai)</span></h4>
+            <p class="cfg-eq-hint" id="inl-pc-local-atual" style="margin-bottom:8px;"></p>
+            <div class="grid-2-col">
+                <div class="form-group"><label>Unidade</label><select id="inl-pc-unit" onchange="_atualizarSelectGuiche()"></select></div>
+                <div class="form-group"><label>Guichê</label><select id="inl-pc-compname"></select></div>
             </div>
+            <p class="cfg-eq-hint" id="inl-pc-compname-warning" style="display:none;color:var(--red);"></p>
+        </div>
+        <div class="form-section">
+            <h4><i class="ph ph-cpu"></i> Peças <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(escolhidas do que está Disponível na Lista do Estoque)</span></h4>
+            <div class="grid-2-col">
+                <div class="periph-preview-item"><label>Modelo da Máquina</label><div class="periph-preview-box" id="part-preview-model"><span class="hw-preview-empty">Nenhuma</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('model')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
+                <div class="periph-preview-item"><label>Processador</label><div class="periph-preview-box" id="part-preview-cpu"><span class="hw-preview-empty">Nenhuma</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('cpu')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
+                <div class="periph-preview-item"><label>Placa Mãe</label><div class="periph-preview-box" id="part-preview-mobo"><span class="hw-preview-empty">Nenhuma</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('mobo')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
+                <div class="periph-preview-item"><label>RAM <span style="font-weight:400;color:#94a3b8;font-size:.68rem;">(pode mais de uma)</span></label><div class="periph-preview-box" id="part-preview-ram"><span class="hw-preview-empty">Nenhuma</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('ram')"><i class="ph ph-plus"></i> Adicionar</button></div>
+                <div class="periph-preview-item"><label>Armazenamento <span style="font-weight:400;color:#94a3b8;font-size:.68rem;">(pode mais de um)</span></label><div class="periph-preview-box" id="part-preview-disk"><span class="hw-preview-empty">Nenhum</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('disk')"><i class="ph ph-plus"></i> Adicionar</button></div>
+                <div class="periph-preview-item"><label>Placa de Vídeo</label><div class="periph-preview-box" id="part-preview-gpu"><span class="hw-preview-empty">Nenhuma</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('gpu')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
+                <div class="periph-preview-item"><label>Monitor</label><div class="periph-preview-box" id="part-preview-monitor"><span class="hw-preview-empty">Nenhum</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('monitor')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
+            </div>
+        </div>
+        <div class="form-section">
+            <h4><i class="ph ph-windows-logo"></i> Software</h4>
+            <div class="grid-3-col">
+                <div class="form-group"><label>Sistema Operacional</label>
+                    <select id="inl-pc-os">
+                        <option value="Windows 11">Windows 11</option>
+                        <option value="Windows 10">Windows 10</option>
+                        <option value="Windows 7">Windows 7</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Arquitetura</label>
+                    <select id="inl-pc-arch">
+                        <option value="x64">x64</option>
+                        <option value="x86">x86</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Licença SO</label>
+                    <select id="inl-pc-lic" onchange="document.getElementById('pc-preset-license-section').classList.toggle('hidden', this.value!=='original')">
+                        <option value="pirata">Não Genuíno</option>
+                        <option value="original">Original</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-section hidden" id="pc-preset-license-section" style="margin-top:10px;">
+                <div class="hw-section-head">
+                    <h4><i class="ph ph-certificate"></i> Licença <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(obrigatória quando Original — escolhida do estoque, vai pro registro de Licenças da unidade)</span></h4>
+                    <button type="button" class="btn-secondary" onclick="abrirSeletorLicenca()"><i class="ph ph-list-magnifying-glass"></i> Selecionar do Estoque</button>
+                </div>
+                <input type="hidden" id="inl-pc-license-stock-id">
+                <div id="inl-pc-license-preview" class="hw-preview-box"><span class="hw-preview-empty">Nenhuma licença selecionada.</span></div>
+            </div>
+        </div>
+        <div class="form-section pc-preset-acessos-highlight">
+            <h4><i class="ph ph-key"></i> Acessos &amp; Senhas <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(deste computador — vai junto com o Hardware)</span></h4>
+            <div class="grid-3-col">
+                <div class="form-group"><label>Senha Guichê</label><input type="text" id="inl-pc-pcpass"></div>
+                <div class="form-group"><label>AnyDesk ID</label><input type="text" id="inl-pc-anyid"></div>
+                <div class="form-group"><label>Senha AnyDesk</label><input type="text" id="inl-pc-anypass"></div>
+                <div class="form-group"><label>User RDP</label><input type="text" id="inl-pc-rdpuser"></div>
+                <div class="form-group"><label>Senha RDP</label><input type="text" id="inl-pc-rdppass"></div>
+            </div>
+        </div>
+        <!-- Campos-espelho ocultos: strings hw_* derivadas das peças (o resto do app lê daqui) -->
+        <div class="hidden">
+            <input type="text" id="inl-pc-model"><input type="text" id="inl-pc-cpu"><input type="text" id="inl-pc-mobo">
+            <input type="text" id="inl-pc-ram"><input type="text" id="inl-pc-disk"><input type="text" id="inl-pc-gpu"><input type="text" id="inl-pc-monitor">
         </div>
         <div class="modal-actions">
             <button class="btn-secondary" onclick="document.getElementById('pc-preset-modal').classList.add('hidden')">Cancelar</button>
             <button class="btn-primary" onclick="savePcPresetModal()"><i class="ph ph-floppy-disk"></i> Salvar Template</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Selecionar Peça do almoxarifado (Lista) -->
+<div id="part-picker-modal" class="modal hidden">
+    <div class="modal-content medium-modal">
+        <div class="modal-header-row">
+            <h3 id="part-picker-title"><i class="ph ph-cpu"></i> Selecionar Peça</h3>
+            <button class="btn-icon" onclick="document.getElementById('part-picker-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        </div>
+        <button type="button" class="filter-clear-btn" id="part-picker-clear" onclick="_removerPeca()"><i class="ph ph-x-circle"></i> Remover seleção</button>
+        <div id="part-picker-list" class="picker-list"></div>
+    </div>
+</div>
+
+<!-- Modal: Entrada de novo item (peça) no almoxarifado -->
+<div id="part-entry-modal" class="modal hidden">
+    <div class="modal-content small-modal">
+        <div class="modal-header-row">
+            <h3 id="part-entry-title"><i class="ph ph-cpu"></i> Entrada de Peça</h3>
+            <div style="display:flex;gap:8px;">
+                <button class="btn-icon hidden" id="part-entry-edit-btn" onclick="_editarPecaModal()" title="Editar especificação e status"><i class="ph ph-pencil-simple"></i></button>
+                <button class="btn-icon" onclick="document.getElementById('part-entry-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+            </div>
+        </div>
+        <input type="hidden" id="part-entry-tipo">
+        <input type="hidden" id="part-entry-id">
+        <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(não pode ser alterado)</span></label><input type="text" id="part-entry-serial" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
+        <div class="hidden" id="part-entry-model-group">
+            <div class="form-group"><label>Modelo</label>
+                <select id="part-entry-modelo">
+                    <option value="DESKTOP">Desktop</option>
+                    <option value="ALL IN ONE">All In One</option>
+                    <option value="NOTEBOOK">Notebook</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Marca da Máquina</label><input type="text" id="part-entry-marca" placeholder="Ex: SLIM C3TECH"></div>
+        </div>
+        <div class="form-group" id="part-entry-spec-group"><label>Especificação</label><input type="text" id="part-entry-spec" placeholder="Ex: 8GB DDR4 2666MHz"></div>
+        <div class="form-group hidden" id="part-entry-status-group"><label>Status</label>
+            <select id="part-entry-status" onchange="document.getElementById('part-entry-motivo-group').classList.toggle('hidden', !['danificado','manutencao','descartado'].includes(this.value))">
+                <option value="disponivel">🔵 Disponível</option>
+                <option value="em_uso">🟢 Em Uso</option>
+                <option value="manutencao">🟡 Manutenção</option>
+                <option value="danificado">🔴 Danificada</option>
+                <option value="descartado">⚫ Descartada</option>
+            </select>
+        </div>
+        <div class="form-group hidden" id="part-entry-motivo-group"><label>Motivo (dano / manutenção)</label><textarea id="part-entry-motivo" rows="2" placeholder="Descreva o que aconteceu com a peça..." style="width:100%;font-family:inherit;font-size:.85rem;padding:8px;border:1px solid var(--border);border-radius:var(--r);"></textarea></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <button type="button" class="btn-consertado hidden" id="part-entry-consertado-btn" onclick="_consertarPeca()"><i class="ph ph-wrench"></i> Consertado</button>
+            <button type="button" class="btn-descartado hidden" id="part-entry-descartado-btn" onclick="_descartarPeca()"><i class="ph ph-trash"></i> Descartado</button>
+        </div>
+        <p class="tpl-link-box" id="part-entry-template-info" style="display:none;"></p>
+        <p class="cfg-eq-hint" id="part-entry-nova-hint">O item entra no estoque com status <strong>Disponível</strong>.</p>
+        <div class="modal-actions" id="part-entry-actions">
+            <button class="btn-secondary" onclick="document.getElementById('part-entry-modal').classList.add('hidden')">Cancelar</button>
+            <button class="btn-primary" id="part-entry-save-btn" onclick="_salvarEntradaPeca()"><i class="ph ph-floppy-disk"></i> Registrar Entrada</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Lixeira do estoque (retenção de 30 dias) -->
+<div id="trash-modal" class="modal hidden">
+    <div class="modal-content medium-modal">
+        <div class="modal-header-row">
+            <h3><i class="ph ph-trash"></i> Lixeira <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(itens ficam 30 dias antes de sumir de vez)</span></h3>
+            <button class="btn-icon" onclick="document.getElementById('trash-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        </div>
+        <div id="trash-modal-body" class="logs-modal-body"></div>
+    </div>
+</div>
+
+<!-- Modal: Logs / Rastreabilidade do inventário -->
+<div id="logs-modal" class="modal hidden">
+    <div class="modal-content medium-modal">
+        <div class="modal-header-row">
+            <h3 id="logs-modal-title"><i class="ph ph-clock-counter-clockwise"></i> Logs do Inventário</h3>
+            <button class="btn-icon" onclick="document.getElementById('logs-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        </div>
+        <div id="logs-modal-body" class="logs-modal-body"></div>
+    </div>
+</div>
+
+<!-- Modal: Entrada de Licença de Software no estoque -->
+<div id="license-entry-modal" class="modal hidden">
+    <div class="modal-content medium-modal">
+        <div class="modal-header-row">
+            <h3 id="lic-entry-title"><i class="ph ph-certificate"></i> Entrada de Licença de Software</h3>
+            <div style="display:flex;gap:8px;">
+                <button class="btn-icon hidden" id="lic-entry-edit-btn" onclick="_editarLicencaModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="btn-icon" onclick="document.getElementById('license-entry-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+            </div>
+        </div>
+        <input type="hidden" id="lic-entry-id">
+        <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="lic-entry-serial" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
+        <div class="grid-2-col">
+            <div class="form-group"><label>Software</label><input type="text" id="lic-entry-software" placeholder="Ex: Windows 11 Pro"></div>
+            <div class="form-group"><label>Tipo de Licença</label>
+                <select id="lic-entry-type">
+                    <option value="oem">OEM</option>
+                    <option value="retail">Retail</option>
+                    <option value="volume">Volume (MAK/KMS)</option>
+                    <option value="subscription">Assinatura</option>
+                    <option value="free">Gratuito / Open Source</option>
+                    <option value="trial">Trial</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group"><label>Chave / Código de Licença</label><input type="text" id="lic-entry-key" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" style="font-family:monospace;letter-spacing:1px;"></div>
+        <div class="grid-2-col">
+            <div class="form-group"><label>Nº de Seats</label><input type="number" id="lic-entry-seats" min="1" value="1"></div>
+            <div class="form-group"><label>Data de Validade</label><input type="date" id="lic-entry-expiry"></div>
+        </div>
+        <div class="form-group"><label>Observações</label><input type="text" id="lic-entry-notes" placeholder="Ex: Renovar em dezembro..."></div>
+        <p class="cfg-eq-hint" id="lic-entry-nova-hint">A licença entra no estoque com status <strong>Disponível</strong> — ela é atrelada a um PC na montagem do Template.</p>
+        <p class="tpl-link-box" id="lic-entry-template-info" style="display:none;"></p>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="document.getElementById('license-entry-modal').classList.add('hidden')">Cancelar</button>
+            <button class="btn-primary" id="lic-entry-save-btn" onclick="_salvarEntradaLicenca()"><i class="ph ph-floppy-disk"></i> Registrar Entrada</button>
+        </div>
+    </div>
+</div>
+
+<!-- Equip Preset Modal — Impressora/Etiquetadora/Térmica/Webcam/TV -->
+<div id="equip-preset-modal" class="modal hidden">
+    <div class="modal-content medium-modal">
+        <div class="modal-header-row">
+            <h3 id="equip-preset-title"><i class="ph ph-printer"></i> Equipamento</h3>
+            <div style="display:flex;gap:8px;">
+                <button class="btn-icon hidden" id="eq-preset-edit-btn" onclick="_editarEquipModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="btn-icon" onclick="document.getElementById('equip-preset-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+            </div>
+        </div>
+        <input type="hidden" id="eq-preset-type">
+        <input type="hidden" id="eq-preset-id">
+        <div class="grid-2-col">
+            <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="eq-preset-serial" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
+            <div class="form-group"><label>Status</label>
+                <select id="eq-preset-status" onchange="_toggleMotivoEquip()">
+                    <option value="disponivel">🔵 Disponível</option>
+                    <option value="em_uso">🟢 Em Uso</option>
+                    <option value="manutencao">🟡 Manutenção</option>
+                    <option value="danificado">🔴 Danificado</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group hidden" id="eq-preset-motivo-group"><label>Motivo (dano / manutenção)</label><textarea id="eq-preset-motivo" rows="2" placeholder="Descreva o que aconteceu com o equipamento..." style="width:100%;font-family:inherit;font-size:.85rem;padding:8px;border:1px solid var(--border);border-radius:var(--r);"></textarea></div>
+        <button type="button" class="btn-consertado hidden" id="eq-preset-consertado-btn" onclick="_consertarEquip()" style="margin-bottom:10px;"><i class="ph ph-wrench"></i> Consertado — volta pra Em Uso / Disponível</button>
+        <div class="grid-2-col">
+            <div class="form-group"><label>Modelo <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(sugestões dos modelos pré-definidos)</span></label><input type="text" id="eq-preset-model" list="eq-preset-model-suggestions" placeholder="Ex: Epson L3150"><datalist id="eq-preset-model-suggestions"></datalist></div>
+            <div class="form-group hidden" id="eq-preset-location-group"><label>Localização</label><input type="text" id="eq-preset-location" readonly style="background:var(--surface-2);cursor:default;"></div>
+        </div>
+        <p class="cfg-eq-hint" id="eq-preset-conn-info" style="display:none;"></p>
+        <div class="form-section pc-preset-loc-highlight hidden" id="eq-loc-section">
+            <h4><i class="ph ph-map-pin"></i> Localização <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(pra qual Guichê já cadastrado este equipamento vai)</span></h4>
+            <p class="cfg-eq-hint" id="eq-loc-atual" style="margin-bottom:8px;"></p>
+            <div class="grid-2-col">
+                <div class="form-group"><label>Unidade</label><select id="eq-loc-unit" onchange="_eqLocAtualizarGuiches()"></select></div>
+                <div class="form-group"><label>Guichê</label><select id="eq-loc-comp"></select></div>
+            </div>
+        </div>
+        <div class="form-group"><label>Observações</label><input type="text" id="eq-preset-notes" placeholder="Ex: trocado o toner em..."></div>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="document.getElementById('equip-preset-modal').classList.add('hidden')">Cancelar</button>
+            <button class="btn-primary" onclick="_saveEquipModal()"><i class="ph ph-floppy-disk"></i> Salvar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Escolher tipo de novo equipamento pra adicionar ao estoque -->
+<div id="add-equip-chooser-modal" class="modal hidden">
+    <div class="modal-content medium-modal">
+        <div class="modal-header-row">
+            <h3><i class="ph ph-plus-circle"></i> Adicionar Equipamento</h3>
+            <button class="btn-icon" onclick="document.getElementById('add-equip-chooser-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        </div>
+        <div id="add-equip-chooser-step1">
+            <p class="cfg-eq-hint">Escolha o tipo de equipamento que você quer adicionar ao estoque.</p>
+            <div class="add-equip-type-grid">
+                <button class="add-equip-type-btn" onclick="_novoEquipamentoEscolher('pc')"><i class="ph ph-desktop-tower"></i> PC / Notebook</button>
+                <button class="add-equip-type-btn" onclick="_novoEquipamentoEscolher('printer')"><i class="ph ph-printer"></i> Impressora</button>
+                <button class="add-equip-type-btn" onclick="_novoEquipamentoEscolher('label')"><i class="ph ph-tag"></i> Etiquetadora</button>
+                <button class="add-equip-type-btn" onclick="_novoEquipamentoEscolher('thermal')"><i class="ph ph-scroll"></i> Imp. Térmica</button>
+                <button class="add-equip-type-btn" onclick="_novoEquipamentoEscolher('webcam')"><i class="ph ph-camera"></i> Webcam</button>
+                <button class="add-equip-type-btn" onclick="_novoEquipamentoEscolher('tv')"><i class="ph ph-television"></i> TV</button>
+                <button class="add-equip-type-btn" onclick="_novoEquipamentoEscolher('mobile')"><i class="ph ph-device-mobile"></i> Celular</button>
+                <button class="add-equip-type-btn" onclick="_novoEquipamentoEscolher('ac')"><i class="ph ph-snowflake"></i> Ar-Condicionado</button>
+                <button class="add-equip-type-btn" onclick="abrirEntradaLicenca()"><i class="ph ph-certificate"></i> Licença de Software</button>
+            </div>
+        </div>
+        <div id="add-equip-parts-step" class="hidden">
+            <p class="cfg-eq-hint">Escolha qual peça de PC você quer registrar a entrada no estoque.</p>
+            <div class="add-equip-type-grid">
+                <button class="add-equip-type-btn" onclick="abrirEntradaPeca('model')"><i class="ph ph-desktop-tower"></i> Modelo da Máquina</button>
+                <button class="add-equip-type-btn" onclick="abrirEntradaPeca('cpu')"><i class="ph ph-cpu"></i> Processador</button>
+                <button class="add-equip-type-btn" onclick="abrirEntradaPeca('mobo')"><i class="ph ph-circuitry"></i> Placa Mãe</button>
+                <button class="add-equip-type-btn" onclick="abrirEntradaPeca('ram')"><i class="ph ph-database"></i> RAM</button>
+                <button class="add-equip-type-btn" onclick="abrirEntradaPeca('disk')"><i class="ph ph-hard-drives"></i> Armazenamento</button>
+                <button class="add-equip-type-btn" onclick="abrirEntradaPeca('gpu')"><i class="ph ph-cube"></i> Placa de Vídeo</button>
+                <button class="add-equip-type-btn" onclick="abrirEntradaPeca('monitor')"><i class="ph ph-monitor"></i> Monitor</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="_novoEquipamentoVoltar()">Voltar</button>
+            </div>
         </div>
     </div>
 </div>
@@ -949,9 +1391,14 @@
         <input type="hidden" id="equip-id">
 
         <div class="grid-3-col">
-            <div class="form-group"><label>Nome do Equipamento *</label><input type="text" id="equip-nome" placeholder="Ex: LABMAX 400"></div>
             <div class="form-group">
-                <label>Código / Patrimônio <span style="color:#94a3b8;font-weight:400;font-size:.72rem;">gerado automaticamente · imutável</span></label>
+                <label>Categoria</label>
+                <select id="equip-categoria" onchange="onEquipCategoriaChange(this.value)">
+                    <option value="">— Selecione —</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Código / Patrimônio</label>
                 <input type="text" id="equip-codigo" placeholder="Selecione uma categoria" readonly style="background:var(--surface-2);cursor:default;">
             </div>
             <div class="form-group"><label>Status</label>
@@ -961,34 +1408,24 @@
                     <option value="Inativo">Inativo</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label>Fabricante / Marca</label>
-                <div style="display:flex;gap:6px;">
-                    <select id="equip-fabricante" style="flex:1;"><option value="">— Selecione —</option></select>
-                    <button type="button" class="equip-lock-btn" style="color:var(--blue);border-color:var(--blue);" title="Adicionar fabricante" onclick="quickAddItem('fabricante')"><i class="ph ph-plus"></i></button>
-                </div>
-            </div>
-            <div class="form-group"><label>Modelo</label><input type="text" id="equip-modelo" placeholder="Ex: Labmax 400 TS"></div>
-            <div class="form-group">
-                <label>Fornecedor</label>
-                <div style="display:flex;gap:6px;">
-                    <select id="equip-fornecedor" style="flex:1;"><option value="">— Selecione —</option></select>
-                    <button type="button" class="equip-lock-btn" style="color:var(--blue);border-color:var(--blue);" title="Adicionar fornecedor" onclick="quickAddItem('fornecedor')"><i class="ph ph-plus"></i></button>
-                </div>
-            </div>
-            <div class="form-group"><label>Número de Série</label><input type="text" id="equip-serie" placeholder="Ex: 2230.131.010"></div>
-            <div class="form-group">
-                <label>Categoria</label>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <select id="equip-categoria" onchange="onEquipCategoriaChange(this.value)" style="flex:1;">
-                        <option value="">— Selecione —</option>
-                    </select>
-                    <button type="button" class="equip-lock-btn" title="Nova categoria" onclick="abrirNovaCategoria()" style="color:var(--blue);border-color:var(--blue);">
-                        <i class="ph ph-plus"></i>
-                    </button>
-                </div>
+
+            <div class="equip-cfg-notice" style="grid-column:1/-1;">
+                <i class="ph ph-info"></i>
+                <span>Categoria, Fabricante/Marca, Fornecedor e Tipo/Subtipo são cadastrados em <strong>Configurações → Informações dos Equipamentos</strong></span>
             </div>
 
+            <div class="form-group"><label>Nome do Equipamento *</label><input type="text" id="equip-nome" placeholder="Ex: LABMAX 400"></div>
+            <div class="form-group"><label>Modelo *</label><input type="text" id="equip-modelo" placeholder="Ex: Labmax 400 TS"></div>
+            <div class="form-group"><label>Número de Série *</label><input type="text" id="equip-serie" placeholder="Ex: 2230.131.010"></div>
+
+            <div class="form-group">
+                <label>Fabricante / Marca</label>
+                <select id="equip-fabricante"><option value="">— Selecione —</option></select>
+            </div>
+            <div class="form-group">
+                <label>Fornecedor</label>
+                <select id="equip-fornecedor"><option value="">— Selecione —</option></select>
+            </div>
             <div class="form-group">
                 <label>Tipo / Subtipo</label>
                 <div class="equip-tipo-wrap">
@@ -996,9 +1433,9 @@
                     <button type="button" class="equip-lock-btn" id="equip-tipo-lock" onclick="toggleTipoLock()" title="Travar / Destravar">
                         <i class="ph ph-lock-simple" id="equip-tipo-lock-icon"></i>
                     </button>
-                    <button type="button" class="equip-lock-btn" style="color:var(--blue);border-color:var(--blue);" title="Adicionar tipo" onclick="quickAddItem('tipo')"><i class="ph ph-plus"></i></button>
                 </div>
             </div>
+
             <div class="form-group" style="grid-column:1/-1;"><label>Localização</label>
                 <select id="equip-unidade"><option value="">— Selecione —</option></select>
             </div>
@@ -1216,5 +1653,52 @@
 </div>
 
 <script src="inv_script.js"></script>
+
+<!-- Card de conta na base da sidebar (menu: voltar / sair) -->
+<style>
+  .sidebar { padding-bottom: 0 !important; }
+  .sidebar-account { position: relative; margin: 6px 12px 26px; }
+  .sidebar-user { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: linear-gradient(135deg,#16233d,#1e2f4d); border: 1px solid rgba(255,255,255,.09); border-radius: 10px; cursor: pointer; position: relative; transition: all .16s; }
+  .sidebar-user:hover { border-color: #3a7ee8; }
+  .sidebar-user .sad-avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#3a7ee8,#2b5fb0); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sidebar-user .sad-name { font-size: .8rem; font-weight: 600; color: #fff; }
+  .sidebar-user .sad-role { font-size: .64rem; color: #8fa3c4; }
+  .sb-user-caret { margin-left: auto; color: #8fa3c4; font-size: .95rem; flex-shrink: 0; transition: transform .18s; }
+  .sidebar-user.open .sb-user-caret { transform: rotate(180deg); }
+  .sb-user-menu { position: fixed; min-width: 180px; background: #16233d; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.5); padding: 5px; z-index: 99999; }
+  .sb-user-menu.hidden { display: none; }
+  .sb-user-menu-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px; background: none; border: none; border-radius: 7px; color: #cbd5e6; font-size: .8rem; font-weight: 500; cursor: pointer; text-align: left; font-family: inherit; transition: all .14s; }
+  .sb-user-menu-item i { font-size: 1rem; flex-shrink: 0; }
+  .sb-user-menu-item:hover { background: rgba(58,126,232,.16); color: #fff; }
+  .sb-user-menu-item.danger:hover { background: rgba(217,64,64,.16); color: #ff6b6b; }
+  .sidebar-user .ni-tip { display: none; position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 10px; background: #1e293b; color: #fff; font-size: .72rem; padding: 4px 9px; border-radius: 6px; white-space: nowrap; pointer-events: none; z-index: 99999; }
+  .sidebar.sb-collapsed .sb-user-caret { display: none; }
+  .sidebar.sb-collapsed .sb-user-info { display: none; }
+  .sidebar.sb-collapsed .sidebar-user { justify-content: center; padding: 6px; }
+  .sidebar.sb-collapsed .sidebar-account { margin: 6px 7px; }
+  .sidebar.sb-collapsed .sidebar-user:hover .ni-tip { display: block; }
+</style>
+<script>
+  function toggleInvUserMenu(ev) {
+    if (ev) ev.stopPropagation();
+    var m = document.getElementById('sb-user-menu'); if (!m) return;
+    var hidden = m.classList.toggle('hidden');
+    var card = document.querySelector('.sidebar-user'); if (card) card.classList.toggle('open', !hidden);
+    if (!hidden && card) {
+      var r = card.getBoundingClientRect();
+      m.style.left = r.left + 'px';
+      m.style.width = Math.max(r.width, 180) + 'px';
+      m.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+    }
+  }
+  function closeInvUserMenu() {
+    var m = document.getElementById('sb-user-menu'); if (m) m.classList.add('hidden');
+    var c = document.querySelector('.sidebar-user'); if (c) c.classList.remove('open');
+  }
+  document.addEventListener('click', function (e) { if (!e.target.closest('.sidebar-account')) closeInvUserMenu(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeInvUserMenu(); });
+  function invBackToMenu() { try { (window.parent || window).postMessage('fecharInventario', '*'); } catch (_) {} }
+  function invLogout() { try { localStorage.removeItem('tic_adminUser'); } catch (_) {} try { (window.top || window).location.href = 'index.html'; } catch (_) { window.location.href = 'index.html'; } }
+</script>
 </body>
 </html>

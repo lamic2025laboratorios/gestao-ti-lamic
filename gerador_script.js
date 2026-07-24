@@ -488,7 +488,7 @@ function gerarPDF(isFromPreview = false) {
 // ═══════════════════════════════════════════════════════
 // NAVEGAÇÃO — NOVOS DOCUMENTOS
 // ═══════════════════════════════════════════════════════
-const _allTelas = ['tela-menu','tela-formulario','tela-comunicado','tela-relatorio','tela-os'];
+const _allTelas = ['tela-menu','tela-formulario','tela-comunicado','tela-relatorio','tela-os','tela-atualizacao','tela-contatos'];
 
 function _esconderTudo() {
     _allTelas.forEach(id => {
@@ -893,12 +893,296 @@ function gerarPDFOS() {
 }
 
 // ═══════════════════════════════════════════════════════
+// ATUALIZAÇÃO DE MELHORIAS — relatório problema → resposta, numerado
+// ═══════════════════════════════════════════════════════
+function _escHtml(s) {
+    return String(s || '').replace(/[&<>]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[c]));
+}
+
+function abrirAtualizacao() {
+    _esconderTudo();
+    document.getElementById('tela-atualizacao').style.display = 'block';
+    const hj = new Date().toISOString().split('T')[0];
+    if (!document.getElementById('upd-data').value) document.getElementById('upd-data').value = hj;
+    if (!document.getElementById('upd-itens-lista').children.length) adicionarItemAtualizacao();
+}
+
+function limparAtualizacao() {
+    if (!confirm('Limpar todos os campos?')) return;
+    ['upd-titulo','upd-versao','upd-data','upd-responsavel','upd-resumo','upd-assinatura'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('upd-itens-lista').innerHTML = '';
+    adicionarItemAtualizacao();
+}
+
+function adicionarItemAtualizacao() {
+    const lista = document.getElementById('upd-itens-lista');
+    const div = document.createElement('div');
+    div.className = 'upd-item-bloco';
+    div.style.cssText = 'background:#f4f7fc;border:1px solid #e2eaf7;border-radius:8px;padding:14px;margin-bottom:12px;';
+    div.innerHTML = `
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+            <span class="upd-item-num" style="background:#0b1a33;color:#dfbc64;font-weight:800;font-size:13px;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"></span>
+            <strong style="flex:1;color:#0b1a33;font-size:13px;">Melhoria</strong>
+            <button onclick="this.closest('.upd-item-bloco').remove(); _renumerarItensAtualizacao();" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-weight:700;">✕</button>
+        </div>
+        <label style="font-size:12px;font-weight:700;color:#475569;">Problema / Pedido</label>
+        <textarea class="upd-problema" rows="2" placeholder="O que foi pedido ou qual o problema..." style="width:100%;padding:8px 12px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;resize:vertical;margin:4px 0 10px;"></textarea>
+        <label style="font-size:12px;font-weight:700;color:#475569;">Resposta / O que foi feito</label>
+        <textarea class="upd-resposta" rows="2" placeholder="Como foi resolvido / o que foi implementado..." style="width:100%;padding:8px 12px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;resize:vertical;margin-top:4px;"></textarea>
+    `;
+    lista.appendChild(div);
+    _renumerarItensAtualizacao();
+}
+
+function _renumerarItensAtualizacao() {
+    document.querySelectorAll('#upd-itens-lista .upd-item-num').forEach((el, i) => { el.textContent = i + 1; });
+}
+
+function _corpoHtmlAtualizacao() {
+    const titulo = document.getElementById('upd-titulo').value || 'Atualização de Melhorias';
+    const versao = document.getElementById('upd-versao').value || '';
+    const datav  = formatarData(document.getElementById('upd-data').value);
+    const resp   = document.getElementById('upd-responsavel').value || '—';
+    const resumo = document.getElementById('upd-resumo').value || '';
+    const assin  = document.getElementById('upd-assinatura').value || resp;
+
+    const itens = [];
+    document.querySelectorAll('#upd-itens-lista .upd-item-bloco').forEach(bloco => {
+        const p = bloco.querySelector('.upd-problema').value.trim();
+        const r = bloco.querySelector('.upd-resposta').value.trim();
+        if (!p && !r) return;
+        itens.push({ p, r });
+    });
+
+    const itensHtml = itens.length ? itens.map((it, i) => `
+        <div class="upd-item">
+            <div class="upd-num">${i + 1}</div>
+            <div class="upd-content">
+                <div class="upd-block"><span class="upd-tag q">Problema / Pedido</span><div class="upd-text">${_escHtml(it.p) || '—'}</div></div>
+                <div class="upd-block"><span class="upd-tag a">Resposta</span><div class="upd-text">${_escHtml(it.r) || '—'}</div></div>
+            </div>
+        </div>`).join('') : '<div class="section-body">Nenhuma melhoria adicionada.</div>';
+
+    const corpo = `
+        <div class="doc-header">
+            <img class="doc-logo" src="img/LAMIC BRANCA.png" onerror="this.style.display='none'">
+            <span class="doc-badge">ATUALIZAÇÃO</span>
+        </div>
+        <div style="margin-bottom:4mm;">
+            <div class="doc-type">ATUALIZAÇÃO DE MELHORIAS${versao ? ' — ' + _escHtml(versao) : ''}</div>
+            <div class="doc-num">${_escHtml(titulo)}</div>
+        </div>
+        <div class="meta-box">
+            <div class="meta-row"><span class="meta-lbl">DATA:</span><span>${datav}</span></div>
+            <div class="meta-row"><span class="meta-lbl">RESPONSÁVEL:</span><span>${_escHtml(resp)}</span></div>
+            ${resumo ? `<div class="meta-row"><span class="meta-lbl">RESUMO:</span><strong>${_escHtml(resumo)}</strong></div>` : ''}
+        </div>
+        <div class="section-title">Melhorias Implementadas</div>
+        ${itensHtml}
+        <div class="footer-doc">
+            <div class="sign-col">
+                <div class="sign-line" style="width:48mm;"></div>
+                <div class="sign-name">${_escHtml(assin)}</div>
+                <div class="sign-sub">Responsável</div>
+            </div>
+            <img src="img/lamicpdfrodape.png" style="height:28px;opacity:.5;" onerror="this.style.display='none'">
+        </div>`;
+    return { titulo, corpo };
+}
+
+function abrirJanelaAtualizacao() {
+    const { titulo, corpo } = _corpoHtmlAtualizacao();
+    _abrirJanela('LAMIC — ' + titulo, corpo, false);
+}
+
+function gerarPDFAtualizacao() {
+    const { titulo, corpo } = _corpoHtmlAtualizacao();
+    const nome = 'LAMIC_Atualizacao_' + titulo.replace(/[^\w-]+/g, '_').slice(0, 40) + '.pdf';
+    _baixarPDFDoc(corpo, nome, 'btn-gerar-atualizacao');
+}
+
+// ═══════════════════════════════════════════════════════
+// DADOS CONTATOS IA — lista de números WhatsApp → CSV
+// ═══════════════════════════════════════════════════════
+// code = DDI; nono = aplica regra do 9º dígito de celular (Brasil)
+const _CT_PAISES = [
+    { nome: 'Brasil',        code: '55',  nono: true  },
+    { nome: 'Portugal',      code: '351', nono: false },
+    { nome: 'EUA / Canadá',  code: '1',   nono: false },
+    { nome: 'Argentina',     code: '54',  nono: false },
+    { nome: 'Paraguai',      code: '595', nono: false },
+    { nome: 'Uruguai',       code: '598', nono: false },
+    { nome: 'Chile',         code: '56',  nono: false },
+    { nome: 'Espanha',       code: '34',  nono: false }
+];
+let _contatos = [];
+
+function abrirContatos() {
+    _esconderTudo();
+    document.getElementById('tela-contatos').style.display = 'block';
+    const sel = document.getElementById('ct-pais');
+    if (!sel.options.length) {
+        sel.innerHTML = _CT_PAISES.map(p => `<option value="${p.code}">${p.nome} (+${p.code})</option>`).join('');
+    }
+    _carregarContatos();
+    _renderContatosLista();
+    setTimeout(() => document.getElementById('ct-numero').focus(), 100);
+}
+
+function limparContatos() {
+    if (!_contatos.length || !confirm('Limpar toda a lista de contatos?')) return;
+    _contatos = [];
+    _salvarContatos();
+    _renderContatosLista();
+}
+
+function contatosKeydown(ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); _addContatoDoInput(); }
+}
+
+function _addContatoDoInput() {
+    const inp = document.getElementById('ct-numero');
+    const nomeInp = document.getElementById('ct-nome');
+    const pais = _CT_PAISES.find(p => p.code === document.getElementById('ct-pais').value) || _CT_PAISES[0];
+    const bruto = inp.value.trim();
+    if (!bruto) return;
+    // Aceita colar vários (um por linha, vírgula ou ;) de uma vez
+    const partes = bruto.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+    let addc = 0;
+    partes.forEach(p => {
+        const fmt = _formatarNumero(p, pais);
+        if (!fmt) return;
+        if (_contatos.some(c => c.e164 === fmt.e164)) return; // sem duplicar
+        _contatos.push({ nome: (partes.length === 1 ? nomeInp.value.trim() : '') , e164: fmt.e164, display: fmt.display });
+        addc++;
+    });
+    if (addc) { _salvarContatos(); _renderContatosLista(); }
+    inp.value = ''; if (partes.length === 1) nomeInp.value = '';
+    inp.focus();
+}
+
+// Normaliza um número pro padrão E.164 (só dígitos, com DDI) e um display.
+function _formatarNumero(raw, pais) {
+    let d = String(raw).replace(/\D/g, '');
+    if (!d) return null;
+    // Tira o DDI se o usuário já colou com ele (ou com 00 internacional)
+    d = d.replace(/^00/, '');
+    if (d.startsWith(pais.code)) d = d.slice(pais.code.length);
+    // Brasil: garante o 9 depois do DDD (DDD 2 díg + 9 + 8 díg = 11)
+    if (pais.nono) {
+        if (d.length === 10) d = d.slice(0, 2) + '9' + d.slice(2); // faltava o 9
+        // 11 dígitos = já ok
+    }
+    if (d.length < 6) return null; // número curto demais, ignora
+    const e164 = pais.code + d;
+    let display = '+' + pais.code + ' ';
+    if (pais.nono && d.length === 11) {
+        display += `(${d.slice(0,2)}) ${d.slice(2,3)} ${d.slice(3,7)}-${d.slice(7)}`;
+    } else {
+        display += d;
+    }
+    return { e164, display };
+}
+
+// Formata o input AO VIVO enquanto digita: +DDI (DD) 9 XXXX-XXXX
+function _formatarInputContato() {
+    const inp = document.getElementById('ct-numero');
+    const pais = _CT_PAISES.find(p => p.code === document.getElementById('ct-pais').value) || _CT_PAISES[0];
+    let d = inp.value.replace(/\D/g, '').replace(/^00/, '');
+    if (d.startsWith(pais.code)) d = d.slice(pais.code.length);
+    d = d.slice(0, pais.nono ? 11 : 15);
+    inp.value = _mascaraDisplay(d, pais);
+}
+
+// Monta a máscara visual progressiva a partir dos dígitos locais
+function _mascaraDisplay(d, pais) {
+    if (!d) return '';
+    let out = '+' + pais.code + ' ';
+    if (pais.nono) {
+        out += '(' + d.slice(0, 2);
+        if (d.length >= 2) out += ')';
+        if (d.length > 2) out += ' ' + d.slice(2, 3);      // o 9
+        if (d.length > 3) out += ' ' + d.slice(3, 7);
+        if (d.length > 7) out += '-' + d.slice(7, 11);
+    } else {
+        out += d;
+    }
+    return out;
+}
+
+function removerContato(i) {
+    _contatos.splice(i, 1);
+    _salvarContatos();
+    _renderContatosLista();
+}
+
+// ESC dentro de qualquer modelo/tela volta pra seleção de modelos (menu)
+document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    const preview = document.getElementById('barra-preview');
+    const previewAberto = preview && preview.style.display && preview.style.display !== 'none';
+    const telaAberta = ['tela-comunicado','tela-relatorio','tela-os','tela-atualizacao','tela-contatos','tela-formulario']
+        .some(id => { const el = document.getElementById(id); return el && el.style.display && el.style.display !== 'none'; });
+    if (previewAberto || telaAberta) { e.preventDefault(); voltarMenuDe(); }
+});
+
+function _renderContatosLista() {
+    const box = document.getElementById('ct-lista');
+    const cont = document.getElementById('ct-contador');
+    if (cont) cont.textContent = `(${_contatos.length})`;
+    if (!box) return;
+    if (!_contatos.length) {
+        box.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:24px;border:1.5px dashed #e2e8f0;border-radius:8px;">Nenhum contato ainda. Cole um número acima e aperte Enter.</div>';
+        return;
+    }
+    box.innerHTML = _contatos.map((c, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;">
+            <span style="background:#0b1a33;color:#dfbc64;font-weight:800;font-size:11px;min-width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;">${i + 1}</span>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;color:#0b1a33;font-size:13px;">${c.display}</div>
+                ${c.nome ? `<div style="font-size:11px;color:#64748b;">${c.nome}</div>` : ''}
+                <div style="font-size:11px;color:#94a3b8;font-family:monospace;">${c.e164}</div>
+            </div>
+            <button onclick="removerContato(${i})" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:700;">✕</button>
+        </div>`).join('');
+}
+
+function exportarContatosCSV() {
+    if (!_contatos.length) return alert('Adicione ao menos um contato antes de exportar.');
+    // CSV: cabeçalho + nome,numero (número E.164 só dígitos, com DDI)
+    const linhas = [['nome', 'numero']];
+    _contatos.forEach(c => linhas.push([c.nome || '', c.e164]));
+    const csv = linhas.map(l => l.map(_csvCampo).join(',')).join('\r\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'contatos_ia_' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function _csvCampo(v) {
+    v = String(v == null ? '' : v);
+    return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+}
+
+function _salvarContatos() {
+    try { localStorage.setItem('lamic_contatos_ia', JSON.stringify(_contatos)); } catch (e) {}
+}
+function _carregarContatos() {
+    try { const s = localStorage.getItem('lamic_contatos_ia'); _contatos = s ? JSON.parse(s) : []; } catch (e) { _contatos = []; }
+}
+
+// ═══════════════════════════════════════════════════════
 // ESTILOS BASE COMPARTILHADOS PARA NOVA ABA (A4)
 // ═══════════════════════════════════════════════════════
 function _cssBaseJanela() {
     return `
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}
+*{box-sizing:border-box;margin:0;padding:0;overflow-wrap:anywhere;word-break:break-word;min-width:0;}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#c0c0c0;font-size:11pt;color:#1a1a1a;line-height:1.5;}
 
 /* ── Toolbar fixa ── */
@@ -1012,6 +1296,30 @@ table.orc tr:nth-child(even) td{background:#f8fafc;}
 .badge-amarela{background:#fef3c7;color:#92400e;}
 .badge-cinza{background:#f1f5f9;color:#475569;}
 
+/* ── Atualização de Melhorias: itens numerados Problema → Resposta ── */
+.upd-item{display:flex;gap:3mm;padding:3mm 3.5mm;background:#f9fafb;border:0.5pt solid #e6ebf2;
+    border-left:2.5pt solid #0b1a33;border-radius:3px;margin-bottom:2.5mm;}
+.upd-num{flex-shrink:0;width:7mm;height:7mm;border-radius:50%;background:#0b1a33;color:#dfbc64;
+    font-weight:800;font-size:10pt;display:flex;align-items:center;justify-content:center;}
+.upd-content{flex:1;}
+.upd-block{margin-bottom:1.5mm;}
+.upd-block:last-child{margin-bottom:0;}
+.upd-tag{font-size:6.5pt;font-weight:800;text-transform:uppercase;letter-spacing:1px;
+    display:inline-block;padding:0.6mm 2mm;border-radius:2px;margin-bottom:1mm;}
+.upd-tag.q{background:#e8f0fe;color:#0b1a33;}
+.upd-tag.a{background:#d1fae5;color:#065f46;}
+.upd-text{font-size:9.5pt;line-height:1.55;color:#333;white-space:pre-wrap;}
+
+/* ── Contenção: nada pode ultrapassar a largura da folha (senão o
+   html2canvas corta). Linhas space-between e rodapé quebram em vez de vazar. ── */
+.inner *{max-width:100%;}
+.inner img{max-width:100%;height:auto;}
+.footer-doc,
+.inner div[style*="space-between"]{flex-wrap:wrap;gap:2mm;}
+.footer-doc .sign-col{flex:1 1 42%;min-width:0;}
+.meta-row{flex-wrap:wrap;}
+.meta-row span,.meta-row strong{min-width:0;overflow-wrap:anywhere;}
+
 /* ── Page-break: evita cortes no meio de blocos importantes ── */
 .doc-header,
 .meta-box,
@@ -1029,6 +1337,7 @@ table.orc      { page-break-inside: auto; }
 table.orc tr   { page-break-inside: avoid; page-break-after: auto; }
 
 .service-item  { page-break-inside: avoid; }
+.upd-item      { page-break-inside: avoid; }
 
 /* Força nova página antes da assinatura se restarem < 40mm */
 .footer-doc    { page-break-before: auto; }
@@ -1344,22 +1653,25 @@ function _baixarPDFDoc(corpoHtml, nomeArquivo, btnId) {
 
     // Elemento A4 invisível
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;z-index:-1;background:#fff;';
+    wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:184mm;z-index:-1;background:#fff;';
+    // Sem borda/padding no elemento: a margem uniforme vem do html2pdf (toda
+    // página igual) e a MOLDURA é desenhada por página com jsPDF depois —
+    // senão o html2pdf fatia uma caixa só e a borda some no meio.
     wrap.innerHTML = `<style>
 ${cssTexto}
 .toolbar{display:none!important;}
-/* Remove alturas mínimas — o conteúdo define o tamanho real, evitando página em branco */
-.page{min-height:0!important;height:auto!important;}
-.inner{min-height:0!important;height:auto!important;}
+.page{min-height:0!important;height:auto!important;border:none!important;box-shadow:none!important;margin:0!important;background:#fff!important;}
+.inner{min-height:268mm!important;height:auto!important;border:none!important;margin:0!important;padding:0!important;}
 </style>
-<div class="page" style="margin:0!important;box-shadow:none!important;border:none!important;width:210mm!important;">
+<div class="page" style="width:184mm!important;">
     <div class="inner">${corpoHtml}</div>
 </div>`;
     document.body.appendChild(wrap);
 
+    const MARGEM = 13; // mm — margem branca uniforme em TODA página
     const pageEl = wrap.querySelector('.page');
     html2pdf().set({
-        margin:      0,
+        margin:      MARGEM,
         filename:    nomeArquivo,
         pagebreak:   { mode: ['css','legacy'] },
         image:       { type: 'jpeg', quality: 0.98 },
@@ -1369,12 +1681,15 @@ ${cssTexto}
       .toPdf()
       .get('pdf')
       .then(pdf => {
-          // Remove páginas em branco ao final (geradas pelo min-height)
-          const total = pdf.internal.getNumberOfPages();
-          for (let i = total; i > 1; i--) {
-              const pageContent = JSON.stringify(pdf.internal.pages[i] || '');
-              if (pageContent.length < 200) pdf.deletePage(i);
-              else break; // para quando encontrar a primeira página com conteúdo
+          // Moldura idêntica em cada página (o conteúdo fica dentro da margem)
+          const n = pdf.internal.getNumberOfPages();
+          const W = pdf.internal.pageSize.getWidth();
+          const H = pdf.internal.pageSize.getHeight();
+          for (let i = 1; i <= n; i++) {
+              pdf.setPage(i);
+              pdf.setDrawColor(11, 26, 51);   // #0b1a33
+              pdf.setLineWidth(0.5);
+              pdf.roundedRect(7, 7, W - 14, H - 14, 2.5, 2.5, 'S');
           }
       })
       .save()

@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="relatorios_style.css?v=5">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
       import { getDatabase, ref, set, get, onValue, remove }
@@ -57,16 +58,6 @@
 
         <div class="sidebar-brand" style="display:none"></div>
 
-        <!-- Badge de identidade -->
-        <div class="sidebar-admin-badge" id="sidebar-admin-name">
-            <div class="sad-avatar" id="sad-avatar-letter">LA</div>
-            <div class="sb-user-info">
-                <div class="sad-name" id="sad-name-text">LAMIC</div>
-                <div class="sad-role">Administrador</div>
-            </div>
-            <div class="sad-status"></div>
-        </div>
-
         <!-- Nav -->
         <div class="sidebar-nav">
             <div class="nav-section-label sb-txt">Dashboards</div>
@@ -101,12 +92,28 @@
             </button>
         </div>
 
-        <!-- Botão Home -->
-        <button class="sidebar-exit" onclick="window.location.href='index.html'" data-tip="Home">
-            <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 22V12h6v10" stroke="currentColor" stroke-width="2"/></svg>
-            <span class="ni-txt">Home</span>
-            <span class="ni-tip">Home</span>
-        </button>
+        <!-- Card de conta (menu: voltar / sair) -->
+        <div class="sidebar-account">
+            <div class="sb-user-menu hidden" id="sb-user-menu">
+                <button class="sb-user-menu-item" onclick="relBackToMenu()">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M9 14L4 9l5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h11a5 5 0 015 5v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Voltar ao menu principal
+                </button>
+                <button class="sb-user-menu-item danger" onclick="relLogout()">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2"/></svg>
+                    Sair do sistema
+                </button>
+            </div>
+            <div class="sidebar-user" onclick="toggleRelUserMenu(event)" data-tip="Conta">
+                <div class="sad-avatar" id="sad-avatar-letter">LA</div>
+                <div class="sb-user-info">
+                    <div class="sad-name" id="sad-name-text">LAMIC</div>
+                    <div class="sad-role">Administrador</div>
+                </div>
+                <svg class="sb-user-caret" viewBox="0 0 24 24" fill="none"><path d="M6 15l6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="ni-tip">Conta</span>
+            </div>
+        </div>
 
     </nav>
 
@@ -630,5 +637,51 @@
 </div><!-- /app -->
 
 <script src="relatorios_script.js?v=5"></script>
+
+<!-- Card de conta na base da sidebar (menu: voltar / sair) -->
+<style>
+  .sidebar { padding-bottom: 0 !important; }
+  .sidebar-account { position: relative; margin: 6px 12px 26px; }
+  .sidebar-user { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: linear-gradient(135deg,#16233d,#1e2f4d); border: 1px solid rgba(255,255,255,.09); border-radius: 10px; cursor: pointer; position: relative; transition: all .16s; }
+  .sidebar-user:hover { border-color: #3a7ee8; }
+  .sidebar-user .sad-avatar { width: 30px; height: 30px; font-size: .78rem; }
+  .sidebar-user .sad-name { font-size: .8rem; }
+  .sidebar-user .sad-role { font-size: .64rem; }
+  .sb-user-caret { width: 14px; height: 14px; margin-left: auto; color: #8fa3c4; flex-shrink: 0; transition: transform .18s; }
+  .sidebar-user.open .sb-user-caret { transform: rotate(180deg); }
+  .sb-user-menu { position: fixed; min-width: 180px; background: #16233d; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.5); padding: 5px; z-index: 99999; }
+  .sb-user-menu.hidden { display: none; }
+  .sb-user-menu-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px; background: none; border: none; border-radius: 7px; color: #cbd5e6; font-size: .8rem; font-weight: 500; cursor: pointer; text-align: left; font-family: inherit; transition: all .14s; }
+  .sb-user-menu-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .sb-user-menu-item:hover { background: rgba(58,126,232,.16); color: #fff; }
+  .sb-user-menu-item.danger:hover { background: rgba(217,64,64,.16); color: #ff6b6b; }
+  .sidebar.sb-collapsed .sb-user-caret { display: none; }
+  .sidebar.sb-collapsed .sb-user-info { display: none; }
+  .sidebar.sb-collapsed .sidebar-user { justify-content: center; padding: 6px; }
+  .sidebar.sb-collapsed .sidebar-account { margin: 6px 7px; }
+  .sidebar.sb-collapsed .sidebar-user:hover .ni-tip { display: flex; }
+</style>
+<script>
+  function toggleRelUserMenu(ev) {
+    if (ev) ev.stopPropagation();
+    var m = document.getElementById('sb-user-menu'); if (!m) return;
+    var hidden = m.classList.toggle('hidden');
+    var card = document.querySelector('.sidebar-user'); if (card) card.classList.toggle('open', !hidden);
+    if (!hidden && card) {
+      var r = card.getBoundingClientRect();
+      m.style.left = r.left + 'px';
+      m.style.width = Math.max(r.width, 180) + 'px';
+      m.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+    }
+  }
+  function closeRelUserMenu() {
+    var m = document.getElementById('sb-user-menu'); if (m) m.classList.add('hidden');
+    var c = document.querySelector('.sidebar-user'); if (c) c.classList.remove('open');
+  }
+  document.addEventListener('click', function (e) { if (!e.target.closest('.sidebar-account')) closeRelUserMenu(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeRelUserMenu(); });
+  function relBackToMenu() { window.location.href = 'index.html'; }
+  function relLogout() { try { localStorage.removeItem('tic_adminUser'); } catch (_) {} window.location.href = 'index.html'; }
+</script>
 </body>
 </html>
