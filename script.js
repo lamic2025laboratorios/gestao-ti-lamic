@@ -7,8 +7,8 @@ const State = {
   currentUnit: null, currentType: null,
   adminUser: null,
   editingRequestId: null, modalStatus: null,
-  requests: {}, units: {}, groups: {}, subOpts: {}, subgroups: {}, admins: {}, suppliers: {},
-  estoque: {}, estoqueMov: {}, compras: {}, activityLog: {}, metas: {},
+  requests: {}, units: {}, groups: {}, groupMeta: {}, subOpts: {}, subgroups: {}, admins: {}, suppliers: {},
+  estoque: {}, estoqueMov: {}, compras: {}, activityLog: {}, metas: {}, config: {},
   charts: {},
   calYear: new Date().getFullYear(), calMonth: new Date().getMonth(),
   editCallback: null
@@ -55,7 +55,7 @@ function toast(msg, type='success') {
 ══════════════════════════════════════════════ */
 const App = {
 
-  reqSortDir: 'desc',
+  reqSortDir: 'desc',   // padrão: mais recentes primeiro (nenhum botão marcado)
   reqSortField: 'createdAt',
   reqHiddenStatuses: new Set(),
 
@@ -176,6 +176,8 @@ const App = {
       if (nm) nm.textContent = user;
       App.goTo('screen-admin');
       App.renderAdminPanels();
+      LS.save('adminTab', 'tab-dashboard');
+      App.resetIdle();
     } else {
       err.classList.remove('hidden');
     }
@@ -184,7 +186,68 @@ const App = {
   adminLogout() {
     State.adminUser = null;
     LS.remove('adminUser');
+    clearTimeout(App._idleTimer);
+    clearInterval(App._idleTick); App._idleTick = null;
     App.goTo('screen-home');
+  },
+
+  /* ── Sessão: auto-logout por inatividade (60 min) + contagem regressiva ── */
+  _IDLE_MS: 60 * 60 * 1000,
+  _idleTimer: null,
+  _idleTick: null,
+  _idleDeadline: 0,
+  resetIdle() {
+    if (!State.adminUser) return;
+    clearTimeout(App._idleTimer);
+    App._idleDeadline = Date.now() + App._IDLE_MS;
+    App._idleTimer = setTimeout(App.idleLogout, App._IDLE_MS);
+    if (!App._idleTick) App._idleTick = setInterval(App._updateIdleChip, 1000);
+    App._updateIdleChip();
+  },
+  _updateIdleChip() {
+    const el = document.getElementById('idle-timer'); if (!el) return;
+    let ms = App._idleDeadline - Date.now(); if (ms < 0) ms = 0;
+    const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+    el.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    const chip = document.getElementById('idle-chip');
+    if (chip) chip.classList.toggle('idle-timer-warn', ms <= 60000);
+  },
+  idleLogout() {
+    if (!State.adminUser) return;
+    App.adminLogout();
+    toast('Sessão encerrada por inatividade.', 'error');
+  },
+  startIdleWatch() {
+    ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(ev =>
+      document.addEventListener(ev, App.resetIdle, { passive: true }));
+  },
+
+  /* ── Restaura a última seção aberta (F5 não volta ao Dashboard) ── */
+  _restoreAdminTab() {
+    const saved = LS.load('adminTab');
+    let btn = saved && document.querySelector(`.nav-item[data-tab="${saved}"]`);
+    if (!btn) btn = document.querySelector('.nav-item[data-tab="tab-dashboard"]');
+    if (btn) App.adminTab(btn);
+  },
+
+  /* ── Menu de conta na sidebar (abre p/ cima, opção Sair) ── */
+  toggleUserMenu(ev) {
+    if (ev) ev.stopPropagation();
+    const m = document.getElementById('sb-user-menu'); if (!m) return;
+    const hidden = m.classList.toggle('hidden');
+    const card = document.querySelector('.sidebar-user');
+    if (card) card.classList.toggle('open', !hidden);
+    if (!hidden && card) {
+      // posiciona acima do card, alinhado à esquerda (fixed = não sofre clip da sidebar)
+      const r = card.getBoundingClientRect();
+      m.style.left = r.left + 'px';
+      m.style.width = Math.max(r.width, 190) + 'px';
+      m.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+    }
+  },
+  closeUserMenu() {
+    const m = document.getElementById('sb-user-menu'); if (m) m.classList.add('hidden');
+    const card = document.querySelector('.sidebar-user'); if (card) card.classList.remove('open');
   },
 
   /* ── REQUEST PANEL ────────────────────────── */
@@ -192,6 +255,7 @@ const App = {
     const wrap = document.getElementById('type-selector');
     wrap.innerHTML = '';
     Object.entries(State.groups||{}).forEach(([id,name]) => {
+      if (App._isGroupInternal(id)) return;   // grupos internos só aparecem na Nova Solicitação do admin
       const btn = document.createElement('button');
       btn.className = 'type-btn';
       btn.textContent = name;
@@ -209,7 +273,7 @@ const App = {
     document.getElementById('urgency-row').style.display = 'none';
     const norm = name.toLowerCase();
     if (norm.includes('tinta')) { App.buildInkPanel(id); document.getElementById('sub-ink').classList.remove('hidden'); }
-    else if (norm.includes('pilha') || norm.includes('bateria')) { App.buildBatteryPanel(id); document.getElementById('sub-battery').classList.remove('hidden'); }
+    else if (norm.includes('pilha') || norm.includes('bateria') || norm.includes('conserto') || norm.includes('concerto')) { App.buildBatteryPanel(id); document.getElementById('sub-battery').classList.remove('hidden'); }
     else { document.getElementById('sub-other').classList.remove('hidden'); }
     document.getElementById('urgency-row').style.display = '';
     App.saveRequestForm();
@@ -239,8 +303,11 @@ const App = {
 
   buildBatteryPanel(groupId) {
     const opts = (State.subOpts||{})[groupId] || {};
-    const modelos = opts.modelos || ["AAA","AA","Bateria de balança 2032","Bateria do cronômetro 1210"];
+    const gname = (State.groups?.[groupId]||'').toLowerCase();
+    const isBat = gname.includes('pilha')||gname.includes('bateria');
+    const modelos = opts.modelos || (isBat ? ["AAA","AA","Bateria de balança 2032","Bateria do cronômetro 1210"] : []);
     const wrap = document.getElementById('battery-models'); wrap.innerHTML = '';
+    if (!modelos.length) { wrap.innerHTML = '<p style="color:var(--gray-500);font-size:.82rem;padding:6px">Nenhum modelo cadastrado. Cadastre em Configurações → Grupos → este grupo → Sub-opções.</p>'; return; }
     // Each model has a checkbox + qty field (multiple selection allowed)
     modelos.forEach((m,i) => {
       const safeId = 'bat_'+i;
@@ -272,7 +339,7 @@ const App = {
       const crs = [...document.querySelectorAll('input[name="cor"]:checked')].map(i=>i.value);
       d.num  = nr ? nr.value : '';
       d.cors = crs; // array
-    } else if (norm.includes('pilha')||norm.includes('bateria')) {
+    } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
       const checked = [...document.querySelectorAll('input[name="bat"]:checked')];
       d.batModels = checked.map(cb => {
         const qtyEl = document.querySelector(`.bat-qty-input[data-model="${cb.value}"]`);
@@ -296,7 +363,7 @@ const App = {
         if (norm.includes('tinta')) {
           if (d.num) { const r=document.querySelector(`input[name="num"][value="${d.num}"]`); if(r) r.checked=true; }
           (d.cors||[]).forEach(c => { const cb=document.querySelector(`input[name="cor"][value="${c}"]`); if(cb) cb.checked=true; });
-        } else if (norm.includes('pilha')||norm.includes('bateria')) {
+        } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
           (d.batModels||[]).forEach(bm => {
             const cb=document.querySelector(`input[name="bat"][value="${bm.modelo}"]`);
             if (cb) {
@@ -354,7 +421,7 @@ const App = {
       crs.forEach(c => {
         rows.push({...base, num: nr.value, cor: c.value, nums: nr.value, cores: c.value});
       });
-    } else if (norm.includes('pilha')||norm.includes('bateria')) {
+    } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
       const checked = [...document.querySelectorAll('input[name="bat"]:checked')];
       if (!checked.length) { toast('Selecione ao menos um modelo.','error'); return; }
       // 1 row per model
@@ -385,6 +452,135 @@ const App = {
         App.resetRequestForm();
       })
       .catch(() => toast('Erro ao enviar.','error'));
+  },
+
+  /* ── Nova solicitação pelo ADMIN (modal) — mesmo fluxo das unidades + grupos internos ── */
+  _nsolType: null,
+  _isGroupInternal(id) {
+    const m = State.groupMeta && State.groupMeta[id];
+    return !!(m && m.internal);
+  },
+  openNovaSolic() {
+    const usel = document.getElementById('nsol-unit');
+    usel.innerHTML = '<option value="">Selecione a unidade</option>';
+    Object.entries(State.units || {}).forEach(([id, nome]) => {
+      const o = document.createElement('option'); o.value = id; o.textContent = nome; usel.appendChild(o);
+    });
+    App._nsolType = null;
+    App._nsolBuildGroups();
+    ['nsol-sub-ink', 'nsol-sub-battery', 'nsol-sub-other'].forEach(s => document.getElementById(s).classList.add('hidden'));
+    document.getElementById('nsol-product').value = '';
+    document.getElementById('nsol-reason').value = '';
+    document.getElementById('nsol-urgency').checked = false;
+    document.getElementById('nsol-obs').value = '';
+    document.getElementById('modal-nova-solic').classList.remove('hidden');
+  },
+  closeNovaSolic() { document.getElementById('modal-nova-solic').classList.add('hidden'); },
+
+  _nsolBuildGroups() {
+    const wrap = document.getElementById('nsol-groups'); wrap.innerHTML = '';
+    Object.entries(State.groups || {}).forEach(([id, name]) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'type-btn';
+      btn.innerHTML = `${name}${App._isGroupInternal(id) ? ' <span class="grp-int-badge">interno</span>' : ''}`;
+      btn.dataset.groupId = id;
+      btn.onclick = () => App.nsolSelectGroup(btn, id, name);
+      wrap.appendChild(btn);
+    });
+  },
+
+  nsolSelectGroup(btn, id, name) {
+    document.querySelectorAll('#nsol-groups .type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    App._nsolType = { id, name };
+    ['nsol-sub-ink', 'nsol-sub-battery', 'nsol-sub-other'].forEach(s => document.getElementById(s).classList.add('hidden'));
+    const norm = name.toLowerCase();
+    if (norm.includes('tinta')) { App._nsolBuildInk(id); document.getElementById('nsol-sub-ink').classList.remove('hidden'); }
+    else if (norm.includes('pilha') || norm.includes('bateria') || norm.includes('conserto') || norm.includes('concerto')) { App._nsolBuildBattery(id); document.getElementById('nsol-sub-battery').classList.remove('hidden'); }
+    else { document.getElementById('nsol-sub-other').classList.remove('hidden'); }
+  },
+
+  _nsolBuildInk(gid) {
+    const opts = (State.subOpts || {})[gid] || {};
+    const nums = opts.numeracoes || ["664", "673", "680XL", "711", "950XL", "951XL"];
+    const cores = opts.cores || ["Preta", "Vermelha", "Azul", "Amarela", "Kit 4 cores"];
+    const nw = document.getElementById('nsol-ink-numbers'); nw.innerHTML = '';
+    nums.forEach(n => { const l = document.createElement('label'); l.className = 'check-item'; l.innerHTML = `<input type="radio" name="nsol-num" value="${n}"/> ${n}`; nw.appendChild(l); });
+    const cw = document.getElementById('nsol-ink-colors'); cw.innerHTML = '';
+    cores.forEach(c => { const l = document.createElement('label'); l.className = 'check-item'; l.innerHTML = `<input type="checkbox" name="nsol-cor" value="${c}"/> ${c}`; cw.appendChild(l); });
+  },
+
+  _nsolBuildBattery(gid) {
+    const opts = (State.subOpts || {})[gid] || {};
+    const gname = (State.groups?.[gid]||'').toLowerCase();
+    const isBat = gname.includes('pilha')||gname.includes('bateria');
+    const modelos = opts.modelos || (isBat ? ["AAA", "AA", "Bateria de balança 2032", "Bateria do cronômetro 1210"] : []);
+    const wrap = document.getElementById('nsol-battery-models'); wrap.innerHTML = '';
+    if (!modelos.length) { wrap.innerHTML = '<p style="color:var(--gray-500);font-size:.82rem;padding:6px">Nenhum modelo cadastrado. Cadastre em Configurações → Grupos → este grupo → Sub-opções.</p>'; return; }
+    modelos.forEach((m, i) => {
+      const sid = 'nsolbat_' + i;
+      const div = document.createElement('div'); div.className = 'bat-model-row';
+      div.innerHTML = `
+        <label class="check-item bat-check"><input type="checkbox" name="nsol-bat" value="${m}" id="${sid}" onchange="document.getElementById('qty_${sid}').style.display=this.checked?'flex':'none'"/> ${m}</label>
+        <div class="bat-qty-wrap" id="qty_${sid}" style="display:none"><input type="number" class="input-field nsol-bat-qty" data-model="${m}" min="1" value="1" placeholder="Qtd"/></div>`;
+      wrap.appendChild(div);
+    });
+  },
+
+  nsolSubmit() {
+    const unitId = document.getElementById('nsol-unit').value;
+    if (!unitId) { toast('Selecione a unidade.', 'error'); return; }
+    if (!App._nsolType) { toast('Selecione o tipo de solicitação.', 'error'); return; }
+    const norm = App._nsolType.name.toLowerCase();
+    const base = {
+      unitId, unitName: State.units[unitId] || '?',
+      groupId: App._nsolType.id, groupName: App._nsolType.name,
+      urgent: document.getElementById('nsol-urgency').checked,
+      obs: document.getElementById('nsol-obs').value,
+      status: 'Solicitado', createdAt: new Date().toISOString(),
+      shippedStatus: 'Não', shippedAt: null
+    };
+    let rows = [];
+    if (norm.includes('tinta')) {
+      const nr = document.querySelector('input[name="nsol-num"]:checked');
+      const crs = [...document.querySelectorAll('input[name="nsol-cor"]:checked')];
+      if (!nr) { toast('Selecione a numeração da tinta.', 'error'); return; }
+      if (!crs.length) { toast('Selecione ao menos uma cor.', 'error'); return; }
+      crs.forEach(c => rows.push({ ...base, num: nr.value, cor: c.value, nums: nr.value, cores: c.value }));
+    } else if (norm.includes('pilha') || norm.includes('bateria') || norm.includes('conserto') || norm.includes('concerto')) {
+      const checked = [...document.querySelectorAll('input[name="nsol-bat"]:checked')];
+      if (!checked.length) { toast('Selecione ao menos um modelo.', 'error'); return; }
+      checked.forEach(cb => {
+        const qtyEl = document.querySelector(`.nsol-bat-qty[data-model="${cb.value}"]`);
+        rows.push({ ...base, modelo: cb.value, qty: parseInt(qtyEl?.value) || 1, batModel: cb.value });
+      });
+    } else {
+      const product = document.getElementById('nsol-product').value.trim();
+      const reason = document.getElementById('nsol-reason').value.trim();
+      if (!product) { toast('Informe o produto desejado.', 'error'); return; }
+      if (!reason) { toast('Informe o motivo.', 'error'); return; }
+      rows.push({ ...base, product, reason });
+    }
+    DB.tx('meta/lastSeq', cur => (cur || 0) + rows.length)
+      .then(res => {
+        const fim = (res?.snapshot?.val()) || rows.length;
+        const ini = fim - rows.length;
+        rows.forEach((r, i) => { r.seq = ini + i + 1; });
+        return Promise.all(rows.map(r => DB.push('requests', r)));
+      })
+      .then(() => {
+        toast(`✓ ${rows.length} solicitação(ões) criada(s)!`);
+        App._logActivity('Solicitações', 'Nova solicitação criada (admin)', `${rows.length}× ${base.groupName} · ${base.unitName}`);
+        App.closeNovaSolic();
+      })
+      .catch(() => toast('Erro ao criar.', 'error'));
+  },
+
+  toggleGroupInternal(gid, checked) {
+    DB.set(`groupMeta/${gid}/internal`, !!checked).then(() => {
+      App._logActivity('Configurações', checked ? 'Grupo marcado como interno' : 'Grupo liberado p/ unidades', State.groups?.[gid] || gid);
+    });
   },
 
   // Atribui seq (#) às solicitações sem número, por ordem de criação. Idempotente.
@@ -1077,6 +1273,7 @@ const App = {
 
     const targetTab = btn.dataset.tab;
     document.getElementById(targetTab).classList.add('active');
+    LS.save('adminTab', targetTab);   // lembra a seção p/ sobreviver ao F5
 
     // Esconde a barra lateral se for o Inventário OU se for o Gerador de PDF
     const layout = document.querySelector('.admin-layout');
@@ -1329,7 +1526,7 @@ const App = {
   },
 
   setReqSort(field, dir, btn) {
-    // Toggle: clicar no botão já ativo desmarca e volta ao padrão (mais recente por solicitação)
+    // Toggle: clicar no botão já ativo desmarca e volta ao padrão (crescente por solicitação)
     if (btn && btn.classList.contains('active')) {
       App.reqSortField = 'createdAt';
       App.reqSortDir   = 'desc';
@@ -1375,6 +1572,7 @@ const App = {
     const allBtn = document.getElementById('btn-toggle-all-status');
     if (allBtn) { allBtn.textContent = 'Todos ✓'; allBtn.classList.remove('all-off'); }
     App.reqSortDir = 'desc';
+    document.querySelectorAll('.req-sort-btn').forEach(b => b.classList.remove('active'));
     const lbl = document.getElementById('req-sort-label');
     if (lbl) lbl.textContent = 'Mais recentes';
     App.renderRequests();
@@ -1477,13 +1675,153 @@ const App = {
 
   /* ── Impressão / PDF do dashboard ─────────── */
   printDashboard() {
-    window.print();
+    const reqs = App.getFilteredReqs();
+    const g   = id => (document.getElementById(id)?.textContent || '').trim();
+    const fmt = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+    // Filtros aplicados
+    const fUnit  = document.getElementById('dash-filter-unit')?.value  || '';
+    const fGroup = document.getElementById('dash-filter-group')?.value || '';
+    const fFrom  = document.getElementById('filter-date-from')?.value  || '';
+    const fTo    = document.getElementById('filter-date-to')?.value    || '';
+    const filtros = [];
+    if (fUnit)  filtros.push(`Unidade: ${fUnit}`);
+    if (fGroup) filtros.push(`Grupo: ${fGroup}`);
+    if (fFrom || fTo) filtros.push(`Período: ${fFrom ? App._labelDia(fFrom) : '…'} → ${fTo ? App._labelDia(fTo) : '…'}`);
+    const filtrosTxt = filtros.length ? filtros.join(' · ') : 'Todas as solicitações (sem filtro)';
+
+    // Status
+    const stC = { Solicitado: 0, Aguardando: 0, Comprado: 0, Estoque: 0, Negado: 0 };
+    reqs.forEach(r => { if (stC[r.status] !== undefined) stC[r.status]++; });
+
+    // Por unidade (contagem) e por grupo (contagem)
+    const byUnit = {}, byGroup = {};
+    reqs.forEach(r => {
+      const u = r.unitName || '—'; byUnit[u] = (byUnit[u] || 0) + 1;
+      const gr = r.groupName || '—'; byGroup[gr] = (byGroup[gr] || 0) + 1;
+    });
+
+    // Gasto por unidade (mesma lógica dos KPIs: à vista por boughtAt, parcelada por p.date)
+    const byUnitSpend = {};
+    Object.values(State.requests || {})
+      .filter(r => r.status === 'Comprado' && (!fUnit || r.unitName === fUnit) && (!fGroup || r.groupName === fGroup))
+      .forEach(r => {
+        const u = r.unitName || '—';
+        if (r.parcelas && r.parcelas.length) {
+          r.parcelas.forEach(p => { const pd = (p.date || p.month + '-01').substring(0, 10); if ((!fFrom || pd >= fFrom) && (!fTo || pd <= fTo)) byUnitSpend[u] = (byUnitSpend[u] || 0) + parseFloat(p.valor || 0); });
+        } else {
+          const bd = (r.boughtAt || '').substring(0, 10); if ((!fFrom || bd >= fFrom) && (!fTo || bd <= fTo)) byUnitSpend[u] = (byUnitSpend[u] || 0) + parseFloat(r.valorTotal || 0);
+        }
+      });
+
+    // Comparativo anual (lê o que já está na tela)
+    const cmp = { curY: g('cmp-cur-year'), curV: g('cmp-cur-val'), prevY: g('cmp-prev-year'), prevV: g('cmp-prev-val'), pct: g('cmp-gauge-pct'), lbl: g('cmp-gauge-lbl'), trend: g('compare-trend-badge') };
+
+    const kpis = [
+      ['Total de solicitações', g('kpi-total')],
+      ['Compradas',             g('kpi-bought')],
+      ['Negadas',               g('kpi-negado')],
+      ['Urgentes',              g('kpi-urgent')],
+      ['Gasto do período',      g('kpi-month-spent')],
+    ];
+    const data  = new Date().toLocaleDateString('pt-BR');
+    const admin = State.adminUser || 'LAMIC';
+
+    const sections = [
+      { heading: 'Indicadores Gerais', headers: ['Indicador', 'Valor'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: kpis.map(([l, v]) => [l, v || '0']) },
+      { heading: 'Solicitações por Status', headers: ['Status', 'Quantidade'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: Object.entries(stC).map(([k, v]) => [k, String(v)]) },
+      { heading: 'Por Unidade', headers: ['Unidade', 'Solicitações', 'Gasto'],
+        cols: [{ w: .5 }, { w: .22, align: 'right' }, { w: .28, align: 'right' }],
+        rows: Object.keys({ ...byUnit, ...byUnitSpend }).sort((a, b) => (byUnit[b] || 0) - (byUnit[a] || 0))
+          .map(u => [u, String(byUnit[u] || 0), fmt(byUnitSpend[u] || 0)]) },
+      { heading: 'Por Grupo', headers: ['Grupo', 'Solicitações'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: Object.entries(byGroup).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, String(v)]) },
+      { heading: 'Comparativo Anual', headers: ['Referência', 'Valor'],
+        cols: [{ w: .5 }, { w: .5, align: 'right' }],
+        rows: [
+          [cmp.curY || 'Ano atual', cmp.curV || '—'],
+          [cmp.prevY || 'Ano anterior', cmp.prevV || '—'],
+          ['Projeção / referência', `${cmp.pct || '—'} ${cmp.lbl || ''} ${cmp.trend ? '· ' + cmp.trend : ''}`.trim()],
+        ] },
+    ];
+
+    App._pdfReport({
+      filename: `Relatorio-Dashboard-${new Date().toISOString().slice(0, 10)}.pdf`,
+      title: 'Relatório do Dashboard — Gestão TI',
+      subtitle: `Gerado em ${data} | ${admin}  ·  Filtros: ${filtrosTxt}`,
+      sections
+    });
+  },
+
+  /* ── Gera um PDF simples (jsPDF) e baixa direto — funciona sem depender do diálogo de impressão ── */
+  _pdfReport({ filename, title, subtitle, sections }) {
+    const J = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (!J) { toast('Biblioteca de PDF não carregada. Recarregue a página (Ctrl+F5).', 'error'); return; }
+    const pdf = new J({ unit: 'pt', format: 'a4' });
+    const W = pdf.internal.pageSize.getWidth();
+    const H = pdf.internal.pageSize.getHeight();
+    const M = 40, CW = W - M * 2, BOT = H - M, LH = 11, PADV = 6;
+    let y = M + 8;
+    const brk = () => { pdf.addPage(); y = M + 8; };
+
+    // Título (quebra se longo)
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15); pdf.setTextColor(15, 30, 53);
+    pdf.splitTextToSize(title, CW).forEach(l => { pdf.text(l, M, y); y += 18; });
+    if (subtitle) {
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(110, 128, 160);
+      pdf.splitTextToSize(subtitle, CW).forEach(l => { pdf.text(l, M, y); y += 11; });
+    }
+    y += 4;
+    pdf.setDrawColor(37, 99, 235); pdf.setLineWidth(1.2); pdf.line(M, y, W - M, y); y += 18;
+
+    sections.forEach(sec => {
+      if (y + 42 > BOT) brk();
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor(71, 85, 105);
+      pdf.text(String(sec.heading).toUpperCase(), M, y); y += 6;
+      pdf.setDrawColor(226, 232, 240); pdf.setLineWidth(0.6); pdf.line(M, y, W - M, y); y += 14;
+
+      const cols = sec.cols, widths = cols.map(c => c.w * CW), xs = [];
+      let acc = M; cols.forEach((c, i) => { xs.push(acc); acc += widths[i]; });
+      const cx = (i, align) => align === 'right' ? xs[i] + widths[i] - 5 : xs[i] + 5;
+
+      if (sec.headers) {
+        if (y + 16 > BOT) brk();
+        pdf.setFillColor(6, 15, 30); pdf.rect(M, y - 9, CW, 15, 'F');
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(255, 255, 255);
+        sec.headers.forEach((h, i) => pdf.text(String(h), cx(i, cols[i].align), y + 1, { align: cols[i].align || 'left' }));
+        y += 16;
+      }
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9);
+      const rws = (sec.rows && sec.rows.length) ? sec.rows : [['— sem dados —']];
+      rws.forEach(row => {
+        const cellLines = row.map((cell, i) => pdf.splitTextToSize(String(cell ?? ''), (widths[i] || CW) - 10));
+        const nL = Math.max(1, ...cellLines.map(l => l.length));
+        const rowH = nL * LH + PADV;
+        if (y + rowH > BOT) brk();
+        pdf.setTextColor(30, 41, 59);
+        cellLines.forEach((lines, i) => {
+          const align = (cols[i] || cols[0]).align || 'left';
+          lines.forEach((ln, k) => pdf.text(ln, cx(i, align), y + k * LH, { align }));
+        });
+        y += rowH;
+        pdf.setDrawColor(238, 242, 248); pdf.setLineWidth(0.4); pdf.line(M, y - PADV + 2, W - M, y - PADV + 2);
+      });
+      y += 12;
+    });
+
+    pdf.save(filename);
   },
 
   /* ── Cards de consumo: Tintas e Pilhas/Baterias ─── */
-  consPeriod: { ink: 'year', bat: 'year', outros: 'year' },
-  consYear:   { ink: new Date().getFullYear().toString(), bat: new Date().getFullYear().toString(), outros: new Date().getFullYear().toString() },
-  consMonth:  { ink: (new Date().getMonth() + 1).toString().padStart(2,'0'), bat: (new Date().getMonth() + 1).toString().padStart(2,'0'), outros: (new Date().getMonth() + 1).toString().padStart(2,'0') },
+  consPeriod: { ink: 'year', bat: 'year', outros: 'year', concerto: 'year' },
+  consYear:   { ink: new Date().getFullYear().toString(), bat: new Date().getFullYear().toString(), outros: new Date().getFullYear().toString(), concerto: new Date().getFullYear().toString() },
+  consMonth:  { ink: (new Date().getMonth() + 1).toString().padStart(2,'0'), bat: (new Date().getMonth() + 1).toString().padStart(2,'0'), outros: (new Date().getMonth() + 1).toString().padStart(2,'0'), concerto: (new Date().getMonth() + 1).toString().padStart(2,'0') },
 
   setConsPeriod(kind, period, btn) {
     App.consPeriod[kind] = period;
@@ -1514,9 +1852,10 @@ const App = {
     const mesesNome = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
     // "outros" usa exclude:true → conta grupos que NÃO batem com tinta/pilha/bateria
     const keywordCfg = {
-      ink:    { kws: ['tinta'],                  exclude: false },
-      bat:    { kws: ['pilha', 'bateria'],        exclude: false },
-      outros: { kws: ['tinta', 'pilha', 'bateria'], exclude: true }
+      ink:      { kws: ['tinta'],                                     exclude: false },
+      bat:      { kws: ['pilha', 'bateria'],                          exclude: false },
+      concerto: { kws: ['conserto', 'concerto'],                      exclude: false },
+      outros:   { kws: ['tinta', 'pilha', 'bateria', 'conserto', 'concerto'], exclude: true }
     };
 
     // Anos com pedidos (qualquer status, qualquer tipo)
@@ -1527,7 +1866,7 @@ const App = {
     });
     const sortedYears = [...allYears].sort().reverse();
 
-    ['ink', 'bat', 'outros'].forEach(kind => {
+    ['ink', 'bat', 'concerto', 'outros'].forEach(kind => {
       const period   = App.consPeriod[kind] || 'year';
       const yearSel  = document.getElementById(`${kind}-year`);
       const monthSel = document.getElementById(`${kind}-month`);
@@ -1637,9 +1976,19 @@ const App = {
 
   renderConsumoCards() {
     App._populateConsYears();
-    App._renderConsumo('ink',    ['tinta'],                    { topField: 'cor',      topLabel: 'ink-top-color',    breakdownTitle: 'Por cor' });
-    App._renderConsumo('bat',    ['pilha', 'bateria'],         { topField: 'modelo',   topLabel: 'bat-top-model',    breakdownTitle: 'Por modelo' });
-    App._renderConsumo('outros', ['tinta', 'pilha', 'bateria'], { topField: 'subgrupo', topLabel: 'outros-top-subgrupo', breakdownTitle: 'Por subgrupo', exclude: true });
+    App._renderConsumo('ink',      ['tinta'],                                             { topField: 'cor',      topLabel: 'ink-top-color',      breakdownTitle: 'Por cor' });
+    App._renderConsumo('bat',      ['pilha', 'bateria'],                                  { topField: 'modelo',   topLabel: 'bat-top-model',      breakdownTitle: 'Por modelo' });
+    App._renderConsumo('concerto', ['conserto', 'concerto'],                              { topField: 'modelo',   topLabel: 'concerto-top-model', breakdownTitle: 'Por modelo' });
+    App._renderConsumo('outros',   ['tinta', 'pilha', 'bateria', 'conserto', 'concerto'], { topField: 'subgrupo', topLabel: 'outros-top-subgrupo', breakdownTitle: 'Por subgrupo', exclude: true });
+  },
+
+  // Atalho: abre a config do grupo Conserto (sub-opções/modelos) a partir do card do dashboard
+  openConcertoSubopts() {
+    const entry = Object.entries(State.groups || {}).find(([, name]) => /conserto|concerto/i.test(name));
+    if (!entry) { toast('Cadastre o grupo "Conserto" em Configurações → Grupos de Produto.', 'error'); return; }
+    const btn = document.querySelector('.nav-item[data-tab="tab-settings"]');
+    if (btn) App.adminTab(btn);
+    setTimeout(() => App.openGroupEdit(entry[0]), 120);
   },
 
   // Formata data/hora ISO curto: "05/07 · 14:32"
@@ -2159,13 +2508,13 @@ const App = {
     });
     const topUnit = Object.entries(unitMap).sort((a, b) => b[1] - a[1])[0];
 
-    // Maior Solicitante — pessoa (campo solicitante) que mais comprou no período,
-    // mesma base/quantidade das demais métricas. Sem solicitante informado não conta.
+    // Maior Solicitante — UNIDADE que mais solicitou (igual às solicitações),
+    // contada por nº de pedidos no período. Não usa o campo livre "solicitante".
     const solicitanteMap = {};
     inCur.forEach(r => {
-      const s = (r.solicitante || '').trim();
-      if (!s) return;
-      solicitanteMap[s] = (solicitanteMap[s] || 0) + App._qtyComprada(r);
+      const u = (r.unitName || '').trim();
+      if (!u) return;
+      solicitanteMap[u] = (solicitanteMap[u] || 0) + 1;
     });
     const topSolicitante = Object.entries(solicitanteMap).sort((a, b) => b[1] - a[1])[0];
 
@@ -3285,7 +3634,8 @@ const App = {
       const db = (b[sortField]||'').substring(0,10);
       const cmp = da.localeCompare(db);
       if (cmp !== 0) return App.reqSortDir === 'asc' ? cmp : -cmp;
-      return (parseInt(a.seq)||0) - (parseInt(b.seq)||0);   // mesmo dia → SL crescente
+      const s = (parseInt(a.seq)||0) - (parseInt(b.seq)||0);   // mesmo dia → segue direção (desc: SL maior em cima)
+      return App.reqSortDir === 'asc' ? s : -s;
     });
     // Compra combinada SEMPRE junta: independente da data/ordenação, os membros
     // da mesma compra ficam adjacentes, ancorados na posição do 1º membro que
@@ -3355,17 +3705,10 @@ const App = {
             : `<span style="display:inline-block;margin-top:3px;font-size:.68rem;font-weight:700;color:#7c52d4;background:#f0ebfc;border:1px solid #ede9fe;border-radius:4px;padding:1px 7px">📦 ${r.parcelas.length}× parcelas · ${r.parcelas[0]?.valor ? 'R$ '+parseFloat(r.parcelas[0].valor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'/mês' : ''}</span>`) : ''}
           ${r.compraCodigo ? `<span class="compra-codigo-tag" title="Compra combinada ${r.compraCodigo}">${r.compraCodigo}</span>` : ''}
         </td>
-        <td>${r.urgent?'<span class="badge-urgent">🚨 Urgente</span>':'<span style="color:var(--gray-500)">—</span>'}</td>
+        <td>${r.urgent?`<span class="badge-urgent-ico" title="Urgente">${App._svg('alert')}</span>`:'<span style="color:var(--gray-500)">—</span>'}</td>
         <td>${envioDisplay}${(r.obs||(isOutros&&(r.product||r.reason))) ? `<span title="${[r.product,r.reason,r.obs].filter(Boolean).join(' | ')}" style=""</span>` : ''}</td>
         <td>${badge}</td>
-        <td style="white-space:nowrap">
-          ${r.origemEstoque
-            ? `<button class="btn-action" onclick="App.showSolicitacaoView('${id}')" style="margin-right:6px" title="Editável somente pela aba Estoque">Ver</button>`
-            : r.compraCodigo
-              ? `<button class="btn-action" onclick="App.manageCompra('${r.compraCodigo}')" style="margin-right:6px" title="Gerenciar compra combinada ${r.compraCodigo}">Gerenciar</button>`
-              : `<button class="btn-action" onclick="App.openModal('${id}')" style="margin-right:6px">Gerenciar</button>`}
-          <button class="btn-delete" onclick="App.confirmDelete('${id}')">Apagar</button>
-        </td>`;
+        <td style="white-space:nowrap">${App._reqAcoes(id, r)}</td>`;
       // Realce amarelo para entradas vindas da aba Estoque; lilás para compra combinada
       if (r.origemEstoque) {
         tr.classList.add('row-estoque-entrada');
@@ -3381,6 +3724,325 @@ const App = {
       }
       tbody.appendChild(tr);
     });
+  },
+
+  // ── Ações da linha de solicitação ─────────────────────────────
+  // origemEstoque e compra combinada seguem exatamente como eram (sem
+  // autorização). A solicitação normal ganha o passo-a-passo de Autorização
+  // ao lado do Gerenciar já existente — quem não precisa de autorização usa
+  // o Gerenciar como sempre.
+  // Ícones de sistema (SVG, cor via currentColor — nunca emoji)
+  _svg(name) {
+    const p = {
+      pencil: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>',
+      lock:   '<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>',
+      hour:   '<path d="M6 2h12M6 22h12M8 2c0 3.6 3.6 5 4 8M16 2c0 3.6-3.6 5-4 8M8 22c0-3.6 3.6-5 4-8M16 22c0-3.6-3.6-5-4-8"/>',
+      check:  '<path d="M20 6L9 17l-5-5"/>',
+      x:      '<path d="M18 6L6 18M6 6l12 12"/>',
+      trash:  '<path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>',
+      eye:    '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>',
+      alert:  '<path d="M10.3 3.6L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.6a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'
+    }[name] || '';
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">${p}</svg>`;
+  },
+
+  _reqAcoes(id, r) {
+    const S = App._svg;
+    const del = `<button class="btn-ico btn-ico-del" onclick="App.confirmDelete('${id}')" title="Apagar">${S('trash')}</button>`;
+    if (r.origemEstoque)
+      return `<button class="btn-ico" onclick="App.showSolicitacaoView('${id}')" title="Ver (editável na aba Estoque)">${S('eye')}</button>`;
+    if (r.compraCodigo)
+      return `<button class="btn-ico" onclick="App.manageCompra('${r.compraCodigo}')" title="Gerenciar compra combinada ${r.compraCodigo}">${S('pencil')}</button>${del}`;
+
+    // O Gerenciar (lápis) fica em TODAS as solicitações — nem toda precisa de autorização.
+    const editar = `<button class="btn-ico" onclick="App.openModal('${id}')" title="Gerenciar / Editar">${S('pencil')}</button>`;
+    // Ícone de autorização DERIVADO DO STATUS (responsivo: mudar o status pelo
+    // Gerenciar troca o ícone na hora). Solicitado→autorizar, Aguardando→decidir,
+    // Comprado/Estoque→✓ autorizado, Negado→✗ negado.
+    const st = r.status || 'Solicitado';
+    const gestor = r.gestorNome ? ` · gestor: ${r.gestorNome}` : '';
+    let mid = '';
+    if (st === 'Solicitado')
+      mid = `<button class="btn-ico btn-ico-autz" onclick="App.autorizarSolicitacao('${id}')" title="Enviar ao gestor para autorização">${S('lock')}</button>`;
+    else if (st === 'Aguardando')
+      mid = `<button class="btn-ico btn-ico-hour" onclick="App._abrirDecisaoAutorizacao('${id}')" title="Decidir — o gestor respondeu?${gestor}">${S('hour')}</button>`;
+    else if (st === 'Negado')
+      mid = `<button class="btn-ico btn-ico-neg" onclick="App._reabrirNegada('${id}')" title="Negado — clique para tentar autorizar de novo${gestor}">${S('x')}</button>`;
+    else  // Comprado / Estoque = autorizado/concluído → abre SÓ a aba de compra
+      mid = `<button class="btn-ico btn-ico-ok" onclick="App.openModal('${id}',{soloCompra:true,preStatus:'${st}'})" title="Autorizado — ver compra (mudar outros dados: Gerenciar)${gestor}">${S('check')}</button>`;
+    // Ordem: autorizar/decidir primeiro, depois Gerenciar, depois Apagar
+    return `${mid}${editar}${del}`;
+  },
+
+  // Bloco de destaque de autorização no modal — status + gestor + responsável
+  _infoAutorizacao(r) {
+    const st = r.status;
+    const gLabel = r.gestorNome ? `${r.gestorNome}${r.gestorNumero ? ' · ' + App._fmtNumeroDisplay(r.gestorNumero) : ''}` : '';
+    const resp = r.usuarioResp || '';
+    const lg = gLabel ? `<div style="color:var(--ink-900);font-size:.86rem;margin-top:2px">Autorizado pelo gestor: <strong>${gLabel}</strong></div>` : '';
+    const lr = resp ? `<div style="color:var(--ink-900);font-size:.86rem;margin-top:2px">Responsável: <strong>${resp}</strong></div>` : '';
+    const wrap = (cor, bg, bd, ico, titulo, linhas) =>
+      `<div style="background:${bg};border:1px solid ${bd};border-left:4px solid ${cor};border-radius:8px;padding:11px 13px;margin-bottom:12px">
+         <div style="display:flex;align-items:center;gap:7px;font-weight:800;color:${cor};font-size:.95rem">${ico}${titulo}</div>
+         ${linhas}
+       </div>`;
+    if (st === 'Aguardando') return wrap('#b45309', '#fffbeb', '#fde68a', App._svg('hour'), 'Aguardando autorização', lg || '<div style="color:var(--ink-500);font-size:.86rem;margin-top:2px">Enviado ao gestor</div>');
+    if (st === 'Comprado' || st === 'Estoque') return wrap('#059669', '#ecfdf5', '#a7f3d0', App._svg('check'), st === 'Comprado' ? 'Autorizada — Comprado' : 'Autorizada — Enviado do estoque', lg + lr);
+    if (st === 'Negado') return wrap('#dc2626', '#fef2f2', '#fecaca', App._svg('x'), 'Autorização negada', lg);
+    return '';
+  },
+
+  // Lista de gestores cadastrados (+ compat com o número único antigo)
+  _gestoresList() {
+    const g = (State.config && State.config.gestores) || {};
+    const arr = Object.entries(g)
+      .map(([gid, v]) => ({ id: gid, nome: (v && v.nome) || '', numero: ((v && v.numero) || '').replace(/\D/g, '') }))
+      .filter(x => x.numero);
+    const legacy = (State.config && State.config.gestorWhats || '').replace(/\D/g, '');
+    if (legacy && !arr.some(x => x.numero === legacy)) arr.unshift({ id: 'legacy', nome: 'Gestor', numero: legacy });
+    return arr;
+  },
+
+  // Formata número BR pra exibição: 88981765537 → +55 (88) 9 8176-5537
+  _fmtNumeroDisplay(num) {
+    let d = String(num || '').replace(/\D/g, '');
+    if (d.startsWith('55')) d = d.slice(2);
+    if (d.length === 11) return `+55 (${d.slice(0,2)}) ${d.slice(2,3)} ${d.slice(3,7)}-${d.slice(7)}`;
+    if (d.length === 10) return `+55 (${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+    return '+' + (String(num||'').replace(/\D/g,''));
+  },
+
+  // valorNum = valor UNITÁRIO (numérico). O total = valorNum × quantidade.
+  _msgWhatsGestor(r, valorNum) {
+    const qtdRaw = r.quantidade || r.qty || '';
+    const qtdN = parseFloat(qtdRaw) || 0;
+    const v = parseFloat(valorNum) || 0;
+    const total = v > 0 ? v * (qtdN || 1) : 0;
+    return [
+      '*Solicitação de compra — precisa de autorização*', '',
+      r.seq != null ? `*Nº:* SL-${r.seq}` : '',
+      `*Unidade:* ${r.unitName || '—'}`,
+      `*Grupo:* ${r.groupName || '—'}`,
+      r.subgrupo ? `*Subgrupo:* ${r.subgrupo}` : '',
+      `*Item:* ${App.reqSummary(r)}`,
+      r.product ? `*Produto:* ${r.product}` : '',
+      qtdRaw ? `*Quantidade:* ${qtdRaw}` : '',
+      `*Motivo:* ${r.reason || '—'}`,
+      v > 0 ? `*Valor unitário:* ${App._fmtMoeda(v)}` : '',
+      v > 0 ? `*Valor total:* ${App._fmtMoeda(total)}${qtdN > 1 ? ` (${App._fmtMoeda(v)} × ${qtdRaw})` : ''}` : '',
+      r.urgent ? '*⚠ URGENTE*' : '',
+      r.obs ? `*Obs:* ${r.obs}` : '',
+      '', 'Pode autorizar a compra?'
+    ].filter(l => l !== '').join('\n');
+  },
+
+  // ── Formatação de dinheiro (R$) ─────────────────────────────────
+  _fmtMoeda(n) {
+    const v = parseFloat(n); if (isNaN(v)) return '';
+    return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
+  _parseMoeda(s) {
+    const d = String(s || '').replace(/[^\d]/g, '');   // pega só dígitos (mask é em centavos)
+    if (!d) return 0;
+    return parseInt(d, 10) / 100;
+  },
+  _formatMoedaInput(el) {   // máscara ao vivo em centavos: digita 25000 → R$ 250,00
+    if (!el) return;
+    el.value = App._fmtMoeda(App._parseMoeda(el.value));
+  },
+
+  // Autorizar → abre o chooser: escolhe gestor (lista), digita valor, clica Enviar
+  _autzSendId: null,
+  _autzGestorSel: null,
+  autorizarSolicitacao(id) {
+    const r = (State.requests || {})[id]; if (!r) return;
+    if (!App._gestoresList().length) { toast('Cadastre ao menos um gestor em Configurações antes de autorizar.', 'error'); return; }
+    App._autzSendId = id;
+    App._autzGestorSel = null;
+    document.getElementById('autz-send-resumo').textContent =
+      `${r.seq != null ? 'SL-' + r.seq + ' · ' : ''}${r.unitName || ''} — ${App.reqSummary(r)}`;
+    document.getElementById('autz-send-qtd').textContent = (r.quantidade || r.qty || '—');
+    const valEl = document.getElementById('autz-send-valor');
+    valEl.value = r.valor ? App._fmtMoeda(r.valor) : '';
+    valEl.oninput = () => { App._formatMoedaInput(valEl); App._autzAtualizarEnviar(); };
+    App._autzSetMode(App._autzMode || localStorage.getItem('tic_autz_mode') || 'app', true);
+    document.getElementById('autz-send-modal').classList.remove('hidden');
+    setTimeout(() => valEl.focus(), 60);
+  },
+
+  _autzMode: null,
+  _autzSetMode(mode, silent) {
+    App._autzMode = mode;
+    try { localStorage.setItem('tic_autz_mode', mode); } catch (e) {}
+    document.getElementById('autz-mode-app')?.classList.toggle('active', mode === 'app');
+    document.getElementById('autz-mode-web')?.classList.toggle('active', mode === 'web');
+    App._autzRebuildLinks();
+  },
+
+  // Lista de gestores selecionável (radio). Escolhe um → depois clica Enviar.
+  _autzRebuildLinks() {
+    const box = document.getElementById('autz-send-gestores');
+    if (!box) return;
+    const lista = App._gestoresList();
+    if (!lista.some(g => g.id === App._autzGestorSel)) App._autzGestorSel = null;
+    box.innerHTML = lista.map(g => {
+      const sel = g.id === App._autzGestorSel;
+      return `<button type="button" class="autz-gestor-opt${sel ? ' selected' : ''}" onclick="App._autzSelecionarGestor('${g.id}')">
+        <span class="autz-g-radio">${sel ? App._svg('check') : ''}</span>
+        <span class="autz-g-nome">${g.nome || 'Gestor'}</span>
+        <small class="autz-g-num">${App._fmtNumeroDisplay(g.numero)}</small>
+      </button>`;
+    }).join('');
+    App._autzAtualizarEnviar();
+  },
+
+  _autzSelecionarGestor(gid) {
+    App._autzGestorSel = gid;
+    App._autzRebuildLinks();
+  },
+
+  // Atualiza o botão Enviar: é um <a> (respeita WhatsApp App/Web sem popup-block).
+  // Sem gestor escolhido → desabilitado.
+  _autzAtualizarEnviar() {
+    const id = App._autzSendId;
+    const r = (State.requests || {})[id];
+    const a = document.getElementById('autz-enviar-btn');
+    if (!a || !r) return;
+    const g = App._gestoresList().find(x => x.id === App._autzGestorSel);
+    if (!g) {
+      a.classList.add('is-disabled');
+      a.removeAttribute('href'); a.removeAttribute('target'); a.onclick = null;
+      a.textContent = 'Escolha um gestor';
+      return;
+    }
+    const valorNum = App._parseMoeda(document.getElementById('autz-send-valor').value);
+    const mode = App._autzMode || 'app';
+    const msg = App._msgWhatsGestor(r, valorNum);
+    a.href = mode === 'web'
+      ? `https://wa.me/${g.numero}?text=${encodeURIComponent(msg)}`
+      : `whatsapp://send?phone=${g.numero}&text=${encodeURIComponent(msg)}`;
+    if (mode === 'web') { a.target = '_blank'; a.rel = 'noopener'; } else { a.removeAttribute('target'); }
+    a.classList.remove('is-disabled');
+    a.textContent = `Enviar para ${g.nome || 'gestor'}`;
+    a.onclick = () => App._enviarAutorizacao(id, g.id);
+  },
+
+  // O <a> Enviar abre o WhatsApp (App ou Web); aqui grava status Aguardando, o
+  // valor (numérico) e VINCULA o gestor pra quem foi mandado (mapeia depois).
+  _enviarAutorizacao(id, gestorId) {
+    const r = (State.requests || {})[id]; if (!r) return;
+    const valorNum = App._parseMoeda(document.getElementById('autz-send-valor').value);
+    const g = App._gestoresList().find(x => x.id === gestorId) || {};
+    const ops = [
+      DB.set(`requests/${id}/status`, 'Aguardando'),
+      DB.set(`requests/${id}/gestorNome`, g.nome || 'Gestor'),
+      DB.set(`requests/${id}/gestorNumero`, g.numero || '')
+    ];
+    if (valorNum > 0) ops.push(DB.set(`requests/${id}/valor`, valorNum.toFixed(2)));
+    Promise.all(ops).then(() => {
+      App._logActivity?.('Solicitações', `Autorização enviada — ${g.nome || 'gestor'}`, App.reqSummary(r));
+      document.getElementById('autz-send-modal')?.classList.add('hidden');
+      App.renderRequests(); App.updatePendingBadge?.();
+    });
+  },
+
+  // Decidir → popup com Estoque / Comprado / Negado
+  _abrirDecisaoAutorizacao(id) {
+    const r = (State.requests || {})[id]; if (!r) return;
+    const modal = document.getElementById('autorizacao-modal');
+    if (!modal) return;
+    document.getElementById('autz-resumo').textContent =
+      `${r.seq != null ? 'SL-' + r.seq + ' · ' : ''}${r.unitName || ''} — ${App.reqSummary(r)}`;
+    document.getElementById('autz-autorizado').onclick = () => App._decidirAutorizacao(id, 'Autorizado');
+    document.getElementById('autz-negado').onclick     = () => App._decidirAutorizacao(id, 'Negado');
+    modal.classList.remove('hidden');
+  },
+
+  // Decisão: só Autorizado ou Negado.
+  //  • Negado  → status Negado direto (o gestor já está vinculado do envio).
+  //  • Autorizado → abre SÓ a aba de compra (Comprado/Estoque); o status
+  //    finaliza ao salvar o popup. Pra mudar outros dados → Gerenciar (lápis).
+  _decidirAutorizacao(id, decisao) {
+    const r = (State.requests || {})[id]; if (!r) return;
+    document.getElementById('autorizacao-modal')?.classList.add('hidden');
+    if (decisao === 'Negado') {
+      DB.set(`requests/${id}/status`, 'Negado').then(() => {
+        App._logActivity?.('Solicitações', `Autorização — Negada${r.gestorNome ? ' · ' + r.gestorNome : ''}`, App.reqSummary(r));
+        App.renderRequests(); App.updatePendingBadge?.();
+      });
+    } else {
+      App.openModal(id, { soloCompra: true, preStatus: 'Comprado' });
+    }
+  },
+
+  // Clique no X de uma solicitação negada → volta ao início pra tentar de novo.
+  // Reseta pra Solicitado e limpa o gestor vinculado (nova autorização do zero).
+  _reabrirNegada(id) {
+    const r = (State.requests || {})[id]; if (!r) return;
+    if (!confirm('Voltar esta solicitação ao início para tentar autorizar de novo?')) return;
+    DB.update(`requests/${id}`, { status: 'Solicitado', gestorNome: null, gestorNumero: null }).then(() => {
+      App._logActivity?.('Solicitações', 'Solicitação negada reaberta (voltou ao início)', App.reqSummary(r));
+      App.renderRequests(); App.updatePendingBadge?.();
+    });
+  },
+
+  // ── Configurações — múltiplos gestores ─────────────────────────
+  salvarGestor() {
+    const nomeEl = document.getElementById('gestor-nome-input');
+    const numEl  = document.getElementById('gestor-whats-input');
+    const nome = (nomeEl?.value || '').trim();
+    const num  = (numEl?.value || '').replace(/\D/g, '');
+    if (!num) { toast('Informe o número do gestor.', 'error'); return; }
+    DB.push('config/gestores', { nome: nome || 'Gestor', numero: num }).then(() => {
+      if (nomeEl) nomeEl.value = ''; if (numEl) numEl.value = '';
+      toast('✓ Gestor cadastrado.');
+      App.renderGestores();
+    });
+  },
+  removerGestor(gid) {
+    if (!confirm('Remover este gestor?')) return;
+    DB.remove(`config/gestores/${gid}`).then(() => App.renderGestores());
+  },
+  // Formata o input do número ao vivo (88981765537 → +55 (88) 9 8176-5537)
+  _formatGestorInput() {
+    const el = document.getElementById('gestor-whats-input');
+    if (!el) return;
+    let d = el.value.replace(/\D/g, '').replace(/^0+/, '');
+    if (d.startsWith('55')) d = d.slice(2);
+    d = d.slice(0, 11);
+    if (!d) { el.value = ''; return; }
+    let out = '+55 ';
+    out += '(' + d.slice(0, 2);
+    if (d.length >= 2) out += ')';
+    if (d.length > 2) out += ' ' + d.slice(2, 3);
+    if (d.length > 3) out += ' ' + d.slice(3, 7);
+    if (d.length > 7) out += '-' + d.slice(7, 11);
+    el.value = out;
+  },
+  renderGestores() {
+    const box = document.getElementById('list-gestores');
+    if (!box) return;
+    const arr = App._gestoresList();
+    box.innerHTML = arr.length
+      ? arr.map(g => `<div class="settings-list-item">
+          <span><strong>${g.nome || 'Gestor'}</strong> · ${App._fmtNumeroDisplay(g.numero)}</span>
+          ${g.id !== 'legacy' ? `<button class="btn-ico btn-ico-del" onclick="App.removerGestor('${g.id}')" title="Remover">${App._svg('trash')}</button>` : ''}
+        </div>`).join('')
+      : '<div style="color:var(--gray-500);font-size:.85rem;padding:8px">Nenhum gestor cadastrado.</div>';
+  },
+  _syncGestorField() { App.renderGestores(); },
+
+  // Puxa o gestor legado (número único antigo em config.gestorWhats) pra dentro
+  // de config/gestores, virando um item normal e deletável no Config. Idempotente.
+  _migrarGestorLegacy() {
+    const cfg = State.config || {};
+    const legacy = (cfg.gestorWhats || '').replace(/\D/g, '');
+    if (!legacy) return;
+    const gestores = cfg.gestores || {};
+    const jaTem = Object.values(gestores).some(v => ((v && v.numero) || '').replace(/\D/g, '') === legacy);
+    if (jaTem) { DB.remove('config/gestorWhats'); return; }
+    DB.push('config/gestores', { nome: cfg.gestorNome || 'Gestor', numero: legacy })
+      .then(() => DB.remove('config/gestorWhats'));
   },
 
   // Cor lilás por código de compra — mesma compra = mesmo tom
@@ -3424,7 +4086,7 @@ const App = {
     if (n.includes('tinta') && (r.num||r.nums||r.cor||r.cores)) {
       const num = r.num||r.nums||''; const cor = r.cor||r.cores||'';
       text = [num, cor].filter(Boolean).join(' · ') || 'TINTA';
-    } else if ((n.includes('pilha')||n.includes('bateria')) && (r.batModel||r.batModels||r.modelo)) {
+    } else if ((n.includes('pilha')||n.includes('bateria')||n.includes('conserto')||n.includes('concerto')) && (r.batModel||r.batModels||r.modelo)) {
       if (r.batModel)   text = `${r.batModel} ×${r.qty||1}`;
       else if (r.batModels) text = r.batModels.map(b=>`${b.modelo} ×${b.qty}`).join(' | ');
       else text = `${r.modelo||''} ×${r.qty||1}`;
@@ -3445,7 +4107,8 @@ const App = {
   },
 
   /* ── MODAL ────────────────────────────────── */
-  openModal(id) {
+  // opts.soloCompra = fluxo de autorização já aprovado → libera só Comprado/Estoque
+  openModal(id, opts = {}) {
     const r = (State.requests||{})[id]; if (!r) return;
     if (r.origemEstoque) {
       toast('Entrada criada pela aba Estoque. Edite grupo/produto/fornecedor/quantidade por lá.', 'error');
@@ -3504,7 +4167,17 @@ const App = {
       <strong>Resumo:</strong> ${App.reqSummary(r)}<br>
       ${r.urgent ? '<strong style="color:var(--orange)">🚨 URGENTE</strong><br>' : ''}
       ${extraLines.length ? extraLines.join('<br>') : ''}
+      ${App._infoAutorizacao(r)}
     `;
+
+    // Restrição de status: fluxo de autorização aprovado só libera Comprado/Estoque.
+    // Gerenciar normal (sem soloCompra) mostra todos os botões, como sempre.
+    const solo = !!opts.soloCompra;
+    if (opts.preStatus) State.modalStatus = opts.preStatus;
+    else if (solo && State.modalStatus !== 'Comprado' && State.modalStatus !== 'Estoque') State.modalStatus = 'Comprado';
+    document.querySelectorAll('.status-btn').forEach(b => {
+      b.style.display = (!solo || b.dataset.s === 'Comprado' || b.dataset.s === 'Estoque') ? '' : 'none';
+    });
 
     document.querySelectorAll('.status-btn').forEach(b => b.classList.toggle('active', b.dataset.s===State.modalStatus));
     App.toggleModalFields(State.modalStatus);
@@ -3842,6 +4515,15 @@ const App = {
     const prevStatus = prevR.status;
     const st = State.modalStatus;
     const upd = { status: st };
+
+    // Mapeia QUEM comprou / enviou do estoque (usuário logado). Grava só quando
+    // vira Comprado/Estoque; mantém o já registrado se continuar no mesmo status.
+    if (st === 'Comprado' || st === 'Estoque') {
+      upd.usuarioResp = prevR.usuarioResp || State.adminUser || '—';
+      upd.usuarioRespAt = prevR.usuarioRespAt || new Date().toISOString();
+    } else {
+      upd.usuarioResp = null; upd.usuarioRespAt = null;   // saiu da compra → limpa
+    }
 
     // Troca de status reseta dados que não pertencem ao novo status.
     // Sem compra (Solicitado/Aguardando/Negado ou indo p/ Estoque) → limpa campos de compra.
@@ -4245,6 +4927,7 @@ const App = {
     App.populateGroupSelects();
     App.populateSubgroupFilterSel();
     App.renderCodigosTab();
+    App._syncGestorField();
   },
 
   // ── Prefixo de lote pelo nome do grupo ──────
@@ -4705,12 +5388,30 @@ const App = {
   },
 
   // GROUPS
+  _cfgSelGroup: null,
+  openGroupEdit(gid) {
+    App._cfgSelGroup = gid;
+    ['sel-group-sub', 'sel-subgroup-filter', 'sel-subgroup-group'].forEach(id => { const s = document.getElementById(id); if (s) s.value = gid; });
+    const key = document.getElementById('sel-subopt-key'); if (key) key.value = 'numeracoes';
+    App.loadSubOpts();
+    App.renderSubgroupsAdmin();
+    const t = document.getElementById('cfg-detail-title'); if (t) t.textContent = State.groups?.[gid] || 'Grupo';
+    document.getElementById('modal-grupo-edit').classList.remove('hidden');
+  },
+  closeGroupEdit() {
+    App._cfgSelGroup = null;
+    document.getElementById('modal-grupo-edit').classList.add('hidden');
+  },
+
   renderGroupsAdmin() {
     const wrap=document.getElementById('list-groups-admin'); wrap.innerHTML='';
     Object.entries(State.groups||{}).forEach(([id,name]) => {
-      const el=document.createElement('div'); el.className='settings-item';
-      el.innerHTML=`<span class="settings-item-name">${name}</span>
+      const el=document.createElement('div'); el.className='settings-item cfg-grp-item'; el.dataset.gid=id;
+      el.innerHTML=`<span class="settings-item-name cfg-grp-click" onclick="App.openGroupEdit('${id}')" title="Editar sub-opções e subgrupos">${name}</span>
         <div class="settings-item-actions">
+          <label class="grp-internal-toggle" title="Interno: só aparece na Nova Solicitação do admin, não para as unidades">
+            <input type="checkbox" ${App._isGroupInternal(id)?'checked':''} onchange="App.toggleGroupInternal('${id}',this.checked)"/> interno
+          </label>
           <button class="btn-icon-sm edit" onclick="App.openEditModal('Renomear Grupo','${name}',v=>DB.set('groups/${id}',v))">
             <svg viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2"/></svg>
           </button>
@@ -4751,7 +5452,7 @@ const App = {
       const key=keySelect.value; const items=opts[key]||[];
       App._renderSubOptList(wrap, gid, key, items);
       addRow.style.display='flex';
-    } else if (norm.includes('pilha')||norm.includes('bateria')) {
+    } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
       keySelect.style.display='none';
       App._renderSubOptList(wrap, gid, 'modelos', opts.modelos||[]);
       addRow.style.display='flex';
@@ -4793,7 +5494,7 @@ const App = {
     let key;
     const keySelect=document.getElementById('sel-subopt-key');
     if (norm.includes('tinta')) key=keySelect.value||'numeracoes';
-    else if (norm.includes('pilha')||norm.includes('bateria')) key='modelos';
+    else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) key='modelos';
     else return;
     const current=[].concat(((State.subOpts||{})[gid]||{})[key]||[]);
     current.push(val);
@@ -5668,7 +6369,8 @@ const App = {
         valor: valor.toFixed(2), valorTotal,
         parcelas: parcelar ? App._buildParcelas(data, n, parseFloat(valorTotal)) : null,
         shippedStatus: 'Não', shippedAt: null,   // sem envio: entra direto no estoque
-        origemEstoque: true   // marca: entrada criada direto pela aba Estoque (só esse rótulo, sem CMP)
+        origemEstoque: true,  // marca: entrada criada direto pela aba Estoque (só esse rótulo, sem CMP)
+        usuarioResp: State.adminUser || '—', usuarioRespAt: new Date().toISOString()   // quem registrou a compra
       };
       const reqRef = DB.push('requests', reqData);
       await reqRef;
@@ -6017,6 +6719,8 @@ const App = {
       ['parcelada-add-modal', () => App._voltaChooserOuFecha('parcelada-add-modal', hide('parcelada-add-modal'))],
       ['compra-modal',     () => App._voltaChooserOuFecha('compra-modal', () => App.closeCompraModal())],
       ['add-compra-chooser',  hide('add-compra-chooser')],
+      ['autz-send-modal',     hide('autz-send-modal')],
+      ['autorizacao-modal',   hide('autorizacao-modal')],
       ['sol-view-modal',      hide('sol-view-modal')],
       ['lote-info-modal',     hide('lote-info-modal')],
       ['compra-detalhe-modal',hide('compra-detalhe-modal')],
@@ -6054,10 +6758,12 @@ const App = {
 
     safeListener('units',     v => { State.units    =v||{}; App.renderUnitsDropdown(); if(State.adminUser) App.renderUnitsAdmin?.(); });
     safeListener('groups',    v => { State.groups   =v||{}; App.populateGroupSelects?.(); if(State.adminUser) App.renderGroupsAdmin?.(); });
+    safeListener('groupMeta', v => { State.groupMeta =v||{}; if(State.adminUser) App.renderGroupsAdmin?.(); });
     safeListener('subOpts',   v => { State.subOpts  =v||{}; });
     safeListener('subgroups', v => { State.subgroups=v||{}; if(State.adminUser) App.renderSubgroupsAdmin?.(); });
     safeListener('admins',    v => { State.admins   =v||{}; if(State.adminUser) App.renderAdminsCards?.(); });
     safeListener('suppliers', v => { State.suppliers=v||{}; if(State.adminUser) App.renderSuppliersAdmin?.(); });
+    safeListener('config',    v => { State.config   =v||{}; App._migrarGestorLegacy?.(); App._syncGestorField?.(); });
     safeListener('requests',  v => {
       State.requests=v||{};
       App.updatePendingBadge();
@@ -6296,8 +7002,11 @@ const App = {
     // ESC fecha qualquer card/modal aberto
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;
+      // Menu de conta na sidebar
+      const userMenu = document.getElementById('sb-user-menu');
+      if (userMenu && !userMenu.classList.contains('hidden')) { App.closeUserMenu(); return; }
       // 0. Modais simples do dashboard (parcelas, meta, extrato, sub-opções) — fecham direto
-      for (const mid of ['parcelas-modal', 'meta-modal', 'activity-detail-modal', 'extrato-modal', 'subopts-all-modal', 'logs-full-modal']) {
+      for (const mid of ['parcelas-modal', 'meta-modal', 'activity-detail-modal', 'extrato-modal', 'subopts-all-modal', 'logs-full-modal', 'modal-nova-solic', 'modal-grupo-edit']) {
         const m = document.getElementById(mid);
         if (m && !m.classList.contains('hidden')) { m.classList.add('hidden'); return; }
       }
@@ -6320,6 +7029,13 @@ const App = {
       const popup = document.querySelector('.cal-popup');
       if (popup) { popup.remove(); return; }
     });
+
+    App.startIdleWatch();   // auto-logout por inatividade
+
+    // Fecha o menu de conta ao clicar fora dele
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.sidebar-account')) App.closeUserMenu();
+    });
   }
 };
 
@@ -6328,7 +7044,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const boot = () => {
     App.initListeners();
     App.seedDefaults();
-    if (State.adminUser) { App.goTo('screen-admin'); App.renderAdminPanels(); }
+    if (State.adminUser) { App.goTo('screen-admin'); App.renderAdminPanels(); App._restoreAdminTab(); App.resetIdle(); }
   };
   if (window._firebaseReady) boot();
   else document.addEventListener('firebaseReady', boot);

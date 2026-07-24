@@ -203,8 +203,13 @@ main {
    ============================================================ */
 .view-header {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 1.5rem;
   flex-wrap: wrap; gap: 12px;
+  background: #fff;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  box-shadow: 0 2px 10px rgba(15,30,53,.04);
+  height: 89px; box-sizing: border-box;
+  margin: -1.5rem -1.5rem 1.5rem;
+  padding: 0 1.5rem;
 }
 .view-title { display: flex; align-items: center; gap: .625rem; }
 .view-title i { font-size: 1.5rem; color: var(--blue); }
@@ -213,6 +218,18 @@ main {
   color: var(--navy); letter-spacing: -.02em;
 }
 .header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* Padroniza a altura/largura de todos os controles do cabeçalho (busca,
+   ordenar, filtro, botão "Novo..."), pra ficarem alinhados e do mesmo tamanho. */
+.header-controls .btn-small,
+.header-controls .btn-filter-toggle {
+  height: 38px; width: 38px; padding: 0;
+  box-sizing: border-box; justify-content: center;
+}
+.header-controls .btn-primary,
+.header-controls .btn-secondary,
+.header-controls .btn-wifi {
+  height: 38px; box-sizing: border-box;
+}
 
 .search-wrap { position: relative; }
 .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1rem; }
@@ -355,6 +372,356 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
 .unit-card .unit-meta span { display: flex; align-items: center; gap: 4px; }
 .unit-card .card-actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; opacity: 0; transition: opacity .2s; }
 .unit-card:hover .card-actions { opacity: 1; }
+
+/* ============================================================
+   ESTOQUE (Modelos de hardware gerados a partir dos computadores)
+   ============================================================ */
+.estoque-layout { display: grid; grid-template-columns: 260px 1fr; gap: 1.25rem; align-items: start; height: calc(100vh - 230px); }
+@media (max-width: 800px) { .estoque-layout { grid-template-columns: 1fr; height: auto; } }
+.estoque-layout.estoque-layout-full { grid-template-columns: 1fr; }
+
+/* Toggle Unidades / Todos os equipamentos — sempre visível no cabeçalho */
+.estoque-mode-toggle {
+  display: inline-flex; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 3px; gap: 3px;
+}
+.estoque-mode-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: .4rem .75rem; border: none; border-radius: calc(var(--r) - 2px);
+  background: transparent; color: var(--text-mid); font-size: .82rem; font-weight: 700;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.estoque-mode-btn:hover { color: var(--blue); }
+.estoque-mode-btn.active { background: linear-gradient(135deg, var(--navy), var(--navy-mid)); color: #fff; }
+
+/* Barra do modo "Todos os equipamentos" — sub-toggle Lista/Gráfico + botão Adicionar */
+.estoque-catalog-subbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin: -.5rem 0 1.1rem; flex-wrap: wrap;
+}
+.estoque-mode-toggle-sm .estoque-mode-btn { padding: .3rem .6rem; font-size: .76rem; }
+
+/* Painel de filtro (Tipo + Status) do modo "Todos os equipamentos" — abre
+   flutuante por cima do conteúdo (popover), igual ao filtro de Estoque do
+   dashboard principal, não empurra o layout. */
+.filter-popover-wrap { position: relative; display: inline-flex; }
+.filter-popover {
+  display: none; flex-direction: column; gap: 12px;
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 100;
+  width: max-content; min-width: 420px; max-width: min(720px, 92vw);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-lg);
+  padding: 14px 16px; box-sizing: border-box;
+}
+.filter-popover.open { display: flex; }
+.filter-popover-row { display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 480px) { .filter-popover { min-width: 0; width: 92vw; } }
+
+/* Card da esquerda: lista de unidades */
+.estoque-units-col {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm); display: flex; flex-direction: column;
+  height: 100%; overflow: hidden;
+}
+.estoque-units-col.hidden { display: none; }
+.estoque-units-list {
+  flex: 1; padding: .5rem; display: flex; flex-direction: column; gap: 4px; overflow-y: auto;
+}
+.estoque-unit-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: .6rem .75rem; border: none; border-radius: var(--r);
+  background: transparent; color: var(--text-mid); font-size: .85rem; font-weight: 600;
+  text-align: left; cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.estoque-unit-item i { color: var(--text-muted); font-size: 1rem; flex-shrink: 0; }
+.estoque-unit-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.estoque-unit-item:hover { background: var(--blue-pale); color: var(--blue); }
+.estoque-unit-item.active { background: linear-gradient(135deg, var(--navy), var(--navy-mid)); color: #fff; }
+.estoque-unit-item.active i { color: #fff; }
+.estoque-unit-item.active small { background: rgba(255,255,255,.2); }
+
+.estoque-comps-panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: 1.25rem; overflow-y: auto; height: 100%; box-shadow: var(--shadow-sm);
+}
+.estoque-empty {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  height: 100%; min-height: 160px; color: var(--text-muted); font-size: .85rem; text-align: center;
+}
+.estoque-comps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.estoque-comp-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding-left: 24px; }
+.estoque-comp-head i { color: var(--blue); font-size: 1.05rem; }
+.estoque-comp-head strong { font-size: .88rem; color: var(--navy); flex: 1; }
+.estoque-badge-pend {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: .68rem; font-weight: 700; padding: 2px 8px; border-radius: 100px;
+  background: var(--surface); color: var(--text-muted); border: 1px solid var(--border);
+}
+.estoque-comp-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.estoque-comp-actions .btn-small { font-size: .75rem; padding: .3rem .55rem; }
+.estoque-comp-actions .btn-small:disabled { opacity: .45; cursor: not-allowed; }
+.estoque-comp-actions .btn-small:disabled:hover { background: var(--surface); border-color: var(--border); color: var(--text-mid); }
+
+/* Catálogo completo de Modelos (modo "Modelos") — card inteiro clicável */
+.estoque-modelo-card {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: 1rem; display: flex; flex-direction: column; gap: 8px;
+  position: relative; cursor: pointer; transition: all .15s;
+}
+.estoque-modelo-card:hover { border-color: var(--blue); box-shadow: var(--shadow-sm); transform: translateY(-2px); }
+.estoque-modelo-card-disabled { cursor: default; }
+.estoque-modelo-card-disabled:hover { border-color: var(--border); box-shadow: none; transform: none; }
+.estoque-serial-line { display: flex; align-items: center; gap: 4px; font-size: .76rem; color: var(--blue); font-weight: 700; letter-spacing: .02em; }
+.estoque-modelo-del {
+  position: absolute; top: 8px; right: 8px; z-index: 1;
+  width: 26px; height: 26px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.estoque-origem-badge {
+  display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+  background: var(--blue-pale); color: var(--blue); border-radius: 100px;
+  padding: 2px 9px; font-size: .7rem; font-weight: 700;
+  margin-top: auto; /* fixa no rodapé do card, independente do tamanho do conteúdo */
+}
+.estoque-modelo-specs { display: flex; flex-direction: column; gap: 3px; }
+.estoque-modelo-specs li { display: flex; justify-content: space-between; gap: 8px; font-size: .78rem; padding: 3px 0; border-bottom: 1px dashed var(--border); }
+.estoque-modelo-specs li:last-child { border-bottom: none; }
+.estoque-modelo-specs li span { color: var(--text-muted); }
+.estoque-modelo-specs li b { color: var(--text-mid); font-weight: 600; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%; }
+.estoque-modelo-specs-empty { color: var(--text-muted); font-style: italic; font-size: .78rem; }
+
+/* Título de subgrupo (demais tipos de equipamento dentro de uma Unidade) */
+.estoque-subgroup-title {
+  display: flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 700;
+  color: var(--text-mid); margin: 1.1rem 0 .6rem; padding-top: .6rem; border-top: 1px dashed var(--border);
+}
+.estoque-subgroup-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.estoque-subgroup-title i { color: var(--blue); }
+
+/* Lista (planilha) do modo "Todos os equipamentos" */
+.estoque-lista-table {
+  width: 100%; border-collapse: collapse; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden;
+}
+.estoque-lista-table thead th {
+  text-align: left; font-size: .68rem; font-weight: 800; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-muted); background: var(--surface-2);
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+}
+.estoque-lista-table tbody tr {
+  cursor: pointer; transition: background .12s; border-bottom: 1px solid var(--border);
+}
+.estoque-lista-table tbody tr:last-child { border-bottom: none; }
+.estoque-lista-table tbody tr:hover { background: var(--blue-pale); }
+.estoque-lista-table td {
+  padding: 9px 12px; font-size: .82rem; color: var(--text-mid); vertical-align: middle;
+}
+.estoque-lista-table td i { color: var(--blue); margin-right: 4px; }
+.estoque-lista-dot-cell { width: 18px; }
+.estoque-lista-codigo { font-family: monospace; font-weight: 700; color: var(--navy); letter-spacing: .02em; }
+.equip-status-dot.equip-status-dot-inline { position: static; display: inline-block; margin: 0; }
+
+/* Chooser "Adicionar Equipamento" */
+.add-equip-type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+.add-equip-type-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 1.1rem .75rem; border: 1.5px solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface-2); color: var(--text-mid); font-size: .82rem; font-weight: 700;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.add-equip-type-btn i { font-size: 1.6rem; color: var(--blue); }
+.add-equip-type-btn:hover { border-color: var(--blue); background: var(--blue-pale); color: var(--blue); transform: translateY(-2px); }
+
+/* Seletor de Hardware/Periférico do Estoque dentro do form do Guichê */
+.hw-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.hw-section-head h4 { margin: 0; }
+.hw-preview-box {
+  background: var(--surface-2); border: 1px dashed var(--border); border-radius: var(--r-lg);
+  padding: 10px 14px; display: flex; flex-direction: column; gap: 4px;
+}
+.hw-preview-row { display: flex; justify-content: space-between; gap: 10px; font-size: .8rem; padding: 2px 0; }
+.hw-preview-row span { color: var(--text-muted); }
+.hw-preview-row b { color: var(--text-mid); font-weight: 600; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65%; }
+.hw-preview-empty { color: var(--text-muted); font-style: italic; font-size: .8rem; }
+.periph-preview-item { display: flex; flex-direction: column; gap: 6px; }
+.periph-preview-item label { font-size: .74rem; font-weight: 700; color: var(--text-mid); }
+.periph-preview-box {
+  background: var(--surface-2); border: 1px dashed var(--border); border-radius: var(--r);
+  padding: 7px 10px; min-height: 34px; display: flex; align-items: center;
+}
+.periph-preview-box .hw-preview-row { flex: 1; }
+.periph-preview-item .btn-secondary { font-size: .74rem; padding: .3rem .55rem; align-self: flex-start; }
+
+/* Lista de itens dentro dos modais seletores (Hardware/Periférico) */
+.picker-list { display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow-y: auto; margin-top: 10px; }
+.picker-item {
+  border: 1.5px solid var(--border); border-radius: var(--r-lg); background: var(--surface-2);
+  padding: 10px 14px; cursor: pointer; transition: all .15s;
+}
+.picker-item:hover { border-color: var(--blue); background: var(--blue-pale); }
+.picker-item-selected { border-color: var(--blue); background: var(--blue-pale); }
+.picker-item-head { display: flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--navy); }
+.picker-item-head i { color: var(--blue); }
+.picker-item-sub { font-size: .76rem; color: var(--text-muted); margin-top: 2px; }
+.picker-section-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--blue); margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--border);
+}
+
+/* Toolbar do seletor de Hardware (toggle Disponíveis/Em uso) */
+.hw-picker-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+
+/* Conexão do periférico — definida dentro da unidade, no form do Guichê */
+.periph-conn-row { display: flex; gap: 6px; align-items: center; }
+.periph-conn-row .conn-select { flex: 1; font-size: .76rem; padding: .3rem .4rem; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); font-family: inherit; }
+.periph-conn-row .ip-input { flex: 1; font-size: .76rem; padding: .3rem .4rem; border: 1px solid var(--border); border-radius: var(--r); font-family: inherit; }
+.periph-conn-row .host-select { flex: 1.4; margin-top: 0; font-size: .76rem; padding: .3rem .4rem; border: 1px solid var(--conn-shared, #f59e0b); border-radius: var(--r); background: #fff7ed; font-family: inherit; }
+
+/* Peças escolhidas no Template (RAM/Disco aceitam várias): cada uma vira um
+   chip empilhado (um abaixo do outro), sem dado cobrindo dado */
+.periph-preview-item .periph-preview-box {
+  flex-direction: column; align-items: stretch; gap: 5px; padding: 8px 10px;
+}
+.periph-preview-item .periph-preview-box .hw-preview-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 9px; margin: 0;
+}
+.part-chip-remove {
+  border: none; background: transparent; color: var(--red); cursor: pointer;
+  display: inline-flex; align-items: center; padding: 0 2px; font-size: .9rem; flex-shrink: 0;
+}
+.part-chip-remove:hover { transform: scale(1.15); }
+
+/* Caixa de vínculo/localização nos popups da Lista (template conectado,
+   unidade onde está etc.) — destacada em azul claro */
+.tpl-link-box {
+  display: flex; align-items: center; gap: 7px;
+  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--r-lg);
+  padding: 9px 13px; font-size: .82rem; color: var(--text-mid); margin: 8px 0;
+}
+.tpl-link-box i { color: var(--blue); font-size: 1rem; }
+.tpl-link-box strong { color: var(--blue); }
+
+/* Peça danificada: linha da Lista com tinta vermelha sutil */
+.estoque-lista-table tbody tr.lista-row-danificada { background: #fef2f2; }
+.estoque-lista-table tbody tr.lista-row-danificada:hover { background: #fee2e2; }
+/* Item em manutenção: linha da Lista com tinta amarela sutil */
+.estoque-lista-table tbody tr.lista-row-manutencao { background: #fefce8; }
+.estoque-lista-table tbody tr.lista-row-manutencao:hover { background: #fef9c3; }
+.estoque-lista-del-cell { width: 40px; text-align: right; }
+
+/* Peça danificada/em manutenção montada no Template: chip vermelho */
+.hw-preview-row.part-chip-defeituosa {
+  background: #fef2f2; border-color: #fca5a5; color: #b91c1c;
+}
+.hw-preview-row.part-chip-defeituosa b { color: #b91c1c; }
+
+/* Gráfico com Tipo filtrado: seções agrupadas por status */
+.estoque-grupo-status { margin-bottom: 18px; }
+.estoque-grupo-status .picker-section-title { margin-bottom: 8px; }
+
+/* Toolbar da Lista: busca digitada + contadores de controle do estoque */
+.estoque-lista-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.estoque-lista-search {
+  display: flex; align-items: center; gap: 6px; flex: 1; min-width: 220px; max-width: 420px;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--surface-2);
+  padding: .35rem .6rem;
+}
+.estoque-lista-search i { color: var(--text-muted); }
+.estoque-lista-search input {
+  border: none; background: transparent; outline: none; width: 100%;
+  font-size: .82rem; font-family: inherit; color: var(--text-mid);
+}
+.estoque-lista-counters { display: flex; gap: 8px; flex-wrap: wrap; }
+.lista-counter {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: .74rem; font-weight: 700; color: var(--text-mid);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 100px; padding: 4px 10px;
+}
+
+/* Destaques do popup de Template de PC: Localização em azul bem claro e
+   Acessos & Senhas num cinza mais escuro, pra diferenciar as seções */
+.pc-preset-loc-highlight {
+  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--r-lg);
+  padding: 12px 14px;
+}
+.pc-preset-acessos-highlight {
+  background: #e2e8f0; border: 1px solid #cbd5e1; border-radius: var(--r-lg);
+  padding: 12px 14px;
+}
+
+/* Botão de histórico (relógio) nos cards do Estoque — ao lado da lixeira */
+.estoque-modelo-log {
+  position: absolute; top: 8px; right: 40px; z-index: 1;
+  width: 26px; height: 26px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+/* Botão de informações do Template — à esquerda do relógio */
+.estoque-modelo-info {
+  position: absolute; top: 8px; right: 72px; z-index: 1;
+  width: 26px; height: 26px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+/* Card de Template (Gráfico) tem só info + log — encosta os dois na direita
+   pra não deixar buraco onde ficava a lixeira/lápis */
+.estoque-modelo-card.card-pc-preset .estoque-modelo-log  { right: 8px; }
+.estoque-modelo-card.card-pc-preset .estoque-modelo-info { right: 40px; }
+
+/* Botão de editar Template (lápis) — no canto direito do card do Gráfico */
+.estoque-modelo-edit {
+  position: absolute; top: 8px; right: 8px; z-index: 1;
+  width: 26px; height: 26px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--blue);
+}
+.estoque-modelo-edit:hover { background: var(--blue-pale); }
+
+/* Aviso de pendência dentro do modal de Informações do Template */
+.info-alerta-defeito {
+  background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c;
+  border-radius: var(--r-lg); padding: 10px 14px; margin-bottom: 10px; font-size: .82rem;
+}
+.info-alerta-defeito ul { margin: 6px 0 0; padding-left: 20px; }
+.info-alerta-defeito li { margin: 2px 0; }
+
+/* Botão "Consertado" — reverter manutenção, verde amigável */
+.btn-consertado {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #dcfce7; color: #15803d; border: 1px solid #86efac;
+  border-radius: 100px; padding: 7px 16px; font-size: .8rem; font-weight: 700;
+  cursor: pointer; transition: all .15s ease; width: 100%; justify-content: center;
+}
+.btn-consertado:hover { background: #bbf7d0; border-color: #4ade80; box-shadow: 0 2px 8px rgba(34,197,94,.25); }
+.btn-consertado i { font-size: 1.05rem; }
+/* Botão "Descartado" — mandar peça danificada pra lixeira, vermelho */
+.btn-descartado {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5;
+  border-radius: 100px; padding: 7px 16px; font-size: .8rem; font-weight: 700;
+  cursor: pointer; transition: all .15s ease; width: 100%; justify-content: center;
+}
+.btn-descartado:hover { background: #fecaca; border-color: #f87171; box-shadow: 0 2px 8px rgba(239,68,68,.25); }
+.btn-descartado i { font-size: 1.05rem; }
+
+/* Logs / Rastreabilidade */
+.logs-modal-body { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; margin-top: 8px; }
+.log-entry {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: 10px 14px;
+}
+.log-entry-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.log-entry-head strong { font-size: .84rem; color: var(--navy); }
+.log-entry-when { font-size: .72rem; color: var(--text-muted); white-space: nowrap; }
+.log-entry-code { font-family: monospace; font-size: .76rem; font-weight: 700; color: var(--blue); margin-top: 2px; }
+.log-entry-det { font-size: .78rem; color: var(--text-mid); margin-top: 2px; }
+.log-entry-user { display: flex; align-items: center; gap: 5px; font-size: .74rem; color: var(--text-muted); margin-top: 6px; }
+.log-admin-badge {
+  background: var(--blue-pale); color: var(--blue); font-size: .64rem; font-weight: 800;
+  padding: 1px 8px; border-radius: 100px;
+}
 
 /* ============================================================
    DASHBOARD SIDEBAR
@@ -542,7 +909,7 @@ tbody tr:last-child td { border-bottom: none; }
 .bg-shared    { background: var(--conn-shared); }
 .bg-hdmi      { background: #1e293b; }
 .bg-vga       { background: #0369a1; }
-.bg-chromecast { background: #f97316; }
+.bg-chromecast { background: #8b5cf6; }
 
 /* Improvement 3: standardized ip/host display badges */
 .ip-display, .host-display {
@@ -747,7 +1114,7 @@ tbody tr:last-child td { border-bottom: none; }
 
 label { display: block; font-size: .8125rem; font-weight: 600; margin-bottom: .3rem; color: var(--text-mid); }
 
-input, select {
+input, select, textarea {
   width: 100%; padding: .625rem .875rem;
   border: 1.5px solid var(--border); border-radius: var(--r);
   height: 40px; font-family: inherit; font-size: .875rem;
@@ -755,7 +1122,8 @@ input, select {
   transition: border-color .15s, box-shadow .15s;
   outline: none;
 }
-input:focus, select:focus {
+textarea { height: auto; resize: vertical; line-height: 1.4; }
+input:focus, select:focus, textarea:focus {
   border-color: var(--blue);
   box-shadow: 0 0 0 3px rgba(13,110,253,.1);
 }
@@ -763,6 +1131,12 @@ select { appearance: none; cursor: pointer; }
 
 .grid-2-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .grid-3-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+.equip-cfg-notice {
+    display: flex; align-items: flex-start; gap: 8px;
+    background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--r-md, 8px);
+    padding: .65rem .85rem; font-size: .78rem; color: #1e40af; line-height: 1.5;
+}
+.equip-cfg-notice i { font-size: 1rem; flex-shrink: 0; color: var(--blue); margin-top: 1px; }
 .grid-peripherals { display: grid; grid-template-columns: 1fr; gap: 1rem; }
 .full-width { grid-column: span 2; }
 
@@ -1482,10 +1856,10 @@ select { appearance: none; cursor: pointer; }
 
 /* ── Botão Filtros e Painel ── */
 .btn-filter-toggle {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 7px 14px; border-radius: var(--r);
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: .35rem .65rem; border-radius: var(--r);
     border: 1.5px solid var(--border-2); background: var(--surface);
-    color: var(--text-mid); font-size: .85rem; font-weight: 600;
+    color: var(--text-mid); font-size: 1rem; font-weight: 600;
     cursor: pointer; transition: all .15s; font-family: inherit;
 }
 .btn-filter-toggle:hover,
@@ -1547,11 +1921,139 @@ select { appearance: none; cursor: pointer; }
 /* ── 4 Cards de Equipamentos em Configurações ── */
 .equip-config-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(4, 1fr);
     gap: 14px;
     margin-bottom: 14px;
 }
+@media (max-width: 1100px) { .equip-config-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 600px) { .equip-config-grid { grid-template-columns: 1fr; } }
+
+/* Linhas clicáveis (config) → popup de editar/excluir */
+.ecl-clickable, .manage-list li.ecl-clickable, .equip-config-list li.ecl-clickable { cursor: pointer; }
+.ecl-clickable:hover { background: var(--surface-2, #f0f6ff); }
+.ecl-caret { color: var(--text-muted, #94a3b8); font-size: .85rem; flex-shrink: 0; }
+.inv-ra-overlay {
+  position: fixed; inset: 0; z-index: 5000;
+  background: rgba(6,15,30,.45); display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .12s ease;
+}
+.inv-ra-card {
+  background: #fff; border-radius: 14px; padding: 16px; min-width: 260px; max-width: 90vw;
+  box-shadow: 0 20px 50px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 8px;
+}
+.inv-ra-name { font-weight: 700; font-size: .95rem; color: #0f1e35; margin-bottom: 6px; word-break: break-word; }
+.inv-ra-btn {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 9px;
+  background: #f8fafc; color: #1a2d44; font-size: .88rem; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: all .14s;
+}
+.inv-ra-btn i { font-size: 1.05rem; }
+.inv-ra-btn:hover { background: #eef4ff; border-color: #60a5fa; }
+.inv-ra-btn.del { color: #d94040; }
+.inv-ra-btn.del:hover { background: #fff0f0; border-color: rgba(217,64,64,.4); }
+.md-list.hidden { display: none; }
+
+/* Card único: Informações dos Equipamentos (master categorias + detalhe) */
+.cfg-eq-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; padding: 1.25rem; align-items: start; }
+@media (max-width: 1000px) { .cfg-eq-layout { grid-template-columns: 1fr; } }
+.cfg-eq-master { border-right: 1px solid var(--border, #e2e8f0); padding-right: 18px; }
+@media (max-width: 1000px) { .cfg-eq-master { border-right: none; padding-right: 0; border-bottom: 1px solid var(--border, #e2e8f0); padding-bottom: 14px; } }
+.cfg-eq-detail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 900px) { .cfg-eq-detail { grid-template-columns: 1fr; } }
+.cfg-eq-coltitle { display: flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #64748b; margin-bottom: 8px; }
+.cfg-eq-coltitle i { font-size: .95rem; color: var(--blue, #3a7ee8); }
+
+/* Card único: Modelos e Templates (master tipos + detalhe) */
+.cfg-md-layout { display: grid; grid-template-columns: 220px 1fr; gap: 20px; padding: 1.25rem; align-items: start; }
+@media (max-width: 900px) { .cfg-md-layout { grid-template-columns: 1fr; } }
+.cfg-md-master { display: flex; flex-direction: column; gap: 5px; }
+.cfg-md-tab { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px 12px; border: 1px solid var(--border, #e2e8f0); border-radius: 9px; background: #f8fafc; color: #1a2d44; font-size: .85rem; font-weight: 600; cursor: pointer; text-align: left; font-family: inherit; transition: all .14s; }
+.cfg-md-tab i { font-size: 1.05rem; }
+.cfg-md-tab:hover { background: #eef4ff; border-color: #60a5fa; }
+.cfg-md-tab.active { background: linear-gradient(90deg, var(--navy, #16233d), var(--navy-mid, #1e2f4d)); color: #fff; border-color: transparent; }
+.cfg-md-detail { min-height: 120px; }
+.cfg-md-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.cfg-md-detail-head span { font-size: .95rem; font-weight: 700; color: #0f1e35; }
+/* Botão adicionar dentro do header azul do card, à direita */
+.cfg-md-fab-header {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.3);
+  cursor: pointer; transition: all .15s;
+}
+.cfg-md-fab-header i { font-size: 1rem; }
+.cfg-md-fab-header:hover { background: rgba(255,255,255,.3); transform: scale(1.06); }
+
+/* Modelos e Templates + Informações dos Equipamentos lado a lado */
+.cfg-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: stretch; margin-bottom: 1.5rem; }
+@media (max-width: 1050px) { .cfg-two-col { grid-template-columns: 1fr; } }
+.cfg-two-col .config-section { margin-bottom: 0; display: flex; flex-direction: column; }
+.cfg-two-col #settings-main-view,
+.cfg-two-col .cfg-eq-single { flex: 1; display: flex; flex-direction: column; }
+.cfg-two-col .cfg-md-layout { flex: 1; }
+.cfg-eq-single { padding: 1.25rem; }
+.cfg-eq-hint { font-size: .75rem; color: var(--text-muted, #94a3b8); margin-bottom: 10px; line-height: 1.4; }
+.cfg-eq-single .equip-config-list { flex: 1; max-height: none; }
+
+/* Modal informações da categoria — visual mais cuidado */
+#cat-info-modal .modal-content { max-width: 1080px; }
+.cat-info-actions {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-top: 20px; padding-top: 16px;
+    border-top: 1px solid var(--border, #e2e8f0);
+}
+.cat-info-actions .btn-small { display: inline-flex; align-items: center; gap: 6px; font-size: .82rem; padding: 8px 14px; }
+.cat-info-actions .btn-small.red { color: #d94040; border-color: rgba(217,64,64,.35); }
+.cat-info-actions .btn-small.red:hover { background: #fff0f0; }
+#cat-info-modal .cfg-eq-hint { margin-bottom: 18px; font-size: .8rem; }
+#cat-info-modal .cfg-eq-detail { grid-template-columns: repeat(3, 1fr); gap: 18px; }
+@media (max-width: 860px) { #cat-info-modal .cfg-eq-detail { grid-template-columns: 1fr; } }
+
+/* Cada bloco (Tipo/Fabricante/Fornecedor) vira um cartão coeso, altura FIXA e
+   igual entre os 3 — a barra de adicionar fica sempre presa embaixo, e a
+   lista rola por dentro quando os itens não cabem. */
+#cat-info-modal .cfg-eq-block {
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: var(--r-lg, 12px);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.06));
+    display: flex;
+    flex-direction: column;
+    height: 360px;
+}
+#cat-info-modal .cfg-eq-coltitle {
+    flex-shrink: 0;
+    margin-bottom: 0;
+    padding: 11px 16px;
+    background: var(--surface-2, #f8fafc);
+    border-bottom: 1px solid var(--border, #e2e8f0);
+    font-size: .76rem;
+}
+#cat-info-modal .cfg-eq-coltitle i { font-size: 1.05rem; }
+
+/* Itens da lista — maiores e mais legíveis, sejam os já cadastrados ou os próximos */
+#cat-info-modal .equip-config-list {
+    flex: 1; min-height: 0; max-height: none;
+    padding: 6px 16px; overflow-y: auto;
+}
+#cat-info-modal .equip-config-list li { font-size: .92rem; padding: 9px 2px; }
+#cat-info-modal .equip-config-list .ecl-empty { font-size: .84rem; padding: 16px 0; }
+
+/* Barra de adicionar — fixa embaixo do cartão, botão "+" quadrado do tamanho do input */
+#cat-info-modal .equip-config-add {
+    flex-shrink: 0;
+    padding: 12px 16px;
+    background: var(--surface-2, #f8fafc);
+    border-top: 1px solid var(--border, #e2e8f0);
+}
+#cat-info-modal .equip-config-add .input-field { height: 38px; font-size: .86rem; }
+#cat-info-modal .equip-config-add .btn-primary {
+    width: 38px; height: 38px; padding: 0;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
 
 .equip-config-card {
     background: var(--surface);
@@ -1610,6 +2112,7 @@ select { appearance: none; cursor: pointer; }
     width: 10px; height: 10px; border-radius: 50%;
     border: 2px solid var(--surface);
 }
+.equip-status-dot.dot-disp    { background: #3b82f6; box-shadow: 0 0 6px #3b82f688; }
 .equip-status-dot.dot-uso     { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
 .equip-status-dot.dot-manut   { background: #f59e0b; box-shadow: 0 0 6px #f59e0b88; }
 .equip-status-dot.dot-inativo { background: #ef4444; box-shadow: 0 0 6px #ef444488; }
@@ -1717,6 +2220,42 @@ select { appearance: none; cursor: pointer; }
    MISC
    ============================================================ */
 .no-select { user-select: none; -webkit-user-select: none; cursor: default; margin-right: 4px; }
+.acc-val { user-select: text; }
+
+/* Acessos: fonte um pouco maior nas células da tabela */
+#access-categories-container td { font-size: .92rem; }
+
+/* Badge "Função" — destaque azul claro */
+.acc-funcao-badge {
+  display: block; width: fit-content; margin-top: 4px;
+  background: #eff6ff; color: #1e40af;
+  border: 1px solid #bfdbfe; border-radius: 100px;
+  padding: 2px 9px; font-size: .78rem; font-weight: 600;
+}
+
+/* Ícone "i" (Ações) — mostra pra que serve o acesso ao passar o mouse ou clicar */
+.acc-info-btn {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  background: #eff6ff; color: var(--blue);
+  border: 1px solid #bfdbfe; cursor: pointer; font-size: .72rem; font-weight: 800;
+}
+.acc-info-btn:hover { background: var(--blue); color: #fff; }
+.acc-info-tip {
+  display: none;
+  position: absolute; bottom: calc(100% + 8px); right: -6px;
+  background: #1e293b; color: #fff; font-size: .76rem; line-height: 1.45;
+  padding: 8px 10px; border-radius: 8px; width: max-content; max-width: 240px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.28); z-index: 60; text-align: left;
+  white-space: normal; font-weight: 400;
+}
+.acc-info-tip::after {
+  content: ''; position: absolute; top: 100%; right: 10px;
+  border: 5px solid transparent; border-top-color: #1e293b;
+}
+.acc-info-btn:hover .acc-info-tip,
+.acc-info-btn.open .acc-info-tip { display: block; }
 /* ══════════════════════════════════════════════
    ANIMAÇÃO E REGRAS DE COLAPSO DA SIDEBAR
    ══════════════════════════════════════════════ */
@@ -1839,9 +2378,12 @@ main.main-expanded {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.75rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid var(--border);
+  background: #fff;
+  height: 89px; box-sizing: border-box;
+  margin: -28px -32px 1.5rem;
+  padding: 0 32px;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 10px rgba(15,30,53,.04);
 }
 .config-page-header .view-title h2 {
   font-size: 1.375rem;
@@ -1866,10 +2408,12 @@ main.main-expanded {
 .config-section-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   padding: .875rem 1.25rem;
   background: linear-gradient(90deg, var(--navy) 0%, var(--navy-mid) 100%);
 }
+.config-section-header h4 { flex: 1; }
 .config-section-header i { font-size: 1.1rem; color: rgba(255,255,255,.8); }
 .config-section-header h4 {
   margin: 0;

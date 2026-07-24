@@ -1858,120 +1858,123 @@ function gerarRelatorio() {
     const avalNao  = Math.max(0, avalEnv - avalResp);
     const c        = p.canais || { whatsapp:0, instagram:0, outros:0 };
 
-    const atendentesHtml = (p.atendentes || []).map((at, i) => `
-        <tr>
-            <td>${i+1}</td>
-            <td>${escHtml(at.nome)}</td>
-            <td>${fNum(at.atendimentos)}</td>
-            <td>${fAval(at.avaliacao)}</td>
-            <td>${fNum(at.avalEnviadas || 0)}</td>
-            <td>${fNum(at.avalRespondidas || 0)}</td>
-        </tr>`).join('');
-
-    const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>Relatório LAMIC — ${escHtml(p.nome)}</title>
-<style>
-    body { font-family: 'Segoe UI', sans-serif; margin: 32px; color: #1e293b; font-size: 13px; }
-    h1 { font-size: 20px; color: #060f1e; border-bottom: 2px solid #2563eb; padding-bottom: 8px; margin-bottom: 4px; }
-    h2 { font-size: 13px; color: #64748b; font-weight: 400; margin-bottom: 20px; }
-    h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #475569; margin: 20px 0 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-    th { background: #060f1e; color: #fff; padding: 7px 10px; text-align: left; font-size: 11px; letter-spacing: 0.04em; }
-    td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
-    tr:last-child td { border-bottom: none; }
-    .kpi-row { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
-    .kpi { background: #f1f5f9; border-radius: 8px; padding: 12px 16px; flex: 1; min-width: 130px; border-top: 3px solid #2563eb; }
-    .kpi-l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; }
-    .kpi-v { font-size: 20px; font-weight: 800; color: #1e293b; margin-top: 4px; }
-    .footer { margin-top: 32px; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
-    @media print { button { display: none; } }
-</style>
-</head>
-<body>
-    <h1>Relatório de Atendimento — ${escHtml(p.nome)}</h1>
-    <h2>Gerado em ${data} | LAMIC</h2>
-
-    <h3>Indicadores Gerais</h3>
-    <div class="kpi-row">
-        <div class="kpi" style="border-top-color:#2563eb;"><div class="kpi-l">Total Atendimentos</div><div class="kpi-v">${fNum(p.total)}</div></div>
-        <div class="kpi" style="border-top-color:#d97706;"><div class="kpi-l">Atendimentos em Aberto</div><div class="kpi-v">${fNum(emAberto)}</div></div>
-        <div class="kpi" style="border-top-color:#059669;"><div class="kpi-l">Avaliação Média</div><div class="kpi-v">${fAval(p.avaliacao)}</div></div>
-        <div class="kpi" style="border-top-color:#8b5cf6;"><div class="kpi-l">Eficiência (msgs/atend.)</div><div class="kpi-v">${ef.hasData ? fNum(ef.index, 1) : '—'}</div></div>
-    </div>
-
-    <h3>Status dos Clientes</h3>
-    <table>
-        <tr><th>Situação</th><th>Quantidade</th></tr>
-        <tr><td>Resolvidos (finalizados)</td><td>${fNum(p.concluidos)}</td></tr>
-        <tr><td>Silenciosos (não responderam)</td><td>${fNum(p.silenciosos)}</td></tr>
-        <tr><td>Em andamento (status Aberto)</td><td>${fNum(emAberto)}</td></tr>
-        <tr><td>Cliente encerrou (fila vazia, sem usuário)</td><td>${fNum(p.clienteEncerrou || 0)}</td></tr>
-    </table>
-
-    <h3>Resposta às Avaliações</h3>
-    <table>
-        <tr><th>Indicador</th><th>Valor</th></tr>
-        <tr><td>Avaliações enviadas</td><td>${fNum(avalEnv)}</td></tr>
-        <tr><td>Respondida</td><td>${fNum(avalResp)}</td></tr>
-        <tr><td>Avaliação não respondida</td><td>${fNum(avalNao)}</td></tr>
-        <tr><td>Taxa de resposta</td><td>${avalEnv ? Math.round(avalResp/avalEnv*100) : 0}%</td></tr>
-        <tr><td>Total de Mensagens</td><td>${fNum(p.mensagens)}</td></tr>
-    </table>
-
-    <h3>Volume por Canal (Conexão)</h3>
-    <table>
-        <tr><th>Canal</th><th>Atendimentos</th></tr>
-        <tr><td>WhatsApp</td><td>${fNum(c.whatsapp || 0)}</td></tr>
-        <tr><td>Instagram</td><td>${fNum(c.instagram || 0)}</td></tr>
-        <tr><td>Outros</td><td>${fNum(c.outros || 0)}</td></tr>
-    </table>
-
-    <h3>Por Que Buscam o LAMIC</h3>
-    <table>
-        <tr><th>Motivo</th><th>Quantidade</th></tr>
-        <tr><td>Resultados de Exames</td><td>${fNum(p.resultados)}</td></tr>
-        <tr><td>Coleta Domiciliar</td><td>${fNum(p.coleta)}</td></tr>
-        <tr><td>Falar com Atendente</td><td>${fNum(p.atendente)}</td></tr>
-        <tr><td>Informações Gerais</td><td>${fNum(p.info)}</td></tr>
-        <tr><td>Orçamentos</td><td>${fNum(p.orcamentos)}</td></tr>
-        <tr><td>Reclamações</td><td>${fNum(p.reclamacoes)}</td></tr>
-        <tr><td>Vacinas</td><td>${fNum(p.vacinas)}</td></tr>
-    </table>
-
-    <h3>Fluxo por Dia da Semana</h3>
-    <table>
-        <tr><th>Dia</th><th>Atendimentos</th></tr>
-        ${Object.entries(p.dias || {}).map(([d,v]) => `<tr><td>${d}</td><td>${fNum(v)}</td></tr>`).join('')}
-    </table>
-
-    <h3>Fluxo por Horário</h3>
-    <table>
-        <tr><th>Horário</th><th>Atendimentos</th></tr>
-        ${Object.entries(p.horarios || {}).map(([h,v]) => `<tr><td>${h.replace('-','h–')}h</td><td>${fNum(v)}</td></tr>`).join('')}
-    </table>
-
-    ${p.atendentes?.length ? `
-    <h3>Desempenho por Atendente</h3>
-    <table>
-        <tr><th>#</th><th>Nome</th><th>Atendimentos</th><th>Avaliação</th><th>Aval. enviadas</th><th>Respondidas</th></tr>
-        ${atendentesHtml}
-    </table>` : ''}
-
-    <div class="footer">LAMIC — Dashboard de Atendimento &nbsp;|&nbsp; Relatório gerado automaticamente em ${data}</div>
-    <br>
-    <button onclick="window.print()">🖨 Imprimir</button>
-</body>
-</html>`;
-
-    const win = window.open('', '_blank', 'width=900,height=700');
-    if (win) {
-        win.document.write(html);
-        win.document.close();
-        setTimeout(() => win.focus(), 300);
+    const sections = [
+        { heading: 'Indicadores Gerais', headers: ['Indicador', 'Valor'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+          rows: [
+            ['Total de Atendimentos', fNum(p.total)],
+            ['Atendimentos em Aberto', fNum(emAberto)],
+            ['Avaliação Média', fAval(p.avaliacao)],
+            ['Eficiência (msgs/atend.)', ef.hasData ? fNum(ef.index, 1) : '—'],
+          ] },
+        { heading: 'Status dos Clientes', headers: ['Situação', 'Quantidade'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+          rows: [
+            ['Resolvidos (finalizados)', fNum(p.concluidos)],
+            ['Silenciosos (não responderam)', fNum(p.silenciosos)],
+            ['Em andamento (status Aberto)', fNum(emAberto)],
+            ['Cliente encerrou (fila vazia, sem usuário)', fNum(p.clienteEncerrou || 0)],
+          ] },
+        { heading: 'Resposta às Avaliações', headers: ['Indicador', 'Valor'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+          rows: [
+            ['Avaliações enviadas', fNum(avalEnv)],
+            ['Respondida', fNum(avalResp)],
+            ['Avaliação não respondida', fNum(avalNao)],
+            ['Taxa de resposta', (avalEnv ? Math.round(avalResp / avalEnv * 100) : 0) + '%'],
+            ['Total de Mensagens', fNum(p.mensagens)],
+          ] },
+        { heading: 'Volume por Canal (Conexão)', headers: ['Canal', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+          rows: [
+            ['WhatsApp', fNum(c.whatsapp || 0)],
+            ['Instagram', fNum(c.instagram || 0)],
+            ['Outros', fNum(c.outros || 0)],
+          ] },
+        { heading: 'Por Que Buscam o LAMIC', headers: ['Motivo', 'Quantidade'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+          rows: [
+            ['Resultados de Exames', fNum(p.resultados)],
+            ['Coleta Domiciliar', fNum(p.coleta)],
+            ['Falar com Atendente', fNum(p.atendente)],
+            ['Informações Gerais', fNum(p.info)],
+            ['Orçamentos', fNum(p.orcamentos)],
+            ['Reclamações', fNum(p.reclamacoes)],
+            ['Vacinas', fNum(p.vacinas)],
+          ] },
+        { heading: 'Fluxo por Dia da Semana', headers: ['Dia', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+          rows: Object.entries(p.dias || {}).map(([d, v]) => [d, fNum(v)]) },
+        { heading: 'Fluxo por Horário', headers: ['Horário', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+          rows: Object.entries(p.horarios || {}).map(([h, v]) => [String(h).replace('-', 'h–') + 'h', fNum(v)]) },
+    ];
+    if (p.atendentes?.length) {
+        sections.push({
+            heading: 'Desempenho por Atendente',
+            headers: ['#', 'Nome', 'Atend.', 'Avaliação', 'Aval. env.', 'Respond.'],
+            cols: [{ w: .06 }, { w: .38 }, { w: .14, align: 'right' }, { w: .16, align: 'right' }, { w: .13, align: 'right' }, { w: .13, align: 'right' }],
+            rows: p.atendentes.map((at, i) => [String(i + 1), at.nome, fNum(at.atendimentos), fAval(at.avaliacao), fNum(at.avalEnviadas || 0), fNum(at.avalRespondidas || 0)])
+        });
     }
+
+    gerarPdfSimples({
+        filename: `Relatorio-${String(p.nome || 'LAMIC').replace(/[^\w-]+/g, '_')}.pdf`,
+        title: `Relatório de Atendimento — ${p.nome}`,
+        subtitle: `Gerado em ${data} | LAMIC`,
+        sections
+    });
+}
+
+// PDF simples (jsPDF) com download direto — mesmo formato do dashboard
+function gerarPdfSimples({ filename, title, subtitle, sections }) {
+    const J = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (!J) { alert('Biblioteca de PDF não carregada. Recarregue a página (Ctrl+F5).'); return; }
+    const pdf = new J({ unit: 'pt', format: 'a4' });
+    const W = pdf.internal.pageSize.getWidth();
+    const H = pdf.internal.pageSize.getHeight();
+    const M = 40, CW = W - M * 2, BOT = H - M, LH = 11, PADV = 6;
+    let y = M + 8;
+    const brk = () => { pdf.addPage(); y = M + 8; };
+
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15); pdf.setTextColor(15, 30, 53);
+    pdf.splitTextToSize(title, CW).forEach(l => { pdf.text(l, M, y); y += 18; });
+    if (subtitle) {
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(110, 128, 160);
+        pdf.splitTextToSize(subtitle, CW).forEach(l => { pdf.text(l, M, y); y += 11; });
+    }
+    y += 4;
+    pdf.setDrawColor(37, 99, 235); pdf.setLineWidth(1.2); pdf.line(M, y, W - M, y); y += 18;
+
+    sections.forEach(sec => {
+        if (y + 42 > BOT) brk();
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor(71, 85, 105);
+        pdf.text(String(sec.heading).toUpperCase(), M, y); y += 6;
+        pdf.setDrawColor(226, 232, 240); pdf.setLineWidth(0.6); pdf.line(M, y, W - M, y); y += 14;
+
+        const cols = sec.cols, widths = cols.map(c => c.w * CW), xs = [];
+        let acc = M; cols.forEach((c, i) => { xs.push(acc); acc += widths[i]; });
+        const cx = (i, align) => align === 'right' ? xs[i] + widths[i] - 5 : xs[i] + 5;
+
+        if (sec.headers) {
+            if (y + 16 > BOT) brk();
+            pdf.setFillColor(6, 15, 30); pdf.rect(M, y - 9, CW, 15, 'F');
+            pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(255, 255, 255);
+            sec.headers.forEach((h, i) => pdf.text(String(h), cx(i, cols[i].align), y + 1, { align: cols[i].align || 'left' }));
+            y += 16;
+        }
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9);
+        const rws = (sec.rows && sec.rows.length) ? sec.rows : [['— sem dados —']];
+        rws.forEach(row => {
+            const cellLines = row.map((cell, i) => pdf.splitTextToSize(String(cell ?? ''), (widths[i] || CW) - 10));
+            const nL = Math.max(1, ...cellLines.map(l => l.length));
+            const rowH = nL * LH + PADV;
+            if (y + rowH > BOT) brk();
+            pdf.setTextColor(30, 41, 59);
+            cellLines.forEach((lines, i) => {
+                const align = (cols[i] || cols[0]).align || 'left';
+                lines.forEach((ln, k) => pdf.text(ln, cx(i, align), y + k * LH, { align }));
+            });
+            y += rowH;
+            pdf.setDrawColor(238, 242, 248); pdf.setLineWidth(0.4); pdf.line(M, y - PADV + 2, W - M, y - PADV + 2);
+        });
+        y += 12;
+    });
+
+    pdf.save(filename);
 }
 
 // ============================================================
