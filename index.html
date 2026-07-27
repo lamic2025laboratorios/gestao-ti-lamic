@@ -481,7 +481,7 @@
 
         <!-- KPI Detail Modal -->
         <div id="kpi-list-modal" class="modal-overlay hidden">
-          <div class="modal-card" style="max-width:800px">
+          <div class="modal-card" style="max-width:1200px">
             <div class="modal-header">
               <h3 id="kpi-list-title">Pedidos</h3>
               <button class="modal-close" onclick="document.getElementById('kpi-list-modal').classList.add('hidden')">
@@ -960,7 +960,7 @@
             <p class="tab-subtitle">Controle itens disponíveis para retirada nas solicitações</p>
           </div>
           <div style="display:flex;gap:8px">
-            <button class="btn-primary" onclick="App.openEstoqueForm()">
+            <button class="btn-primary" onclick="App.escolherTipoEstoque()">
               <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:4px"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               Novo Item
             </button>
@@ -1182,6 +1182,31 @@
       </div>
 
       <!-- Modal: Novo/Editar Item de Estoque -->
+      <!-- ── MODAL: escolher tipo (Nova compra x Nova entrada) ── -->
+      <div id="estoque-tipo-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:460px">
+          <div class="modal-header">
+            <h3>Adicionar ao Estoque</h3>
+            <button class="modal-close" onclick="document.getElementById('estoque-tipo-modal').classList.add('hidden')">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p style="color:var(--ink-500);margin-bottom:14px">O que você está adicionando?</p>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <button type="button" class="estoque-tipo-opt" onclick="App.openEstoqueForm(null,'compra')">
+                <span class="estoque-tipo-ico" style="background:#dbeafe;color:#1d4ed8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
+                <span class="estoque-tipo-txt"><strong>Nova compra</strong><small>Produto comprado — entra no total gasto do dashboard.</small></span>
+              </button>
+              <button type="button" class="estoque-tipo-opt" onclick="App.openEstoqueForm(null,'entrada')">
+                <span class="estoque-tipo-ico" style="background:#dcfce7;color:#059669"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg></span>
+                <span class="estoque-tipo-txt"><strong>Nova entrada</strong><small>Item que já existe fisicamente (não foi comprado) — NÃO conta como gasto.</small></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="estoque-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:620px">
           <div class="modal-header">
@@ -1215,7 +1240,7 @@
               <datalist id="estoque-produto-list"></datalist>
             </div>
             <div class="form-row-2" style="margin-top:10px">
-              <div class="form-group">
+              <div class="form-group estoque-money">
                 <label class="form-label">Fornecedor</label>
                 <select id="estoque-fornecedor" class="input-field select-styled">
                   <option value="">— Selecione —</option>
@@ -1234,7 +1259,7 @@
                     <option value="">— Selecione —</option>
                   </select>
                 </div>
-                <div class="form-group">
+                <div class="form-group estoque-money">
                   <label class="form-label">Valor unitário (R$) *</label>
                   <input type="number" id="estoque-valor" class="input-field" min="0" step="0.01" placeholder="0,00" oninput="App.calcEstoqueValorTotal()">
                 </div>
@@ -1244,12 +1269,12 @@
                   <label class="form-label">Nome do solicitante</label>
                   <input type="text" id="estoque-solicitante" class="input-field" placeholder="Nome de quem solicitou">
                 </div>
-                <div class="form-group">
+                <div class="form-group estoque-money">
                   <label class="form-label">Valor total</label>
                   <input type="text" id="estoque-valor-total" class="input-field" readonly style="background:#f8fafc;font-weight:600;color:#1a7a4a">
                 </div>
               </div>
-              <div class="form-row-2" style="margin-top:10px;align-items:flex-end">
+              <div class="form-row-2 estoque-money" style="margin-top:10px;align-items:flex-end">
                 <div class="form-group">
                   <label class="form-label">Forma de Pagamento</label>
                   <select id="estoque-forma-pagamento" class="input-field select-styled">
@@ -1301,21 +1326,26 @@
             <div class="modal-body">
               <div class="compra-step1-header">
                 <span style="font-size:.85rem;font-weight:600;color:#1a3a6b">Selecione as solicitações para esta compra</span>
-                <button class="btn-ghost" id="btn-toggle-compradas" onclick="App.toggleCompradasVisiveis()" style="font-size:.76rem;padding:3px 10px">Mostrar Compradas</button>
+                <select id="compra-sort" class="input-field select-styled" onchange="App.renderCompraReqList()" style="max-width:170px;font-size:.78rem;padding:4px 8px">
+                  <option value="recente">Mais recente</option>
+                  <option value="antiga">Mais antiga</option>
+                  <option value="sl">Código SL</option>
+                </select>
               </div>
-              <input type="text" id="compra-search" class="req-search-input" placeholder="Buscar por #, unidade, grupo..." oninput="App.renderCompraReqList()" style="max-width:100%;margin-bottom:8px">
+              <input type="text" id="compra-search" class="req-search-input" placeholder="Buscar por SL, unidade, grupo..." oninput="App.renderCompraReqList()" style="max-width:100%;margin-bottom:8px">
               <div id="compra-req-list" class="compra-req-list"></div>
               <div id="compra-sel-count" style="font-size:.76rem;color:#6680a0;margin-top:6px;text-align:right"></div>
             </div>
             <div class="modal-footer">
               <button class="btn-ghost" onclick="App.closeCompraModal()">Cancelar</button>
-              <button class="btn-primary" id="btn-compra-prosseguir" onclick="App.compraStep2()" disabled>Prosseguir →</button>
+              <button class="btn-primary" id="btn-compra-prosseguir" onclick="App.compraStep2()" title="Prosseguir" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
             </div>
           </div>
 
           <!-- PASSO 2: Dados da compra -->
           <div id="compra-step-2" class="hidden">
             <div class="modal-body" style="max-height:72vh;overflow-y:auto;padding-right:6px">
+              <div id="compra-autz-info"></div>
               <div class="form-row-2">
                 <div class="form-group">
                   <label class="form-label">Fornecedor</label>
@@ -1362,6 +1392,7 @@
             </div>
             <div class="modal-footer">
               <button class="btn-ghost" id="btn-compra-voltar" onclick="App.compraBackStep1()">← Voltar</button>
+              <button class="btn-ghost" id="btn-compra-descombinar" onclick="App.descombinarCompra()" style="display:none;color:#dc2626;border-color:#fecaca">Descombinar</button>
               <button class="btn-primary" id="btn-salvar-compra" onclick="App.saveCompraCombinada()">Registrar Compra</button>
             </div>
           </div>
@@ -1545,9 +1576,8 @@
             <input type="text" id="req-live-search" class="req-search-input" placeholder="Buscar por unidade, grupo, status, fornecedor, resumo..." oninput="App.renderRequests()" />
           </div>
           <div class="filter-popover-wrap">
-            <button class="btn-filter-toggle labeled" id="btn-req-conf-toggle" onclick="App.toggleReqConfPopover(event)" title="Configurações">
+            <button class="btn-filter-toggle" id="btn-req-conf-toggle" onclick="App.toggleReqConfPopover(event)" title="Configurações">
               <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.66 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2.5a2 2 0 010-4h.09A1.65 1.65 0 004.6 8.66a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5"/></svg>
-              <span>Conf</span>
             </button>
             <div class="filter-popover" id="req-conf-popover">
               <div class="filter-popover-row">
@@ -1555,6 +1585,9 @@
               </div>
               <div class="filter-popover-row">
                 <button id="btn-compra-combinada" class="btn-secondary" onclick="App.openCompraModal()" title="Comprar vários pedidos juntos (parcelado ou à vista)">Compra combinada</button>
+              </div>
+              <div class="filter-popover-row">
+                <button id="btn-autorizar-compra" class="btn-secondary" onclick="App.abrirAutorizarCompra()" title="Pedir autorização de várias solicitações de uma vez">Autorizar compra</button>
               </div>
             </div>
           </div>
@@ -1796,7 +1829,7 @@
               </div>
               <div class="codigos-toolbar">
                 <input type="text" id="codigos-lotes-search" class="codigos-search" placeholder="Buscar lote, produto..." oninput="App.renderCodigosTab()">
-                <button class="btn-add codigos-add" onclick="App.openEstoqueForm()" title="Cadastrar entrada de estoque">+ Entrada</button>
+                <button class="btn-add codigos-add" onclick="App.escolherTipoEstoque()" title="Cadastrar entrada de estoque">+ Entrada</button>
               </div>
               <div id="codigos-lotes-list" class="codigos-list"></div>
             </div>
@@ -2236,6 +2269,59 @@
       <label class="form-label">Escolha o gestor</label>
       <div id="autz-send-gestores" class="autz-gestores-box"></div>
       <a id="autz-enviar-btn" class="btn-primary autz-enviar-btn is-disabled" href="#">Escolha um gestor</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: autorizar compra em LOTE (várias solicitações) ══ -->
+<div id="autz-lote-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:560px">
+    <div class="modal-header">
+      <h3 id="autz-lote-title">Autorizar compra — Solicitações</h3>
+      <button class="modal-close" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')">✕</button>
+    </div>
+
+    <!-- PASSO 1: escolher solicitações -->
+    <div id="autz-lote-step1">
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <p style="color:var(--ink-500);margin-bottom:8px">Escolha as solicitações (status Solicitado) que vão pedir autorização juntas.</p>
+        <input type="text" id="autz-lote-search" class="req-search-input" placeholder="Buscar por SL, unidade, grupo..." oninput="App._autzLoteRenderList()" style="max-width:100%;margin-bottom:8px">
+        <div id="autz-lote-list" class="compra-req-list"></div>
+        <div id="autz-lote-sel-count" style="font-size:.76rem;color:#6680a0;margin-top:6px;text-align:right"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')">Cancelar</button>
+        <button class="btn-primary" id="autz-lote-next1" onclick="App._autzLoteStep2()" title="Próximo" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
+
+    <!-- PASSO 2: valor + quantidade por item -->
+    <div id="autz-lote-step2" class="hidden">
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <p style="color:var(--ink-500);margin-bottom:10px">Informe o valor de cada item. A quantidade vem do sistema — clique no cadeado para editar.</p>
+        <div id="autz-lote-itens"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="App._autzLoteBackStep1()">← Voltar</button>
+        <button class="btn-primary" onclick="App._autzLoteStep3()" title="Próximo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
+
+    <!-- PASSO 3: gestor + envio -->
+    <div id="autz-lote-step3" class="hidden">
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <label class="form-label">Abrir WhatsApp no</label>
+        <div class="autz-mode-row" style="display:flex;gap:8px;margin-bottom:12px">
+          <button id="autz-lote-mode-app" class="autz-mode-btn" onclick="App._autzLoteSetMode('app')" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> App</button>
+          <button id="autz-lote-mode-web" class="autz-mode-btn" onclick="App._autzLoteSetMode('web')" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Web</button>
+        </div>
+        <label class="form-label">Escolha o gestor</label>
+        <div id="autz-lote-gestores" class="autz-gestores-box"></div>
+        <a id="autz-lote-enviar" class="btn-primary autz-enviar-btn is-disabled" href="#">Escolha o gestor</a>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="App._autzLoteBackStep2()">← Voltar</button>
+      </div>
     </div>
   </div>
 </div>
