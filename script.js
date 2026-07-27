@@ -301,13 +301,27 @@ const App = {
     });
   },
 
+  // Grupo de conserto (aceita grafia antiga "concerto")
+  _isConserto(name) { const n = (name || '').toLowerCase(); return n.includes('conserto') || n.includes('concerto'); },
+
   buildBatteryPanel(groupId) {
     const opts = (State.subOpts||{})[groupId] || {};
     const gname = (State.groups?.[groupId]||'').toLowerCase();
+    const isConserto = App._isConserto(gname);
     const isBat = gname.includes('pilha')||gname.includes('bateria');
     const modelos = opts.modelos || (isBat ? ["AAA","AA","Bateria de balança 2032","Bateria do cronômetro 1210"] : []);
     const wrap = document.getElementById('battery-models'); wrap.innerHTML = '';
-    if (!modelos.length) { wrap.innerHTML = '<p style="color:var(--gray-500);font-size:.82rem;padding:6px">Nenhum modelo cadastrado. Cadastre em Configurações → Grupos → este grupo → Sub-opções.</p>'; return; }
+    if (!modelos.length) { wrap.innerHTML = `<p style="color:var(--gray-500);font-size:.82rem;padding:6px">Nenhum ${isConserto?'equipamento':'modelo'} cadastrado. Cadastre em Configurações → Grupos → este grupo → Sub-opções.</p>`; return; }
+    // Conserto: escolhe o EQUIPAMENTO consertado — SEM quantidade
+    if (isConserto) {
+      modelos.forEach(m => {
+        const l = document.createElement('label'); l.className = 'check-item';
+        l.innerHTML = `<input type="checkbox" name="bat" value="${m}"/> ${m}`;
+        l.querySelector('input').onchange = () => App.saveRequestForm();
+        wrap.appendChild(l);
+      });
+      return;
+    }
     // Each model has a checkbox + qty field (multiple selection allowed)
     modelos.forEach((m,i) => {
       const safeId = 'bat_'+i;
@@ -514,10 +528,20 @@ const App = {
   _nsolBuildBattery(gid) {
     const opts = (State.subOpts || {})[gid] || {};
     const gname = (State.groups?.[gid]||'').toLowerCase();
+    const isConserto = App._isConserto(gname);
     const isBat = gname.includes('pilha')||gname.includes('bateria');
     const modelos = opts.modelos || (isBat ? ["AAA", "AA", "Bateria de balança 2032", "Bateria do cronômetro 1210"] : []);
     const wrap = document.getElementById('nsol-battery-models'); wrap.innerHTML = '';
-    if (!modelos.length) { wrap.innerHTML = '<p style="color:var(--gray-500);font-size:.82rem;padding:6px">Nenhum modelo cadastrado. Cadastre em Configurações → Grupos → este grupo → Sub-opções.</p>'; return; }
+    if (!modelos.length) { wrap.innerHTML = `<p style="color:var(--gray-500);font-size:.82rem;padding:6px">Nenhum ${isConserto?'equipamento':'modelo'} cadastrado. Cadastre em Configurações → Grupos → este grupo → Sub-opções.</p>`; return; }
+    // Conserto: escolhe o EQUIPAMENTO consertado — SEM quantidade
+    if (isConserto) {
+      modelos.forEach(m => {
+        const l = document.createElement('label'); l.className = 'check-item';
+        l.innerHTML = `<input type="checkbox" name="nsol-bat" value="${m}"/> ${m}`;
+        wrap.appendChild(l);
+      });
+      return;
+    }
     modelos.forEach((m, i) => {
       const sid = 'nsolbat_' + i;
       const div = document.createElement('div'); div.className = 'bat-model-row';
@@ -720,6 +744,7 @@ const App = {
   _compraManageCodigo: null,   // null = criar nova compra; senão = editando compra combinada existente
 
   openCompraModal() {
+    App._closeAllPopovers?.();   // fecha o popover de Conf ao abrir o modal
     App._fromChooser = false;   // default: aberto direto (não do chooser)
     App._compraManageCodigo = null;
     App._compraSelectedIds = new Set();
@@ -731,6 +756,9 @@ const App = {
     document.getElementById('compra-step-1')?.classList.remove('hidden');
     document.getElementById('compra-step-2')?.classList.add('hidden');
     document.getElementById('compra-modal-title').textContent = 'Compra Combinada — Seleção';
+    document.getElementById('btn-compra-descombinar')?.style.setProperty('display', 'none');
+    // Toggle "Mostrar Compradas" não faz mais sentido: só listamos autorizadas.
+    document.getElementById('btn-toggle-compradas')?.style.setProperty('display', 'none');
     App.renderCompraReqList();
     document.getElementById('compra-modal').classList.remove('hidden');
   },
@@ -753,35 +781,36 @@ const App = {
   renderCompraReqList() {
     const box = document.getElementById('compra-req-list'); if (!box) return;
     const termo = (document.getElementById('compra-search')?.value || '').toLowerCase();
-    let reqs = Object.entries(State.requests || {});
-    if (App._compraShowCompradas) {
-      reqs = reqs.filter(([, r]) => r.status === 'Solicitado' || r.status === 'Aguardando' || r.status === 'Comprado');
-    } else {
-      reqs = reqs.filter(([, r]) => r.status === 'Solicitado' || r.status === 'Aguardando');
-    }
-    reqs.sort((a, b) => (parseInt(a[1].seq) || 0) - (parseInt(b[1].seq) || 0));
+    // Só combina COMPRADAS (autorizadas/compradas) ainda NÃO combinadas.
+    // Autorização é feita antes, pelo botão "Autorizar compra".
+    let reqs = Object.entries(State.requests || {})
+      .filter(([, r]) => r.status === 'Comprado' && !r.compraCodigo && !r.origemEstoque);
     if (termo) {
       reqs = reqs.filter(([, r]) =>
-        [r.seq, r.unitName, r.groupName, App.reqSummary(r)].filter(Boolean).join(' ').toLowerCase().includes(termo)
+        [r.seq != null ? 'SL-' + r.seq : '', r.seq, r.unitName, r.groupName, App.reqSummary(r)].filter(Boolean).join(' ').toLowerCase().includes(termo)
       );
     }
+    // Ordenação: mais recente (boughtAt/createdAt desc), mais antiga (asc) ou por SL
+    const sort = document.getElementById('compra-sort')?.value || 'recente';
+    const dataDe = r => (r.boughtAt || r.createdAt || '').substring(0, 10);
+    if (sort === 'sl') reqs.sort((a, b) => (parseInt(a[1].seq) || 0) - (parseInt(b[1].seq) || 0));
+    else if (sort === 'antiga') reqs.sort((a, b) => dataDe(a[1]).localeCompare(dataDe(b[1])) || (parseInt(a[1].seq) || 0) - (parseInt(b[1].seq) || 0));
+    else reqs.sort((a, b) => dataDe(b[1]).localeCompare(dataDe(a[1])) || (parseInt(b[1].seq) || 0) - (parseInt(a[1].seq) || 0));
     if (!reqs.length) {
-      box.innerHTML = '<div class="compra-empty">Nenhuma solicitação encontrada.</div>';
+      box.innerHTML = '<div class="compra-empty">Nenhuma compra disponível para combinar.<br>Só entram aqui solicitações já <strong>compradas</strong> (e ainda não combinadas).</div>';
       App._updateCompraSel();
       return;
     }
     box.innerHTML = reqs.map(([id, r]) => {
       const checked = App._compraSelectedIds.has(id);
-      const isComprada = r.status === 'Comprado';
       return `
-        <div class="compra-req-item ${checked ? 'sel' : ''} ${isComprada ? 'comprada' : ''}">
+        <div class="compra-req-item ${checked ? 'sel' : ''} comprada">
           <input type="checkbox" data-id="${id}" ${checked ? 'checked' : ''} onchange="App.onCompraReqToggle('${id}', this.checked)">
           <span class="req-seq-badge">SL-${r.seq != null ? r.seq : '—'}</span>
           <div class="compra-req-info">
-            <span class="compra-req-unit">${r.unitName || '—'}${isComprada ? ' <span style="font-size:.68rem;color:#059669;font-weight:600">[Comprado]</span>' : ''}</span>
+            <span class="compra-req-unit">${r.unitName || '—'}</span>
             <span class="compra-req-sum">${r.groupName || ''} · ${App.reqSummary(r)}</span>
           </div>
-          ${r.compraCodigo ? `<span class="compra-codigo-tag">${r.compraCodigo}</span>` : ''}
         </div>`;
     }).join('');
     App._updateCompraSel();
@@ -790,9 +819,10 @@ const App = {
   _updateCompraSel() {
     const n = App._compraSelectedIds.size;
     const countEl = document.getElementById('compra-sel-count');
-    if (countEl) countEl.textContent = n > 0 ? `${n} selecionado(s)` : '';
+    if (countEl) countEl.textContent = n > 0 ? `${n} selecionado(s)${n < 2 ? ' — escolha ao menos 2' : ''}` : '';
+    // Combinar exige 2+ (não faz sentido "combinar" 1 só).
     const btn = document.getElementById('btn-compra-prosseguir');
-    if (btn) btn.disabled = n === 0;
+    if (btn) btn.disabled = n < 2;
   },
 
   onCompraReqToggle(id, on) {
@@ -809,6 +839,9 @@ const App = {
     App._compraManageCodigo = null;   // fluxo normal = criar nova compra
     // Restaura UI de criação (modo gestão pode ter alterado)
     document.getElementById('btn-compra-voltar')?.style.setProperty('display', '');
+    document.getElementById('btn-compra-descombinar')?.style.setProperty('display', 'none');
+    const autzBoxNew = document.getElementById('compra-autz-info');
+    if (autzBoxNew) autzBoxNew.innerHTML = '';
     const salvarBtn = document.getElementById('btn-salvar-compra');
     if (salvarBtn) salvarBtn.textContent = 'Registrar Compra';
     const sup = document.getElementById('compra-fornecedor');
@@ -1115,9 +1148,13 @@ const App = {
 
     App.renderCompraStep2Items(ids);
     App.calcCompraStep2Total();
+    // Bloco "Autorizada" acima do Fornecedor (igual às outras solicitações)
+    const autzBox = document.getElementById('compra-autz-info');
+    if (autzBox) autzBox.innerHTML = App._infoAutorizacaoCompra(membros);
 
-    // UI modo gestão: sem "voltar", título e botão próprios
+    // UI modo gestão: sem "voltar", título e botão próprios + Descombinar
     document.getElementById('btn-compra-voltar')?.style.setProperty('display', 'none');
+    document.getElementById('btn-compra-descombinar')?.style.setProperty('display', '');
     const salvarBtn = document.getElementById('btn-salvar-compra');
     if (salvarBtn) salvarBtn.textContent = 'Salvar Alterações';
     document.getElementById('compra-modal-title').textContent = `Gerenciar Compra ${codigo}`;
@@ -1176,10 +1213,14 @@ const App = {
         const entry = Object.entries(State.compras || {}).find(([, c]) => c.codigo === manageCodigo);
         compraId = entry?.[0] || null;
       } else {
-        // CRIAÇÃO: novo código sequencial + node compras
-        const txr = await DB.tx('meta/lastCompra', cur => (cur || 0) + 1);
-        const num = (txr?.snapshot?.val()) || 1;
+        // CRIAÇÃO: reaproveita o MENOR número CMP livre (evita buracos deixados
+        // por descombinar). Considera tanto o node compras quanto os requests.
+        const usados = new Set();
+        Object.values(State.compras || {}).forEach(c => { const nn = parseInt(String(c.codigo || '').replace(/\D/g, '')); if (nn) usados.add(nn); });
+        Object.values(State.requests || {}).forEach(r => { if (r.compraCodigo) { const nn = parseInt(String(r.compraCodigo).replace(/\D/g, '')); if (nn) usados.add(nn); } });
+        let num = 1; while (usados.has(num)) num++;
         codigo = 'CMP-' + String(num).padStart(4, '0');
+        await DB.tx('meta/lastCompra', cur => Math.max(cur || 0, num));   // mantém meta coerente
         const compraRef = DB.push('compras', {
           codigo, fornecedor, boughtAt: data, valorTotal: grandTotal.toFixed(2),
           parcelas: parcelar ? App._buildParcelas(data, n, grandTotal) : null,
@@ -1205,6 +1246,11 @@ const App = {
           solicitante: it.solicitante,
           formaPagamento,
           compraId: compraId || null, compraCodigo: codigo,
+          // Guarda o status anterior p/ o descombinar restaurar (preserva o já gravado).
+          statusAntesCombinada: ((State.requests || {})[it.id]?.statusAntesCombinada) || ((State.requests || {})[it.id]?.status) || 'Comprado',
+          // Mapeamento: quem montou/combinou a compra (admin logado); preserva o já gravado.
+          usuarioResp: ((State.requests || {})[it.id]?.usuarioResp) || State.adminUser || '—',
+          usuarioRespAt: ((State.requests || {})[it.id]?.usuarioRespAt) || new Date().toISOString(),
           parcelas: parcelar ? App._buildParcelas(data, n, parseFloat(it.valorTotal)) : null,
           // Rastreabilidade do Envio: se há data, marca como enviado (assim a data
           // aparece na solicitação — antes ficava 'Não' e a data nunca era exibida).
@@ -1263,6 +1309,93 @@ const App = {
     } finally {
       if (btn) { btn.innerHTML = orig; btn.disabled = false; }
     }
+  },
+
+  // Descombinar: separa os pedidos de uma compra combinada. Cada um continua
+  // COMPRADO (individual) com seu valor, mas perde o código CMP e as parcelas
+  // combinadas. Mantém o gestor que autorizou. Remove o node compras.
+  async descombinarCompra() {
+    const codigo = App._compraManageCodigo;
+    if (!codigo) { toast('Abra o Gerenciar de uma compra para descombinar.', 'error'); return; }
+    const membros = Object.entries(State.requests || {}).filter(([, r]) => r.compraCodigo === codigo);
+    if (!membros.length) { toast('Compra não encontrada.', 'error'); return; }
+    if (!confirm(`Descombinar a compra ${codigo}?\nAs ${membros.length} solicitação(ões) voltam ao status que tinham antes de combinar (sem o código ${codigo} e sem as parcelas combinadas).`)) return;
+
+    const btn = document.getElementById('btn-compra-descombinar');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Descombinando…'; btn.disabled = true; }
+    try {
+      // Restaura o status anterior à combinação (geralmente Comprado) e desagrupa.
+      const ops = membros.map(([id, r]) => DB.update(`requests/${id}`, {
+        compraCodigo: null, compraId: null, parcelas: null,
+        status: r.statusAntesCombinada || 'Comprado', statusAntesCombinada: null
+      }));
+      const entry = Object.entries(State.compras || {}).find(([, c]) => c.codigo === codigo);
+      if (entry) ops.push(DB.remove(`compras/${entry[0]}`));
+      await Promise.all(ops);
+      App._logActivity('Solicitações', `Compra combinada ${codigo} descombinada`, `${membros.length} pedido(s) voltaram a compras individuais`);
+      toast(`✓ ${codigo} descombinada · ${membros.length} pedido(s) individuais.`);
+      App._compraManageCodigo = null;
+      App.closeCompraModal();
+      App.renderRequests(); App.renderDashboard(); App.updatePendingBadge();
+    } catch (e) {
+      console.error('[descombinarCompra] erro', e);
+      toast('Erro ao descombinar.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  // Renumera as compras combinadas pra ficarem contíguas (CMP-0001, CMP-0002…),
+  // fechando lacunas deixadas por descombinar. Atualiza o node compras + os requests.
+  async _renumerarCompras() {
+    const compras = Object.entries(State.compras || {});
+    if (!compras.length) return 0;
+    compras.sort((a, b) => (parseInt(String(a[1].codigo || '').replace(/\D/g, '')) || 0) - (parseInt(String(b[1].codigo || '').replace(/\D/g, '')) || 0));
+    const ops = [];
+    compras.forEach(([compraId, c], idx) => {
+      const novoCod = 'CMP-' + String(idx + 1).padStart(4, '0');
+      if (c.codigo !== novoCod) {
+        ops.push(DB.set(`compras/${compraId}/codigo`, novoCod));
+        Object.entries(State.requests || {}).forEach(([rid, r]) => {
+          if ((r.compraId && r.compraId === compraId) || r.compraCodigo === c.codigo)
+            ops.push(DB.set(`requests/${rid}/compraCodigo`, novoCod));
+        });
+      }
+    });
+    await Promise.all(ops);
+    await DB.tx('meta/lastCompra', () => compras.length);
+    return ops.length;
+  },
+
+  // Correção 1x por sessão: (1) renumera CMP contíguo e (2) preenche a tag de
+  // mapeamento em TODOS os dados concluídos (Comprado, Estoque e combinadas) —
+  // mostra quem autorizou (gestor) ou, se foi feito direto pelo Gerenciar (sem
+  // gestor), o admin logado. Regra idêntica à do _mapTag.
+  _comprasFixOK: false,
+  async _maybeFixCompras() {
+    if (App._comprasFixOK || !State.adminUser) return;
+    if (!Object.keys(State.requests || {}).length) return;   // espera os requests carregarem
+    App._comprasFixOK = true;
+    let mudou = false;
+
+    const compras = Object.values(State.compras || {});
+    const nums = compras.map(c => parseInt(String(c.codigo || '').replace(/\D/g, '')) || 0).sort((a, b) => a - b);
+    const contiguo = nums.length && nums.every((n, i) => n === i + 1);
+    if (compras.length && !contiguo) { await App._renumerarCompras(); mudou = true; }
+
+    // Backfill da tag: concluído (Comprado/Estoque/combinada), sem gestor e sem
+    // responsável → carimba o admin logado (quem fez via Gerenciar). Se tem gestor,
+    // a tag já mostra o gestor — não mexe.
+    const ops = [];
+    Object.entries(State.requests || {}).forEach(([rid, r]) => {
+      const concluido = r.status === 'Comprado' || r.status === 'Estoque' || r.status === 'Negado' || !!r.compraCodigo;
+      if (concluido && !r.gestorNome && (!r.usuarioResp || r.usuarioResp === '—'))
+        ops.push(DB.set(`requests/${rid}/usuarioResp`, State.adminUser));
+    });
+    if (ops.length) { await Promise.all(ops); mudou = true; }
+
+    if (mudou) App.renderRequests();
   },
 
   /* ══ ADMIN ══════════════════════════════════ */
@@ -2833,7 +2966,7 @@ const App = {
   _extratoEventos() {
     const cmpMap = {};
     const eventos = [];
-    Object.values(State.requests || {}).filter(r => r.status === 'Comprado').forEach(r => {
+    Object.values(State.requests || {}).filter(r => r.status === 'Comprado' && !r.entradaSemCusto).forEach(r => {
       const v = parseFloat(r.valorTotal || 0);
       const dt = (r.boughtAt || '').substring(0, 10);
       if (r.compraCodigo) {
@@ -2989,7 +3122,7 @@ const App = {
     const _ku = fUnit;
     const _kg = document.getElementById('dash-filter-group')?.value || '';
     Object.values(State.requests||{})
-      .filter(r => r.status === 'Comprado'
+      .filter(r => r.status === 'Comprado' && !r.entradaSemCusto   // Nova entrada (sem custo) não é gasto
         && (!_ku || r.unitName  === _ku)
         && (!_kg || r.groupName === _kg))
       .forEach(r => {
@@ -3746,13 +3879,29 @@ const App = {
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">${p}</svg>`;
   },
 
+  // Etiqueta de mapeamento na linha: quem autorizou (gestor) ou quem adicionou (admin).
+  _mapTag(r) {
+    if (r.gestorNome)
+      return `<span class="map-tag map-tag-ok" title="Autorizado por ${r.gestorNome}">${App._svg('check')}<span>${r.gestorNome}</span></span>`;
+    if (r.usuarioResp && r.usuarioResp !== '—')
+      return `<span class="map-tag" title="Adicionado por ${r.usuarioResp}">${App._svg('check')}<span>${r.usuarioResp}</span></span>`;
+    return '';
+  },
+
   _reqAcoes(id, r) {
     const S = App._svg;
     const del = `<button class="btn-ico btn-ico-del" onclick="App.confirmDelete('${id}')" title="Apagar">${S('trash')}</button>`;
     if (r.origemEstoque)
       return `<button class="btn-ico" onclick="App.showSolicitacaoView('${id}')" title="Ver (editável na aba Estoque)">${S('eye')}</button>`;
-    if (r.compraCodigo)
-      return `<button class="btn-ico" onclick="App.manageCompra('${r.compraCodigo}')" title="Gerenciar compra combinada ${r.compraCodigo}">${S('pencil')}</button>${del}`;
+    if (r.compraCodigo) {
+      // Combinada mostra o mesmo ícone de autorização (derivado do status) + Gerenciar + Apagar.
+      const stc = r.status || 'Comprado';
+      const tagc = (r.gestorNome ? ` · autorizado por ${r.gestorNome}` : '') + (r.usuarioResp && r.usuarioResp !== '—' ? ` · add: ${r.usuarioResp}` : '');
+      const icoc = stc === 'Negado'
+        ? `<button class="btn-ico btn-ico-neg" onclick="App.manageCompra('${r.compraCodigo}')" title="Negado${tagc}">${S('x')}</button>`
+        : `<button class="btn-ico btn-ico-ok" onclick="App.manageCompra('${r.compraCodigo}')" title="Autorizado / comprado${tagc}">${S('check')}</button>`;
+      return `${icoc}<button class="btn-ico" onclick="App.manageCompra('${r.compraCodigo}')" title="Gerenciar compra combinada ${r.compraCodigo}">${S('pencil')}</button>${del}`;
+    }
 
     // O Gerenciar (lápis) fica em TODAS as solicitações — nem toda precisa de autorização.
     const editar = `<button class="btn-ico" onclick="App.openModal('${id}')" title="Gerenciar / Editar">${S('pencil')}</button>`;
@@ -3776,20 +3925,53 @@ const App = {
 
   // Bloco de destaque de autorização no modal — status + gestor + responsável
   _infoAutorizacao(r) {
-    const st = r.status;
-    const gLabel = r.gestorNome ? `${r.gestorNome}${r.gestorNumero ? ' · ' + App._fmtNumeroDisplay(r.gestorNumero) : ''}` : '';
-    const resp = r.usuarioResp || '';
-    const lg = gLabel ? `<div style="color:var(--ink-900);font-size:.86rem;margin-top:2px">Autorizado pelo gestor: <strong>${gLabel}</strong></div>` : '';
-    const lr = resp ? `<div style="color:var(--ink-900);font-size:.86rem;margin-top:2px">Responsável: <strong>${resp}</strong></div>` : '';
-    const wrap = (cor, bg, bd, ico, titulo, linhas) =>
+    const wrap = (cor, bg, bd, ico, titulo, linha) =>
       `<div style="background:${bg};border:1px solid ${bd};border-left:4px solid ${cor};border-radius:8px;padding:11px 13px;margin-bottom:12px">
          <div style="display:flex;align-items:center;gap:7px;font-weight:800;color:${cor};font-size:.95rem">${ico}${titulo}</div>
-         ${linhas}
+         ${linha}
        </div>`;
-    if (st === 'Aguardando') return wrap('#b45309', '#fffbeb', '#fde68a', App._svg('hour'), 'Aguardando autorização', lg || '<div style="color:var(--ink-500);font-size:.86rem;margin-top:2px">Enviado ao gestor</div>');
-    if (st === 'Comprado' || st === 'Estoque') return wrap('#059669', '#ecfdf5', '#a7f3d0', App._svg('check'), st === 'Comprado' ? 'Autorizada — Comprado' : 'Autorizada — Enviado do estoque', lg + lr);
-    if (st === 'Negado') return wrap('#dc2626', '#fef2f2', '#fecaca', App._svg('x'), 'Autorização negada', lg);
+    const linhaTxt = t => `<div style="color:var(--ink-900);font-size:.86rem;margin-top:2px">${t}</div>`;
+    const usr   = (r.usuarioResp && r.usuarioResp !== '—') ? r.usuarioResp : '';
+    const gNome = r.gestorNome || '';
+    const gNum  = r.gestorNumero ? ' ' + App._fmtNumeroDisplay(r.gestorNumero) : '';
+
+    // Entrada direta pela aba Estoque (Estoque Geral) — só "Produto adicionado".
+    if (r.origemEstoque) {
+      if (!usr) return '';
+      return wrap('#2563eb', '#eff6ff', '#bfdbfe', App._svg('check'), 'Produto adicionado', linhaTxt(`Adicionado pelo usuário: <strong>${usr}</strong>`));
+    }
+
+    const st = r.status;
+    if (st === 'Aguardando')
+      return wrap('#b45309', '#fffbeb', '#fde68a', App._svg('hour'), 'Aguardando autorização',
+        gNome ? linhaTxt(`Enviado ao gestor: <strong>${gNome}${gNum}</strong>`) : linhaTxt('Enviado ao gestor'));
+    if (st === 'Comprado' || st === 'Estoque') {
+      const titulo = st === 'Comprado' ? 'Autorizada — Comprado' : 'Autorizada — Enviado do estoque';
+      const linha = gNome
+        ? linhaTxt(`Autorizado pelo gestor: <strong>${gNome}${gNum}</strong>`)
+        : (usr ? linhaTxt(`Autorizado pelo Usuário: <strong>${usr}</strong>`) : '');
+      return wrap('#059669', '#ecfdf5', '#a7f3d0', App._svg('check'), titulo, linha);
+    }
+    if (st === 'Negado') {
+      const linha = gNome
+        ? linhaTxt(`Negada pelo gestor: <strong>${gNome}${gNum}</strong>`)
+        : (usr ? linhaTxt(`Negada pelo usuário: <strong>${usr}</strong>`) : '');
+      return wrap('#dc2626', '#fef2f2', '#fecaca', App._svg('x'), 'Autorização negada', linha);
+    }
     return '';
+  },
+
+  // Bloco de autorização da COMPRA combinada (agrega os gestores dos membros)
+  _infoAutorizacaoCompra(membros) {
+    const gestores = [...new Set(membros.map(([, r]) => r.gestorNome).filter(Boolean))];
+    const resp     = [...new Set(membros.map(([, r]) => r.usuarioResp).filter(v => v && v !== '—'))];
+    const lg = gestores.length ? `<div style="color:var(--ink-900);font-size:.86rem;margin-top:2px">Autorizado pelo gestor: <strong>${gestores.join(', ')}</strong></div>` : '';
+    const lr = resp.length     ? `<div style="color:var(--ink-900);font-size:.86rem;margin-top:2px">Adicionado por: <strong>${resp.join(', ')}</strong></div>` : '';
+    if (!lg && !lr) return '';
+    return `<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-left:4px solid #059669;border-radius:8px;padding:11px 13px;margin-bottom:12px">
+       <div style="display:flex;align-items:center;gap:7px;font-weight:800;color:#059669;font-size:.95rem">${App._svg('check')}Autorizada</div>
+       ${lg}${lr}
+     </div>`;
   },
 
   // Lista de gestores cadastrados (+ compat com o número único antigo)
@@ -3946,6 +4128,176 @@ const App = {
     });
   },
 
+  // ── Autorizar compra em LOTE — wizard 1 popup (seleção → valor/qtd → gestor) ──
+  _autzLoteIds: null,
+  _autzLoteGestor: null,
+  _autzLoteMode: null,
+  abrirAutorizarCompra() {
+    App._closeAllPopovers?.();   // fecha o popover de Conf ao abrir o modal
+    if (!App._gestoresList().length) { toast('Cadastre ao menos um gestor em Configurações antes de autorizar.', 'error'); return; }
+    App._autzLoteIds = new Set();
+    App._autzLoteGestor = null;
+    const s = document.getElementById('autz-lote-search'); if (s) s.value = '';
+    App._autzLoteShowStep(1);
+    App._autzLoteRenderList();
+    App._autzLoteSetMode(App._autzMode || localStorage.getItem('tic_autz_mode') || 'app', true);
+    document.getElementById('autz-lote-modal').classList.remove('hidden');
+  },
+  _autzLoteShowStep(n) {
+    [1, 2, 3].forEach(i => document.getElementById('autz-lote-step' + i)?.classList.toggle('hidden', i !== n));
+    const t = document.getElementById('autz-lote-title');
+    if (t) t.textContent = n === 1 ? 'Autorizar compra — Solicitações' : n === 2 ? 'Autorizar compra — Valores' : 'Autorizar compra — Gestor';
+  },
+
+  // PASSO 1 — seleção
+  _autzLoteRenderList() {
+    const box = document.getElementById('autz-lote-list'); if (!box) return;
+    const termo = (document.getElementById('autz-lote-search')?.value || '').toLowerCase();
+    let reqs = Object.entries(State.requests || {})
+      .filter(([, r]) => (r.status || 'Solicitado') === 'Solicitado' && !r.origemEstoque && !r.compraCodigo)
+      .sort((a, b) => (parseInt(b[1].seq) || 0) - (parseInt(a[1].seq) || 0));   // mais recente primeiro
+    if (termo) reqs = reqs.filter(([, r]) => [r.seq != null ? 'SL-' + r.seq : '', r.unitName, r.groupName, App.reqSummary(r)].filter(Boolean).join(' ').toLowerCase().includes(termo));
+    if (!reqs.length) { box.innerHTML = '<div class="compra-empty">Nenhuma solicitação pendente para autorizar.</div>'; App._autzLoteUpdateSel(); return; }
+    box.innerHTML = reqs.map(([id, r]) => {
+      const on = App._autzLoteIds.has(id);
+      return `<div class="compra-req-item ${on ? 'sel' : ''}">
+        <input type="checkbox" ${on ? 'checked' : ''} onchange="App._autzLoteToggle('${id}', this.checked)">
+        <span class="req-seq-badge">SL-${r.seq != null ? r.seq : '—'}</span>
+        <div class="compra-req-info">
+          <span class="compra-req-unit">${r.unitName || '—'}</span>
+          <span class="compra-req-sum">${r.groupName || ''} · ${App.reqSummary(r)}</span>
+        </div>
+      </div>`;
+    }).join('');
+    App._autzLoteUpdateSel();
+  },
+  _autzLoteToggle(id, on) { if (on) App._autzLoteIds.add(id); else App._autzLoteIds.delete(id); App._autzLoteRenderList(); },
+  _autzLoteUpdateSel() {
+    const n = App._autzLoteIds ? App._autzLoteIds.size : 0;
+    const c = document.getElementById('autz-lote-sel-count'); if (c) c.textContent = n ? `${n} selecionada(s)` : '';
+    const b = document.getElementById('autz-lote-next1'); if (b) b.disabled = n < 1;
+  },
+
+  // PASSO 2 — valor + quantidade (qtd vem do sistema; cadeado libera edição)
+  _autzLoteStep2() {
+    const ids = [...(App._autzLoteIds || [])]; if (!ids.length) return;
+    const wrap = document.getElementById('autz-lote-itens');
+    wrap.innerHTML = ids.map(id => {
+      const r = (State.requests || {})[id] || {};
+      const qtd = r.quantidade || r.qty || 1;
+      return `<div class="autz-lote-item" style="border:1px solid var(--surf-border);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+        <div style="font-weight:700;font-size:.82rem;color:var(--ink-900);margin-bottom:6px"><span class="req-seq-badge">SL-${r.seq != null ? r.seq : '—'}</span> ${r.unitName || ''} · ${App.reqSummary(r)}</div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Valor unitário (R$)</label>
+            <input type="number" class="input-field autz-lote-val" data-id="${id}" min="0" step="0.01" value="${r.valor || ''}" placeholder="0,00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantidade</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="number" class="input-field autz-lote-qtd" data-id="${id}" min="1" value="${qtd}" readonly style="background:#f1f5f9">
+              <button type="button" class="btn-ico" title="Clique para editar a quantidade" onclick="App._autzLoteQtdUnlock('${id}')">${App._svg('lock')}</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    App._autzLoteShowStep(2);
+  },
+  _autzLoteQtdUnlock(id) {
+    const inp = document.querySelector(`.autz-lote-qtd[data-id="${id}"]`); if (!inp) return;
+    const estavaTravado = inp.readOnly;
+    inp.readOnly = !estavaTravado;
+    inp.style.background = estavaTravado ? '' : '#f1f5f9';
+    if (estavaTravado) { inp.focus(); inp.select(); }
+  },
+  _autzLoteBackStep1() { App._autzLoteShowStep(1); },
+  _autzLoteBackStep2() { App._autzLoteShowStep(2); },
+
+  // PASSO 3 — gestor + envio
+  _autzLoteStep3() { App._autzLoteRenderGestores(); App._autzLoteShowStep(3); },
+  _autzLoteSelGestor(gid) { App._autzLoteGestor = gid; App._autzLoteRenderGestores(); },
+  _autzLoteSetMode(mode, silent) {
+    App._autzLoteMode = mode;
+    document.getElementById('autz-lote-mode-app')?.classList.toggle('active', mode === 'app');
+    document.getElementById('autz-lote-mode-web')?.classList.toggle('active', mode === 'web');
+    if (!silent) App._autzLoteRenderGestores();
+  },
+  _autzLoteRenderGestores() {
+    const box = document.getElementById('autz-lote-gestores'); if (!box) return;
+    const lista = App._gestoresList();
+    if (!lista.some(g => g.id === App._autzLoteGestor)) App._autzLoteGestor = null;
+    box.innerHTML = lista.map(g => {
+      const sel = g.id === App._autzLoteGestor;
+      return `<button type="button" class="autz-gestor-opt${sel ? ' selected' : ''}" onclick="App._autzLoteSelGestor('${g.id}')">
+        <span class="autz-g-radio">${sel ? App._svg('check') : ''}</span>
+        <span class="autz-g-nome">${g.nome || 'Gestor'}</span>
+        <small class="autz-g-num">${App._fmtNumeroDisplay(g.numero)}</small>
+      </button>`;
+    }).join('');
+    App._autzLoteAtualizar();
+  },
+  // Lê valor/qtd dos inputs do passo 2 (ficam no DOM mesmo no passo 3).
+  _autzLoteColeta() {
+    return [...(App._autzLoteIds || [])].map(id => {
+      const r = (State.requests || {})[id] || {};
+      const val = parseFloat(document.querySelector(`.autz-lote-val[data-id="${id}"]`)?.value) || 0;
+      const qtd = parseFloat(document.querySelector(`.autz-lote-qtd[data-id="${id}"]`)?.value) || (parseFloat(r.quantidade) || 1);
+      return { id, r, val, qtd };
+    });
+  },
+  // Um bloco por solicitação, no mesmo formato do pedido individual, um abaixo do outro.
+  _msgWhatsGestorLote(itens) {
+    const bloco = ({ r, val, qtd }) => {
+      const q = qtd || r.quantidade || r.qty || '';
+      const v = parseFloat(val) || 0;
+      return [
+        '*Solicitação de compra — precisa de autorização*',
+        `*Nº:* ${r.seq != null ? 'SL-' + r.seq : '—'}`,
+        `*Unidade:* ${r.unitName || '—'}`,
+        `*Grupo:* ${r.groupName || '—'}`,
+        `*Subgrupo:* ${r.subgrupo || '—'}`,
+        `*Item:* ${App.reqSummary(r)}`,
+        `*Produto:* ${r.product || '—'}`,
+        q ? `*Quantidade:* ${q}` : '',
+        `*Motivo:* ${r.reason || '—'}`,
+        v > 0 ? `*Valor:* ${App._fmtMoeda(v * (parseFloat(q) || 1))}` : ''
+      ].filter(l => l !== '').join('\n');
+    };
+    return itens.map(bloco).join('\n\n') + '\n\nPode autorizar as compras?';
+  },
+  _autzLoteAtualizar() {
+    const a = document.getElementById('autz-lote-enviar'); if (!a) return;
+    const g = App._gestoresList().find(x => x.id === App._autzLoteGestor);
+    if (!g) { a.classList.add('is-disabled'); a.removeAttribute('href'); a.removeAttribute('target'); a.onclick = null; a.textContent = 'Escolha o gestor'; return; }
+    const itens = App._autzLoteColeta();
+    const msg = App._msgWhatsGestorLote(itens);
+    const mode = App._autzLoteMode || 'app';
+    a.href = mode === 'web' ? `https://wa.me/${g.numero}?text=${encodeURIComponent(msg)}` : `whatsapp://send?phone=${g.numero}&text=${encodeURIComponent(msg)}`;
+    if (mode === 'web') { a.target = '_blank'; a.rel = 'noopener'; } else a.removeAttribute('target');
+    a.classList.remove('is-disabled');
+    a.textContent = `Enviar ${itens.length} p/ ${g.nome || 'gestor'}`;
+    a.onclick = () => App._enviarAutorizacaoLote(g.id);
+  },
+  // Grava: cada uma vira Aguardando + gestor + valor + quantidade (mesma regra do individual).
+  _enviarAutorizacaoLote(gestorId) {
+    const itens = App._autzLoteColeta(); if (!itens.length) return;
+    const g = App._gestoresList().find(x => x.id === gestorId) || {};
+    const ops = [];
+    itens.forEach(({ id, val, qtd }) => {
+      ops.push(DB.set(`requests/${id}/status`, 'Aguardando'));
+      ops.push(DB.set(`requests/${id}/gestorNome`, g.nome || 'Gestor'));
+      ops.push(DB.set(`requests/${id}/gestorNumero`, g.numero || ''));
+      if (val > 0) ops.push(DB.set(`requests/${id}/valor`, val.toFixed(2)));
+      if (qtd > 0) ops.push(DB.set(`requests/${id}/quantidade`, String(qtd)));
+    });
+    Promise.all(ops).then(() => {
+      App._logActivity?.('Solicitações', `Autorização em lote enviada — ${g.nome || 'gestor'}`, `${itens.length} solicitação(ões)`);
+      document.getElementById('autz-lote-modal')?.classList.add('hidden');
+      App.renderRequests(); App.updatePendingBadge?.();
+    });
+  },
+
   // Decidir → popup com Estoque / Comprado / Negado
   _abrirDecisaoAutorizacao(id) {
     const r = (State.requests || {})[id]; if (!r) return;
@@ -4032,6 +4384,17 @@ const App = {
   },
   _syncGestorField() { App.renderGestores(); },
 
+  // Corrige a grafia do grupo "Concerto" → "Conserto" (idempotente).
+  _migrarGrupoConserto() {
+    const groups = State.groups || {};
+    Object.entries(groups).forEach(([id, name]) => {
+      if (/concerto/i.test(name) && !/conserto/i.test(name)) {
+        const novo = String(name).replace(/concerto/gi, seg => seg[0] === seg[0].toUpperCase() ? 'Conserto' : 'conserto');
+        DB.set(`groups/${id}`, novo);
+      }
+    });
+  },
+
   // Puxa o gestor legado (número único antigo em config.gestorWhats) pra dentro
   // de config/gestores, virando um item normal e deletável no Config. Idempotente.
   _migrarGestorLegacy() {
@@ -4086,6 +4449,10 @@ const App = {
     if (n.includes('tinta') && (r.num||r.nums||r.cor||r.cores)) {
       const num = r.num||r.nums||''; const cor = r.cor||r.cores||'';
       text = [num, cor].filter(Boolean).join(' · ') || 'TINTA';
+    } else if (App._isConserto(n) && (r.equipamento||r.batModel||r.modelo)) {
+      // Conserto: equipamento consertado + observação (sem quantidade)
+      const eq = r.equipamento || r.batModel || r.modelo || '';
+      text = [eq, r.obs].filter(Boolean).join(' — ');
     } else if ((n.includes('pilha')||n.includes('bateria')||n.includes('conserto')||n.includes('concerto')) && (r.batModel||r.batModels||r.modelo)) {
       if (r.batModel)   text = `${r.batModel} ×${r.qty||1}`;
       else if (r.batModels) text = r.batModels.map(b=>`${b.modelo} ×${b.qty}`).join(' | ');
@@ -4173,6 +4540,7 @@ const App = {
     // Restrição de status: fluxo de autorização aprovado só libera Comprado/Estoque.
     // Gerenciar normal (sem soloCompra) mostra todos os botões, como sempre.
     const solo = !!opts.soloCompra;
+    State.modalSolo = solo;   // solo = veio do fluxo do gestor (mantém gestor na tag)
     if (opts.preStatus) State.modalStatus = opts.preStatus;
     else if (solo && State.modalStatus !== 'Comprado' && State.modalStatus !== 'Estoque') State.modalStatus = 'Comprado';
     document.querySelectorAll('.status-btn').forEach(b => {
@@ -4496,6 +4864,13 @@ const App = {
       }
     }
     if (State.modalStatus === 'Comprado') {
+      // Valor é OBRIGATÓRIO pra concluir a compra — só prossegue se tiver valor.
+      // Exceção: "Nova entrada (sem custo)" é Comprado com valor 0 de propósito.
+      const rAtual = (State.requests || {})[id] || {};
+      if (!rAtual.entradaSemCusto) {
+        const valNum = parseFloat(document.getElementById('modal-val')?.value || 0);
+        if (!(valNum > 0)) { toast('Informe o VALOR para concluir a compra.', 'error'); document.getElementById('modal-val')?.focus(); return; }
+      }
       const comprada = parseFloat(document.getElementById('modal-qty')?.value || 0);
       const enviada  = parseFloat(document.getElementById('modal-qty-enviada')?.value || 0);
       if (enviada > comprada) { toast(`Não pode enviar mais do que comprou. Comprado: ${comprada}.`, 'error'); return; }
@@ -4516,13 +4891,21 @@ const App = {
     const st = State.modalStatus;
     const upd = { status: st };
 
-    // Mapeia QUEM comprou / enviou do estoque (usuário logado). Grava só quando
-    // vira Comprado/Estoque; mantém o já registrado se continuar no mesmo status.
-    if (st === 'Comprado' || st === 'Estoque') {
-      upd.usuarioResp = prevR.usuarioResp || State.adminUser || '—';
-      upd.usuarioRespAt = prevR.usuarioRespAt || new Date().toISOString();
+    // Mapeia QUEM concluiu: comprar/negar pelo GERENCIAR (não-solo) é ação do
+    // usuário logado — e limpa o gestor antigo (o usuário assumiu). O fluxo do
+    // gestor (solo) mantém o gestor vinculado na tag.
+    const viaGerenciar = !State.modalSolo;
+    if (st === 'Comprado' || st === 'Estoque' || st === 'Negado') {
+      if (viaGerenciar) {
+        upd.usuarioResp = State.adminUser || '—';
+        upd.usuarioRespAt = new Date().toISOString();
+        upd.gestorNome = null; upd.gestorNumero = null;   // Gerenciar → mostra o usuário, não o gestor antigo
+      } else {
+        upd.usuarioResp = prevR.usuarioResp || State.adminUser || '—';
+        upd.usuarioRespAt = prevR.usuarioRespAt || new Date().toISOString();
+      }
     } else {
-      upd.usuarioResp = null; upd.usuarioRespAt = null;   // saiu da compra → limpa
+      upd.usuarioResp = null; upd.usuarioRespAt = null;   // saiu da conclusão → limpa
     }
 
     // Troca de status reseta dados que não pertencem ao novo status.
@@ -4537,6 +4920,14 @@ const App = {
     // Nem Comprado nem Estoque → também limpa envio e referência de estoque usado.
     if (st !== 'Comprado' && st !== 'Estoque') {
       Object.assign(upd, { shippedStatus: 'Não', shippedAt: null, estoqueItemId: null, estoqueQtyUsed: null });
+    }
+    // Voltar para SOLICITADO reseta TUDO: dinheiro, tags de autorização e vínculo
+    // de compra combinada — a solicitação recomeça do zero.
+    if (st === 'Solicitado') {
+      Object.assign(upd, {
+        gestorNome: null, gestorNumero: null, usuarioResp: null, usuarioRespAt: null,
+        compraCodigo: null, compraId: null, statusAntesCombinada: null
+      });
     }
 
     // Data da solicitação (editável pelo admin)
@@ -5202,6 +5593,7 @@ const App = {
       ? `<div style="margin-top:10px">${App._parcelaPaga(r.parcelas) ? '<span class="mov-tag-pago" title="Todas as parcelas já venceram">✓ PAGO</span>' : `<span class="mov-tag-parcelada">PARCELADA ${r.parcelas.length}×</span>`} de ${fmtR(r.parcelas[0]?.valor)}</div>` : '';
     document.getElementById('sol-view-titulo').textContent = `Solicitação SL-${r.seq ?? '—'}`;
     document.getElementById('sol-view-body').innerHTML = `
+      ${App._infoAutorizacao(r)}
       <div class="compra-detalhe-meta">
         ${linha('Status', r.status || '—')}
         ${linha('Unidade', r.unitName || '—')}
@@ -6119,9 +6511,15 @@ const App = {
     App.openEstoqueForm(id);
   },
 
-  openEstoqueForm(id = null) {
+  // Passo 1: escolher se é Nova compra (conta gasto) ou Nova entrada (sem custo)
+  escolherTipoEstoque() {
+    document.getElementById('estoque-tipo-modal')?.classList.remove('hidden');
+  },
+
+  _estoqueEntradaMode: 'compra',   // 'compra' = conta gasto | 'entrada' = sem custo
+  openEstoqueForm(id = null, modo = 'compra') {
+    document.getElementById('estoque-tipo-modal')?.classList.add('hidden');
     document.getElementById('estoque-modal').classList.remove('hidden');
-    document.getElementById('estoque-form-title').textContent = id ? 'Editar Item' : 'Novo Item em Estoque';
     document.getElementById('estoque-edit-id').value = id || '';
     App._populateEstoqueGrupoSel();
     App._populateEstoqueFornecedor();
@@ -6131,13 +6529,23 @@ const App = {
     const reqLig = item.reqId ? (State.requests || {})[item.reqId] : null;
     const ehNovoItem = !!(reqLig && reqLig.origemEstoque);  // veio de "Novo Item" → edita como novo item
 
-    // Campos de compra (valor/unidade/parcelas) aparecem ao criar OU ao editar um Novo Item.
+    // Modo: ao criar vem do chooser; ao editar deriva da flag da solicitação.
+    const ehEntrada = id ? !!(reqLig && reqLig.entradaSemCusto) : (modo === 'entrada');
+    App._estoqueEntradaMode = ehEntrada ? 'entrada' : 'compra';
+
+    document.getElementById('estoque-form-title').textContent =
+      id ? 'Editar Item' : (ehEntrada ? 'Nova Entrada (sem custo)' : 'Nova Compra em Estoque');
+
+    // Campos de compra (unidade/data) aparecem ao criar OU ao editar um Novo Item.
     // Item manual (sem request) editado → só ajusta saldo do lote (Reposição/Ajuste manual).
     const mostrarCompra = !id || ehNovoItem;
     const compraFields = document.getElementById('estoque-compra-fields');
     if (compraFields) compraFields.style.display = mostrarCompra ? '' : 'none';
+    // Campos de DINHEIRO (valor/fornecedor/parcelas/forma pgto) somem na Nova entrada.
+    const showMoney = mostrarCompra && !ehEntrada;
+    document.querySelectorAll('.estoque-money').forEach(el => { el.style.display = showMoney ? '' : 'none'; });
     const dataLabel = document.getElementById('estoque-data-label');
-    if (dataLabel) dataLabel.textContent = mostrarCompra ? 'Data da compra' : 'Data da movimentação';
+    if (dataLabel) dataLabel.textContent = !mostrarCompra ? 'Data da movimentação' : (ehEntrada ? 'Data da entrada' : 'Data da compra');
 
     const hoje = new Date().toISOString().substring(0,10);
     if (id) {
@@ -6303,7 +6711,10 @@ const App = {
     // (solicitação status Comprado, respeitando fornecedor/valor/parcelas), reaproveitando
     // o mesmo pipeline usado nas compras vindas de solicitação (_processarCompraEstoque).
     if (!id && novaQtd > 0) {
-      App._saveEstoqueComoCompra({ grupo, subgrupo, produto, fornecedor, qtd: novaQtd, data: dataSel });
+      if (App._estoqueEntradaMode === 'entrada')
+        App._saveEstoqueComoEntrada({ grupo, subgrupo, produto, qtd: novaQtd, data: dataSel });
+      else
+        App._saveEstoqueComoCompra({ grupo, subgrupo, produto, fornecedor, qtd: novaQtd, data: dataSel });
       return;
     }
     // Edição de item que veio de "Novo Item" → atualiza a solicitação + reconstrói o lote.
@@ -6389,34 +6800,74 @@ const App = {
     }
   },
 
-  // Edição de uma entrada "Novo Item": atualiza a solicitação vinculada com os novos
-  // dados (unidade/valor/parcelas/qtd) e reconstrói o lote de estoque (remove o antigo,
-  // recria via _processarCompraEstoque). Mantém a mesma solicitação (não cria outra SL).
-  async _updateEstoqueComoCompra(reqId, { grupo, subgrupo, produto, fornecedor, qtd, data }) {
+  // Nova ENTRADA (sem custo): item que já existe fisicamente, não foi comprado.
+  // Segue o mesmo pipeline (solicitação + lote de estoque), MAS com valor 0 e flag
+  // entradaSemCusto → NÃO entra no total gasto do dashboard.
+  async _saveEstoqueComoEntrada({ grupo, subgrupo, produto, qtd, data }) {
     const unidadeSel = document.getElementById('estoque-unidade-destino')?.value || '';
-    const valor = parseFloat(document.getElementById('estoque-valor')?.value) || 0;
-    if (!unidadeSel) { toast('Selecione a unidade de destino.', 'error'); return; }
-    if (valor <= 0)  { toast('Informe o valor unitário da compra.', 'error'); return; }
-
-    const parcelar = document.getElementById('chk-estoque-parcelas')?.checked;
-    const n = parcelar ? (parseInt(document.getElementById('estoque-parcelas-n')?.value) || 0) : 0;
-    if (parcelar && n < 2) { toast('Nº de parcelas deve ser ≥ 2.', 'error'); return; }
+    if (!unidadeSel) { toast('Selecione a unidade onde o item está.', 'error'); return; }
 
     const unitId   = unidadeSel === '__central__' ? null : unidadeSel;
     const unitName = unidadeSel === '__central__' ? 'Estoque Central' : (State.units?.[unidadeSel] || '—');
     const solicitante = document.getElementById('estoque-solicitante')?.value.trim() || '';
-    const formaPagamento = document.getElementById('estoque-forma-pagamento')?.value || 'dinheiro';
-    const valorTotal = (qtd * valor).toFixed(2);
 
     const btn = document.getElementById('estoque-modal')?.querySelector('.btn-primary');
     const orig = btn ? btn.innerHTML : '';
     if (btn) { btn.innerHTML = 'Salvando…'; btn.disabled = true; }
     try {
+      const seqTx = await DB.tx('meta/lastSeq', cur => (cur || 0) + 1);
+      const seq = seqTx?.snapshot?.val() || null;
+
+      const reqData = {
+        seq, unitId, unitName,
+        groupName: grupo, subgrupo, descricao: produto, solicitante, formaPagamento: 'dinheiro',
+        status: 'Comprado', createdAt: data + 'T00:00:00.000Z',
+        boughtAt: data, fornecedor: '', quantidade: String(qtd),
+        valor: '0.00', valorTotal: '0.00', parcelas: null,   // sem custo
+        shippedStatus: 'Não', shippedAt: null,
+        origemEstoque: true, entradaSemCusto: true,   // marca: entrada sem compra → fora do total gasto
+        usuarioResp: State.adminUser || '—', usuarioRespAt: new Date().toISOString()
+      };
+      const reqRef = DB.push('requests', reqData);
+      await reqRef;
+      const reqId = reqRef.key;
+
+      await App._processarCompraEstoque(reqId, reqData);
+
+      toast(`✓ Entrada (sem custo) registrada${seq != null ? ' · SL-' + seq : ''}.`);
+      App.closeEstoqueForm();
+      App.renderRequests(); App.renderDashboard(); App.updatePendingBadge(); App.renderEstoque?.();
+    } catch (e) {
+      console.error('[_saveEstoqueComoEntrada] erro', e);
+      toast('Erro ao registrar entrada. Veja o console.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  // Edição de uma entrada "Novo Item": atualiza a solicitação vinculada com os novos
+  // dados (unidade/qtd) e reconstrói o lote de estoque (remove o antigo, recria via
+  // _processarCompraEstoque). Mantém a mesma solicitação (não cria outra SL).
+  // DINHEIRO CONGELADO: valor/valorTotal/parcelas NÃO são recalculados aqui — mudar a
+  // quantidade nunca altera o total gasto do dashboard (corrige só a contagem física).
+  async _updateEstoqueComoCompra(reqId, { grupo, subgrupo, produto, fornecedor, qtd, data }) {
+    const unidadeSel = document.getElementById('estoque-unidade-destino')?.value || '';
+    if (!unidadeSel) { toast('Selecione a unidade de destino.', 'error'); return; }
+
+    const unitId   = unidadeSel === '__central__' ? null : unidadeSel;
+    const unitName = unidadeSel === '__central__' ? 'Estoque Central' : (State.units?.[unidadeSel] || '—');
+    const solicitante = document.getElementById('estoque-solicitante')?.value.trim() || '';
+
+    const btn = document.getElementById('estoque-modal')?.querySelector('.btn-primary');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Salvando…'; btn.disabled = true; }
+    try {
+      // Dinheiro CONGELADO: mantém valor/valorTotal/parcelas/formaPagamento da solicitação
+      // original — mudar a quantidade não recalcula nem soma nada no dashboard.
       const reqUpd = {
-        unitId, unitName, groupName: grupo, subgrupo, descricao: produto, solicitante, formaPagamento,
-        createdAt: data + 'T00:00:00.000Z', boughtAt: data, fornecedor, quantidade: String(qtd),
-        valor: valor.toFixed(2), valorTotal,
-        parcelas: parcelar ? App._buildParcelas(data, n, parseFloat(valorTotal)) : null
+        unitId, unitName, groupName: grupo, subgrupo, descricao: produto, solicitante,
+        createdAt: data + 'T00:00:00.000Z', boughtAt: data, fornecedor, quantidade: String(qtd)
+        // valor, valorTotal, parcelas, formaPagamento: NÃO tocados (dinheiro travado)
       };
       await DB.update(`requests/${reqId}`, reqUpd);
       // Reconstrói o lote: remove estoque auto antigo + flag, recria com dados novos
@@ -6720,6 +7171,7 @@ const App = {
       ['compra-modal',     () => App._voltaChooserOuFecha('compra-modal', () => App.closeCompraModal())],
       ['add-compra-chooser',  hide('add-compra-chooser')],
       ['autz-send-modal',     hide('autz-send-modal')],
+      ['autz-lote-modal',     hide('autz-lote-modal')],
       ['autorizacao-modal',   hide('autorizacao-modal')],
       ['sol-view-modal',      hide('sol-view-modal')],
       ['lote-info-modal',     hide('lote-info-modal')],
@@ -6727,7 +7179,8 @@ const App = {
       ['mov-date-modal',   () => App.closeMovDate()],
       ['mov-detail-modal', () => App.closeMovDetail()],
       ['mov-hist-modal',   () => App.closeMovHist()],
-      ['estoque-modal',    () => App.closeEstoqueForm()]
+      ['estoque-modal',    () => App.closeEstoqueForm()],
+      ['estoque-tipo-modal', hide('estoque-tipo-modal')]
     ];
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;
@@ -6757,7 +7210,7 @@ const App = {
     };
 
     safeListener('units',     v => { State.units    =v||{}; App.renderUnitsDropdown(); if(State.adminUser) App.renderUnitsAdmin?.(); });
-    safeListener('groups',    v => { State.groups   =v||{}; App.populateGroupSelects?.(); if(State.adminUser) App.renderGroupsAdmin?.(); });
+    safeListener('groups',    v => { State.groups   =v||{}; App._migrarGrupoConserto?.(); App.populateGroupSelects?.(); if(State.adminUser) App.renderGroupsAdmin?.(); });
     safeListener('groupMeta', v => { State.groupMeta =v||{}; if(State.adminUser) App.renderGroupsAdmin?.(); });
     safeListener('subOpts',   v => { State.subOpts  =v||{}; });
     safeListener('subgroups', v => { State.subgroups=v||{}; if(State.adminUser) App.renderSubgroupsAdmin?.(); });
@@ -6775,6 +7228,7 @@ const App = {
         if (tab?.id==='tab-calendar')  App.renderCalendar();
         if (tab?.id==='tab-settings')  App.renderCodigosTab();
       }
+      App._maybeFixCompras?.();
     });
     safeListener('estoque', v => {
       State.estoque = v || {};
@@ -6794,6 +7248,7 @@ const App = {
         const tab = document.querySelector('.tab-panel.active');
         if (tab?.id === 'tab-requests') App.renderRequests();
       }
+      App._maybeFixCompras?.();
     });
     safeListener('activityLog', v => {
       State.activityLog = v || {};

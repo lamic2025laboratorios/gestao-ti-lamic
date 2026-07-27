@@ -1759,6 +1759,25 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 }
 .autz-enviar-btn:hover { background: #047857; }
 .autz-enviar-btn.is-disabled { background: #cbd5e1; color: #64748b; pointer-events: none; opacity: .8; }
+/* Chooser Nova compra x Nova entrada */
+.estoque-tipo-opt {
+  display: flex; align-items: center; gap: 14px; width: 100%; cursor: pointer; text-align: left;
+  padding: 14px 16px; border: 1.5px solid var(--surf-border); border-radius: var(--r-sm);
+  background: #fff; color: var(--ink-900); font: inherit; transition: all .15s var(--ease);
+}
+.estoque-tipo-opt:hover { border-color: var(--blue-400); background: var(--surf-2); transform: translateY(-1px); }
+.estoque-tipo-ico { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; height: 44px; border-radius: 10px; }
+.estoque-tipo-txt { display: flex; flex-direction: column; gap: 3px; }
+.estoque-tipo-txt strong { font-size: .98rem; color: var(--ink-900); }
+.estoque-tipo-txt small { font-size: .8rem; color: var(--ink-500); line-height: 1.35; }
+/* Etiqueta de mapeamento (quem autorizou / adicionou) na linha da solicitação */
+.map-tag {
+  display: inline-flex; align-items: center; gap: 3px; margin-top: 3px; margin-left: 4px;
+  font-size: .66rem; font-weight: 700; color: var(--ink-500);
+  background: var(--surf-2); border: 1px solid var(--surf-border); border-radius: 4px; padding: 1px 6px;
+}
+.map-tag svg { width: 11px; height: 11px; }
+.map-tag-ok { color: #059669; background: #ecfdf5; border-color: #a7f3d0; }
 .settings-list-item {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 8px 12px; border-bottom: 1px solid var(--surf-border); font-size: .86rem;
