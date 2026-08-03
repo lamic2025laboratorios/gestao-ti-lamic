@@ -4426,3 +4426,63 @@ button.kbg-ico { cursor: pointer; }
 /* Título da seção de passos (mesmo peso do "Introdução") */
 .kbg-passos-sec { margin-top: 38px; padding-bottom: 0; }
 .kbg-passos-sec + .kbg-passos { margin-top: 16px; }
+
+/* ══════════════════════════════════════════════════════════
+   PASSO — formato de manual: foto grande à esquerda,
+   miniaturas em linha e texto em tópicos à direita
+   ══════════════════════════════════════════════════════════ */
+.kbg-passo { padding: 26px 0 22px; }
+.kbg-passo-cab { display: flex; align-items: baseline; gap: 14px; margin-bottom: 16px; }
+.kbg-passo-n {
+  flex-shrink: 0; font-family: 'Rajdhani', sans-serif;
+  font-size: 1.5rem; font-weight: 700; color: var(--ink-900);
+  background: none; width: auto; height: auto; border-radius: 0; padding: 0;
+}
+.kbg-passo-tit {
+  flex: 1; min-width: 0; margin: 0;
+  font-family: 'Rajdhani', sans-serif; font-size: 1.42rem; font-weight: 600; color: var(--ink-500);
+}
+.kbg-passo-acts { flex-shrink: 0; display: flex; gap: 4px; align-self: center; }
+
+/* Corpo em duas colunas */
+.kbg-passo-corpo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.kbg-passo.sem-foto .kbg-passo-corpo { grid-template-columns: 1fr; }
+
+.kbg-passo-foto {
+  border: 1px solid var(--surf-border); border-radius: var(--r-sm);
+  overflow: hidden; background: var(--surf-0); line-height: 0;
+}
+.kbg-passo-foto img, .kbg-passo-foto .kbd-img { width: 100%; height: auto; display: block; cursor: zoom-in; }
+.kbg-passo-foto iframe, .kbg-passo-foto .kbd-frame { width: 100%; aspect-ratio: 4/3; border: none; display: block; }
+
+.kbg-passo-lado { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* Miniaturas lado a lado, no topo da coluna direita */
+.kbg-passo-minis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.kbg-mini {
+  padding: 0; border: 1px solid var(--surf-border); border-radius: var(--r-sm);
+  background: var(--surf-0); cursor: pointer; overflow: hidden; line-height: 0;
+  transition: border-color .15s var(--ease), box-shadow .15s var(--ease);
+}
+.kbg-mini img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+.kbg-mini:hover { border-color: var(--blue-400); }
+.kbg-mini.on { border-color: var(--blue-500); box-shadow: 0 0 0 2px var(--blue-500); }
+
+/* Texto em tópicos, com marcador */
+.kbg-passo-txt { display: flex; flex-direction: column; gap: 12px; }
+.kbg-topico { display: flex; align-items: flex-start; gap: 11px; }
+.kbg-bullet {
+  flex-shrink: 0; width: 8px; height: 8px; margin-top: .55em;
+  border-radius: 50%; background: var(--ink-900);
+}
+.kbg-topico .kbd-bloco-texto { flex: 1; min-width: 0; }
+
+.kbg-passo-rodape {
+  display: flex; justify-content: flex-end; align-items: center;
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--surf-border);
+}
+
+@media (max-width: 900px) {
+  .kbg-passo-corpo { grid-template-columns: 1fr; }
+  .kbg-passo-minis { grid-template-columns: repeat(4, 1fr); }
+}

@@ -9104,7 +9104,8 @@ const App = {
       '<button class="kbd-add-bloco" onclick="App.kbdNovoBloco(\'resol\')">+ Adicionar passo</button>';
   },
 
-  // Um passo: galeria de imagens à esquerda, texto à direita
+  // Um passo no formato de manual técnico: foto grande à esquerda;
+  // à direita as miniaturas em linha e, abaixo delas, o texto em tópicos.
   _kbdHtmlPasso(raw, i, total) {
     const b = App._kbdNorm(raw);
     const imgs = [];
@@ -9112,27 +9113,30 @@ const App = {
     const fixa = App._kbdImgFixa[i];
     const atual = (fixa !== undefined && imgs[fixa]) ? imgs[fixa] : imgs[0];
 
-    const galeria = imgs.length
-      ? '<div class="kbg-passo-galeria">' +
-          '<div class="kbg-passo-foto" id="kbg-foto-' + i + '">' + App._kbdMidia({ img: atual }) + '</div>' +
-          (imgs.length > 1
-            ? '<div class="kbg-passo-minis">' + imgs.map((src, k) =>
-                '<button class="kbg-mini' + (k === (fixa !== undefined ? fixa : 0) ? ' on' : '') + '"' +
-                ' onmouseenter="App.kbdHoverImg(' + i + ',' + k + ')"' +
-                ' onmouseleave="App.kbdSaiImg(' + i + ')"' +
-                ' onclick="App.kbdFixarImg(' + i + ',' + k + ')" title="Ver esta imagem">' +
-                '<img src="' + src + '" alt=""></button>').join('') + '</div>'
-            : '') +
-        '</div>'
+    const fotoGrande = imgs.length
+      ? '<div class="kbg-passo-foto" id="kbg-foto-' + i + '">' + App._kbdMidia({ img: atual }) + '</div>'
       : '';
 
-    const textos = b.itens.map(it => it.texto ? '<div class="kbd-bloco-texto">' + it.texto + '</div>' : '').join('');
+    // Miniaturas ficam ao lado da foto grande, uma do lado da outra
+    const minis = imgs.length > 1
+      ? '<div class="kbg-passo-minis">' + imgs.map((src, k) =>
+          '<button class="kbg-mini' + (k === (fixa !== undefined ? fixa : 0) ? ' on' : '') + '"' +
+          ' onmouseenter="App.kbdHoverImg(' + i + ',' + k + ')"' +
+          ' onmouseleave="App.kbdSaiImg(' + i + ')"' +
+          ' onclick="App.kbdFixarImg(' + i + ',' + k + ')" title="Ver esta imagem">' +
+          '<img src="' + src + '" alt=""></button>').join('') + '</div>'
+      : '';
+
+    // Cada item vira um tópico com marcador
+    const textos = b.itens.map(it =>
+      it.texto ? '<div class="kbg-topico"><span class="kbg-bullet"></span>' +
+                 '<div class="kbd-bloco-texto">' + it.texto + '</div></div>' : '').join('');
     const nc = App._kbdComentarios().filter(c => c.refTipo === 'resol' && c.refIdx === i).length;
 
-    return '<article class="kbg-passo" id="kbg-passo-' + i + '">' +
+    return '<article class="kbg-passo' + (imgs.length ? '' : ' sem-foto') + '" id="kbg-passo-' + i + '">' +
       '<div class="kbg-passo-cab">' +
-        '<span class="kbg-passo-n">' + (i + 1) + '</span>' +
-        '<h4 class="kbg-passo-tit">' + (b.titulo || 'Passo ' + (i + 1)) + '</h4>' +
+        '<span class="kbg-passo-n">Passo ' + (i + 1) + '</span>' +
+        '<h4 class="kbg-passo-tit">' + (b.titulo || '') + '</h4>' +
         '<span class="kbg-passo-acts">' +
           '<button class="btn-ico" title="Subir" onclick="App.kbdMoverBloco(\'resol\',' + i + ',-1)"' + (i === 0 ? ' disabled' : '') + '>&uarr;</button>' +
           '<button class="btn-ico" title="Descer" onclick="App.kbdMoverBloco(\'resol\',' + i + ',1)"' + (i === total - 1 ? ' disabled' : '') + '>&darr;</button>' +
@@ -9142,7 +9146,10 @@ const App = {
             : '<button class="btn-ico is-off" title="Só o criador da wiki pode excluir passos" onclick="App._kbAvisoDono(\'passos\')">' + App._svg('trash') + '</button>') +
         '</span>' +
       '</div>' +
-      '<div class="kbg-passo-corpo">' + galeria + '<div class="kbg-passo-txt">' + textos + '</div></div>' +
+      '<div class="kbg-passo-corpo">' +
+        fotoGrande +
+        '<div class="kbg-passo-lado">' + minis + '<div class="kbg-passo-txt">' + textos + '</div></div>' +
+      '</div>' +
       '<div class="kbg-passo-rodape">' +
         '<button class="kbg-coment-link' + (nc ? ' tem' : '') + '" onclick="App.kbdComentarPasso(' + i + ')">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="19" height="19"><path d="M21 11.5a8.4 8.4 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.4 8.4 0 01-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.4 8.4 0 013.8-.9h.5a8.5 8.5 0 018 8v.5z"/></svg>' +
