@@ -4395,3 +4395,31 @@ button.kbg-ico { cursor: pointer; }
 .kbi-guia-tit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .kbi-guia > .kbg-selo { position: static; }
 .kbi-guia-tit .kbg-selo { position: static; flex-shrink: 0; }
+
+/* ══════════════════════════════════════════════════════════
+   ÍNDICE DO PASSO A PASSO — coluna lateral esquerda
+   ══════════════════════════════════════════════════════════ */
+.kbd-ind { display: flex; flex-direction: column; padding: 16px 14px; }
+.kbd-ind-tit {
+  font-size: .78rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-400); padding-bottom: 10px; margin-bottom: 10px;
+  border-bottom: 1px solid var(--surf-border);
+}
+.kbd-ind-lista { list-style: none; margin: 0; padding: 0; counter-reset: passo; }
+.kbd-ind-lista li { counter-increment: passo; margin-bottom: 2px; }
+.kbd-ind-lista button {
+  display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left;
+  padding: 8px 10px; border: none; background: none; border-radius: var(--r-sm);
+  font-family: inherit; font-size: .88rem; font-weight: 600; line-height: 1.35;
+  color: var(--ink-700); cursor: pointer; transition: all .14s var(--ease);
+}
+.kbd-ind-lista button::before {
+  content: counter(passo);
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--gray-100); color: var(--ink-500);
+  font-size: .72rem; font-weight: 800;
+}
+.kbd-ind-lista button:hover { background: #eef4ff; color: var(--blue-500); }
+.kbd-ind-lista button:hover::before { background: var(--blue-500); color: #fff; }
+.kbd-ind-vazio { font-size: .84rem; color: var(--ink-400); padding: 6px 2px; }
