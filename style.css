@@ -4423,3 +4423,6 @@ button.kbg-ico { cursor: pointer; }
 .kbd-ind-lista button:hover { background: #eef4ff; color: var(--blue-500); }
 .kbd-ind-lista button:hover::before { background: var(--blue-500); color: #fff; }
 .kbd-ind-vazio { font-size: .84rem; color: var(--ink-400); padding: 6px 2px; }
+/* Título da seção de passos (mesmo peso do "Introdução") */
+.kbg-passos-sec { margin-top: 38px; padding-bottom: 0; }
+.kbg-passos-sec + .kbg-passos { margin-top: 16px; }

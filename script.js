@@ -9096,7 +9096,8 @@ const App = {
       (g.intro ? '<section class="kbg-introducao"><h3>Introdução</h3><div class="kbg-intro">' + g.intro + '</div></section>' : '');
 
     const html = passos.length
-      ? '<div class="kbg-passos">' + passos.map((b, i) => App._kbdHtmlPasso(b, i, passos.length)).join('') + '</div>'
+      ? '<section class="kbg-introducao kbg-passos-sec"><h3>Passo a passo</h3></section>' +
+        '<div class="kbg-passos">' + passos.map((b, i) => App._kbdHtmlPasso(b, i, passos.length)).join('') + '</div>'
       : '<div class="kbd-vazio">Este guia ainda não tem passos.</div>';
 
     return chips + cab + html +
