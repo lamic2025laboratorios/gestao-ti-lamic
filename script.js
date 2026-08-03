@@ -8711,57 +8711,6 @@ const App = {
     document.getElementById('kbi-modal').classList.remove('hidden');
   },
 
-  // Barra de formatação do editor (negrito, itálico, listas, setas, emojis)
-  kbdFmt(cmd, val) { document.execCommand(cmd, false, val || null); },
-  kbdInserir(txt) { document.execCommand('insertText', false, txt); },
-
-  _kbdRenderItens() {
-    const box = document.getElementById('kbd-itens'); if (!box) return;
-    const simbolos = ['→', '←', '↑', '↓', '✔', '✖', '•', '⚠'];
-    box.innerHTML = App._kbdItens.map((it, i) => {
-      const linkVal = (it.img || '').indexOf('data:') === 0 ? '' : (it.img || '');
-      return '<div class="kbd-item-edit">' +
-        '<div class="kbd-item-edit-head">' +
-          '<span class="kbd-item-num">Item ' + (i + 1) + '</span>' +
-          '<span style="display:flex;gap:4px">' +
-            '<button type="button" class="btn-ico" title="Subir" onclick="App.kbdMoverItem(' + i + ',-1)"' + (i === 0 ? ' disabled' : '') + '>&uarr;</button>' +
-            '<button type="button" class="btn-ico" title="Descer" onclick="App.kbdMoverItem(' + i + ',1)"' + (i === App._kbdItens.length - 1 ? ' disabled' : '') + '>&darr;</button>' +
-            '<button type="button" class="btn-ico btn-ico-del" title="Remover item" onclick="App.kbdRemItem(' + i + ')">' + App._svg('trash') + '</button>' +
-          '</span>' +
-        '</div>' +
-        '<div class="kbd-item-edit-body">' +
-          '<div class="kbd-item-img-col">' +
-            '<input type="text" id="kbd-lk-' + i + '" class="input-field" placeholder="Link (Drive ou .jpg/.png)" value="' + linkVal + '" oninput="App.kbdPreviewLink(' + i + ')">' +
-            '<div style="display:flex;gap:6px;margin-top:6px">' +
-              '<button type="button" class="btn-secondary" style="flex:1;font-size:.76rem;padding:5px" onclick="App.kbdPedirImg(' + i + ')">Enviar arquivo</button>' +
-              (it.img ? '<button type="button" class="btn-ghost" style="font-size:.76rem;padding:5px;color:#dc2626" onclick="App.kbdTirarImg(' + i + ')">Remover</button>' : '') +
-            '</div>' +
-            '<div class="kbd-pv" id="kbd-pv-' + i + '">' + (it.img ? App._kbdMidia(it) : '') + '</div>' +
-          '</div>' +
-          '<div class="kbd-item-txt-col">' +
-            App._kbdEditor('kbd-ed-' + i, it.texto || '', 'Explique este item...') +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    }).join('') +
-      '<button type="button" class="kbd-add-item" onclick="App.kbdAddItem()">+ Adicionar mais uma informação</button>';
-  },
-
-  /* ── Cabeçalho ── */
-  kbdEditarCabecalho() {
-    const cab = App._kbdInfo().cabecalho;
-    App._kbdCtxInfo = { tipo: 'cabecalho' };
-    document.getElementById('kbi-modal-title').textContent = 'Título e foto';
-    document.getElementById('kbi-campo-titulo').value = cab.titulo || App._kbdProb()?.titulo || '';
-    document.getElementById('kbi-lbl-titulo').textContent = 'Título';
-    document.getElementById('kbi-img-row').style.display = '';
-    document.getElementById('kbi-link').value = (cab.img || '').indexOf('data:') === 0 ? '' : (cab.img || '');
-    App._kbiImg = cab.img || '';
-    document.getElementById('kbi-preview').innerHTML = cab.img ? App._kbdMidia({ img: cab.img }) : '';
-    document.getElementById('kbi-editor-wrap').innerHTML = App._kbdEditor('kbi-conteudo', cab.descricao || '', 'Descrição curta...');
-    document.getElementById('kbi-modal').classList.remove('hidden');
-  },
-
   /* ── Seções (título + texto) ── */
   kbdNovaSecao() {
     App._kbdCtxInfo = { tipo: 'secao', idx: -1 };
@@ -9532,41 +9481,6 @@ const App = {
     document.getElementById('kbg-modal').classList.add('hidden');
   },
 
-  // Excluir pelo modal de edição
-  kbdExcluirGuiaAtual() {
-    const gid = App._kbdCtxGuia; if (!gid) return;
-    document.getElementById('kbg-modal').classList.add('hidden');
-    App.kbdExcluirGuia(gid);
-  },
-
-  /* ── Zoom de imagem ── */
-  _kbdZoomEsc: 1,
-  kbdAbrirZoom(src) {
-    const box = document.getElementById('kbd-zoom');
-    const img = document.getElementById('kbd-zoom-img');
-    if (!box || !img) return;
-    img.src = src;
-    App._kbdZoomEsc = 1;
-    App._kbdAplicaZoom();
-    box.classList.remove('hidden');
-  },
-  kbdZoom(delta) {
-    App._kbdZoomEsc = Math.min(6, Math.max(0.25, App._kbdZoomEsc + delta));
-    App._kbdAplicaZoom();
-  },
-  kbdZoomReset() { App._kbdZoomEsc = 1; App._kbdAplicaZoom(); },
-  _kbdAplicaZoom() {
-    const img = document.getElementById('kbd-zoom-img');
-    const pct = document.getElementById('kbd-zoom-pct');
-    if (img) img.style.transform = 'scale(' + App._kbdZoomEsc + ')';
-    if (pct) pct.textContent = Math.round(App._kbdZoomEsc * 100) + '%';
-  },
-  kbdFecharZoom(ev) {
-    // clicar no fundo fecha; clicar na imagem, não
-    if (ev && ev.target && ev.target.id === 'kbd-zoom-img') return;
-    document.getElementById('kbd-zoom')?.classList.add('hidden');
-  },
-
   /* ── Blocos: criar / editar / mover / excluir ── */
   _kbdItens: [],
   _kbdLayout: 'lado',
@@ -9596,10 +9510,10 @@ const App = {
     document.querySelectorAll('.kbd-lay-btn').forEach(b => b.classList.toggle('active', b.dataset.lay === lay));
   },
 
-  kbdAddItem() { App._kbdSyncItens(); App._kbdItens.push({ img: '', texto: '' }); App._kbdRenderItens(); },
+  kbdAddItem() { App._kbdSyncItens(); App._kbdItens.push({ imgs: [], texto: '' }); App._kbdRenderItens(); },
   kbdRemItem(i) {
     App._kbdSyncItens();
-    if (App._kbdItens.length <= 1) App._kbdItens = [{ img: '', texto: '' }];
+    if (App._kbdItens.length <= 1) App._kbdItens = [{ imgs: [], texto: '' }];
     else App._kbdItens.splice(i, 1);
     App._kbdRenderItens();
   },
@@ -9610,25 +9524,38 @@ const App = {
     App._kbdRenderItens();
   },
 
-  // Lê o que está na tela (editor rich text + campo de link) para o array
+  // Lê o texto dos editores de volta pro array (as imagens já ficam no array)
   _kbdSyncItens() {
     App._kbdItens.forEach((it, i) => {
       const ed = document.getElementById('kbd-ed-' + i);
-      const lk = document.getElementById('kbd-lk-' + i);
       if (ed) it.texto = ed.innerHTML.trim();
-      if (lk && lk.value.trim()) it.img = lk.value.trim();
+      if (!Array.isArray(it.imgs)) it.imgs = it.img ? [it.img] : [];
     });
   },
 
   _kbdItemAlvo: null,
+  // Envia arquivo → acrescenta mais uma imagem no item
   kbdPedirImg(i) { App._kbdSyncItens(); App._kbdItemAlvo = i; document.getElementById('kbd-bloco-file').click(); },
-  kbdTirarImg(i) { App._kbdSyncItens(); if (App._kbdItens[i]) { App._kbdItens[i].img = ''; App._kbdRenderItens(); } },
-  kbdPreviewLink(i) {
-    const lk = document.getElementById('kbd-lk-' + i);
-    if (!lk) return;
-    App._kbdItens[i].img = lk.value.trim();
-    const pv = document.getElementById('kbd-pv-' + i);
-    if (pv) pv.innerHTML = App._kbdItens[i].img ? App._kbdMidia(App._kbdItens[i]) : '';
+  // Adiciona a imagem pelo link digitado
+  kbdAddLink(i) {
+    App._kbdSyncItens();
+    const inp = document.getElementById('kbd-lk-' + i);
+    const v = (inp?.value || '').trim();
+    if (!v) { toast('Cole o link da imagem.', 'error'); return; }
+    App._kbdItens[i].imgs.push(v);
+    if (inp) inp.value = '';
+    App._kbdRenderItens();
+  },
+  kbdRemImg(i, k) {
+    App._kbdSyncItens();
+    if (App._kbdItens[i]) { App._kbdItens[i].imgs.splice(k, 1); App._kbdRenderItens(); }
+  },
+  kbdMoverImg(i, k, dir) {
+    App._kbdSyncItens();
+    const arr = App._kbdItens[i]?.imgs; if (!arr) return;
+    const j = k + dir; if (j < 0 || j >= arr.length) return;
+    const t = arr[k]; arr[k] = arr[j]; arr[j] = t;
+    App._kbdRenderItens();
   },
 
   // Upload com compressão no cliente (evita arquivo pesado no banco)
@@ -9646,7 +9573,11 @@ const App = {
         const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
         cv.getContext('2d').drawImage(img, 0, 0, w, h);
         const i = App._kbdItemAlvo;
-        if (App._kbdItens[i]) { App._kbdItens[i].img = cv.toDataURL('image/jpeg', 0.8); App._kbdRenderItens(); }
+        if (App._kbdItens[i]) {
+          if (!Array.isArray(App._kbdItens[i].imgs)) App._kbdItens[i].imgs = [];
+          App._kbdItens[i].imgs.push(cv.toDataURL('image/jpeg', 0.8));
+          App._kbdRenderItens();
+        }
       };
       img.src = ev.target.result;
     };
@@ -9654,17 +9585,28 @@ const App = {
   },
 
   // Barra de formatação do editor (negrito, itálico, listas, setas, emojis)
-  kbdFmt(cmd, val) { document.execCommand(cmd, false, val || null); },
-  kbdInserir(txt) { document.execCommand('insertText', false, txt); },
-
+  // Cada item pode ter várias imagens — a galeria fica na coluna da esquerda
   _kbdRenderItens() {
     const box = document.getElementById('kbd-itens'); if (!box) return;
-    const simbolos = ['→', '←', '↑', '↓', '✔', '✖', '•', '⚠'];
     box.innerHTML = App._kbdItens.map((it, i) => {
-      const linkVal = (it.img || '').indexOf('data:') === 0 ? '' : (it.img || '');
+      const imgs = Array.isArray(it.imgs) ? it.imgs : (it.img ? [it.img] : []);
+      const listaImgs = imgs.length
+        ? '<div class="kbd-imgs-lista">' + imgs.map((src, k) =>
+            '<div class="kbd-img-mini">' +
+              (App._kbdDriveEmbed(src)
+                ? '<iframe src="' + App._kbdDriveEmbed(src) + '" loading="lazy"></iframe>'
+                : '<img src="' + src + '" alt="">') +
+              '<span class="kbd-img-mini-acts">' +
+                '<button type="button" class="btn-ico" title="Antes" onclick="App.kbdMoverImg(' + i + ',' + k + ',-1)"' + (k === 0 ? ' disabled' : '') + '>&larr;</button>' +
+                '<button type="button" class="btn-ico" title="Depois" onclick="App.kbdMoverImg(' + i + ',' + k + ',1)"' + (k === imgs.length - 1 ? ' disabled' : '') + '>&rarr;</button>' +
+                '<button type="button" class="btn-ico btn-ico-del" title="Remover" onclick="App.kbdRemImg(' + i + ',' + k + ')">' + App._svg('trash') + '</button>' +
+              '</span>' +
+            '</div>').join('') + '</div>'
+        : '<div class="kbd-sem-img-item">Nenhuma imagem neste item.</div>';
+
       return '<div class="kbd-item-edit">' +
         '<div class="kbd-item-edit-head">' +
-          '<span class="kbd-item-num">Item ' + (i + 1) + '</span>' +
+          '<span class="kbd-item-num">Item ' + (i + 1) + (imgs.length ? ' · ' + imgs.length + ' imagem(ns)' : '') + '</span>' +
           '<span style="display:flex;gap:4px">' +
             '<button type="button" class="btn-ico" title="Subir" onclick="App.kbdMoverItem(' + i + ',-1)"' + (i === 0 ? ' disabled' : '') + '>&uarr;</button>' +
             '<button type="button" class="btn-ico" title="Descer" onclick="App.kbdMoverItem(' + i + ',1)"' + (i === App._kbdItens.length - 1 ? ' disabled' : '') + '>&darr;</button>' +
@@ -9673,26 +9615,15 @@ const App = {
         '</div>' +
         '<div class="kbd-item-edit-body">' +
           '<div class="kbd-item-img-col">' +
-            '<input type="text" id="kbd-lk-' + i + '" class="input-field" placeholder="Link (Drive ou .jpg/.png)" value="' + linkVal + '" oninput="App.kbdPreviewLink(' + i + ')">' +
-            '<div style="display:flex;gap:6px;margin-top:6px">' +
-              '<button type="button" class="btn-secondary" style="flex:1;font-size:.76rem;padding:5px" onclick="App.kbdPedirImg(' + i + ')">Enviar arquivo</button>' +
-              (it.img ? '<button type="button" class="btn-ghost" style="font-size:.76rem;padding:5px;color:#dc2626" onclick="App.kbdTirarImg(' + i + ')">Remover</button>' : '') +
+            listaImgs +
+            '<div class="kbd-add-img-row">' +
+              '<input type="text" id="kbd-lk-' + i + '" class="input-field" placeholder="Colar link (Drive ou .jpg/.png)">' +
+              '<button type="button" class="btn-secondary" onclick="App.kbdAddLink(' + i + ')">Adicionar link</button>' +
+              '<button type="button" class="btn-secondary" onclick="App.kbdPedirImg(' + i + ')">Enviar arquivo</button>' +
             '</div>' +
-            '<div class="kbd-pv" id="kbd-pv-' + i + '">' + (it.img ? App._kbdMidia(it) : '') + '</div>' +
           '</div>' +
           '<div class="kbd-item-txt-col">' +
-            '<div class="kbd-fmtbar">' +
-              '<button type="button" onclick="App.kbdFmt(\'bold\')" title="Negrito"><b>B</b></button>' +
-              '<button type="button" onclick="App.kbdFmt(\'italic\')" title="Itálico"><i>I</i></button>' +
-              '<button type="button" onclick="App.kbdFmt(\'underline\')" title="Sublinhado"><u>U</u></button>' +
-              '<button type="button" onclick="App.kbdFmt(\'insertUnorderedList\')" title="Lista">&#8226;</button>' +
-              '<button type="button" onclick="App.kbdFmt(\'insertOrderedList\')" title="Lista numerada">1.</button>' +
-              '<span class="kbd-fmt-sep"></span>' +
-              simbolos.map(s => '<button type="button" onclick="App.kbdInserir(\'' + s + '\')" title="Inserir ' + s + '">' + s + '</button>').join('') +
-              '<span class="kbd-fmt-sep"></span>' +
-              '<button type="button" onclick="App.kbdFmt(\'removeFormat\')" title="Limpar formatação">Tx</button>' +
-            '</div>' +
-            '<div id="kbd-ed-' + i + '" class="kbd-editor" contenteditable="true" data-ph="Explique este item...">' + (it.texto || '') + '</div>' +
+            App._kbdEditor('kbd-ed-' + i, it.texto || '', 'Explique este item...') +
           '</div>' +
         '</div>' +
       '</div>';
