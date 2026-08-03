@@ -10399,6 +10399,25 @@ window.App = App;
    NOVOS RECURSOS v3 — sem alterar lógica existente
 ══════════════════════════════════════════════ */
 
+/* ── Arranque: liga os listeners do Firebase e restaura a sessão ── */
+document.addEventListener('DOMContentLoaded', () => {
+  App.init();
+  const boot = () => {
+    App.initListeners();
+    App.seedDefaults();
+    if (State.adminUser) { App.goTo('screen-admin'); App.renderAdminPanels(); App._restoreAdminTab(); App.resetIdle(); }
+  };
+  if (window._firebaseReady) boot();
+  else document.addEventListener('firebaseReady', boot);
+});
+
+// Ouvinte para o inventário/gerador pedirem o retorno ao painel
+window.addEventListener('message', function(event) {
+  if (event.data === 'fecharInventario' || event.data === 'fecharGeradorPDF') {
+    App.backToCompras();
+  }
+});
+
 /* ── Sidebar hambúrguer ──────────────────────── */
 App.toggleSidebar = function() {
   const sb   = document.getElementById('main-sidebar');
