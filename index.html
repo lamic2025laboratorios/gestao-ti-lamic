@@ -32,7 +32,7 @@
 </head>
 <body>
 
-<!-- ══ TELA 1 — HOME ══ -->
+<!-- ==.==.== TELA 1 ==?" HOME ==.==.== -->
 <div id="screen-home" class="screen active">
   <div class="home-bg">
     <div class="home-grid"></div>
@@ -88,7 +88,7 @@
     <div class="home-card-right">
       <img class="home-logo-main" src="img/LAMIC (VERTICAL).png" alt="LAMIC Laboratório" onerror="this.style.display='none'" />
       <div class="home-logo-strip">
-        <img src="img/RÉGUA DE LOGOS.png"    alt="LAMIC" onerror="this.style.display='none'" />
+        <img src="img/R==?GUA DE LOGOS.png"    alt="LAMIC" onerror="this.style.display='none'" />
         <img src="assets/logo-lamic-aquamed.png" alt="LAMIC Aquamed" onerror="this.style.display='none'" />
         <img src="assets/logo-lamic-kids.png"   alt="LAMIC Kids" onerror="this.style.display='none'" />
         <img src="assets/logo-lamic-vital.png"  alt="LAMIC Vital" onerror="this.style.display='none'" />
@@ -97,7 +97,7 @@
   </div>
 </div>
 
-<!-- ══ TELA 2 — LOGIN UNIDADES ══ -->
+<!-- ==.==.== TELA 2 ==?" LOGIN UNIDADES ==.==.== -->
 <div id="screen-units-login" class="screen">
   <div class="page-topbar">
     <button class="back-btn" onclick="App.goTo('screen-home')">
@@ -106,7 +106,7 @@
     </button>
     <div class="page-topbar-title">
       <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2"/></svg>
-      Acesso — Unidades
+      Acesso ==?" Unidades
     </div>
   </div>
   <div class="units-login-wrap">
@@ -116,7 +116,7 @@
       <div class="form-group">
         <label class="form-label">Unidade</label>
         <select id="unit-select" class="input-field select-styled" onchange="App.onUnitSelectChange()">
-          <option value="">— Selecione uma unidade —</option>
+          <option value="">==?" Selecione uma unidade ==?"</option>
         </select>
       </div>
       <div id="unit-selected-info" class="unit-selected-info hidden">
@@ -131,7 +131,7 @@
   </div>
 </div>
 
-<!-- ══ TELA 3 — LOGIN ADMIN ══ -->
+<!-- ==.==.== TELA 3 ==?" LOGIN ADMIN ==.==.== -->
 <div id="screen-admin-login" class="screen">
   <div class="page-topbar">
     <button class="back-btn" onclick="App.goTo('screen-home')">
@@ -178,7 +178,7 @@
   </div>
 </div>
 
-<!-- ══ TELA 4 — PAINEL SOLICITAÇÃO ══ -->
+<!-- ==.==.== TELA 4 ==?" PAINEL SOLICITA==?==fO ==.==.== -->
 <div id="screen-request" class="screen">
   <div class="req-topbar">
     <div class="req-topbar-left">
@@ -186,7 +186,7 @@
         <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="8" fill="#1a3a6b"/><rect x="6" y="6" width="10" height="10" rx="2" fill="#4a90d9"/><rect x="20" y="6" width="10" height="10" rx="2" fill="#4a90d9" opacity=".5"/><rect x="6" y="20" width="10" height="10" rx="2" fill="#4a90d9" opacity=".5"/><rect x="20" y="20" width="10" height="10" rx="2" fill="#fff" opacity=".9"/></svg>
         <div>
           <div class="req-brand-name">TI Compras</div>
-          <div class="req-brand-unit" id="topbar-unit-name">—</div>
+          <div class="req-brand-unit" id="topbar-unit-name">==?"</div>
         </div>
       </div>
     </div>
@@ -244,7 +244,7 @@
             <span class="urgency-thumb"></span>
           </span>
           <span class="urgency-text">
-            <span class="urgency-label">🚨 Marcar como URGENTE</span>
+            <span class="urgency-label">==Ys== Marcar como URGENTE</span>
             <span class="urgency-hint">O administrador será notificado da prioridade</span>
           </span>
         </label>
@@ -267,7 +267,7 @@
   </div>
 </div>
 
-<!-- ══ TELA 5 — PAINEL ADMIN ══ -->
+<!-- ==.==.== TELA 5 ==?" PAINEL ADMIN ==.==.== -->
 <div id="screen-admin" class="screen">
   <div class="admin-layout">
     <!-- SIDEBAR -->
@@ -284,45 +284,69 @@
       <!-- sidebar-brand mantido vazio para não quebrar seletores CSS existentes -->
       <div class="sidebar-brand" style="display:none"></div>
       <nav class="sidebar-nav">
-        <div class="nav-section-label sb-txt">Estoque</div>
-        <button class="nav-item active" data-tab="tab-dashboard" onclick="App.adminTab(this)" data-tip="Dashboard">
-          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>
-          <span class="ni-txt">Dashboard</span>
-          <span class="ni-tip">Dashboard</span>
+        <!-- ==.==.==.== MENU PRINCIPAL (some no modo Financeiro) ==.==.==.== -->
+        <div class="nav-section-label sb-txt menu-only">Menu principal</div>
+        <button class="nav-item menu-only" data-tab="tab-unilamic" onclick="App.adminTab(this)" data-tip="Home">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M3 21h18M5 21V9l7-5 7 5v12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 21v-6h6v6" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <span class="ni-txt">Home</span>
+          <span class="ni-tip">Home</span>
         </button>
-        <button class="nav-item" data-tab="tab-calendar" onclick="App.adminTab(this)" data-tip="Calendário">
-          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>
-          <span class="ni-txt">Calendário</span>
-          <span class="ni-tip">Calendário</span>
-        </button>
-        <button class="nav-item" data-tab="tab-requests" onclick="App.adminTab(this)" data-tip="Solicitações">
-          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg>
-          <span class="ni-txt">Solicitações</span>
-          <span class="nav-badge" id="nav-badge-pending">0</span>
-          <span class="ni-tip">Solicitações <span class="ni-tip-badge" id="ni-tip-badge">0</span></span>
-        </button>
-        <button class="nav-item" data-tab="tab-estoque" onclick="App.adminTab(this)" data-tip="Estoque">
-          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
-          <span class="ni-txt">Estoque</span>
-          <span class="ni-tip">Estoque</span>
-        </button>
-        <button class="nav-item" data-tab="tab-settings" onclick="App.adminTab(this)" data-tip="Configurações">
+        <button class="nav-item menu-only" data-tab="tab-home-config" onclick="App.adminTab(this)" data-tip="Configurações">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/></svg>
           <span class="ni-txt">Configurações</span>
           <span class="ni-tip">Configurações</span>
         </button>
-        <div class="nav-section-label sb-txt">Gestão</div>
-        <button class="nav-item" data-tab="tab-inventario" onclick="App.adminTab(this)" data-tip="Inventário TI">
+        <div class="nav-section-label sb-txt menu-only">Gestão</div>
+
+        <!-- Financeiro ==?" abre o portal financeiro (mesma ideia do Inventário) -->
+        <button class="nav-item menu-only" id="nav-grp-financeiro" onclick="App.abrirFinanceiro()" data-tip="Financeiro">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="ni-txt">Financeiro</span>
+          <span class="nav-badge" id="nav-badge-grp-fin">0</span>
+          <span class="ni-tip">Financeiro</span>
+        </button>
+
+        <!-- ==.==.==.== PORTAL FINANCEIRO (só aparece dentro do modo) ==.==.==.== -->
+        <div class="nav-section-label sb-txt fin-only">Financeiro</div>
+        <div class="nav-subgroup" id="nav-sub-financeiro">
+          <button class="nav-item nav-sub-item active" data-tab="tab-dashboard" onclick="App.adminTab(this)" data-tip="Dashboard">
+            <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>
+            <span class="ni-txt">Dashboard</span>
+            <span class="ni-tip">Dashboard</span>
+          </button>
+          <button class="nav-item nav-sub-item" data-tab="tab-calendar" onclick="App.adminTab(this)" data-tip="Calendário">
+            <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>
+            <span class="ni-txt">Calendário</span>
+            <span class="ni-tip">Calendário</span>
+          </button>
+          <button class="nav-item nav-sub-item" data-tab="tab-requests" onclick="App.adminTab(this)" data-tip="Solicitações">
+            <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg>
+            <span class="ni-txt">Solicitações</span>
+            <span class="nav-badge" id="nav-badge-pending">0</span>
+            <span class="ni-tip">Solicitações <span class="ni-tip-badge" id="ni-tip-badge">0</span></span>
+          </button>
+          <button class="nav-item nav-sub-item" data-tab="tab-estoque" onclick="App.adminTab(this)" data-tip="Estoque">
+            <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+            <span class="ni-txt">Estoque</span>
+            <span class="ni-tip">Estoque</span>
+          </button>
+          <button class="nav-item nav-sub-item" data-tab="tab-settings" onclick="App.adminTab(this)" data-tip="Configurações">
+            <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/></svg>
+            <span class="ni-txt">Configurações</span>
+            <span class="ni-tip">Configurações</span>
+          </button>
+        </div>
+        <button class="nav-item menu-only" data-tab="tab-inventario" onclick="App.adminTab(this)" data-tip="Inventário TI">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/><polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="currentColor" stroke-width="2"/><line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2"/></svg>
           <span class="ni-txt">Inventário TI</span>
           <span class="ni-tip">Inventário TI</span>
         </button>
-        <button class="nav-item" onclick="window.location.href='relatorios.html'" data-tip="Relatórios">
+        <button class="nav-item menu-only" onclick="window.location.href='relatorios.html'" data-tip="Relatórios">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><line x1="18" y1="20" x2="18" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="20" x2="12" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="20" x2="6" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           <span class="ni-txt">Relatórios</span>
           <span class="ni-tip">Relatórios</span>
         </button>
-        <button class="nav-item" data-tab="tab-gerador-pdf" onclick="App.adminTab(this)" data-tip="Gerador de PDFs">
+        <button class="nav-item menu-only" data-tab="tab-gerador-pdf" onclick="App.adminTab(this)" data-tip="Gerador de PDFs">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2"/></svg>
           <span class="ni-txt">Gerador de PDFs</span>
           <span class="ni-tip">Gerador de PDFs</span>
@@ -330,6 +354,10 @@
       </nav>
       <div class="sidebar-account">
         <div class="sb-user-menu hidden" id="sb-user-menu">
+          <button class="sb-user-menu-item fin-only" onclick="App.voltarMenuPrincipal()">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Voltar ao menu principal
+          </button>
           <button class="sb-user-menu-item danger" onclick="App.adminLogout()">
             <svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2"/></svg>
             Sair do sistema
@@ -350,7 +378,269 @@
     <!-- MAIN -->
     <main class="admin-main">
 
-      <!-- ── DASHBOARD ── -->
+      <!-- =="?=="? HOME ==?" Base de Problemas & Soluções =="?=="? -->
+      <div id="tab-unilamic" class="tab-panel">
+        <div class="tab-header dash-topbar">
+          <div>
+            <h2>Home</h2>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="idle-chip" id="idle-chip" title="Tempo restante até o logout automático por inatividade">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span id="idle-timer">60:00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Duas seções: problemas recorrentes e guias de instalação -->
+        <div class="kb-secoes">
+          <button class="kb-secao active" data-sec="problema" onclick="App.kbSecao('problema',this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="19" height="19"><path d="M10.3 3.6L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.6a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+            <span class="kb-secao-txt">Problemas<small>Falhas recorrentes e suas soluções</small></span>
+            <span class="kb-secao-n" id="kb-n-problema">0</span>
+          </button>
+          <button class="kb-secao" data-sec="instalacao" onclick="App.kbSecao('instalacao',this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="19" height="19"><path d="M14.7 6.3a4 4 0 01-5 5L4 17v3h3l5.7-5.7a4 4 0 015-5l2.3-2.3-2-2-2.3 2.3z"/></svg>
+            <span class="kb-secao-txt">Instalação<small>Tutoriais de instalação de equipamentos</small></span>
+            <span class="kb-secao-n" id="kb-n-instalacao">0</span>
+          </button>
+        </div>
+
+        <!-- Status geral + atalho de cadastro -->
+        <div class="kb-topo">
+          <div class="kb-status-box">
+            <div class="kb-status-item kb-st-aberto" onclick="App.kbSetStatus('aberto')">
+              <div class="kb-status-num" id="kb-num-aberto">0</div>
+              <div class="kb-status-lbl">Aberto</div>
+              <div class="kb-status-sub">sem solução registrada</div>
+            </div>
+            <div class="kb-status-sep"></div>
+            <div class="kb-status-item kb-st-fechado" onclick="App.kbSetStatus('fechado')">
+              <div class="kb-status-num" id="kb-num-fechado">0</div>
+              <div class="kb-status-lbl">Fechado</div>
+              <div class="kb-status-sub">com solução registrada</div>
+            </div>
+          </div>
+          <button class="kb-add-card" onclick="App.kbNovo()" title="Adicionar WIKI">
+            <svg viewBox="0 0 24 24" fill="none" width="34" height="34"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            <span>Adicionar<br>WIKI</span>
+          </button>
+        </div>
+
+        <!-- Busca + filtros -->
+        <div class="kb-toolbar">
+          <div class="req-search-wrap kb-busca">
+            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
+            <input type="text" id="kb-search" class="req-search-input" placeholder="Buscar por código, nome, grupo..." oninput="App.kbRender()" />
+          </div>
+          <div class="filter-popover-wrap">
+            <button class="btn-filter-toggle" id="kb-btn-filtro" onclick="App.kbToggleFiltro(event)" title="Filtros">
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="nav-badge" id="kb-filtro-badge" style="display:none">0</span>
+            </button>
+            <div class="filter-popover" id="kb-filtro-popover">
+              <div class="filter-popover-row">
+                <label class="form-label">Status</label>
+                <select id="kb-filter-status" class="filter-select" onchange="App.kbRender()">
+                  <option value="">Todos</option>
+                  <option value="aberto">Aberto</option>
+                  <option value="fechado">Fechado</option>
+                </select>
+              </div>
+              <div class="filter-popover-row">
+                <label class="form-label">Prioridade</label>
+                <select id="kb-filter-grav" class="filter-select" onchange="App.kbRender()">
+                  <option value="">Todas</option>
+                  <option value="simples">Simples</option>
+                  <option value="medio">Médio</option>
+                  <option value="grave">Grave</option>
+                  <option value="critico">Crítico</option>
+                </select>
+              </div>
+              <div class="filter-popover-row">
+                <label class="form-label">Grupo</label>
+                <select id="kb-filter-grupo" class="filter-select" onchange="App.kbRender()">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div class="filter-popover-row">
+                <label class="form-label">Subgrupo</label>
+                <select id="kb-filter-sub" class="filter-select" onchange="App.kbRender()">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div class="filter-popover-row">
+                <button class="btn-ghost" style="width:100%" onclick="App.kbLimparFiltros()">Limpar filtros</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="kb-table-wrap">
+          <table class="kb-table">
+            <thead>
+              <tr>
+                <th style="width:96px">ID</th>
+                <th id="kb-th-nome">Nome do problema</th>
+                <th style="width:110px">Prioridade</th>
+                <th style="width:150px">Grupo</th>
+                <th style="width:150px">Subgrupo</th>
+                <th style="width:110px">Status</th>
+                <th style="width:88px;text-align:right">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="kb-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- =="?=="? DETALHE DO PROBLEMA (página própria) =="?=="? -->
+      <div id="tab-kb-detalhe" class="tab-panel">
+        <div class="kbd-layout">
+          <!-- Coluna lateral -->
+          <aside class="kbd-side">
+            <div class="kbd-side-top">
+              <div class="kbd-side-head">
+                <button class="kbd-voltar" onclick="App.kbdVoltar()" title="Voltar (ESC)">
+                  <svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button class="btn-ico" id="kbd-btn-editar" title="Editar dados do problema">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+                </button>
+              </div>
+              <div class="kbd-user">
+                <div class="kbd-avatar" id="kbd-avatar">A</div>
+                <div>
+                  <div class="kbd-user-nome" id="kbd-user-nome">==?"</div>
+                  <div class="kbd-user-cargo" id="kbd-user-cargo">Administrador</div>
+                </div>
+              </div>
+              <div class="kbd-badges" id="kbd-badges"></div>
+            </div>
+            <div class="kbd-side-bottom" id="kbd-side-bottom"></div>
+          </aside>
+
+          <!-- Área principal -->
+          <section class="kbd-main">
+            <div class="kbd-topbar">
+              <div class="kbd-tabs">
+                <button class="kbd-tab active" data-aba="info"  onclick="App.kbdAba('info',this)">Informação <span class="kbd-badge" id="kbd-b-info">0</span></button>
+                <button class="kbd-tab" data-aba="resol" onclick="App.kbdAba('resol',this)">Resolução <span class="kbd-badge" id="kbd-b-resol">0</span></button>
+                <button class="kbd-tab" data-aba="coment" onclick="App.kbdAba('coment',this)">Comentários <span class="kbd-badge" id="kbd-b-coment">0</span></button>
+                <button class="kbd-tab" data-aba="links" onclick="App.kbdAba('links',this)">Links <span class="kbd-badge" id="kbd-b-links">0</span></button>
+              </div>
+            </div>
+            <div class="kbd-conteudo" id="kbd-conteudo"></div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- ══ PERFIL DO USUÁRIO ══ -->
+      <div id="tab-perfil" class="tab-panel">
+        <div class="tab-header dash-topbar">
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="kbd-voltar" onclick="App.perfilVoltar()" title="Voltar">
+              <svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <h2 id="perfil-titulo">Perfil</h2>
+          </div>
+        </div>
+        <div class="perfil-layout">
+          <aside class="perfil-side">
+            <div class="perfil-card">
+              <div class="perfil-avatar" id="perfil-avatar">A</div>
+              <div class="perfil-nome" id="perfil-nome">—</div>
+              <div class="perfil-user" id="perfil-user">@—</div>
+              <div class="perfil-stats" id="perfil-stats"></div>
+            </div>
+            <nav class="perfil-nav">
+              <button class="perfil-nav-item active" data-aba="sobre" onclick="App.perfilAba('sobre',this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M14 9h4M14 13h4M5 16c.8-1.5 2-2 3-2s2.2.5 3 2"/></svg>
+                Sobre
+              </button>
+              <button class="perfil-nav-item" data-aba="contrib" onclick="App.perfilAba('contrib',this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="8" y="2" width="13" height="17" rx="2"/><path d="M16 22H5a2 2 0 01-2-2V6"/></svg>
+                Contribuições
+              </button>
+              <button class="perfil-nav-item" data-aba="ativ" onclick="App.perfilAba('ativ',this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                Atividade
+              </button>
+            </nav>
+          </aside>
+          <section class="perfil-main" id="perfil-conteudo"></section>
+        </div>
+      </div>
+      <!-- =="?=="? CONFIGURA==?==.ES DA HOME =="?=="? -->
+      <div id="tab-home-config" class="tab-panel">
+        <div class="tab-header dash-topbar">
+          <div>
+            <h2>Configurações</h2>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <!-- Grupos da base de problemas -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-icon" style="background:#e8f0fe;color:#1d4ed8">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div><h3>Grupos da Home</h3><p>Categorias usadas nos problemas</p></div>
+            </div>
+            <p class="config-tools-desc">Cadastre aqui os grupos. Clique num grupo para ver e editar os subgrupos dele.</p>
+            <div class="settings-list-box"><div id="hc-list-grupos" class="settings-list"></div></div>
+            <div class="add-row" style="display:flex;gap:8px;margin-top:10px">
+              <input type="text" id="hc-novo-grupo" class="input-field" placeholder="Ex: Impressoras" style="flex:1"
+                     onkeydown="if(event.key==='Enter') App.hcAddGrupo()">
+              <button class="btn-add" onclick="App.hcAddGrupo()">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+                Adicionar
+              </button>
+            </div>
+          </div>
+
+          <!-- Subgrupos da base de problemas -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-card-icon" style="background:#dcfce7;color:#059669">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M3 7h18M3 12h18M3 17h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </div>
+              <div><h3>Subgrupos da Home</h3><p id="hc-sub-hint">Marca/modelo dentro de cada grupo</p></div>
+            </div>
+            <p class="config-tools-desc" id="hc-sub-desc">Selecione um grupo ao lado para gerenciar os subgrupos dele.</p>
+            <div class="settings-list-box"><div id="hc-list-subs" class="settings-list"></div></div>
+            <div class="add-row" id="hc-add-sub-row" style="display:none;gap:8px;margin-top:10px">
+              <input type="text" id="hc-novo-sub" class="input-field" placeholder="Ex: Epson L3250" style="flex:1"
+                     onkeydown="if(event.key==='Enter') App.hcAddSub()">
+              <button class="btn-add" onclick="App.hcAddSub()">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+                Adicionar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Administradores -->
+        <div class="settings-card admin-section-card" style="margin-top:18px">
+          <div class="settings-card-header">
+            <div class="settings-card-icon green">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2"/></svg>
+            </div>
+            <div><h3>Administradores do Sistema</h3><p>Usuários com acesso administrativo</p></div>
+          </div>
+          <div id="admin-cards-grid-home" class="admin-cards-grid admin-cards-fixed"></div>
+          <div class="add-admin-bar" style="justify-content:flex-end">
+            <button class="btn-primary" onclick="App.abrirNovoUsuario()">
+              <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:5px"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/><path d="M19 8v6M22 11h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Cadastrar novo usuário
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- =="?=="? DASHBOARD FINANCEIRO =="?=="? -->
       <div id="tab-dashboard" class="tab-panel active">
         <div class="tab-header dash-topbar">
           <div>
@@ -358,10 +648,6 @@
             <p class="tab-subtitle">Visão geral das solicitações e gastos</p>
           </div>
           <div class="dash-controls">
-            <div class="idle-chip" id="idle-chip" title="Tempo restante até o logout automático por inatividade">
-              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-              <span id="idle-timer">60:00</span>
-            </div>
             <button class="btn-dash-print" onclick="App.printDashboard()" title="Baixar relatório em PDF">
               <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Relatório
@@ -373,15 +659,15 @@
         <div class="kpi-row">
           <div class="kpi-card k-blue kpi-clickable" onclick="App.showTotalKpi()" title="Clique para ver por unidade">
             <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado ↗</div></div>
+            <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado ==?-</div></div>
           </div>
           <div class="kpi-card k-red kpi-clickable" onclick="App.showKpiList('Negado')" title="Clique para ver pedidos negados">
             <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados ↗</div></div>
+            <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados ==?-</div></div>
           </div>
           <div class="kpi-card k-teal kpi-clickable" onclick="App.showKpiList('Comprado')" title="Clique para ver pedidos comprados">
             <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><polyline points="20 12 20 22 4 22 4 12" stroke="currentColor" stroke-width="2"/><rect x="2" y="7" width="20" height="5" stroke="currentColor" stroke-width="2"/><path d="M12 22V7" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados ↗</div></div>
+            <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados ==?-</div></div>
           </div>
           <div class="kpi-card k-orange">
             <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2"/><line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="2"/></svg></div>
@@ -444,12 +730,12 @@
               <span>De</span>
               <input type="date" id="filter-date-from" class="input-field" onchange="App.clearYearSelect();App.renderDashboard()" />
             </label>
-            <span class="date-range-sep">→</span>
+            <span class="date-range-sep">==?'</span>
             <label class="date-range-field">
               <span>Até</span>
               <input type="date" id="filter-date-to" class="input-field" onchange="App.clearYearSelect();App.renderDashboard()" />
             </label>
-            <button class="btn-date-clear" onclick="App.clearDateRange()" title="Limpar datas">✕ Limpar</button>
+            <button class="btn-date-clear" onclick="App.clearDateRange()" title="Limpar datas">==o. Limpar</button>
           </div>
           <div class="date-range-actions">
             <div class="dash-search-wrap">
@@ -526,7 +812,7 @@
             <!-- Central de Tratamento de Novas Solicitações -->
             <div class="chart-card mgmt-card mgmt-card-right">
               <div class="chart-card-header">
-                <span>Central de Tratamento — Novas Solicitações</span>
+                <span>Central de Tratamento ==?" Novas Solicitações</span>
                 <span class="chart-badge" id="novas-sol-count"></span>
               </div>
               <div id="novas-sol-feed" class="mgmt-feed"></div>
@@ -557,7 +843,7 @@
                 <div class="cmp-gauge-wrap">
                   <canvas id="chart-cmp-gauge"></canvas>
                   <div class="cmp-gauge-center">
-                    <div class="cmp-gauge-pct" id="cmp-gauge-pct">—</div>
+                    <div class="cmp-gauge-pct" id="cmp-gauge-pct">==?"</div>
                     <div class="cmp-gauge-lbl" id="cmp-gauge-lbl">da meta</div>
                   </div>
                 </div>
@@ -567,7 +853,7 @@
               <div class="cmp-years-row">
                 <div class="cmp-year-card cmp-year-card--cur">
                   <div class="cmp-year-top">
-                    <span class="cmp-year-num" id="cmp-cur-year">—</span>
+                    <span class="cmp-year-num" id="cmp-cur-year">==?"</span>
                     <span class="cmp-year-tag">Atual</span>
                   </div>
                   <div class="cmp-year-val" id="cmp-cur-val">R$ 0</div>
@@ -575,7 +861,7 @@
                 </div>
                 <div class="cmp-year-card cmp-year-card--prev">
                   <div class="cmp-year-top">
-                    <span class="cmp-year-num" id="cmp-prev-year">—</span>
+                    <span class="cmp-year-num" id="cmp-prev-year">==?"</span>
                     <span class="cmp-year-tag cmp-year-tag--prev">Anterior</span>
                   </div>
                   <div class="cmp-year-val" id="cmp-prev-val">R$ 0</div>
@@ -603,7 +889,7 @@
             <div id="unit-spending-list" class="unit-spending-list"></div>
           </div>
 
-          <!-- ── Parcelas + Log de Atividades (dentro da coluna esquerda) ── -->
+          <!-- =="?=="? Parcelas + Log de Atividades (dentro da coluna esquerda) =="?=="? -->
           <div class="dash-mgmt-grid">
 
           <!-- Card 1: Métrica de Compras Parceladas -->
@@ -681,7 +967,7 @@
         <div id="parcelas-modal" class="modal-overlay hidden">
           <div class="modal-card" style="max-width:760px">
             <div class="modal-header">
-              <h3>Compras Parceladas — status das parcelas</h3>
+              <h3>Compras Parceladas ==?" status das parcelas</h3>
               <button class="modal-close" onclick="document.getElementById('parcelas-modal').classList.add('hidden')">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
               </button>
@@ -707,7 +993,7 @@
                 </label>
 
                 <div class="meta-field">
-                  <span>Gasto do ano anterior (<b id="meta-prev-year-lbl">—</b>)</span>
+                  <span>Gasto do ano anterior (<b id="meta-prev-year-lbl">==?"</b>)</span>
                   <div class="meta-prev-wrap">
                     <input type="text" id="meta-prev-val" class="input-field" placeholder="R$ 0,00" oninput="App.recalcMetaPreview()">
                     <span class="meta-prev-src" id="meta-prev-src"></span>
@@ -722,7 +1008,7 @@
 
                 <div class="meta-preview" id="meta-preview">
                   <div class="meta-preview-row">
-                    <span>Gasto atual (<b id="meta-cur-year-lbl">—</b>, automático)</span>
+                    <span>Gasto atual (<b id="meta-cur-year-lbl">==?"</b>, automático)</span>
                     <strong id="meta-cur-val">R$ 0,00</strong>
                   </div>
                   <div class="meta-preview-row meta-preview-target">
@@ -736,7 +1022,7 @@
                   <div class="meta-status-box" id="meta-status-box"></div>
                 </div>
 
-                <!-- Histórico de metas por ano — bateu / não bateu -->
+                <!-- Histórico de metas por ano ==?" bateu / não bateu -->
                 <div class="meta-hist-section">
                   <div class="meta-hist-title">Histórico de Metas</div>
                   <div class="meta-hist-list" id="meta-hist-list"></div>
@@ -750,7 +1036,7 @@
           </div>
         </div>
 
-        <!-- ── Cards de Consumo: Tintas e Pilhas/Baterias ── -->
+        <!-- =="?=="? Cards de Consumo: Tintas e Pilhas/Baterias =="?=="? -->
         <div class="consumo-grid">
 
           <!-- Card Tintas -->
@@ -774,7 +1060,7 @@
               <div class="consumo-main">
                 <div class="consumo-big" id="ink-count">0</div>
                 <div class="consumo-big-lbl">tintas no período</div>
-                <span class="consumo-trend" id="ink-trend">—</span>
+                <span class="consumo-trend" id="ink-trend">==?"</span>
               </div>
               <div class="consumo-stats">
                 <div class="consumo-stat">
@@ -783,15 +1069,15 @@
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Cor mais comprada</span>
-                  <span class="consumo-stat-val" id="ink-top-color">—</span>
+                  <span class="consumo-stat-val" id="ink-top-color">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Unidade que mais comprou</span>
-                  <span class="consumo-stat-val" id="ink-top-unit">—</span>
+                  <span class="consumo-stat-val" id="ink-top-unit">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="ink-top-solicitante">—</span>
+                  <span class="consumo-stat-val" id="ink-top-solicitante">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl" id="ink-prev-lbl">Período anterior</span>
@@ -823,7 +1109,7 @@
               <div class="consumo-main">
                 <div class="consumo-big" id="bat-count">0</div>
                 <div class="consumo-big-lbl">unidades no período</div>
-                <span class="consumo-trend" id="bat-trend">—</span>
+                <span class="consumo-trend" id="bat-trend">==?"</span>
               </div>
               <div class="consumo-stats">
                 <div class="consumo-stat">
@@ -832,15 +1118,15 @@
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Modelo mais comprado</span>
-                  <span class="consumo-stat-val" id="bat-top-model">—</span>
+                  <span class="consumo-stat-val" id="bat-top-model">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Unidade que mais comprou</span>
-                  <span class="consumo-stat-val" id="bat-top-unit">—</span>
+                  <span class="consumo-stat-val" id="bat-top-unit">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="bat-top-solicitante">—</span>
+                  <span class="consumo-stat-val" id="bat-top-solicitante">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl" id="bat-prev-lbl">Período anterior</span>
@@ -872,7 +1158,7 @@
               <div class="consumo-main">
                 <div class="consumo-big" id="outros-count">0</div>
                 <div class="consumo-big-lbl">itens no período</div>
-                <span class="consumo-trend" id="outros-trend">—</span>
+                <span class="consumo-trend" id="outros-trend">==?"</span>
               </div>
               <div class="consumo-stats">
                 <div class="consumo-stat">
@@ -881,15 +1167,15 @@
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Subgrupo mais comprado</span>
-                  <span class="consumo-stat-val" id="outros-top-subgrupo">—</span>
+                  <span class="consumo-stat-val" id="outros-top-subgrupo">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Unidade que mais comprou</span>
-                  <span class="consumo-stat-val" id="outros-top-unit">—</span>
+                  <span class="consumo-stat-val" id="outros-top-unit">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="outros-top-solicitante">—</span>
+                  <span class="consumo-stat-val" id="outros-top-solicitante">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl" id="outros-prev-lbl">Período anterior</span>
@@ -921,7 +1207,7 @@
               <div class="consumo-main">
                 <div class="consumo-big" id="concerto-count">0</div>
                 <div class="consumo-big-lbl">consertos no período</div>
-                <span class="consumo-trend" id="concerto-trend">—</span>
+                <span class="consumo-trend" id="concerto-trend">==?"</span>
               </div>
               <div class="consumo-stats">
                 <div class="consumo-stat">
@@ -930,15 +1216,15 @@
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Modelo que mais deu problema</span>
-                  <span class="consumo-stat-val" id="concerto-top-model">—</span>
+                  <span class="consumo-stat-val" id="concerto-top-model">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Unidade que mais deu problema</span>
-                  <span class="consumo-stat-val" id="concerto-top-unit">—</span>
+                  <span class="consumo-stat-val" id="concerto-top-unit">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="concerto-top-solicitante">—</span>
+                  <span class="consumo-stat-val" id="concerto-top-solicitante">==?"</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl" id="concerto-prev-lbl">Período anterior</span>
@@ -952,7 +1238,7 @@
         </div>
       </div>
 
-      <!-- ── ESTOQUE ── -->
+      <!-- =="?=="? ESTOQUE =="?=="? -->
       <div id="tab-estoque" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
@@ -1017,19 +1303,19 @@
         <!-- Card resumo de movimentação -->
         <div id="estoque-resumo-card" class="estoque-resumo-card hidden">
           <div class="resumo-box resumo-ent">
-            <div class="resumo-ico">↓</div>
+            <div class="resumo-ico">==?"</div>
             <div><div class="resumo-val" id="resumo-entradas">0</div><div class="resumo-lbl">Entradas</div></div>
           </div>
           <div class="resumo-box resumo-sai">
-            <div class="resumo-ico">↑</div>
+            <div class="resumo-ico">==?'</div>
             <div><div class="resumo-val" id="resumo-saidas">0</div><div class="resumo-lbl">Saídas</div></div>
           </div>
           <div class="resumo-box resumo-sld">
-            <div class="resumo-ico">∑</div>
+            <div class="resumo-ico">==^'</div>
             <div><div class="resumo-val" id="resumo-saldo">0</div><div class="resumo-lbl">Saldo Total</div></div>
           </div>
           <div class="resumo-box resumo-zer">
-            <div class="resumo-ico">⚠</div>
+            <div class="resumo-ico">==s==</div>
             <div><div class="resumo-val" id="resumo-zerados">0</div><div class="resumo-lbl">Zerados</div></div>
           </div>
         </div>
@@ -1056,9 +1342,9 @@
             </table>
           </div>
           <div id="estoque-pager" class="estoque-pager hidden">
-            <button id="estoque-prev" class="estoque-pager-btn" onclick="App.estoquePage('prev')">‹ Anterior</button>
+            <button id="estoque-prev" class="estoque-pager-btn" onclick="App.estoquePage('prev')">==?== Anterior</button>
             <span id="estoque-pager-info" class="estoque-pager-info">1 / 1</span>
-            <button id="estoque-next" class="estoque-pager-btn" onclick="App.estoquePage('next')">Próximo ›</button>
+            <button id="estoque-next" class="estoque-pager-btn" onclick="App.estoquePage('next')">Próximo ==?==</button>
           </div>
         </div>
 
@@ -1073,8 +1359,8 @@
               </div>
               <div class="emc-actions">
                 <div class="emc-sort">
-                  <button class="emc-sort-btn active" id="sort-ent-desc" onclick="App.setMovSort('entrada','desc',this)" title="Mais recente">↓</button>
-                  <button class="emc-sort-btn" id="sort-ent-asc" onclick="App.setMovSort('entrada','asc',this)" title="Mais antiga">↑</button>
+                  <button class="emc-sort-btn active" id="sort-ent-desc" onclick="App.setMovSort('entrada','desc',this)" title="Mais recente">==?"</button>
+                  <button class="emc-sort-btn" id="sort-ent-asc" onclick="App.setMovSort('entrada','asc',this)" title="Mais antiga">==?'</button>
                 </div>
                 <button class="emc-ver-btn" onclick="App.openMovHist('entrada')">Histórico</button>
               </div>
@@ -1096,8 +1382,8 @@
               </div>
               <div class="emc-actions">
                 <div class="emc-sort">
-                  <button class="emc-sort-btn active" id="sort-sai-desc" onclick="App.setMovSort('saida','desc',this)" title="Mais recente">↓</button>
-                  <button class="emc-sort-btn" id="sort-sai-asc" onclick="App.setMovSort('saida','asc',this)" title="Mais antiga">↑</button>
+                  <button class="emc-sort-btn active" id="sort-sai-desc" onclick="App.setMovSort('saida','desc',this)" title="Mais recente">==?"</button>
+                  <button class="emc-sort-btn" id="sort-sai-asc" onclick="App.setMovSort('saida','asc',this)" title="Mais antiga">==?'</button>
                 </div>
                 <button class="emc-ver-btn" onclick="App.openMovHist('saida')">Histórico</button>
               </div>
@@ -1132,9 +1418,9 @@
               </table>
             </div>
             <div class="estoque-pager" style="margin-top:14px">
-              <button id="mov-hist-prev" class="estoque-pager-btn" onclick="App.movHistPage('prev')">‹ Anterior</button>
+              <button id="mov-hist-prev" class="estoque-pager-btn" onclick="App.movHistPage('prev')">==?== Anterior</button>
               <span id="mov-hist-pager-info" class="estoque-pager-info">1 / 1</span>
-              <button id="mov-hist-next" class="estoque-pager-btn" onclick="App.movHistPage('next')">Próximo ›</button>
+              <button id="mov-hist-next" class="estoque-pager-btn" onclick="App.movHistPage('next')">Próximo ==?==</button>
             </div>
           </div>
         </div>
@@ -1182,7 +1468,7 @@
       </div>
 
       <!-- Modal: Novo/Editar Item de Estoque -->
-      <!-- ── MODAL: escolher tipo (Nova compra x Nova entrada) ── -->
+      <!-- =="?=="? MODAL: escolher tipo (Nova compra x Nova entrada) =="?=="? -->
       <div id="estoque-tipo-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:460px">
           <div class="modal-header">
@@ -1196,11 +1482,11 @@
             <div style="display:flex;flex-direction:column;gap:12px">
               <button type="button" class="estoque-tipo-opt" onclick="App.openEstoqueForm(null,'compra')">
                 <span class="estoque-tipo-ico" style="background:#dbeafe;color:#1d4ed8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
-                <span class="estoque-tipo-txt"><strong>Nova compra</strong><small>Produto comprado — entra no total gasto do dashboard.</small></span>
+                <span class="estoque-tipo-txt"><strong>Nova compra</strong><small>Produto comprado ==?" entra no total gasto do dashboard.</small></span>
               </button>
               <button type="button" class="estoque-tipo-opt" onclick="App.openEstoqueForm(null,'entrada')">
                 <span class="estoque-tipo-ico" style="background:#dcfce7;color:#059669"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg></span>
-                <span class="estoque-tipo-txt"><strong>Nova entrada</strong><small>Item que já existe fisicamente (não foi comprado) — NÃO conta como gasto.</small></span>
+                <span class="estoque-tipo-txt"><strong>Nova entrada</strong><small>Item que já existe fisicamente (não foi comprado) ==?" N==fO conta como gasto.</small></span>
               </button>
             </div>
           </div>
@@ -1221,20 +1507,20 @@
               <div class="form-group">
                 <label class="form-label">Grupo *</label>
                 <select id="estoque-grupo" class="input-field select-styled" onchange="App.onEstoqueGrupoChange()">
-                  <option value="">— Selecione —</option>
+                  <option value="">==?" Selecione ==?"</option>
                 </select>
               </div>
               <div class="form-group">
                 <label class="form-label">Subgrupo</label>
                 <select id="estoque-subgrupo" class="input-field select-styled">
-                  <option value="">— Selecione —</option>
+                  <option value="">==?" Selecione ==?"</option>
                 </select>
               </div>
             </div>
             <div class="form-group" style="margin-top:10px">
               <label class="form-label">Produto / Descrição *</label>
               <select id="estoque-produto-select" class="input-field select-styled hidden">
-                <option value="">— Selecione —</option>
+                <option value="">==?" Selecione ==?"</option>
               </select>
               <input type="text" id="estoque-produto" class="input-field" list="estoque-produto-list" placeholder="Ex: Tinta Ciano HP 122">
               <datalist id="estoque-produto-list"></datalist>
@@ -1243,7 +1529,7 @@
               <div class="form-group estoque-money">
                 <label class="form-label">Fornecedor</label>
                 <select id="estoque-fornecedor" class="input-field select-styled">
-                  <option value="">— Selecione —</option>
+                  <option value="">==?" Selecione ==?"</option>
                 </select>
               </div>
               <div class="form-group">
@@ -1256,7 +1542,7 @@
                 <div class="form-group">
                   <label class="form-label">Unidade de destino *</label>
                   <select id="estoque-unidade-destino" class="input-field select-styled">
-                    <option value="">— Selecione —</option>
+                    <option value="">==?" Selecione ==?"</option>
                   </select>
                 </div>
                 <div class="form-group estoque-money">
@@ -1311,11 +1597,11 @@
         </div>
       </div>
 
-      <!-- ── MODAL: COMPRA COMBINADA ── -->
+      <!-- =="?=="? MODAL: COMPRA COMBINADA =="?=="? -->
       <div id="compra-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:720px">
           <div class="modal-header">
-            <h3 id="compra-modal-title">Compra Combinada — Seleção</h3>
+            <h3 id="compra-modal-title">Compra Combinada ==?" Seleção</h3>
             <button class="modal-close" onclick="App.closeCompraModal()">
               <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
             </button>
@@ -1379,8 +1665,8 @@
               </div>
               <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <span style="font-size:.82rem;color:#6680a0;font-weight:500">Rastreabilidade do Envio:</span>
-                <span id="compra-envio-display" style="font-size:.82rem;font-weight:600;color:#1a3a6b">—</span>
-                <button class="btn-ghost" onclick="App.toggleEnvioEdit()" style="font-size:.72rem;padding:2px 8px" title="Editar data de envio">⚙</button>
+                <span id="compra-envio-display" style="font-size:.82rem;font-weight:600;color:#1a3a6b">==?"</span>
+                <button class="btn-ghost" onclick="App.toggleEnvioEdit()" style="font-size:.72rem;padding:2px 8px" title="Editar data de envio">==sT</button>
               </div>
               <div id="compra-envio-edit-wrap" style="display:none;margin-top:6px">
                 <input type="date" id="compra-envio-data" class="input-field" style="max-width:180px;display:inline-block">
@@ -1391,7 +1677,7 @@
               <div id="compra-step2-resumo" class="compra-resumo" style="margin-top:12px;display:none"></div>
             </div>
             <div class="modal-footer">
-              <button class="btn-ghost" id="btn-compra-voltar" onclick="App.compraBackStep1()">← Voltar</button>
+              <button class="btn-ghost" id="btn-compra-voltar" onclick="App.compraBackStep1()">==?== Voltar</button>
               <button class="btn-ghost" id="btn-compra-descombinar" onclick="App.descombinarCompra()" style="display:none;color:#dc2626;border-color:#fecaca">Descombinar</button>
               <button class="btn-primary" id="btn-salvar-compra" onclick="App.saveCompraCombinada()">Registrar Compra</button>
             </div>
@@ -1399,7 +1685,7 @@
         </div>
       </div>
 
-      <!-- ── CALENDÁRIO ── -->
+      <!-- =="?=="? CALENDÁRIO =="?=="? -->
       <div id="tab-calendar" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
@@ -1429,10 +1715,10 @@
         <div id="cal-day-detail" class="cal-day-detail hidden"></div>
       </div>
 
-       <!-- ── geradorpdf ── -->
+       <!-- =="?=="? geradorpdf =="?=="? -->
 
 
-      <!-- ── INVENTÁRIO ── -->
+      <!-- =="?=="? INVENTÁRIO =="?=="? -->
 <div id="tab-inventario" class="tab-panel">
   <iframe src="inventario.html" class="iframe-container"></iframe>
 </div>
@@ -1441,7 +1727,7 @@
   <iframe src="Geradorpdf.html" class="iframe-container"></iframe>
 </div>
 
-      <!-- ── SOLICITAÇÕES ── -->
+      <!-- =="?=="? SOLICITA==?==.ES =="?=="? -->
       <div id="tab-requests" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
@@ -1464,10 +1750,10 @@
 
         </div>
 
-        <!-- ── Mini-KPIs (5 cards) ── -->
+        <!-- =="?=="? Mini-KPIs (5 cards) =="?=="? -->
         <div class="rk-grid">
 
-          <!-- Card 1: Unidade — mais/menos solicitou -->
+          <!-- Card 1: Unidade ==?" mais/menos solicitou -->
           <div class="rk-card rk-blue">
             <div class="rk-card-header">
               <div class="rk-card-icon">
@@ -1477,20 +1763,20 @@
             </div>
             <div class="rk-duo">
               <div class="rk-half">
-                <div class="rk-pill rk-pill-green">↑ Mais</div>
-                <div class="rk-name" id="rk-sol-max">—</div>
+                <div class="rk-pill rk-pill-green">==?' Mais</div>
+                <div class="rk-name" id="rk-sol-max">==?"</div>
                 <div class="rk-count" id="rk-sol-max-n"></div>
               </div>
               <div class="rk-vsep"></div>
               <div class="rk-half">
-                <div class="rk-pill rk-pill-red">↓ Menos</div>
-                <div class="rk-name" id="rk-sol-min">—</div>
+                <div class="rk-pill rk-pill-red">==?" Menos</div>
+                <div class="rk-name" id="rk-sol-min">==?"</div>
                 <div class="rk-count" id="rk-sol-min-n"></div>
               </div>
             </div>
           </div>
 
-          <!-- Card 2: Unidade — mais/menos comprou -->
+          <!-- Card 2: Unidade ==?" mais/menos comprou -->
           <div class="rk-card rk-blue">
             <div class="rk-card-header">
               <div class="rk-card-icon">
@@ -1500,14 +1786,14 @@
             </div>
             <div class="rk-duo">
               <div class="rk-half">
-                <div class="rk-pill rk-pill-green">↑ Mais</div>
-                <div class="rk-name" id="rk-buy-max">—</div>
+                <div class="rk-pill rk-pill-green">==?' Mais</div>
+                <div class="rk-name" id="rk-buy-max">==?"</div>
                 <div class="rk-count" id="rk-buy-max-n"></div>
               </div>
               <div class="rk-vsep"></div>
               <div class="rk-half">
-                <div class="rk-pill rk-pill-red">↓ Menos</div>
-                <div class="rk-name" id="rk-buy-min">—</div>
+                <div class="rk-pill rk-pill-red">==?" Menos</div>
+                <div class="rk-name" id="rk-buy-min">==?"</div>
                 <div class="rk-count" id="rk-buy-min-n"></div>
               </div>
             </div>
@@ -1523,7 +1809,7 @@
             </div>
             <div class="rk-single">
               <div class="rk-pill rk-pill-gold"><svg viewBox="0 0 24 24" fill="none" width="11" height="11"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM7 4H4a2 2 0 002 2v0a1 1 0 001-1V4zM17 4h3a2 2 0 01-2 2v0a1 1 0 01-1-1V4z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> Top</div>
-              <div class="rk-name rk-name-lg" id="rk-grp-top">—</div>
+              <div class="rk-name rk-name-lg" id="rk-grp-top">==?"</div>
               <div class="rk-count" id="rk-grp-top-n"></div>
             </div>
           </div>
@@ -1538,7 +1824,7 @@
             </div>
             <div class="rk-single">
               <div class="rk-pill rk-pill-blue"><svg viewBox="0 0 24 24" fill="none" width="11" height="11"><path d="M12 2l2.9 6.5 7.1.6-5.4 4.7 1.7 6.9L12 17.3 5.7 20.7l1.7-6.9L2 9.1l7.1-.6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg> Destaque</div>
-              <div class="rk-name rk-name-lg" id="rk-sup-top">—</div>
+              <div class="rk-name rk-name-lg" id="rk-sup-top">==?"</div>
               <div class="rk-count" id="rk-sup-top-n"></div>
             </div>
           </div>
@@ -1553,14 +1839,14 @@
             </div>
             <div class="rk-duo">
               <div class="rk-half">
-                <div class="rk-pill rk-pill-green">↑ Mais usada</div>
-                <div class="rk-name" id="rk-pag-max">—</div>
+                <div class="rk-pill rk-pill-green">==?' Mais usada</div>
+                <div class="rk-name" id="rk-pag-max">==?"</div>
                 <div class="rk-count" id="rk-pag-max-n"></div>
               </div>
               <div class="rk-vsep"></div>
               <div class="rk-half">
-                <div class="rk-pill rk-pill-red">↓ Menos usada</div>
-                <div class="rk-name" id="rk-pag-min">—</div>
+                <div class="rk-pill rk-pill-red">==?" Menos usada</div>
+                <div class="rk-name" id="rk-pag-min">==?"</div>
                 <div class="rk-count" id="rk-pag-min-n"></div>
               </div>
             </div>
@@ -1595,13 +1881,13 @@
             <button class="btn-filter-toggle" id="btn-req-filter-toggle" onclick="App.toggleReqFilterPanel(event)" title="Filtros">
               <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
             </button>
-            <!-- ── Filtro completo ── -->
+            <!-- =="?=="? Filtro completo =="?=="? -->
             <div id="req-filter-panel" class="req-filter-panel">
               <div class="req-filter-panel-inner">
             <!-- Status chips -->
             <div class="req-filter-group">
               <span class="req-filter-label">Status</span>
-              <button class="btn-toggle-all-status" id="btn-toggle-all-status" onclick="App.toggleAllStatus(this)">Todos ✓</button>
+              <button class="btn-toggle-all-status" id="btn-toggle-all-status" onclick="App.toggleAllStatus(this)">Todos ==o"</button>
               <button class="req-status-chip chip-sol active" data-status="Solicitado" onclick="App.toggleStatusFilter(this)">Solicitado</button>
               <button class="req-status-chip chip-agu active" data-status="Aguardando" onclick="App.toggleStatusFilter(this)">Aguardando</button>
               <button class="req-status-chip chip-com active" data-status="Comprado"   onclick="App.toggleStatusFilter(this)">Comprado</button>
@@ -1652,14 +1938,14 @@
             <div class="req-filter-group">
               <span class="req-filter-label">Data solicitação</span>
               <input type="date" id="req-date-from" class="req-filter-date" onchange="App.renderRequests()">
-              <span style="color:#8898b8">→</span>
+              <span style="color:#8898b8">==?'</span>
               <input type="date" id="req-date-to" class="req-filter-date" onchange="App.renderRequests()">
             </div>
             <!-- Data envio -->
             <div class="req-filter-group">
               <span class="req-filter-label">Data envio</span>
               <input type="date" id="req-sent-from" class="req-filter-date" onchange="App.renderRequests()">
-              <span style="color:#8898b8">→</span>
+              <span style="color:#8898b8">==?'</span>
               <input type="date" id="req-sent-to" class="req-filter-date" onchange="App.renderRequests()">
             </div>
             <!-- Limpar -->
@@ -1700,7 +1986,7 @@
         </div>
       </div>
 
-      <!-- ── CONFIGURAÇÕES ── -->
+      <!-- =="?=="? CONFIGURA==?==.ES =="?=="? -->
       <div id="tab-settings" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
@@ -1794,7 +2080,7 @@
             </div>
 
             <!-- selects ocultos, lidos pelas funções existentes -->
-            <select id="sel-group-sub" onchange="App.loadSubOpts()" style="display:none"><option value="">—</option></select>
+            <select id="sel-group-sub" onchange="App.loadSubOpts()" style="display:none"><option value="">==?"</option></select>
             <select id="sel-subgroup-filter" onchange="App.filterSubgroupsView()" style="display:none"><option value="">Todos os grupos</option></select>
             <select id="sel-subgroup-group" style="display:none"><option value="">Grupo pai</option></select>
 
@@ -1812,7 +2098,7 @@
 
         </div>
 
-        <!-- ── REGISTRO DE CÓDIGOS ── -->
+        <!-- =="?=="? REGISTRO DE C=="DIGOS =="?=="? -->
         <div class="codigos-section">
           <h3 class="codigos-section-title">Registro de Códigos</h3>
           <div class="codigos-grid">
@@ -1871,7 +2157,7 @@
           </div>
         </div>
 
-        <!-- ── FERRAMENTAS & BACKUP (2 cards) ── -->
+        <!-- =="?=="? FERRAMENTAS & BACKUP (2 cards) =="?=="? -->
         <div class="config-tools-section">
           <h3 class="codigos-section-title" style="margin-top:22px">Ferramentas & Backup</h3>
           <div class="config-tools-grid config-tools-2">
@@ -1886,11 +2172,11 @@
               </div>
               <p class="config-tools-desc">Baixe um arquivo com <strong>todos os dados</strong> (solicitações, estoque, compras, configurações, metas e logs). Guarde-o para não perder nada.</p>
               <div class="config-tools-actions">
-                <button class="btn-primary" onclick="App.exportBackupSistema()">⬇ Baixar backup</button>
-                <button class="btn-secondary" onclick="document.getElementById('restore-sys-file').click()">⬆ Restaurar</button>
+                <button class="btn-primary" onclick="App.exportBackupSistema()">==? Baixar backup</button>
+                <button class="btn-secondary" onclick="document.getElementById('restore-sys-file').click()">==? Restaurar</button>
                 <input type="file" id="restore-sys-file" accept=".json" style="display:none" onchange="App.importBackupSistema(event)">
               </div>
-              <p class="config-tools-warn">⚠ Restaurar substitui os dados atuais pelos do arquivo.</p>
+              <p class="config-tools-warn">==s== Restaurar substitui os dados atuais pelos do arquivo.</p>
             </div>
 
             <!-- Card 2: Logs completos -->
@@ -1903,63 +2189,36 @@
               </div>
               <p class="config-tools-desc">Veja <strong>todos os registros</strong> de quem fez o quê e quando, dia a dia. Clique num registro para o detalhamento completo.</p>
               <div class="config-tools-actions">
-                <button class="btn-primary" onclick="App.showLogsCompletos()">📋 Ver logs</button>
-                <button class="btn-secondary" onclick="App.baixarLogs()">⬇ Baixar logs</button>
+                <button class="btn-primary" onclick="App.showLogsCompletos()">==Y"< Ver logs</button>
+                <button class="btn-secondary" onclick="App.baixarLogs()">==? Baixar logs</button>
               </div>
               <p class="config-tools-desc" id="config-logs-count" style="margin-top:8px"></p>
             </div>
 
           </div>
 
-          <!-- Administradores (largo, fixo, abaixo) -->
-          <div class="settings-card admin-section-card" style="margin-top:18px">
-            <div class="settings-card-header">
-              <div class="settings-card-icon green">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <div><h3>Administradores do Sistema</h3><p>Usuários com acesso administrativo</p></div>
-            </div>
-            <div id="admin-cards-grid" class="admin-cards-grid admin-cards-fixed"></div>
-            <div class="add-admin-bar">
-              <div class="input-icon-wrap">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/></svg>
-                <input type="text" id="inp-admin-nome" placeholder="Nome completo" class="input-field with-icon" />
-              </div>
-              <div class="input-icon-wrap">
-                <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="2"/></svg>
-                <input type="text" id="inp-admin-user" placeholder="Nome de usuário (login)" class="input-field with-icon" />
-              </div>
-              <div class="input-icon-wrap">
-                <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2"/></svg>
-                <input type="password" id="inp-admin-pass" placeholder="Senha" class="input-field with-icon" />
-              </div>
-              <button class="btn-add" onclick="App.addAdmin()">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
-                Adicionar
-              </button>
-            </div>
-          </div>
+          <!-- Administradores do Sistema ficam em Configurações (Home) -->
         </div>
 
         <!-- Modal: Logs completos por dia -->
         <div id="logs-full-modal" class="modal-overlay hidden">
           <div class="modal-card" style="max-width:760px">
             <div class="modal-header">
-              <h3>Logs de Atividade — Histórico Completo</h3>
+              <h3>Logs de Atividade ==?" Histórico Completo</h3>
               <button class="modal-close" onclick="document.getElementById('logs-full-modal').classList.add('hidden')">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
               </button>
             </div>
             <div class="modal-body" id="logs-full-body"></div>
             <div class="modal-footer" id="logs-full-footer" style="display:none">
-              <button class="btn-delete" onclick="App.apagarLogs()">🗑 Apagar todos os logs</button>
+              <button class="btn-delete" onclick="App.apagarLogs()">==Y-' Apagar todos os logs</button>
             </div>
           </div>
         </div>
 
       </div>
 
-      <!-- ── MODAL: EDITAR GRUPO (sub-opções + subgrupos) ── -->
+      <!-- =="?=="? MODAL: EDITAR GRUPO (sub-opções + subgrupos) =="?=="? -->
       <div id="modal-grupo-edit" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:560px">
           <div class="modal-header">
@@ -1991,7 +2250,7 @@
 
             <div class="cfg-block">
               <div class="cfg-block-head">
-                <span class="cfg-col-title">Subgrupos — Mapeamento Interno</span>
+                <span class="cfg-col-title">Subgrupos ==?" Mapeamento Interno</span>
               </div>
               <div class="settings-list-box">
                 <div id="list-subgroups-admin" class="settings-list"></div>
@@ -2007,7 +2266,7 @@
         </div>
       </div>
 
-      <!-- ── MODAL: NOVA SOLICITAÇÃO (ADMIN) ── -->
+      <!-- =="?=="? MODAL: NOVA SOLICITA==?==fO (ADMIN) =="?=="? -->
       <div id="modal-nova-solic" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:560px">
           <div class="modal-header">
@@ -2062,7 +2321,7 @@
             </div>
 
             <div class="form-group">
-              <label class="check-item"><input type="checkbox" id="nsol-urgency" /> 🚨 Marcar como URGENTE</label>
+              <label class="check-item"><input type="checkbox" id="nsol-urgency" /> ==Ys== Marcar como URGENTE</label>
             </div>
             <div class="form-group">
               <label class="form-label">Observação <span class="opt-tag">opcional</span></label>
@@ -2076,7 +2335,7 @@
         </div>
       </div>
 
-      <!-- ── MODAL: DETALHE COMPRA COMBINADA ── -->
+      <!-- =="?=="? MODAL: DETALHE COMPRA COMBINADA =="?=="? -->
       <div id="compra-detalhe-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:600px">
           <div class="modal-header">
@@ -2092,7 +2351,7 @@
         </div>
       </div>
 
-      <!-- ── MODAL: INFO DO LOTE (ESTOQUE) ── -->
+      <!-- =="?=="? MODAL: INFO DO LOTE (ESTOQUE) =="?=="? -->
       <div id="lote-info-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:560px">
           <div class="modal-header">
@@ -2108,7 +2367,7 @@
         </div>
       </div>
 
-      <!-- ── MODAL: VER SOLICITAÇÃO (somente leitura) ── -->
+      <!-- =="?=="? MODAL: VER SOLICITA==?==fO (somente leitura) =="?=="? -->
       <div id="sol-view-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:540px">
           <div class="modal-header">
@@ -2124,11 +2383,11 @@
         </div>
       </div>
 
-      <!-- ── MODAL: TODAS AS SUB-OPÇÕES ── -->
+      <!-- =="?=="? MODAL: TODAS AS SUB-OP==?==.ES =="?=="? -->
       <div id="subopts-all-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:560px">
           <div class="modal-header">
-            <h3 id="subopts-all-titulo">Sub-opções — Todas</h3>
+            <h3 id="subopts-all-titulo">Sub-opções ==?" Todas</h3>
             <button class="modal-close" onclick="document.getElementById('subopts-all-modal').classList.add('hidden')">
               <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
             </button>
@@ -2140,7 +2399,7 @@
         </div>
       </div>
 
-      <!-- ── MODAL: ESCOLHER TIPO DE COMPRA ── -->
+      <!-- =="?=="? MODAL: ESCOLHER TIPO DE COMPRA =="?=="? -->
       <div id="add-compra-chooser" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:440px">
           <div class="modal-header">
@@ -2167,7 +2426,7 @@
         </div>
       </div>
 
-      <!-- ── MODAL: ADICIONAR ITEM PARCELADO ── -->
+      <!-- =="?=="? MODAL: ADICIONAR ITEM PARCELADO =="?=="? -->
       <div id="parcelada-add-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:600px">
           <div class="modal-header">
@@ -2180,11 +2439,11 @@
             <div class="form-row-2">
               <div class="form-group">
                 <label class="form-label">Grupo *</label>
-                <select id="parc-grupo" class="input-field select-styled" onchange="App.onParcGrupoChange()"><option value="">— Selecione —</option></select>
+                <select id="parc-grupo" class="input-field select-styled" onchange="App.onParcGrupoChange()"><option value="">==?" Selecione ==?"</option></select>
               </div>
               <div class="form-group">
                 <label class="form-label">Subgrupo</label>
-                <select id="parc-subgrupo" class="input-field select-styled"><option value="">— Selecione —</option></select>
+                <select id="parc-subgrupo" class="input-field select-styled"><option value="">==?" Selecione ==?"</option></select>
               </div>
             </div>
             <div class="form-group" style="margin-top:10px">
@@ -2194,7 +2453,7 @@
             <div class="form-row-2" style="margin-top:10px">
               <div class="form-group">
                 <label class="form-label">Fornecedor</label>
-                <select id="parc-fornecedor" class="input-field select-styled"><option value="">— Selecione —</option></select>
+                <select id="parc-fornecedor" class="input-field select-styled"><option value="">==?" Selecione ==?"</option></select>
               </div>
               <div class="form-group">
                 <label class="form-label">Quantidade *</label>
@@ -2242,12 +2501,12 @@
   </div>
 </div>
 
-<!-- ══ MODAL: enviar para autorização (escolher gestor + valor) ══ -->
+<!-- ==.==.== MODAL: enviar para autorização (escolher gestor + valor) ==.==.== -->
 <div id="autz-send-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width:480px">
     <div class="modal-header">
       <h3>Enviar para autorização</h3>
-      <button class="modal-close" onclick="document.getElementById('autz-send-modal').classList.add('hidden')">✕</button>
+      <button class="modal-close" onclick="document.getElementById('autz-send-modal').classList.add('hidden')">==o.</button>
     </div>
     <div class="modal-body">
       <p id="autz-send-resumo" style="font-weight:600;color:var(--ink-900);background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:14px"></p>
@@ -2273,12 +2532,364 @@
   </div>
 </div>
 
-<!-- ══ MODAL: autorizar compra em LOTE (várias solicitações) ══ -->
+<!-- ==.==.== MODAL: autorizar compra em LOTE (várias solicitações) ==.==.== -->
+<!-- ==.==.== MODAL: cadastrar / editar problema (base de soluções) ==.==.== -->
+<div id="kb-form-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:640px">
+    <div class="modal-header">
+      <h3 id="kb-form-title">Adicionar WIKI</h3>
+      <button class="modal-close" onclick="App.kbFecharForm()">X</button>
+    </div>
+    <div class="modal-body" style="max-height:74vh;overflow-y:auto">
+      <input type="hidden" id="kb-id">
+      <div class="form-group">
+        <label class="form-label">Seção *</label>
+        <div class="kb-grav-pick" id="kb-tipo-pick">
+          <button type="button" class="kb-chip kb-tipo-chip active" data-t="problema"   onclick="App.kbPickTipo('problema')">Problema</button>
+          <button type="button" class="kb-chip kb-tipo-chip"        data-t="instalacao" onclick="App.kbPickTipo('instalacao')">Instalação</button>
+        </div>
+        <input type="hidden" id="kb-tipo" value="problema">
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label" id="kb-lbl-titulo">Nome do problema *</label>
+        <input type="text" id="kb-titulo" class="input-field" placeholder="Ex: Spooler de impressao travado" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="form-row-2" style="margin-top:12px">
+        <div class="form-group">
+          <label class="form-label">Grupo *</label>
+          <select id="kb-grupo" class="input-field select-styled" onchange="App.kbSyncSubList()">
+            <option value="">- Selecione -</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subgrupo</label>
+          <select id="kb-subgrupo" class="input-field select-styled">
+            <option value="">- Selecione -</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Prioridade *</label>
+        <div class="kb-grav-pick" id="kb-grav-pick">
+          <button type="button" class="kb-chip kb-g-simples" data-g="simples" onclick="App.kbPickGravidade('simples')">Simples</button>
+          <button type="button" class="kb-chip kb-g-medio"   data-g="medio"   onclick="App.kbPickGravidade('medio')">Medio</button>
+          <button type="button" class="kb-chip kb-g-grave"   data-g="grave"   onclick="App.kbPickGravidade('grave')">Grave</button>
+          <button type="button" class="kb-chip kb-g-critico" data-g="critico" onclick="App.kbPickGravidade('critico')">Critico</button>
+        </div>
+        <input type="hidden" id="kb-gravidade" value="simples">
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Status</label>
+        <select id="kb-status" class="input-field select-styled">
+          <option value="aberto">Aberto</option>
+          <option value="fechado">Fechado</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Introdução</label>
+        <div id="kb-intro-wrap"></div>
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Imagem</label>
+        <div class="kb-img-row">
+          <input type="text" id="kb-link" class="input-field" placeholder="Cole o link da imagem (ou envie um arquivo)" oninput="App.kbPreviewImg()">
+          <button type="button" class="btn-ghost" onclick="document.getElementById('kb-file').click()">Enviar foto</button>
+          <input type="file" id="kb-file" accept="image/*" style="display:none" onchange="App.kbiUpload(this,'wiki')">
+        </div>
+        <div id="kb-preview" class="kb-img-prev"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-delete" id="kb-btn-excluir" onclick="App.kbExcluir()" style="display:none">Excluir</button>
+      <button class="btn-ghost" onclick="App.kbFecharForm()">Cancelar</button>
+      <button class="btn-primary" onclick="App.kbSalvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: bloco (imagem/link + texto) usado nas abas Informacao e Resolucao -->
+<!-- MODAL: título/foto e informações (aba Informação) -->
+<!-- MODAL: gerenciar guias (listar / criar / editar / apagar) -->
+<!-- MODAL: cadastrar / editar usuário -->
+<div id="usr-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:620px">
+    <div class="modal-header">
+      <h3 id="usr-modal-title">Cadastrar novo usuário</h3>
+      <button class="modal-close" onclick="document.getElementById('usr-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="max-height:72vh;overflow-y:auto">
+      <input type="hidden" id="usr-edit-login">
+      <div class="form-group">
+        <label class="form-label">Nome completo *</label>
+        <input type="text" id="usr-nome" class="input-field" placeholder="Ex: Felipe Souza">
+      </div>
+      <div class="form-row-2" style="margin-top:12px">
+        <div class="form-group">
+          <label class="form-label">Telefone</label>
+          <input type="text" id="usr-tel" class="input-field" placeholder="(xx) x xxxx-xxxx" maxlength="16" oninput="App.mascaraTel(this)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input type="text" id="usr-email" class="input-field" placeholder="nome@empresa.com">
+        </div>
+      </div>
+      <div class="form-row-2" style="margin-top:12px">
+        <div class="form-group">
+          <label class="form-label">Usuário (login) *</label>
+          <input type="text" id="usr-login" class="input-field" placeholder="felipe">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha *</label>
+          <div class="campo-senha">
+            <input type="password" id="usr-pass" class="input-field" placeholder="Senha de acesso">
+            <button type="button" class="btn-olho" id="usr-pass-olho" onclick="App.verSenha('usr-pass', this)" title="Mostrar senha">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Sobre</label>
+        <textarea id="usr-sobre" class="input-field" rows="3" placeholder="Cargo, área, o que essa pessoa faz..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn-ghost" onclick="document.getElementById('usr-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-delete" id="usr-btn-excluir" onclick="App.excluirUsuario()" style="display:none">Excluir usuário</button>
+      <button class="btn-primary" onclick="App.salvarUsuario()">Salvar</button>
+    </div>
+  </div>
+</div>
+<div id="kbgm-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:620px">
+    <div class="modal-header">
+      <h3>Gerenciar guias</h3>
+      <button class="modal-close" onclick="document.getElementById('kbgm-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="max-height:66vh;overflow-y:auto">
+      <p style="font-size:.8rem;color:var(--ink-500);margin-bottom:12px">
+        Cada guia é um caminho de solução do problema.
+      </p>
+      <div id="kbgm-lista"></div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn-ghost" onclick="document.getElementById('kbgm-modal').classList.add('hidden')">Fechar</button>
+      <button class="btn-primary" onclick="App.kbdNovoGuia(true)">+ Novo guia</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: guia de resolução -->
+<div id="kbg-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:720px">
+    <div class="modal-header">
+      <h3 id="kbg-modal-title">Novo guia</h3>
+      <button class="modal-close" onclick="document.getElementById('kbg-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="max-height:74vh;overflow-y:auto">
+      <div class="form-row-2">
+        <div class="form-group">
+          <label class="form-label">Nome do guia *</label>
+          <input type="text" id="kbg-nome" class="input-field" placeholder="Ex: Trocar o cartucho">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tempo médio</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="kbg-tempo" class="input-field" placeholder="Ex: 10 - 15" style="flex:1;min-width:0">
+            <select id="kbg-tempo-un" class="input-field select-styled" style="max-width:120px">
+              <option value="minutos">minutos</option>
+              <option value="horas">horas</option>
+              <option value="dias">dias</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Foto do guia</label>
+        <input type="text" id="kbg-link" class="input-field" placeholder="Link (Drive ou .jpg/.png)" oninput="App.kbgPreview()">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('kbg-file').click()">Enviar arquivo</button>
+        </div>
+        <input type="file" id="kbg-file" accept="image/*" style="display:none" onchange="App.kbiUpload(this,'guia')">
+        <div id="kbg-preview" class="kbd-pv"></div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Introdução</label>
+        <div id="kbg-editor-wrap"></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn-ghost" onclick="document.getElementById('kbg-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-delete" id="kbg-btn-excluir" onclick="App.kbdExcluirGuiaAtual()" style="display:none">Excluir guia</button>
+      <button class="btn-primary" onclick="App.kbdSalvarGuia()">Salvar guia</button>
+    </div>
+  </div>
+</div>
+<div id="kbi-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:760px">
+    <div class="modal-header">
+      <h3 id="kbi-modal-title">Informação</h3>
+      <button class="modal-close" onclick="document.getElementById('kbi-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="max-height:74vh;overflow-y:auto">
+      <div class="form-group">
+        <label class="form-label" id="kbi-lbl-titulo">Título</label>
+        <input type="text" id="kbi-campo-titulo" class="input-field" placeholder="Ex: Especificações">
+      </div>
+      <div class="form-group" id="kbi-img-row" style="margin-top:12px">
+        <label class="form-label">Imagem</label>
+        <input type="text" id="kbi-link" class="input-field" placeholder="Link (Drive ou .jpg/.png)" oninput="App.kbiPreview()">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('kbi-file').click()">Enviar arquivo</button>
+          <span style="font-size:.76rem;color:var(--ink-500)">Comprime automaticamente antes de salvar.</span>
+        </div>
+        <input type="file" id="kbi-file" accept="image/*" style="display:none" onchange="App.kbiUpload(this,'info')">
+        <div id="kbi-preview" class="kbd-pv"></div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Texto</label>
+        <div id="kbi-editor-wrap"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="document.getElementById('kbi-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-primary" onclick="App.kbdSalvarInfo()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ferramenta necessária -->
+<div id="kbf-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:520px">
+    <div class="modal-header">
+      <h3 id="kbf-modal-title">Nova ferramenta</h3>
+      <button class="modal-close" onclick="document.getElementById('kbf-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nome da ferramenta *</label>
+        <input type="text" id="kbf-nome" class="input-field" placeholder="Ex: Kit de chaves de precisão">
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Link (opcional)</label>
+        <input type="text" id="kbf-url" class="input-field" placeholder="https://... (botão Visualizar)">
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Foto da ferramenta</label>
+        <input type="text" id="kbf-link" class="input-field" placeholder="Link da imagem (Drive ou .jpg/.png)" oninput="App.kbfPreview()">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('kbf-file').click()">Enviar arquivo</button>
+        </div>
+        <input type="file" id="kbf-file" accept="image/*" style="display:none" onchange="App.kbiUpload(this,'ferr')">
+        <div id="kbf-preview" class="kbd-pv"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="document.getElementById('kbf-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-primary" onclick="App.kbdSalvarFerramenta()">Salvar</button>
+    </div>
+  </div>
+</div>
+<div id="kbd-bloco-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:860px">
+    <div class="modal-header">
+      <h3 id="kbd-bloco-title">Novo bloco</h3>
+      <button class="modal-close" onclick="document.getElementById('kbd-bloco-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="max-height:74vh;overflow-y:auto">
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Título do passo (opcional)</label>
+        <input type="text" id="kbd-bloco-titulo" class="input-field" placeholder="Ex: Remover a tampa">
+      </div>
+      <p style="font-size:.78rem;color:var(--ink-500);margin:0 0 14px">
+        Cada item vira uma imagem na galeria com a explicação ao lado.
+      </p>
+      <div id="kbd-itens"></div>
+      <button type="button" class="kbd-add-bloco" style="margin-top:6px" onclick="App.kbdAddItem()">+ Adicionar item (imagem + texto)</button>
+      <input type="file" id="kbd-bloco-file" accept="image/*" style="display:none" onchange="App.kbdUploadImg(this)">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="document.getElementById('kbd-bloco-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-primary" onclick="App.kbdSalvarBloco()">Salvar bloco</button>
+    </div>
+  </div>
+</div>
+
+<!-- Visualizador de imagem com zoom -->
+<div id="kbd-zoom" class="kbd-zoom hidden" onclick="App.kbdFecharZoom(event)">
+  <div class="kbd-zoom-bar">
+    <button class="kbd-zoom-btn" onclick="event.stopPropagation();App.kbdZoom(-0.25)" title="Diminuir">
+      <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <span class="kbd-zoom-pct" id="kbd-zoom-pct">100%</span>
+    <button class="kbd-zoom-btn" onclick="event.stopPropagation();App.kbdZoom(0.25)" title="Aumentar">
+      <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <button class="kbd-zoom-btn" onclick="event.stopPropagation();App.kbdZoomReset()" title="Tamanho original">
+      <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="kbd-zoom-btn" onclick="App.kbdFecharZoom()" title="Fechar">
+      <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <img id="kbd-zoom-img" src="" alt="">
+</div>
+
+<!-- MODAL: link de apoio -->
+<div id="kbd-link-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:560px">
+    <div class="modal-header">
+      <h3 id="kbd-link-title">Novo link</h3>
+      <button class="modal-close" onclick="document.getElementById('kbd-link-modal').classList.add('hidden')">X</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Titulo *</label>
+        <input type="text" id="kbd-link-titulo" class="input-field" placeholder="Ex: Manual da Epson L3250">
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Descricao</label>
+        <textarea id="kbd-link-desc" class="input-field" rows="2" placeholder="Para que serve"></textarea>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">URL *</label>
+        <input type="text" id="kbd-link-url" class="input-field" placeholder="https://...">
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Tipo</label>
+        <select id="kbd-link-tipo" class="input-field select-styled">
+          <option value="Tutorial">Tutorial</option>
+          <option value="Download">Download</option>
+          <option value="Documentacao">Documentacao</option>
+          <option value="Video">Video</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="document.getElementById('kbd-link-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-primary" onclick="App.kbdSalvarLink()">Salvar link</button>
+    </div>
+  </div>
+</div>
+
 <div id="autz-lote-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width:560px">
     <div class="modal-header">
-      <h3 id="autz-lote-title">Autorizar compra — Solicitações</h3>
-      <button class="modal-close" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')">✕</button>
+      <h3 id="autz-lote-title">Autorizar compra ==?" Solicitações</h3>
+      <button class="modal-close" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')">==o.</button>
     </div>
 
     <!-- PASSO 1: escolher solicitações -->
@@ -2298,11 +2909,11 @@
     <!-- PASSO 2: valor + quantidade por item -->
     <div id="autz-lote-step2" class="hidden">
       <div class="modal-body" style="max-height:70vh;overflow-y:auto">
-        <p style="color:var(--ink-500);margin-bottom:10px">Informe o valor de cada item. A quantidade vem do sistema — clique no cadeado para editar.</p>
+        <p style="color:var(--ink-500);margin-bottom:10px">Informe o valor de cada item. A quantidade vem do sistema ==?" clique no cadeado para editar.</p>
         <div id="autz-lote-itens"></div>
       </div>
       <div class="modal-footer">
-        <button class="btn-ghost" onclick="App._autzLoteBackStep1()">← Voltar</button>
+        <button class="btn-ghost" onclick="App._autzLoteBackStep1()">==?== Voltar</button>
         <button class="btn-primary" onclick="App._autzLoteStep3()" title="Próximo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
       </div>
     </div>
@@ -2320,18 +2931,18 @@
         <a id="autz-lote-enviar" class="btn-primary autz-enviar-btn is-disabled" href="#">Escolha o gestor</a>
       </div>
       <div class="modal-footer">
-        <button class="btn-ghost" onclick="App._autzLoteBackStep2()">← Voltar</button>
+        <button class="btn-ghost" onclick="App._autzLoteBackStep2()">==?== Voltar</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══ MODAL: decisão de autorização (gestor respondeu) ══ -->
+<!-- ==.==.== MODAL: decisão de autorização (gestor respondeu) ==.==.== -->
 <div id="autorizacao-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width:460px">
     <div class="modal-header">
       <h3>Decisão de Autorização</h3>
-      <button class="modal-close" onclick="document.getElementById('autorizacao-modal').classList.add('hidden')">✕</button>
+      <button class="modal-close" onclick="document.getElementById('autorizacao-modal').classList.add('hidden')">==o.</button>
     </div>
     <div class="modal-body">
       <p style="color:var(--ink-500);margin-bottom:6px">O que o gestor decidiu?</p>
@@ -2345,7 +2956,7 @@
   </div>
 </div>
 
-<!-- ══ MODAL SOLICITAÇÃO ══ -->
+<!-- ==.==.== MODAL SOLICITA==?==fO ==.==.== -->
 <div id="modal-request" class="modal-overlay hidden">
   <div class="modal-card">
     <div class="modal-header">
@@ -2393,7 +3004,7 @@
           <div class="form-group">
             <label class="form-label">Fornecedor</label>
             <select id="modal-supplier-sel" class="input-field select-styled" onchange="App.onSupplierSelChange()">
-              <option value="">— Selecione —</option>
+              <option value="">==?" Selecione ==?"</option>
             </select>
             <input type="text" id="modal-supplier" class="input-field" placeholder="Ou digite o nome" style="margin-top:6px;display:none" />
           </div>
@@ -2457,7 +3068,7 @@
           </div>
         </div>
       </div>
-      <!-- Painel Estoque — aparece só quando status = Estoque -->
+      <!-- Painel Estoque ==?" aparece só quando status = Estoque -->
       <div id="modal-estoque-panel" class="modal-section hidden">
         <div class="modal-section-title">
           <svg viewBox="0 0 24 24" fill="none" style="width:16px"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
@@ -2467,7 +3078,7 @@
         <div id="modal-estoque-ja-retirado" class="hidden" style="background:var(--surf-2,#eef3fb);border:1px solid var(--surf-border,#c8d4e8);border-radius:var(--r-md,10px);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
           <div>
             <div style="font-size:.78rem;color:#6680a0;font-weight:600">Já retirado do estoque</div>
-            <div id="modal-estoque-ja-retirado-info" style="font-size:.88rem;font-weight:700;color:#1a3a6b;margin-top:2px">—</div>
+            <div id="modal-estoque-ja-retirado-info" style="font-size:.88rem;font-weight:700;color:#1a3a6b;margin-top:2px">==?"</div>
           </div>
           <button type="button" class="btn-ghost" onclick="App.cancelarRetiradaEstoque()" title="Devolve a quantidade ao estoque e permite escolher outro item">Cancelar retirada</button>
         </div>
@@ -2478,7 +3089,7 @@
           <div class="form-group" style="margin-top:8px">
             <label class="form-label">Item selecionado</label>
             <select id="modal-estoque-sel" class="input-field select-styled" onchange="App.onEstoqueSelChange()">
-              <option value="">— Selecione o item —</option>
+              <option value="">==?" Selecione o item ==?"</option>
             </select>
           </div>
           <div class="form-row-2" style="margin-top:8px">
@@ -2535,7 +3146,7 @@
             <div class="form-group">
               <label class="form-label">Item do estoque</label>
               <select id="modal-combo-estoque-sel" class="input-field select-styled" onchange="App.onComboEstoqueSelChange()">
-                <option value="">— Selecione —</option>
+                <option value="">==?" Selecione ==?"</option>
               </select>
             </div>
             <div class="form-row-2" style="margin-top:8px">

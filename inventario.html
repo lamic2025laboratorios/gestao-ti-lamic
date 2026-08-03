@@ -526,9 +526,9 @@
                 <div class="form-group"><label>Nome / Guichê</label><input type="text" id="comp-name"></div>
                 <div class="form-group"><label>Status do Equipamento</label>
                     <select id="comp-status">
-                        <option value="ativo">✅ Ativo</option>
-                        <option value="inativo">❌ Inativo</option>
-                        <option value="manutencao">🔧 Em Manutenção</option>
+                        <option value="ativo">Ativo</option>
+                        <option value="inativo">Inativo</option>
+                        <option value="manutencao">Em Manutenção</option>
                     </select>
                 </div>
             </div>
@@ -659,10 +659,10 @@
             </div>
             <div class="form-group" id="mob-status-group"><label>Status</label>
                 <select id="mob-status" onchange="_toggleMotivoMobile()">
-                    <option value="disponivel">🔵 Disponível</option>
-                    <option value="em_uso">🟢 Em Uso</option>
-                    <option value="manutencao">🟡 Manutenção</option>
-                    <option value="danificado">🔴 Danificado</option>
+                    <option value="disponivel">Disponível</option>
+                    <option value="em_uso">Em Uso</option>
+                    <option value="manutencao">Manutenção</option>
+                    <option value="danificado">Danificado</option>
                 </select>
             </div>
         </div>
@@ -771,10 +771,10 @@
             <div class="form-group"><label>Nº de Série</label><input type="text" id="ac-serial" placeholder="Número de série"></div>
             <div class="form-group"><label>Status</label>
                 <select id="ac-status" onchange="_acToggleLocation(); _toggleMotivoAc()">
-                    <option value="disponivel">🔵 Disponível</option>
-                    <option value="ativo">🟢 Em Uso</option>
-                    <option value="manutencao">🟡 Manutenção</option>
-                    <option value="danificado">🔴 Danificado</option>
+                    <option value="disponivel">Disponível</option>
+                    <option value="ativo">Em Uso</option>
+                    <option value="manutencao">Manutenção</option>
+                    <option value="danificado">Danificado</option>
                 </select>
             </div>
         </div>
@@ -867,8 +867,24 @@
                 <ul id="list-categorias-equip" class="equip-config-list"></ul>
             </div>
         </div>
+        <!-- Setores / Categorias de Acessos (3ª coluna) -->
+        <div class="config-section">
+            <div class="config-section-header">
+                <i class="ph ph-shield-check"></i>
+                <h4>Setores / Categorias de Acessos</h4>
+                <button class="cfg-md-fab-header" onclick="abrirCategoriaAcesso(null)" title="Novo setor / categoria">
+                    <i class="ph ph-plus"></i>
+                </button>
+            </div>
+            <div class="cfg-eq-single">
+                <p class="cfg-eq-hint">Crie os setores dos Acessos Corporativos e escolha a cor de identificação de cada um.</p>
+                <ul id="list-categorias-acesso" class="equip-config-list"></ul>
+            </div>
+        </div>
         </div><!-- /cfg-two-col -->
 
+        <!-- Backup + Logs lado a lado -->
+        <div class="cfg-cols-2">
         <!-- Backup e Restauração -->
         <div class="config-section">
             <div class="config-section-header">
@@ -897,19 +913,77 @@
                     </button>
                 </div>
                 <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(this)">
+            </div>
+        </div>
+
+        <!-- Logs do Inventário (card próprio) -->
+        <div class="config-section">
+            <div class="config-section-header">
+                <i class="ph ph-clock-counter-clockwise"></i>
+                <h4>Logs do Inventário</h4>
+            </div>
+            <div class="backup-restore-area">
                 <div class="backup-card">
-                    <div class="backup-card-icon"><i class="ph ph-clock-counter-clockwise"></i></div>
+                    <div class="backup-card-icon"><i class="ph ph-gauge"></i></div>
                     <div class="backup-card-info">
-                        <strong>Logs do Inventário</strong>
-                        <span>Rastreabilidade: veja todas as modificações, quem fez e quando</span>
+                        <strong>Logs do Dashboard</strong>
+                        <span>O que foi adicionado, editado ou retirado nas unidades: guichês, templates e acessos</span>
                     </div>
-                    <button class="btn-secondary" onclick="abrirLogsEquipamento(null)">
-                        <i class="ph ph-clock-counter-clockwise"></i> Ver Logs
+                    <button class="btn-secondary" onclick="abrirLogsEquipamento(null,'dashboard')">
+                        <i class="ph ph-clock-counter-clockwise"></i> Ver
+                    </button>
+                </div>
+                <div class="backup-card">
+                    <div class="backup-card-icon"><i class="ph ph-desktop-tower"></i></div>
+                    <div class="backup-card-info">
+                        <strong>Logs de Equipamentos</strong>
+                        <span>Da seção Equipamentos: cadastro, edição e exclusão dos equipamentos</span>
+                    </div>
+                    <button class="btn-secondary" onclick="abrirLogsEquipamento(null,'equip')">
+                        <i class="ph ph-clock-counter-clockwise"></i> Ver
+                    </button>
+                </div>
+                <div class="backup-card">
+                    <div class="backup-card-icon"><i class="ph ph-package"></i></div>
+                    <div class="backup-card-info">
+                        <strong>Logs do Estoque</strong>
+                        <span>Peças, licenças, celulares, ACs, periféricos e a lixeira</span>
+                    </div>
+                    <button class="btn-secondary" onclick="abrirLogsEquipamento(null,'estoque')">
+                        <i class="ph ph-clock-counter-clockwise"></i> Ver
                     </button>
                 </div>
             </div>
         </div>
+        </div><!-- /cfg-cols-2 -->
 
+    </div>
+</div>
+
+<!-- Modal: novo/editar Setor / Categoria de Acesso (nome + cor) -->
+<div id="cat-acesso-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:420px;">
+        <div class="config-page-header" style="margin:-28px -32px 18px;height:auto;padding:18px 32px;">
+            <div class="view-title"><i class="ph ph-shield-check"></i><h2 id="cat-acesso-title">Novo Setor / Categoria</h2></div>
+            <button class="btn-icon" onclick="fecharCategoriaAcesso()"><i class="ph ph-x"></i></button>
+        </div>
+        <input type="hidden" id="cat-acesso-id">
+        <div class="form-group">
+            <label>Nome do setor / categoria</label>
+            <input type="text" id="cat-acesso-nome" placeholder="Ex: Financeiro">
+        </div>
+        <div class="form-group">
+            <label>Cor de identificação</label>
+            <div class="cat-acesso-swatches" id="cat-acesso-swatches"></div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+                <input type="color" id="cat-acesso-cor" value="#1e3a8a" style="width:56px;height:38px;padding:2px;cursor:pointer;">
+                <span style="font-size:.78rem;color:var(--text-muted);">Escolha uma cor pronta ou personalize aqui.</span>
+            </div>
+        </div>
+        <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
+            <button class="btn-secondary" onclick="fecharCategoriaAcesso()">Cancelar</button>
+            <button class="btn-primary" onclick="salvarCategoriaAcesso()"><i class="ph ph-check"></i> Salvar</button>
+        </div>
     </div>
 </div>
 
@@ -1073,9 +1147,9 @@
             <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="inl-pc-name" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
             <div class="form-group" id="pc-preset-status-group" style="display:none;"><label>Status</label>
                 <select id="inl-pc-status">
-                    <option value="ativo">✅ Ativo</option>
-                    <option value="inativo">❌ Inativo</option>
-                    <option value="manutencao">🔧 Em Manutenção</option>
+                    <option value="ativo">Ativo</option>
+                    <option value="inativo">Inativo</option>
+                    <option value="manutencao">Em Manutenção</option>
                 </select>
             </div>
         </div>
@@ -1192,10 +1266,10 @@
         <div class="form-group" id="part-entry-spec-group"><label>Especificação</label><input type="text" id="part-entry-spec" placeholder="Ex: 8GB DDR4 2666MHz"></div>
         <div class="form-group hidden" id="part-entry-status-group"><label>Status</label>
             <select id="part-entry-status" onchange="document.getElementById('part-entry-motivo-group').classList.toggle('hidden', !['danificado','manutencao','descartado'].includes(this.value))">
-                <option value="disponivel">🔵 Disponível</option>
-                <option value="em_uso">🟢 Em Uso</option>
-                <option value="manutencao">🟡 Manutenção</option>
-                <option value="danificado">🔴 Danificada</option>
+                <option value="disponivel">Disponível</option>
+                <option value="em_uso">Em Uso</option>
+                <option value="manutencao">Manutenção</option>
+                <option value="danificado">Danificada</option>
                 <option value="descartado">⚫ Descartada</option>
             </select>
         </div>
@@ -1231,6 +1305,7 @@
             <h3 id="logs-modal-title"><i class="ph ph-clock-counter-clockwise"></i> Logs do Inventário</h3>
             <button class="btn-icon" onclick="document.getElementById('logs-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
         </div>
+        <div id="logs-nav-inv" class="logs-nav-inv"></div>
         <div id="logs-modal-body" class="logs-modal-body"></div>
     </div>
 </div>
@@ -1291,10 +1366,10 @@
             <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="eq-preset-serial" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
             <div class="form-group"><label>Status</label>
                 <select id="eq-preset-status" onchange="_toggleMotivoEquip()">
-                    <option value="disponivel">🔵 Disponível</option>
-                    <option value="em_uso">🟢 Em Uso</option>
-                    <option value="manutencao">🟡 Manutenção</option>
-                    <option value="danificado">🔴 Danificado</option>
+                    <option value="disponivel">Disponível</option>
+                    <option value="em_uso">Em Uso</option>
+                    <option value="manutencao">Manutenção</option>
+                    <option value="danificado">Danificado</option>
                 </select>
             </div>
         </div>
