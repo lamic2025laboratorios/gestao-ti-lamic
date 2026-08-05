@@ -1429,13 +1429,22 @@ const App = {
       }
     }
 
-    if (btn.dataset.tab === 'tab-dashboard') App.renderDashboard();
-    if (btn.dataset.tab === 'tab-requests')  App.renderRequests();
-    if (btn.dataset.tab === 'tab-settings')  App.renderSettings();
-    if (btn.dataset.tab === 'tab-calendar')  App.renderCalendar();
-    if (btn.dataset.tab === 'tab-estoque')   App.renderEstoque();
-    if (btn.dataset.tab === 'tab-unilamic')  App.kbRender();
-    if (btn.dataset.tab === 'tab-home-config') App.renderHomeConfig?.();
+    // Cada render é isolado: um erro numa seção não pode deixar as
+    // outras em branco. A falha vai pro console com o nome da rotina.
+    const _run = (nome, fn) => {
+      try { fn(); }
+      catch (e) { console.error('[adminTab] falha em ' + nome, e); }
+    };
+    if (btn.dataset.tab === 'tab-dashboard') _run('renderDashboard', () => App.renderDashboard());
+    if (btn.dataset.tab === 'tab-requests')  _run('renderRequests',  () => App.renderRequests());
+    if (btn.dataset.tab === 'tab-settings')  {
+      _run('renderSettings',   () => App.renderSettings());
+      _run('renderCodigosTab', () => App.renderCodigosTab());   // registro de códigos
+    }
+    if (btn.dataset.tab === 'tab-calendar')  _run('renderCalendar', () => App.renderCalendar());
+    if (btn.dataset.tab === 'tab-estoque')   _run('renderEstoque',  () => App.renderEstoque());
+    if (btn.dataset.tab === 'tab-unilamic')  _run('kbRender',       () => App.kbRender());
+    if (btn.dataset.tab === 'tab-home-config') _run('renderHomeConfig', () => App.renderHomeConfig?.());
     // Lembra a última aba do portal financeiro pra reabrir nela
     if (App.ABAS_FINANCEIRO.includes(targetTab)) LS.save('abaFinanceiro', targetTab);
     App._syncNavGrupos?.();
@@ -4162,6 +4171,9 @@ const App = {
       return;
     }
     reqs.forEach(([id,r]) => {
+     // Um registro com dado inesperado não pode derrubar a lista inteira:
+     // cada linha é montada isoladamente e o erro vai pro console.
+     try {
       // Data da solicitação — parse direto para evitar timezone shift
       let d = '—';
       if (r.createdAt) {
@@ -4221,6 +4233,13 @@ const App = {
         if (firstTd) firstTd.style.borderLeft = `4px solid ${c.b}`;
       }
       tbody.appendChild(tr);
+     } catch (e) {
+       console.error('[renderRequests] falha ao montar a linha', r?.seq ?? id, e);
+       const tr = document.createElement('tr');
+       tr.innerHTML = '<td colspan="9" style="color:#b45309;background:#fffbeb;font-size:.8rem;padding:8px 16px">' +
+         'SL-' + (r?.seq ?? '?') + ' — não foi possível exibir esta linha (dado inconsistente).</td>';
+       tbody.appendChild(tr);
+     }
     });
   },
 
@@ -10622,8 +10641,12 @@ App.toggleSidebar = function() {
   /* Wrap renderRequests: chama o original e depois aplica busca e KPIs */
   const _orig = App.renderRequests.bind(App);
   App.renderRequests = function() {
-    _orig();   // já aplica a busca ao vivo (req-live-search) no próprio conjunto filtrado
-    _updateReqKpis();
+    // Os cartões de ranking são calculados mesmo se a tabela falhar:
+    // antes, um erro no render deixava os cartões presos no placeholder.
+    try { _orig(); }   // já aplica a busca ao vivo (req-live-search) no próprio conjunto filtrado
+    catch (e) { console.error('[renderRequests] erro no render da tabela', e); }
+    try { _updateReqKpis(); }
+    catch (e) { console.error('[renderRequests] erro nos cartões de ranking', e); }
   };
 
   function _updateReqKpis() {
