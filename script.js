@@ -87,13 +87,26 @@ const App = {
     main?.classList.toggle('main-expanded', sb.classList.contains('sb-collapsed'));
   },
 
-  /* ══ MENU DA CONTA ══ */
+  /* ══ MENU DA CONTA ══
+     O menu é position:fixed (assim escapa do recorte da sidebar),
+     então a posição precisa ser calculada aqui: logo acima do card,
+     alinhado pela esquerda. */
   toggleUserMenu(ev) {
-    ev?.stopPropagation();
-    document.getElementById('sb-user-menu')?.classList.toggle('hidden');
+    if (ev) ev.stopPropagation();
+    const m = document.getElementById('sb-user-menu'); if (!m) return;
+    const escondido = m.classList.toggle('hidden');
+    const card = document.querySelector('.sidebar-user');
+    if (card) card.classList.toggle('open', !escondido);
+    if (!escondido && card) {
+      const r = card.getBoundingClientRect();
+      m.style.left   = r.left + 'px';
+      m.style.width  = Math.max(r.width, 190) + 'px';
+      m.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+    }
   },
   closeUserMenu() {
     document.getElementById('sb-user-menu')?.classList.add('hidden');
+    document.querySelector('.sidebar-user')?.classList.remove('open');
   },
 
   /* ══ LOGIN ADMINISTRATIVO ══
