@@ -65,8 +65,15 @@ const App = {
 
     const alvo = btn.dataset.tab;
     if (!alvo) return;
-    document.getElementById(alvo)?.classList.add('active');
+    const painel = document.getElementById(alvo);
+    painel?.classList.add('active');
     LS.save('secao', alvo);
+
+    // O iframe do módulo só carrega na primeira vez que a seção abre —
+    // assim o boot dele já encontra login/unidade certos no localStorage,
+    // em vez de rodar cedo demais com dado de sessão anterior.
+    const iframe = painel?.querySelector('iframe[data-src]');
+    if (iframe) { iframe.src = iframe.dataset.src; iframe.removeAttribute('data-src'); }
 
     // Cada seção monta o próprio conteúdo. Isolado: erro numa não
     // pode deixar as outras em branco.
@@ -86,7 +93,7 @@ const App = {
   voltarAoMenu() {
     const layout = document.querySelector('.admin-layout');
     layout?.classList.remove('hide-master-sidebar');
-    const btn = document.querySelector('.nav-item[data-tab="tab-unilamic-ti"]');
+    const btn = document.querySelector('.nav-item[data-tab="tab-unilamic"]');
     if (btn) App.abrirSecao(btn);
   },
 
@@ -259,7 +266,7 @@ const App = {
     App._pintarConta(user);
     App.goTo('screen-admin');
     // Entra sempre pelo UniLAMIC TI
-    const btn = document.querySelector('.nav-item[data-tab="tab-unilamic-ti"]');
+    const btn = document.querySelector('.nav-item[data-tab="tab-unilamic"]');
     if (btn) App.abrirSecao(btn);
     App.resetIdle();
   },
@@ -353,15 +360,14 @@ const App = {
 
   /* ══ ARRANQUE ══ */
   init() {
-    // Sessão salva: entra direto no painel
+    // Sessão salva: entra direto no painel — o menu principal é sempre
+    // o UniLAMIC TI (nunca a última seção aberta antes de sair)
     const user = LS.load('adminUser');
     if (user) {
       State.adminUser = user;
       App._pintarConta(user);
       App.goTo('screen-admin');
-      const salva = LS.load('secao');
-      const btn = (salva && document.querySelector(`.nav-item[data-tab="${salva}"]`))
-               || document.querySelector('.nav-item[data-tab="tab-unilamic-ti"]');
+      const btn = document.querySelector('.nav-item[data-tab="tab-unilamic"]');
       if (btn) App.abrirSecao(btn);
       App.startIdleWatch();
       App.resetIdle();
