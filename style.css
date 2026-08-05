@@ -21,6 +21,21 @@
   overflow: hidden;
 }
 
+/* Módulo aberto = tela cheia. Vale só para a aba ATIVA, senão um
+   painel escondido fica fixo por cima dos outros. */
+.admin-layout.hide-master-sidebar #tab-financeiro.active,
+.admin-layout.hide-master-sidebar #tab-inventario.active,
+.admin-layout.hide-master-sidebar #tab-gerador-pdf.active {
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+}
+/* Painel não-ativo nunca aparece, mesmo com as regras acima */
+.admin-layout.hide-master-sidebar .tab-panel:not(.active) { display: none !important; }
+
 /* ── Menu da conta: o item de voltar não é destrutivo ── */
 .sb-user-menu-item:not(.danger):hover {
   background: var(--surf-2);

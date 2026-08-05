@@ -2555,8 +2555,10 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   display: none !important;
 }
 
-/* Força a aba do inventário a ocupar 100% da largura e altura da tela */
-.admin-layout.hide-master-sidebar #tab-inventario {
+/* Força a aba do inventário a ocupar 100% da largura e altura da tela.
+   Só quando ela é a aba ATIVA: sem isso o painel do inventário ficava
+   fixo por cima de qualquer outro módulo em tela cheia. */
+.admin-layout.hide-master-sidebar #tab-inventario.active {
   display: block !important;
   width: 100vw !important;
   height: 100vh !important;

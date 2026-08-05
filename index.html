@@ -147,13 +147,20 @@
   </div>
 </div>
 
-<!-- ══ TELA 4 — PAINEL SOLICITAÇÃO ══ -->
+<!-- ══ TELA 3 — PAINEL PRINCIPAL ══ -->
 <div id="screen-admin" class="screen">
   <div class="admin-layout">
     <aside class="sidebar" id="main-sidebar">
-      <button class="sb-burger" onclick="App.toggleSidebar()" title="Recolher/expandir menu">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
+      <!-- Hambúrguer: fora do brand, sempre visível mesmo colapsado -->
+      <div class="sb-hamburger-row">
+        <div class="sb-brand-inline">
+          <img class="sb-logo-svg" src="img/LAMIC BRANCA.png" alt="LAMIC" onerror="this.style.display='none'" />
+        </div>
+        <button class="sidebar-hamburger" onclick="App.toggleSidebar()" title="Recolher/expandir menu">
+          <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <!-- sidebar-brand mantido vazio para não quebrar seletores CSS existentes -->
       <div class="sidebar-brand" style="display:none"></div>
       <nav class="sidebar-nav">
         <div class="nav-section-label sb-txt">Home</div>
@@ -187,21 +194,21 @@
         </button>
       </nav>
       <div class="sidebar-account">
-      <div class="sb-user-menu hidden" id="sb-user-menu">
-      <button class="sb-user-menu-item danger" onclick="App.adminLogout()">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2"/></svg>
-      Sair do sistema
-      </button>
-      </div>
-      <div class="sidebar-user" onclick="App.toggleUserMenu(event)" data-tip="Conta">
-      <div class="sad-avatar" id="sad-avatar-letter">A</div>
-      <div class="sb-user-info">
-      <div class="sad-name" id="sad-name-text">Admin</div>
-      <div class="sad-role">Administrador</div>
-      </div>
-      <svg class="sb-user-caret" viewBox="0 0 24 24" fill="none"><path d="M6 15l6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span class="ni-tip">Conta</span>
-      </div>
+        <div class="sb-user-menu hidden" id="sb-user-menu">
+          <button class="sb-user-menu-item danger" onclick="App.adminLogout()">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2"/></svg>
+            Sair do sistema
+          </button>
+        </div>
+        <div class="sidebar-user" onclick="App.toggleUserMenu(event)" data-tip="Conta">
+          <div class="sad-avatar" id="sad-avatar-letter">A</div>
+          <div class="sb-user-info">
+            <div class="sad-name" id="sad-name-text">Admin</div>
+            <div class="sad-role">Administrador</div>
+          </div>
+          <svg class="sb-user-caret" viewBox="0 0 24 24" fill="none"><path d="M6 15l6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="ni-tip">Conta</span>
+        </div>
       </div>
     </aside>
 
