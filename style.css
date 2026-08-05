@@ -4486,3 +4486,121 @@ button.kbg-ico { cursor: pointer; }
   .kbg-passo-corpo { grid-template-columns: 1fr; }
   .kbg-passo-minis { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* ══════════════════════════════════════════════════════════
+   PASSO — ajustes finais: título "PASSO N: TÍTULO",
+   miniaturas discretas e imagem em container de altura fixa
+   ══════════════════════════════════════════════════════════ */
+.kbg-passos { margin-top: 26px; }
+.kbg-passo { padding: 22px 0 20px; }
+.kbg-passo + .kbg-passo { border-top: 1px solid var(--surf-border); }
+
+/* Título único: "PASSO 1: Desmontagem da estrutura" */
+.kbg-passo-tit {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px;
+  font-family: 'Rajdhani', sans-serif; font-size: 1.34rem; font-weight: 600;
+  color: var(--ink-700); margin: 0;
+}
+.kbg-passo-n { font-weight: 700; color: var(--ink-900); letter-spacing: .02em; }
+.kbg-passo-sep { font-weight: 700; color: var(--ink-900); margin-left: -4px; }
+
+/* Container da imagem: altura fixa — a foto se ajusta, o layout não quebra */
+.kbg-passo-foto {
+  height: 340px; display: flex; align-items: center; justify-content: center;
+  background: var(--surf-2); border: 1px solid var(--surf-border);
+  border-radius: var(--r-sm); overflow: hidden; padding: 0;
+}
+.kbg-passo-foto img, .kbg-passo-foto .kbd-img {
+  width: 100%; height: 100%; object-fit: contain; display: block; cursor: zoom-in;
+}
+.kbg-passo-foto iframe, .kbg-passo-foto .kbd-frame { width: 100%; height: 100%; border: none; }
+
+/* Miniaturas discretas, acima do texto */
+.kbg-passo-minis { display: flex; flex-wrap: wrap; gap: 8px; }
+.kbg-mini { width: 76px; height: 58px; flex: 0 0 auto; border-radius: var(--r-sm); }
+.kbg-mini img { width: 100%; height: 100%; object-fit: cover; aspect-ratio: auto; cursor: pointer; }
+.kbg-mini.on { box-shadow: 0 0 0 2px var(--blue-500); }
+
+@media (max-width: 1200px) { .kbg-passo-foto { height: 280px; } }
+@media (max-width: 900px)  { .kbg-passo-foto { height: 240px; } .kbg-mini { width: 64px; height: 50px; } }
+
+/* Modal de zoom: cursor indica a roda do mouse */
+.kbd-zoom { cursor: zoom-out; }
+#kbd-zoom-img { cursor: grab; transition: transform .12s ease-out; }
+
+/* ══════════════════════════════════════════════════════════
+   CRONOGRAMA DE RESOLUÇÃO — timeline de triagem dos guias
+   ══════════════════════════════════════════════════════════ */
+.crono-timeline { list-style: none; margin: 18px 0 0; padding: 0; }
+.crono-etapa {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr);
+  column-gap: 16px; align-items: start;
+}
+
+/* Coluna da marcação: bolinha numerada + linha de ligação */
+.crono-marca { display: flex; flex-direction: column; align-items: center; align-self: stretch; }
+.crono-num {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--blue-500); color: #fff;
+  font-family: 'Rajdhani', sans-serif; font-size: 1.22rem; font-weight: 700;
+  box-shadow: 0 0 0 4px #eef4ff;
+}
+.crono-linha { flex: 1; width: 3px; min-height: 26px; background: var(--gray-100); border-radius: 2px; margin-top: 6px; }
+
+/* Cartão do guia */
+.crono-card {
+  background: var(--surf-0); border: 1px solid var(--surf-border); border-radius: var(--r-md);
+  padding: 15px 17px; transition: border-color .16s var(--ease), box-shadow .16s var(--ease), transform .16s var(--ease);
+}
+.crono-card:hover { border-color: var(--blue-400); box-shadow: 0 4px 16px rgba(15,30,53,.08); transform: translateY(-1px); }
+.crono-card-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.crono-nome {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-family: 'Rajdhani', sans-serif; font-size: 1.18rem; font-weight: 700; color: var(--ink-900);
+  text-transform: uppercase; letter-spacing: .01em;
+}
+.crono-acts { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* Etiquetas de tempo / passos / consultas */
+.crono-meta { display: flex; flex-wrap: wrap; gap: 7px; margin: 11px 0 13px; }
+.crono-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 11px; border-radius: 999px;
+  background: var(--surf-2); border: 1px solid var(--surf-border);
+  font-size: .8rem; font-weight: 700; color: var(--ink-500);
+}
+.crono-tag.t-rapido { background: var(--kb-simples-bg); border-color: var(--kb-simples-bd); color: var(--kb-simples); }
+.crono-tag.t-medio  { background: var(--kb-medio-bg);   border-color: var(--kb-medio-bd);   color: var(--kb-medio); }
+.crono-tag.t-longo  { background: var(--kb-grave-bg);   border-color: var(--kb-grave-bd);   color: var(--kb-grave); }
+
+.crono-abrir {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: var(--r-sm);
+  background: var(--blue-500); border: 1px solid var(--blue-500); color: #fff;
+  font-family: inherit; font-size: .88rem; font-weight: 700; cursor: pointer;
+  transition: background .15s var(--ease);
+}
+.crono-abrir:hover { background: var(--ink-900); border-color: var(--ink-900); }
+
+/* Conector entre uma etapa e a seguinte */
+.crono-conector {
+  grid-column: 2; display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 0 14px; font-size: .82rem; font-weight: 600; color: var(--ink-400); font-style: italic;
+}
+.crono-conector::before {
+  content: ''; width: 26px; height: 1px; background: var(--gray-200);
+}
+
+.crono-fim {
+  display: flex; align-items: center; gap: 9px; margin-top: 6px; padding: 13px 16px;
+  background: var(--surf-2); border: 1px dashed var(--surf-border); border-radius: var(--r-md);
+  font-size: .86rem; font-weight: 600; color: var(--ink-500);
+}
+.crono-fim svg { flex-shrink: 0; color: var(--kb-medio); }
+
+@media (max-width: 700px) {
+  .crono-etapa { grid-template-columns: 34px minmax(0, 1fr); column-gap: 11px; }
+  .crono-num { width: 32px; height: 32px; font-size: 1rem; }
+  .crono-card-topo { flex-direction: column; }
+}

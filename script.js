@@ -8691,9 +8691,123 @@ const App = {
           : '<div class="kbi-vazio">Nenhum guia ainda. Crie um para registrar o passo a passo.</div>') +
       '</section>';
 
-    return '<div class="kbi-pagina">' + htmlCab + htmlSecoes + htmlGuias + htmlFerr +
+    return '<div class="kbi-pagina">' + htmlCab + htmlSecoes + htmlGuias + htmlFerr + App._kbdCronograma() +
       '<button class="kbd-add-bloco" onclick="App.kbdNovaSecao()">+ Adicionar informação (título + texto)</button>' +
       '</div>';
+  },
+
+  /* ══════════════════════════════════════════════════════════
+     CRONOGRAMA DE RESOLUÇÃO
+     Um problema costuma ter várias causas e vários guias. Esta
+     seção mostra em que ordem o técnico deve testar cada um.
+     Ordem: a definida na mão (campo `ordem`); sem ela, o guia mais
+     rápido vem primeiro (triagem) e, empatando, o mais consultado.
+     ══════════════════════════════════════════════════════════ */
+
+  // Tempo do guia em minutos, para poder comparar horas com dias
+  _kbdTempoMin(g) {
+    const n = parseFloat(String(g?.tempo || '').replace(',', '.'));
+    if (!n || isNaN(n)) return Number.MAX_SAFE_INTEGER;   // sem tempo vai pro fim
+    const un = g.tempoUn || 'minutos';
+    if (un === 'horas') return n * 60;
+    if (un === 'dias')  return n * 60 * 24;
+    return n;
+  },
+
+  _kbdGuiasOrdenados() {
+    return App._kbdGuias().slice().sort((a, b) => {
+      const oa = Number.isFinite(a.ordem) ? a.ordem : null;
+      const ob = Number.isFinite(b.ordem) ? b.ordem : null;
+      if (oa !== null && ob !== null) return oa - ob;      // ambos posicionados na mão
+      if (oa !== null) return -1;                          // quem tem ordem vem antes
+      if (ob !== null) return 1;
+      const ta = App._kbdTempoMin(a), tb = App._kbdTempoMin(b);
+      if (ta !== tb) return ta - tb;                       // o mais rápido primeiro
+      return (b.views || 0) - (a.views || 0);              // desempate: mais consultado
+    });
+  },
+
+  _kbdCronograma() {
+    const guias = App._kbdGuiasOrdenados();
+    const cab =
+      '<div class="kbi-sec-head">' +
+        '<h3>Cronograma de Resolução</h3>' +
+        (guias.length > 1
+          ? '<span class="kbi-sec-acts"><button class="btn-ico" title="Voltar à ordem automática (mais rápido primeiro)" onclick="App.kbdCronoAuto()">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button></span>'
+          : '') +
+      '</div>' +
+      '<p class="kbi-sec-hint">Ordem sugerida de teste: comece pelo primeiro e siga adiante se o problema continuar.</p>';
+
+    if (!guias.length) {
+      return '<section class="kbi-sec" id="kbi-crono">' + cab +
+        '<div class="kbi-vazio">Cadastre os guias de resolução para montar o cronograma.</div></section>';
+    }
+
+    const etapas = guias.map((g, i) => {
+      const min = App._kbdTempoMin(g);
+      const tempo = g.tempo ? (g.tempo + ' ' + (g.tempoUn || 'minutos')) : 'sem estimativa';
+      const nPassos = (g.passos || []).length;
+      // Peso visual pela duração: rápido (verde), médio (âmbar), demorado (vermelho)
+      const faixa = min <= 15 ? 'rapido' : (min <= 60 ? 'medio' : (min === Number.MAX_SAFE_INTEGER ? 'indef' : 'longo'));
+      const ultimo = i === guias.length - 1;
+
+      return '<li class="crono-etapa">' +
+        '<span class="crono-marca">' +
+          '<span class="crono-num">' + (i + 1) + '</span>' +
+          (ultimo ? '' : '<span class="crono-linha"></span>') +
+        '</span>' +
+        '<div class="crono-card">' +
+          '<div class="crono-card-topo">' +
+            '<span class="crono-nome">' + (g.nome || 'Guia') + App._kbNotifSelo(App._kbdId, g.id) + '</span>' +
+            '<span class="crono-acts">' +
+              '<button class="btn-ico" title="Testar antes" onclick="App.kbdMoverCrono(\'' + g.id + '\',-1)"' + (i === 0 ? ' disabled' : '') + '>&uarr;</button>' +
+              '<button class="btn-ico" title="Testar depois" onclick="App.kbdMoverCrono(\'' + g.id + '\',1)"' + (ultimo ? ' disabled' : '') + '>&darr;</button>' +
+            '</span>' +
+          '</div>' +
+          '<div class="crono-meta">' +
+            '<span class="crono-tag t-' + faixa + '">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="13" height="13"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>' +
+              tempo + '</span>' +
+            '<span class="crono-tag">' + nPassos + ' passo' + (nPassos === 1 ? '' : 's') + '</span>' +
+            (g.views ? '<span class="crono-tag">' + g.views + ' consulta' + (g.views === 1 ? '' : 's') + '</span>' : '') +
+          '</div>' +
+          '<button class="crono-abrir" onclick="App.kbdIrGuia(\'' + g.id + '\')">' +
+            'Abrir este guia' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M5 12h14M13 6l6 6-6 6"/></svg>' +
+          '</button>' +
+        '</div>' +
+        (ultimo ? '' : '<span class="crono-conector">se não resolver, siga para</span>') +
+      '</li>';
+    }).join('');
+
+    return '<section class="kbi-sec" id="kbi-crono">' + cab +
+      '<ol class="crono-timeline">' + etapas + '</ol>' +
+      '<div class="crono-fim">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M10.3 3.6L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.6a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>' +
+        'Esgotou o cronograma? Registre um guia novo com a solução encontrada.' +
+      '</div>' +
+    '</section>';
+  },
+
+  // Move o guia na fila de testes (grava a posição em todos, pra ordem ficar estável)
+  kbdMoverCrono(gid, dir) {
+    const ordenados = App._kbdGuiasOrdenados();
+    const i = ordenados.findIndex(g => g.id === gid);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ordenados.length) return;
+    const t = ordenados[i]; ordenados[i] = ordenados[j]; ordenados[j] = t;
+    const posicao = {};
+    ordenados.forEach((g, k) => { posicao[g.id] = k; });
+    const guias = App._kbdGuias().map(g => ({ ...g, ordem: posicao[g.id] }));
+    App._kbdGravarGuias(guias, 'Cronograma reordenado');
+  },
+
+  // Volta para a ordem automática (limpa a posição manual)
+  kbdCronoAuto() {
+    const guias = App._kbdGuias().map(g => { const c = { ...g }; delete c.ordem; return c; });
+    App._kbdGravarGuias(guias, 'Cronograma automático');
+    toast('Ordem automática: o guia mais rápido vem primeiro.');
   },
 
   /* ── Cabeçalho ── */
@@ -8929,6 +9043,23 @@ const App = {
     App._kbdZoomEsc = 1;
     App._kbdAplicaZoom();
     box.classList.remove('hidden');
+    App._kbdLigarRoda();
+  },
+
+  /* Zoom pela roda do mouse dentro do modal.
+     O listener é registrado uma única vez e fica preso ao overlay,
+     com passive:false para poder cancelar a rolagem da página. */
+  _kbdRodaOn: false,
+  _kbdLigarRoda() {
+    if (App._kbdRodaOn) return;
+    const box = document.getElementById('kbd-zoom'); if (!box) return;
+    box.addEventListener('wheel', ev => {
+      if (box.classList.contains('hidden')) return;
+      ev.preventDefault();                       // não rola a página atrás
+      const passo = ev.deltaY < 0 ? 0.18 : -0.18;  // roda pra cima aumenta
+      App.kbdZoom(passo);
+    }, { passive: false });
+    App._kbdRodaOn = true;
   },
 
   /* ── Autores ── */
@@ -9096,8 +9227,7 @@ const App = {
       (g.intro ? '<section class="kbg-introducao"><h3>Introdução</h3><div class="kbg-intro">' + g.intro + '</div></section>' : '');
 
     const html = passos.length
-      ? '<section class="kbg-introducao kbg-passos-sec"><h3>Passo a passo</h3></section>' +
-        '<div class="kbg-passos">' + passos.map((b, i) => App._kbdHtmlPasso(b, i, passos.length)).join('') + '</div>'
+      ? '<div class="kbg-passos">' + passos.map((b, i) => App._kbdHtmlPasso(b, i, passos.length)).join('') + '</div>'
       : '<div class="kbd-vazio">Este guia ainda não tem passos.</div>';
 
     return chips + cab + html +
@@ -9135,8 +9265,9 @@ const App = {
 
     return '<article class="kbg-passo' + (imgs.length ? '' : ' sem-foto') + '" id="kbg-passo-' + i + '">' +
       '<div class="kbg-passo-cab">' +
-        '<span class="kbg-passo-n">Passo ' + (i + 1) + '</span>' +
-        '<h4 class="kbg-passo-tit">' + (b.titulo || '') + '</h4>' +
+        // "PASSO 1: TÍTULO" — numeração consecutiva, título só se houver
+        '<h4 class="kbg-passo-tit"><span class="kbg-passo-n">PASSO ' + (i + 1) + '</span>' +
+          (b.titulo ? '<span class="kbg-passo-sep">:</span> ' + b.titulo : '') + '</h4>' +
         '<span class="kbg-passo-acts">' +
           '<button class="btn-ico" title="Subir" onclick="App.kbdMoverBloco(\'resol\',' + i + ',-1)"' + (i === 0 ? ' disabled' : '') + '>&uarr;</button>' +
           '<button class="btn-ico" title="Descer" onclick="App.kbdMoverBloco(\'resol\',' + i + ',1)"' + (i === total - 1 ? ' disabled' : '') + '>&darr;</button>' +
@@ -10397,6 +10528,10 @@ const App = {
   }
 };
 window.App = App;
+// Expostos para os iframes filhos (inventario/gerador) lerem quem está logado:
+// `const` não cria propriedade em window, então a ponte precisa ser explícita.
+window.State = State;
+window.DB = DB;
 
 /* Popover de filtros da Home acompanha rolagem e redimensionamento */
 ['scroll', 'resize'].forEach(ev =>
@@ -10417,6 +10552,19 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   if (window._firebaseReady) boot();
   else document.addEventListener('firebaseReady', boot);
+});
+
+/* Clique em qualquer imagem do registro abre o zoom.
+   Delegação no documento: pega também o que é renderizado depois.
+   Miniaturas ficam de fora — nelas o clique serve para trocar a foto. */
+document.addEventListener('click', function(ev) {
+  const img = ev.target;
+  if (!img || img.tagName !== 'IMG') return;
+  if (img.closest('.kbg-mini, .kbd-img-mini, #kbd-zoom')) return;   // seletor de foto / o próprio modal
+  if (!img.closest('#tab-kb-detalhe, #tab-perfil')) return;         // só dentro do registro
+  if (!img.src) return;
+  ev.preventDefault();
+  App.kbdAbrirZoom(img.src);
 });
 
 // Ouvinte para o inventário/gerador pedirem o retorno ao painel
