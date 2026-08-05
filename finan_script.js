@@ -149,12 +149,11 @@ const App = {
     App.restoreRequestForm();
   },
 
+  // A escolha de unidade agora é feita na casca (index.html)
   backToUnits() {
     App.resetRequestForm();
-    App.goTo('screen-units-login');
-    // Reset dropdown selection
-    const sel = document.getElementById('unit-select');
-    if (sel) { sel.value = ''; App.onUnitSelectChange(); }
+    LS.remove('currentUnit');
+    window.location.href = 'index.html';
   },
 
   /* ── ADMIN LOGIN ──────────────────────────── */
@@ -186,12 +185,17 @@ const App = {
     }
   },
 
+  // Sair encerra a sessão e devolve para a casca, onde fica o login
   adminLogout() {
     State.adminUser = null;
     LS.remove('adminUser');
+    LS.remove('currentUnit');
     clearTimeout(App._idleTimer);
     clearInterval(App._idleTick); App._idleTick = null;
-    App.goTo('screen-home');
+    if (window.parent && window.parent !== window) {
+      try { window.parent.postMessage('sairDoSistema', '*'); return; } catch (e) {}
+    }
+    window.location.href = 'index.html';
   },
 
   /* ── Sessão: auto-logout por inatividade (60 min) + contagem regressiva ── */
@@ -7503,15 +7507,33 @@ const App = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Dentro do iframe da casca: já entra no portal, sem o menu principal
-  // (quem navega entre os módulos é o index.html).
+  // Este arquivo é um módulo: quem faz login é a casca (index.html).
+  // Sem sessão de admin nem unidade escolhida, devolve para lá.
   const emIframe = window.parent && window.parent !== window;
   if (emIframe) document.querySelector('.admin-layout')?.classList.add('em-iframe');
+
+  const temAdmin  = !!LS.load('adminUser');
+  const temUnidade = !!LS.load('currentUnit');
+  if (!temAdmin && !temUnidade) {
+    if (emIframe) { try { window.parent.postMessage('fecharFinanceiro', '*'); } catch (e) {} }
+    else window.location.href = 'index.html';
+    return;
+  }
+
   App.init();
   const boot = () => {
     App.initListeners();
     App.seedDefaults();
-    if (State.adminUser) { App.goTo('screen-admin'); App.renderAdminPanels(); App._restoreAdminTab(); App.resetIdle(); }
+    if (State.adminUser) {
+      App.goTo('screen-admin'); App.renderAdminPanels(); App._restoreAdminTab(); App.resetIdle();
+    } else {
+      // Unidade escolhida na casca: monta e abre o formulário direto
+      const nome = document.getElementById('topbar-unit-name');
+      if (nome) nome.textContent = State.units?.[State.currentUnit] || State.currentUnit || '—';
+      App.buildRequestPanel?.();
+      App.goTo('screen-request');
+      App.restoreRequestForm?.();
+    }
   };
   if (window._firebaseReady) boot();
   else document.addEventListener('firebaseReady', boot);

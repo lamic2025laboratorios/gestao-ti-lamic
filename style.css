@@ -36,6 +36,13 @@
 /* Painel não-ativo nunca aparece, mesmo com as regras acima */
 .admin-layout.hide-master-sidebar .tab-panel:not(.active) { display: none !important; }
 
+/* Com um módulo aberto, quem manda na navegação é a sidebar de dentro:
+   a da casca sai de cena para não aparecerem duas. O caminho de volta
+   é o "Voltar ao menu principal", no menu da conta de cada módulo. */
+.admin-layout.hide-master-sidebar > .sidebar,
+.admin-layout.hide-master-sidebar #main-sidebar { display: none !important; }
+.admin-layout.hide-master-sidebar .admin-main { margin-left: 0 !important; width: 100% !important; }
+
 /* ── Menu da conta: o item de voltar não é destrutivo ── */
 .sb-user-menu-item:not(.danger):hover {
   background: var(--surf-2);

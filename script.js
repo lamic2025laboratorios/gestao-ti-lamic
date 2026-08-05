@@ -209,9 +209,41 @@ const App = {
     document.querySelector('.sidebar-user')?.classList.remove('open');
   },
 
-  /* ══ LOGIN ADMINISTRATIVO ══
-     O acesso das unidades (escolher unidade + fazer solicitação) vive
-     no módulo financeiro; aqui o botão só encaminha para lá. */
+  /* ══ ACESSO DAS UNIDADES ══
+     A escolha da unidade acontece aqui; o formulário de solicitação
+     em si continua no módulo financeiro, que lê a unidade salva. */
+  renderUnitsDropdown() {
+    const sel = document.getElementById('unit-select');
+    if (!sel) return;
+    const atual = sel.value;
+    sel.innerHTML = '<option value="">— Selecione uma unidade —</option>' +
+      Object.entries(State.units || {})
+        .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
+        .map(([id, nome]) => `<option value="${id}">${nome}</option>`).join('');
+    if (atual) sel.value = atual;
+  },
+
+  onUnitSelectChange() {
+    const sel  = document.getElementById('unit-select');
+    const btn  = document.getElementById('btn-units-ok');
+    const info = document.getElementById('unit-selected-info');
+    const nome = document.getElementById('unit-selected-name');
+    const id   = sel?.value || '';
+    if (btn) btn.disabled = !id;
+    if (info) info.classList.toggle('hidden', !id);
+    if (nome && id) nome.textContent = (State.units || {})[id] || '';
+  },
+
+  selectUnit() {
+    const id = document.getElementById('unit-select')?.value;
+    if (!id) { toast('Selecione uma unidade.', 'error'); return; }
+    State.currentUnit = id;
+    LS.save('currentUnit', id);
+    // O painel de solicitação vive no módulo financeiro
+    window.location.href = 'financeiro.html';
+  },
+
+  /* ══ LOGIN ADMINISTRATIVO ══ */
   adminLogin() {
     const user = document.getElementById('admin-user')?.value.trim();
     const pass = document.getElementById('admin-pass')?.value;
@@ -287,7 +319,7 @@ const App = {
       try { DB.listen(caminho, cb); }
       catch (e) { console.error('[listener] ' + caminho, e); }
     };
-    liga('units',  v => { State.units  = v || {}; });
+    liga('units',  v => { State.units  = v || {}; App.renderUnitsDropdown(); });
     liga('admins', v => { State.admins = v || {}; App.renderAdminsCards?.(); });
     liga('activityLog', v => { State.activityLog = v || {}; });
 
@@ -3136,11 +3168,13 @@ window.App = App;
 window.State = State;
 window.DB = DB;
 
-/* Módulos pedindo para voltar ao menu principal */
+/* Mensagens vindas dos módulos em iframe */
 window.addEventListener('message', function(ev) {
   if (ev.data === 'fecharFinanceiro' || ev.data === 'fecharInventario' || ev.data === 'fecharGeradorPDF') {
     App.voltarAoMenu();
   }
+  // Sair pelo menu de um módulo encerra a sessão aqui também
+  if (ev.data === 'sairDoSistema') App.adminLogout();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
