@@ -8,21 +8,6 @@ let modelSettings = {};
 let globalAccessData = [];
 let accessToggleStates = {};
 
-// Setores/Categorias de Acessos (configuráveis, com cor por setor). Vêm do nó
-// itAccessCategorias; se vazio, semeia estes padrões (os antigos fixos + cor).
-let accessCategorias = [];
-const CAT_ACESSO_DEFAULT = [
-  { nome: 'Administrativo', cor: '#1e3a8a' },
-  { nome: 'Biomedicos', cor: '#0891b2' },
-  { nome: 'Diretoria', cor: '#7c3aed' },
-  { nome: 'Lamic viva+', cor: '#059669' },
-  { nome: 'Triagem coletas e vacinas', cor: '#d97706' },
-  { nome: 'Unidade externas', cor: '#dc2626' },
-  { nome: 'Links', cor: '#0d9488' },
-  { nome: 'Atendimento UNILAB', cor: '#db2777' },
-  { nome: 'Outros', cor: '#475569' }
-];
-
 const defaultModels = {
     printer: ['Epson L3150', 'Epson L3250', 'Epson L4160', 'Epson L4260', 'Epson L120', 'Epson L355'],
     label: ['Zebra ZD220', 'Zebra GC420t', 'Zebra TLP2844', 'Zebra ZD230',],
@@ -140,20 +125,6 @@ function iniciarConexaoFirebase() {
   DB.listen('itAccesses', data => {
     globalAccessData = parseArray(data);
     renderAccesses();
-  });
-
-  // Escuta os Setores/Categorias de Acessos (com cor). Se vazio, semeia padrões.
-  DB.listen('itAccessCategorias', data => {
-    const arr = parseArray(data);
-    if (!arr.length) {
-      accessCategorias = CAT_ACESSO_DEFAULT.map((c, i) => ({ id: (Date.now() + i).toString(), nome: c.nome, cor: c.cor }));
-      DB.set('itAccessCategorias', accessCategorias);
-    } else {
-      accessCategorias = arr;
-    }
-    _populateAccCategoriaSelect();
-    renderAccesses();
-    renderAccessCategoriasSettings();
   });
 
   // Escuta Categorias de Equipamentos (Tipo/Fabricante/Fornecedor ficam
@@ -1818,7 +1789,7 @@ const panelBadge = comp.per_tv ?
             const statusBadge = `<span class="status-badge status-${compStatus}">${getStatusLabel(compStatus)}</span>`;
 
             const trHw = document.createElement('tr');
-            trHw.innerHTML = `<td>${pcCell}</td><td>${hwHTML}</td><td>${pHTML}</td><td><div class="os-row">${comp.os || 'N/A'} ${comp.os_arch ? `<span class="arch-badge">${comp.os_arch}</span>` : ''}</div><span class="license-badge ${licClass}">${licText}</span></td><td>${statusBadge}</td><td><div class="row-actions"><button class="btn-icon" title="Ver logs do dashboard" onclick="abrirLogsEquipamento(null,'dashboard')"><i class="ph ph-clock-counter-clockwise"></i></button><button class="btn-icon" onclick="editComputer('${comp.id}')"><i class="ph ph-pencil-simple"></i></button><button class="btn-icon" onclick="desvincularGuiche('${comp.id}')" title="Desvincular equipamentos — voltam pro estoque; o guichê permanece"><i class="ph ph-arrow-u-up-left"></i></button></div></td>`;
+            trHw.innerHTML = `<td>${pcCell}</td><td>${hwHTML}</td><td>${pHTML}</td><td><div class="os-row">${comp.os || 'N/A'} ${comp.os_arch ? `<span class="arch-badge">${comp.os_arch}</span>` : ''}</div><span class="license-badge ${licClass}">${licText}</span></td><td>${statusBadge}</td><td><div style="display:flex;gap:5px;"><button class="btn-icon" onclick="editComputer('${comp.id}')"><i class="ph ph-pencil-simple"></i></button><button class="btn-icon" onclick="desvincularGuiche('${comp.id}')" title="Desvincular equipamentos — voltam pro estoque; o guichê permanece"><i class="ph ph-arrow-u-up-left"></i></button></div></td>`;
             listHw.appendChild(trHw);
 
             const passField = (p) => p
@@ -1865,7 +1836,7 @@ const panelBadge = comp.per_tv ?
         unit.mobiles.forEach(mob => {
             let waBadge = mob.wa_temp ? '<br><span class="wa-badge">WhatsApp 90 Dias</span>' : '';
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td><strong>${mob.model}</strong><div class="pass-info">${mob.user}</div></td><td>${mob.number}</td><td><ul class="detail-list" style="margin:0;"><li><strong>CPU:</strong> ${mob.cpu}</li><li><strong>RAM:</strong> ${mob.ram}</li><li><strong>ROM:</strong> ${mob.rom}</li></ul></td><td>${waBadge || '<span style="color:#999">--</span>'}</td><td><div class="row-actions"><button class="btn-icon" title="Ver logs" onclick="abrirLogsEquipamento('${mob.serial || ''}')"><i class="ph ph-clock-counter-clockwise"></i></button><button class="btn-icon" onclick="openMobileModal('${mob.id}')"><i class="ph ph-pencil-simple"></i></button><button class="btn-icon" onclick="desvincularMobile('${mob.id}')" title="Desvincular — devolve pro estoque como Disponível (apagar de vez, só na aba Estoque)"><i class="ph ph-arrow-u-up-left"></i></button></div></td>`;
+            tr.innerHTML = `<td><strong>${mob.model}</strong><div class="pass-info">${mob.user}</div></td><td>${mob.number}</td><td><ul class="detail-list" style="margin:0;"><li><strong>CPU:</strong> ${mob.cpu}</li><li><strong>RAM:</strong> ${mob.ram}</li><li><strong>ROM:</strong> ${mob.rom}</li></ul></td><td>${waBadge || '<span style="color:#999">--</span>'}</td><td><div style="display:flex;gap:5px;"><button class="btn-icon" onclick="openMobileModal('${mob.id}')"><i class="ph ph-pencil-simple"></i></button><button class="btn-icon" onclick="desvincularMobile('${mob.id}')" title="Desvincular — devolve pro estoque como Disponível (apagar de vez, só na aba Estoque)"><i class="ph ph-arrow-u-up-left"></i></button></div></td>`;
             listMob.appendChild(tr);
         });
     }
@@ -2447,7 +2418,7 @@ function renderAcs() {
             <td>${ac.install_date ? formatDate(ac.install_date) : '<span style="color:#ccc">---</span>'}</td>
             <td>${maintDisplay}</td>
             <td><span class="status-badge status-${statusVal}">${getStatusLabel(statusVal)}</span></td>
-            <td><div class="row-actions"><button class="btn-icon" title="Ver logs" onclick="abrirLogsEquipamento('${ac.stockCode || ''}')"><i class="ph ph-clock-counter-clockwise"></i></button><button class="btn-icon" onclick="openAcModal('${ac.id}')"><i class="ph ph-pencil-simple"></i></button><button class="btn-icon" onclick="desvincularAc('${ac.id}')" title="Desvincular — devolve pro estoque como Disponível (apagar de vez, só na aba Estoque)"><i class="ph ph-arrow-u-up-left"></i></button></div></td>
+            <td><div style="display:flex;gap:5px;"><button class="btn-icon" onclick="openAcModal('${ac.id}')"><i class="ph ph-pencil-simple"></i></button><button class="btn-icon" onclick="desvincularAc('${ac.id}')" title="Desvincular — devolve pro estoque como Disponível (apagar de vez, só na aba Estoque)"><i class="ph ph-arrow-u-up-left"></i></button></div></td>
         `;
         tbody.appendChild(tr);
     });
@@ -2584,8 +2555,7 @@ function renderUnits() {
         if (licCount > 0) subInfo += `<div class="unit-sub-info unit-sub-lic"><i class="ph ph-certificate"></i> ${licCount} licença(s)</div>`;
         if (inativoCount > 0) subInfo += `<div class="unit-sub-info unit-sub-alert"><i class="ph ph-warning"></i> ${inativoCount} fora de operação</div>`;
         card.innerHTML = `
-            <div class="card-actions" style="z-index:2;">
-                <button class="btn-icon" title="Ver logs do dashboard" onclick="event.stopPropagation();abrirLogsEquipamento(null,'dashboard')"><i class="ph ph-clock-counter-clockwise"></i></button>
+            <div style="position:absolute;top:10px;right:10px;display:flex;gap:5px;z-index:2;">
                 <button class="btn-icon" onclick="editUnit('${unit.id}')"><i class="ph ph-pencil-simple"></i></button>
                 <button class="btn-icon btn-delete" onclick="deleteUnit('${unit.id}')"><i class="ph ph-trash"></i></button>
             </div>
@@ -2929,8 +2899,8 @@ function addWifiRowInternal(container, data = {}) {
                 <label>Nível de Acesso</label>
                 <select class="wifi-access">
                     <option value="" ${!data.access ? 'selected' : ''}>Selecione...</option>
-                    <option value="Restrito" ${data.access === 'Restrito' ? 'selected' : ''}>Restrito</option>
-                    <option value="Público" ${data.access === 'Público' ? 'selected' : ''}>Público</option>
+                    <option value="Restrito" ${data.access === 'Restrito' ? 'selected' : ''}>Restrito 🔒</option>
+                    <option value="Público" ${data.access === 'Público' ? 'selected' : ''}>Público 🌐</option>
                 </select>
             </div>
             <div class="form-group" style="margin:0">
@@ -3238,7 +3208,7 @@ async function exportData() {
 
     // Todos os paths do sistema
     const paths = [
-        'itInventory', 'itSettings', 'itAccesses', 'itAccessCategorias',
+        'itInventory', 'itSettings', 'itAccesses',
         'itEquipamentos', 'itCategoriasEquip',
         'itFabricantes', 'itFornecedores', 'itTiposEquip'
     ];
@@ -3264,7 +3234,6 @@ async function exportData() {
         inventory:        dados.itInventory        || inventoryData,
         settings:         dados.itSettings         || modelSettings,
         accesses:         dados.itAccesses         || globalAccessData,
-        accessCategorias: dados.itAccessCategorias || accessCategorias,
         // Equipamentos e suas listas de configuração
         equipamentos:     dados.itEquipamentos     || {},
         categoriasEquip:  dados.itCategoriasEquip  || {},
@@ -3349,7 +3318,6 @@ function importData(inputElement) {
             if (d.inventory)       ops.push(DB.set('itInventory',       d.inventory));
             if (d.settings)        ops.push(DB.set('itSettings',        d.settings));
             if (d.accesses)        ops.push(DB.set('itAccesses',        d.accesses));
-            if (d.accessCategorias) ops.push(DB.set('itAccessCategorias', d.accessCategorias));
             if (d.equipamentos)    ops.push(DB.set('itEquipamentos',    d.equipamentos));
             if (d.categoriasEquip) ops.push(DB.set('itCategoriasEquip', d.categoriasEquip));
             if (d.fabricantes)     ops.push(DB.set('itFabricantes',     d.fabricantes));
@@ -3509,99 +3477,16 @@ function filterUnitItems() {
 globalAccessData = [];
 accessToggleStates = {};
 
-// ── Setores/Categorias de Acessos — CRUD + cor ────────────────────
-// Popula o select do modal com os setores da config. `manter` = categoria do
-// acesso aberto: se o setor dela foi apagado da config, entra como opção órfã
-// pra não perder o vínculo ao salvar.
-function _populateAccCategoriaSelect(manter) {
-    const sel = document.getElementById('acc-categoria');
-    if (!sel) return;
-    const atual = manter || sel.value;
-    const lista = accessCategorias.length ? accessCategorias : CAT_ACESSO_DEFAULT;
-    let html = lista.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('');
-    if (atual && !lista.some(c => c.nome === atual))
-        html += `<option value="${atual}">${atual} (setor removido)</option>`;
-    sel.innerHTML = html;
-    if (atual) sel.value = atual;
-}
-
-function renderAccessCategoriasSettings() {
-    const list = document.getElementById('list-categorias-acesso');
-    if (!list) return;
-    const lista = accessCategorias.length ? accessCategorias : CAT_ACESSO_DEFAULT;
-    if (!lista.length) { list.innerHTML = '<li class="ecl-empty">Nenhum setor cadastrado</li>'; return; }
-    list.innerHTML = lista.map(c => `
-        <li style="display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid #f1f5f9;font-size:.82rem;">
-            <span style="width:16px;height:16px;border-radius:4px;flex:0 0 16px;background:${c.cor || '#334155'};border:1px solid rgba(0,0,0,.12)"></span>
-            <strong style="flex:1;">${c.nome}</strong>
-            <button title="Editar" onclick="abrirCategoriaAcesso('${c.id}')" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:1rem;padding:2px"><i class="ph ph-pencil-simple"></i></button>
-            <button title="Apagar" onclick="apagarCategoriaAcesso('${c.id}')" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:1rem;padding:2px"><i class="ph ph-trash"></i></button>
-        </li>`).join('');
-}
-
-const PALETA_ACESSO = ['#1e3a8a', '#2563eb', '#0891b2', '#0d9488', '#059669', '#65a30d', '#d97706', '#dc2626', '#db2777', '#7c3aed', '#475569', '#0f172a'];
-function _selecionarCorAcesso(cor) {
-    document.getElementById('cat-acesso-cor').value = cor;
-    document.querySelectorAll('#cat-acesso-swatches .cat-swatch').forEach(s => s.classList.toggle('sel', s.dataset.cor === cor));
-}
-function _renderSwatchesAcesso(corAtual) {
-    const box = document.getElementById('cat-acesso-swatches'); if (!box) return;
-    box.innerHTML = PALETA_ACESSO.map(c =>
-        `<button type="button" class="cat-swatch${c === corAtual ? ' sel' : ''}" data-cor="${c}" style="background:${c}" title="${c}" onclick="_selecionarCorAcesso('${c}')"></button>`
-    ).join('');
-}
-function abrirCategoriaAcesso(id) {
-    const cat = id ? accessCategorias.find(c => c.id === id) : null;
-    const cor = cat ? (cat.cor || '#1e3a8a') : '#1e3a8a';
-    document.getElementById('cat-acesso-id').value  = cat ? cat.id : '';
-    document.getElementById('cat-acesso-nome').value = cat ? cat.nome : '';
-    document.getElementById('cat-acesso-cor').value  = cor;
-    _renderSwatchesAcesso(cor);
-    document.getElementById('cat-acesso-title').textContent = cat ? 'Editar Setor / Categoria' : 'Novo Setor / Categoria';
-    document.getElementById('cat-acesso-modal').classList.remove('hidden');
-}
-function fecharCategoriaAcesso() { document.getElementById('cat-acesso-modal').classList.add('hidden'); }
-
-function salvarCategoriaAcesso() {
-    const id   = document.getElementById('cat-acesso-id').value;
-    const nome = document.getElementById('cat-acesso-nome').value.trim();
-    const cor  = document.getElementById('cat-acesso-cor').value || '#1e3a8a';
-    if (!nome) { alert('Informe o nome do setor/categoria.'); return; }
-    const lista = accessCategorias.slice();
-    if (lista.some(c => c.nome.toLowerCase() === nome.toLowerCase() && c.id !== id)) { alert('Já existe um setor com esse nome.'); return; }
-    if (id) {
-        const c = lista.find(x => x.id === id);
-        if (c) { c.nome = nome; c.cor = cor; }
-    } else {
-        lista.push({ id: Date.now().toString(), nome, cor });
-    }
-    DB.set('itAccessCategorias', lista);
-    accessCategorias = lista;
-    fecharCategoriaAcesso();
-    _populateAccCategoriaSelect(); renderAccesses(); renderAccessCategoriasSettings();
-}
-
-function apagarCategoriaAcesso(id) {
-    const c = accessCategorias.find(x => x.id === id); if (!c) return;
-    const emUso = globalAccessData.filter(a => (a.categoria || 'Outros') === c.nome).length;
-    if (!confirm(`Apagar o setor "${c.nome}"?${emUso ? `\n${emUso} acesso(s) ficam sem a cor/config deste setor.` : ''}`)) return;
-    const lista = accessCategorias.filter(x => x.id !== id);
-    DB.set('itAccessCategorias', lista);
-    accessCategorias = lista;
-    _populateAccCategoriaSelect(); renderAccesses(); renderAccessCategoriasSettings();
-}
-
 function renderAccesses() {
     const container = document.getElementById('access-categories-container');
     if (!container) return;
     container.innerHTML = '';
 
-    // Categorias vêm da config (com cor). Fallback pros padrões se ainda não carregou.
-    const catList = accessCategorias.length ? accessCategorias : CAT_ACESSO_DEFAULT;
-    const corDe = nome => (catList.find(c => c.nome === nome)?.cor) || '#334155';
-    const grouped = {};
-    catList.forEach(c => { grouped[c.nome] = []; });
-    if (!grouped['Outros']) grouped['Outros'] = [];
+    const grouped = {
+        'Administrativo': [], 'Biomedicos': [], 'Diretoria': [],
+        'Lamic viva+': [], 'Triagem coletas e vacinas': [],
+        'Unidade externas': [], 'Links': [], 'Atendimento UNILAB': [], 'Outros': []
+    };
 
     globalAccessData.forEach(acc => {
         if (!_accessPassesFilters(acc)) return; // aplica filtros ativos
@@ -3627,21 +3512,13 @@ function renderAccesses() {
            </span>`
         : '';
 
-    // Setor cadastrado na config aparece MESMO vazio (senão um setor novo some
-    // da tela e não dá pra ver que existe / mover acessos pra ele).
-    // Com filtro ativo, setor sem resultado some — senão "vazio" enganaria.
-    const filtroAtivo = !!(_accessFilters.assinatura || _accessFilters['2fa'] || _accessFilters.drive);
-    const cadastrado = nome => catList.some(c => c.nome === nome);
     Object.entries(grouped).forEach(([cat, items], index) => {
-        if (items.length === 0 && (filtroAtivo || !cadastrado(cat))) return;
+        if (items.length === 0) return;
         const sectionId = `access-sec-${index}`;
-        // Todo setor começa FECHADO (inclusive os criados agora). Só fica aberto
-        // depois que o usuário clica — aí accessToggleStates[cat] vira false.
-        const isClosed = accessToggleStates[cat] !== false;
+        const isClosed = accessToggleStates[cat] === true;
         
         const header = document.createElement('div');
         header.className = 'collapsible-header';
-        header.style.background = corDe(cat);   // cor do setor definida na config
         header.onclick = () => {
             const el = document.getElementById(sectionId);
             el.classList.toggle('hidden');
@@ -3683,16 +3560,6 @@ function renderAccesses() {
                     <th style="padding: 10px; border-bottom: 2px solid #ddd; width: 10%;">Ações</th>
                 </tr>
             `;
-        }
-
-        if (!items.length) {
-            contentDiv.innerHTML = `<div class="estoque-empty" style="padding:18px;text-align:center;">
-                Nenhum acesso neste setor. Use o <strong>editar</strong> de um acesso e troque o campo
-                <em>Setor / Categoria</em> para movê-lo pra cá.
-            </div>`;
-            container.appendChild(header);
-            container.appendChild(contentDiv);
-            return;
         }
 
         contentDiv.innerHTML = `
@@ -3754,8 +3621,8 @@ function renderAccesses() {
                                 </td>
                                 <td style="padding: 10px; border-bottom: 1px solid #eee; font-size: 0.85rem; vertical-align: middle; word-break: break-word;">
                                     <div style="display:flex; gap:5px; margin-bottom: 8px; flex-wrap: wrap;">
-                                        ${acc.assinatura ? '<span style="background:#28a745; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">COM ASSINATURA</span>' : '<span style="background:#6c757d; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">SEM ASSINATURA</span>'}
-                                        ${acc.twoFA ? '<span style="background:#28a745; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">COM 2FA</span>' : '<span style="background:#6c757d; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">SEM 2FA</span>'}
+                                        ${acc.assinatura ? '<span style="background:#28a745; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">✅ COM ASSINATURA</span>' : '<span style="background:#6c757d; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">❌ SEM ASSINATURA</span>'}
+                                        ${acc.twoFA ? '<span style="background:#28a745; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">✅ COM 2FA</span>' : '<span style="background:#6c757d; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">❌ SEM 2FA</span>'}
                                     </div>
                                     <div>
                                         ${acc.linkDrive ? `<a href="${acc.linkDrive}" target="_blank" style="background:#e8f0fe; color:#0b4a99; padding:4px 8px; border-radius:4px; text-decoration:none; font-weight:bold; border:1px solid #0b4a99; display:inline-block;"><i class="ph ph-link"></i> Ver Senha no Drive</a>` : '<span style="color:#999; font-style:italic;">Sem link do Drive</span>'}
@@ -3788,9 +3655,6 @@ function openAccessModal(id = null) {
     if (id) {
         const acc = globalAccessData.find(a => a.id === id);
         if(acc) {
-            // Recarrega os setores da config (inclui os criados agora) antes de
-            // selecionar — é por aqui que o acesso é movido de um setor pro outro.
-            _populateAccCategoriaSelect(acc.categoria || 'Administrativo');
             r('access-id', acc.id); r('acc-categoria', acc.categoria || 'Administrativo');
             r('acc-setor', acc.setor); r('acc-funcao', acc.funcao); r('acc-depto', acc.depto); 
             r('acc-contato', acc.contato); r('acc-email-corp', acc.emailCorp); 
@@ -3806,20 +3670,17 @@ function openAccessModal(id = null) {
             document.getElementById('access-modal-title').textContent = "Editar Acesso";
         }
     } else {
-        _populateAccCategoriaSelect();
-        r('access-id', ''); r('acc-setor', '');
-        r('acc-funcao', ''); r('acc-depto', ''); r('acc-contato', ''); r('acc-email-corp', '');
+        r('access-id', ''); r('acc-categoria', 'Administrativo'); r('acc-setor', ''); 
+        r('acc-funcao', ''); r('acc-depto', ''); r('acc-contato', ''); r('acc-email-corp', ''); 
         r('acc-email-redir', ''); r('acc-pass-cpanel', ''); r('acc-pass-gmail', '');
         r('acc-link-drive', ''); r('acc-info', '');
 
         // Limpa novos campos
         chk('acc-assinatura', false);
         chk('acc-2fa', false);
-
+        
         document.getElementById('access-modal-title').textContent = "Novo Acesso";
     }
-    // Ajusta os rótulos/campos conforme o setor selecionado (Links/UNILAB têm layout próprio)
-    if (typeof toggleAccessFields === 'function') toggleAccessFields();
 }
 
 function saveAccess() {
@@ -3843,10 +3704,6 @@ function saveAccess() {
 
     if (id) {
         const idx = globalAccessData.findIndex(a => a.id === id);
-        // Registra a troca de setor (movimentação entre categorias)
-        if (idx > -1 && globalAccessData[idx].categoria !== data.categoria && typeof registrarLog === 'function')
-            registrarLog(data.setor || data.emailCorp || '', 'acesso', 'Acesso movido de setor',
-                `${globalAccessData[idx].categoria || '—'} → ${data.categoria} · ${data.setor || ''}`);
         if(idx > -1) globalAccessData[idx] = data;
     } else {
         globalAccessData.push(data);
@@ -3878,9 +3735,16 @@ function showAccessesView() {
     const b = document.getElementById('btn-nav-accesses'); if(b) { document.querySelectorAll('.sidebar-nav .nav-item').forEach(x=>x.classList.remove('active')); b.classList.add('active'); }
     closeModals();
 
-    // Zera o estado: sem entrada = fechado (vale pra qualquer setor, inclusive
-    // os criados na config — a lista fixa antiga deixava os novos de fora).
+    const categorias = [
+        'Administrativo', 'Biomedicos', 'Diretoria', 
+        'Lamic viva+', 'Triagem coletas e vacinas', 
+        'Unidade externas', 'Links', 'Atendimento UNILAB', 'Outros'
+    ];
+    
     accessToggleStates = {};
+    categorias.forEach(cat => {
+        accessToggleStates[cat] = true;
+    });
 
     document.getElementById('accesses-view').classList.remove('hidden');
     document.getElementById('accesses-view').classList.add('active');
@@ -5986,115 +5850,29 @@ function registrarLog(equipCode, tipo, acao, detalhe) {
 
 // Abre o modal de logs — com equipCode mostra só o histórico daquele
 // equipamento; sem código mostra TODOS os movimentos do inventário.
-// Três grupos, espelhando a sidebar:
-//  • dashboard = guichês/templates (unidades)
-//  • equip     = seção "Equipamentos" (equipamentos de laboratório)
-//  • estoque   = peças/licenças/celulares/ACs/periféricos e a lixeira
-const _LOG_TIPOS_DASH    = ['guiche', 'pc', 'acesso'];
-const _LOG_TIPOS_EQUIP   = ['equip'];
-const _LOG_TIPOS_ESTOQUE = ['peca', 'licenca', 'mobile', 'ac', 'printer', 'label', 'thermal', 'webcam', 'tv', 'lixeira'];
-
-let _logsCtx = { equipCode: null, grupo: null, modo: 'dia', data: null };
-
-function _hojeISO() {
-    const h = new Date();
-    return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`;
-}
-
-function abrirLogsEquipamento(equipCode, grupo) {
+function abrirLogsEquipamento(equipCode) {
     const modal = document.getElementById('logs-modal');
     if (!modal) return;
-    _logsCtx = { equipCode: equipCode || null, grupo: grupo || null, modo: 'dia', data: _hojeISO() };
-    // Começa no dia do registro MAIS RECENTE deste filtro (evita abrir vazio em "hoje").
-    const recente = invLogs.find(l => {
-        if (equipCode) return l.equipCode === equipCode;
-        if (grupo === 'dashboard') return _LOG_TIPOS_DASH.includes(l.tipo);
-        if (grupo === 'equip')     return _LOG_TIPOS_EQUIP.includes(l.tipo);
-        if (grupo === 'estoque')   return _LOG_TIPOS_ESTOQUE.includes(l.tipo);
-        return true;
-    });
-    if (recente && recente.ts) _logsCtx.data = recente.ts.substring(0, 10);
-    _renderLogs();
-    modal.classList.remove('hidden');
-}
-
-// Navegação dia a dia / semana a semana + calendário (igual ao index).
-function _logsNav(dir) {
-    const d = new Date((_logsCtx.data || _hojeISO()) + 'T00:00:00');
-    d.setDate(d.getDate() + dir * (_logsCtx.modo === 'semana' ? 7 : 1));
-    _logsCtx.data = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    _renderLogs();
-}
-function _logsSetData(val) { if (val) { _logsCtx.data = val; _renderLogs(); } }
-function _logsSetModo(m) { _logsCtx.modo = m; _renderLogs(); }
-
-function _fmtDiaLog(data) {
-    const d = new Date(data + 'T00:00:00');
-    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-    const ontem = new Date(hoje); ontem.setDate(hoje.getDate() - 1);
-    if (d.getTime() === hoje.getTime()) return 'Hoje';
-    if (d.getTime() === ontem.getTime()) return 'Ontem';
-    return d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-function _fmtSemanaLog(data) {
-    const sel = new Date(data + 'T00:00:00'); const ini = new Date(sel); ini.setDate(sel.getDate() - 6);
-    const f = dt => dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-    return `${f(ini)} — ${f(sel)}`;
-}
-
-function _renderLogs() {
-    const { equipCode, grupo, modo, data } = _logsCtx;
-    const titGrupo = grupo === 'dashboard' ? 'Logs do Dashboard' : grupo === 'equip' ? 'Logs de Equipamentos' : grupo === 'estoque' ? 'Logs do Estoque' : 'Logs do Inventário';
     document.getElementById('logs-modal-title').innerHTML = equipCode
         ? `<i class="ph ph-clock-counter-clockwise"></i> Histórico — ${equipCode}`
-        : `<i class="ph ph-clock-counter-clockwise"></i> ${titGrupo}`;
-
-    let base = invLogs;
-    if (equipCode) base = base.filter(l => l.equipCode === equipCode);
-    else if (grupo === 'dashboard') base = base.filter(l => _LOG_TIPOS_DASH.includes(l.tipo));
-    else if (grupo === 'equip')     base = base.filter(l => _LOG_TIPOS_EQUIP.includes(l.tipo));
-    else if (grupo === 'estoque')   base = base.filter(l => _LOG_TIPOS_ESTOQUE.includes(l.tipo));
-
-    // Filtra pelo dia (ou semana: 7 dias terminando na data escolhida)
-    const noRange = ts => {
-        const d = (ts || '').substring(0, 10); if (!d) return false;
-        if (modo === 'dia') return d === data;
-        const dObj = new Date(d + 'T00:00:00'), sel = new Date(data + 'T00:00:00');
-        const ini = new Date(sel); ini.setDate(sel.getDate() - 6);
-        return dObj >= ini && dObj <= sel;
-    };
-    const linhas = base.filter(l => noRange(l.ts));
-
-    const nav = document.getElementById('logs-nav-inv');
-    if (nav) nav.innerHTML = `
-        <div class="logs-nav-row">
-            <button class="logs-nav-arrow" onclick="_logsNav(-1)" title="${modo === 'semana' ? 'Semana anterior' : 'Dia anterior'}"><i class="ph ph-caret-left"></i></button>
-            <div class="logs-nav-center">
-                <input type="date" class="logs-nav-date" value="${data}" onchange="_logsSetData(this.value)">
-                <div class="logs-nav-modo">
-                    <button class="${modo === 'dia' ? 'active' : ''}" onclick="_logsSetModo('dia')">Dia</button>
-                    <button class="${modo === 'semana' ? 'active' : ''}" onclick="_logsSetModo('semana')">Semana</button>
-                </div>
-            </div>
-            <button class="logs-nav-arrow" onclick="_logsNav(1)" title="${modo === 'semana' ? 'Próxima semana' : 'Próximo dia'}"><i class="ph ph-caret-right"></i></button>
-        </div>
-        <div class="logs-nav-label">${modo === 'dia' ? _fmtDiaLog(data) : _fmtSemanaLog(data)} · ${linhas.length} registro(s)</div>`;
-
+        : `<i class="ph ph-clock-counter-clockwise"></i> Logs do Inventário`;
+    const linhas = equipCode ? invLogs.filter(l => l.equipCode === equipCode) : invLogs;
     const body = document.getElementById('logs-modal-body');
     if (!linhas.length) {
-        body.innerHTML = `<div class="estoque-empty">Nenhuma modificação registrada ${modo === 'dia' ? 'neste dia' : 'nesta semana'}.</div>`;
-        return;
+        body.innerHTML = '<div class="estoque-empty">Nenhuma modificação registrada ainda.</div>';
+    } else {
+        body.innerHTML = linhas.map(l => `
+            <div class="log-entry">
+                <div class="log-entry-head">
+                    <strong>${l.acao}</strong>
+                    <span class="log-entry-when">${new Date(l.ts).toLocaleString('pt-BR')}</span>
+                </div>
+                ${l.equipCode ? `<div class="log-entry-code">${l.equipCode}</div>` : ''}
+                ${l.detalhe ? `<div class="log-entry-det">${l.detalhe}</div>` : ''}
+                <div class="log-entry-user"><i class="ph ph-user"></i> ${l.user} ${l.admin ? '<span class="log-admin-badge">Administrador</span>' : ''}</div>
+            </div>`).join('');
     }
-    body.innerHTML = linhas.map(l => `
-        <div class="log-entry">
-            <div class="log-entry-head">
-                <strong>${l.acao}</strong>
-                <span class="log-entry-when">${new Date(l.ts).toLocaleString('pt-BR')}</span>
-            </div>
-            ${l.equipCode ? `<div class="log-entry-code">${l.equipCode}</div>` : ''}
-            ${l.detalhe ? `<div class="log-entry-det">${l.detalhe}</div>` : ''}
-            <div class="log-entry-user"><i class="ph ph-user"></i> ${l.user} ${l.admin ? '<span class="log-admin-badge">Administrador</span>' : ''}</div>
-        </div>`).join('');
+    modal.classList.remove('hidden');
 }
 
 // Depósito de Licenças de Software do estoque — licença nova só entra por
@@ -6460,7 +6238,7 @@ function _renderEquipCard(reg, type, unit, soLeitura = false) {
     else if (type === 'ac') { clickAction = `_openAcFromEstoque('${unitId}','${reg.id}',${soLeitura})`; delAction = `_deleteAcFromEstoque('${unitId}','${reg.id}')`; }
     else { clickAction = `openEquipPresetModal('${type}','${unitId}','${reg.id}',false,${soLeitura})`; delAction = `_deleteEquipRegistro('${type}','${unitId}','${reg.id}')`; }
     return `
-    <div class="estoque-modelo-card${soLeitura ? ' estoque-card-nodel' : ''}" onclick="${clickAction}" title="${soLeitura ? 'Visualização (somente leitura — editar é pela Lista)' : 'Clique para ver / editar'}">
+    <div class="estoque-modelo-card" onclick="${clickAction}" title="${soLeitura ? 'Visualização (somente leitura — editar é pela Lista)' : 'Clique para ver / editar'}">
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
         ${soLeitura ? '' : `<button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); ${delAction}" title="Excluir"><i class="ph ph-trash"></i></button>`}
@@ -6708,9 +6486,8 @@ function _renderLicencaCard(l) {
     const preset = l.status === 'em_uso' ? (modelSettings.compPresets || []).find(p => p.licenseStockId === l.id) : null;
     const local = preset ? `${preset.serial || preset.name}${preset.compName ? ' · ' + preset.compName + ' (' + preset.unitName + ')' : ''}` : 'Estoque';
     return `
-    <div class="estoque-modelo-card estoque-card-nodel" onclick="abrirEntradaLicenca('${l.id}', false, true)" title="Visualização (somente leitura — editar é pela Lista)">
+    <div class="estoque-modelo-card" onclick="abrirEntradaLicenca('${l.id}', false, true)" title="Visualização (somente leitura — editar é pela Lista)">
         <div class="equip-status-dot ${dotClass}"></div>
-        <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${l.serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
         <div class="estoque-comp-head">
             <i class="ph ph-certificate"></i>
             <strong>${l.serial || '—'}</strong>
@@ -7860,7 +7637,6 @@ function renderEquipGrid() {
         card.innerHTML = `
             <div class="equip-status-dot ${dotClass}"></div>
             <div class="card-actions">
-                <button class="btn-icon" title="Ver logs" onclick="event.stopPropagation();abrirLogsEquipamento('${e.serie || ''}')"><i class="ph ph-clock-counter-clockwise"></i></button>
                 <button class="btn-icon" title="Editar" onclick="event.stopPropagation();openEquipModal('${e.id}')"><i class="ph ph-pencil-simple"></i></button>
                 <button class="btn-icon btn-delete" title="Excluir" onclick="event.stopPropagation();deleteEquip('${e.id}')"><i class="ph ph-trash"></i></button>
             </div>
@@ -7974,9 +7750,6 @@ function saveEquipamento() {
     if (idx !== -1) equipData[idx] = { ...equipData[idx], ...data };
     else            equipData.push(data);
 
-    if (typeof registrarLog === 'function')
-        registrarLog(serie || data.codigo || nome, 'equip', idx !== -1 ? 'Equipamento editado' : 'Equipamento cadastrado', `${nome} · ${modelo}${data.categoria ? ' · ' + data.categoria : ''}`);
-
     // Fecha o modal
     document.getElementById('equip-modal').classList.add('hidden');
 
@@ -8006,8 +7779,6 @@ function saveEquipamento() {
 function deleteEquip(id) {
     const e = equipData.find(x => x.id === id);
     if (!e || !confirm(`Excluir permanentemente "${e.nome}"?`)) return;
-    if (typeof registrarLog === 'function')
-        registrarLog(e.serie || e.codigo || e.nome, 'equip', 'Equipamento excluído', `${e.nome}${e.modelo ? ' · ' + e.modelo : ''}`);
     equipData = equipData.filter(x => x.id !== id); // eco local ignorado — atualiza aqui
     renderEquipGrid();
     DB.remove('itEquipamentos/' + id);

@@ -1274,33 +1274,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#c0c0c0;font-size:11pt;c
 .footer-doc{margin-top:auto;padding-top:3mm;border-top:1pt solid #ccc;
     display:flex;justify-content:space-between;align-items:flex-end;}
 .sign-col{text-align:center;}
-/* margin auto: sem isso a linha com largura fixa cola na esquerda em vez de
-   ficar acima do nome. 1pt: 0.5pt sumia no html2canvas. */
-.sign-line{height:1pt;background:#0b1a33;margin:0 auto 1.5mm;}
+.sign-line{height:0.5pt;background:#0b1a33;margin-bottom:1.5mm;}
 .sign-name{font-size:9pt;font-weight:700;color:#0b1a33;}
 .sign-sub{font-size:7.5pt;color:#888;}
 
-/* Tabela orçamento — layout fixo: sem isso o texto longo da coluna Item
-   engole Descrição/Qtd/Pagamento e o cabeçalho quebra letra por letra. */
-table.orc{width:100%;border-collapse:collapse;font-size:9.5pt;margin-bottom:3mm;table-layout:fixed;}
-table.orc col.c-item{width:37%;}
-table.orc col.c-desc{width:18%;}
-table.orc col.c-qtd {width:9%;}
-table.orc col.c-pgto{width:36%;}
-table.orc th{background:#0b1a33;color:#fff;padding:2mm 3mm;text-align:left;font-size:8pt;letter-spacing:.5px;
-    white-space:nowrap;}
-table.orc td{padding:2mm 3mm;border-bottom:0.5pt solid #e2e8f0;vertical-align:top;
-    overflow-wrap:break-word;word-break:normal;line-height:1.45;}
-/* Qtd é estreita: padding menor pra sobrar espaço ao cabeçalho */
-table.orc th:nth-child(3),table.orc td:nth-child(3){padding-left:1mm;padding-right:1mm;}
-/* Valor + forma de pagamento: 9pt cabe "R$ 1.348,00 em 12x de R$ 11,08"
-   numa linha só, sem estourar/cortar na borda direita da folha. */
-table.orc td.pgto-cell{white-space:normal;font-size:9pt;}
-/* O reset universal usa overflow-wrap:anywhere + word-break:break-word, que
-   fatiava valores no meio ("R$ 33,90" saía embaralhado com "à vista").
-   Nas células só quebra em espaço; valor monetário nunca é fatiado. */
-table.orc td,table.orc td *{word-break:normal;overflow-wrap:break-word;}
-table.orc td.pgto-cell,table.orc td.pgto-cell *{word-break:keep-all;overflow-wrap:normal;}
+/* Tabela orçamento */
+table.orc{width:100%;border-collapse:collapse;font-size:9.5pt;margin-bottom:3mm;}
+table.orc th{background:#0b1a33;color:#fff;padding:2mm 3mm;text-align:left;font-size:8pt;letter-spacing:.5px;}
+table.orc td{padding:2mm 3mm;border-bottom:0.5pt solid #e2e8f0;vertical-align:top;}
 table.orc tr:last-child td{border-bottom:none;}
 table.orc tr:nth-child(even) td{background:#f8fafc;}
 .total-bar{background:#0b1a33;color:#fff;padding:3mm 4mm;
@@ -1357,9 +1338,6 @@ table.orc tr   { page-break-inside: avoid; page-break-after: auto; }
 
 .service-item  { page-break-inside: avoid; }
 .upd-item      { page-break-inside: avoid; }
-/* Link nunca é fatiado no meio da linha entre páginas */
-.link-item     { page-break-inside: avoid; break-inside: avoid; padding:0.4mm 0;
-                 overflow-wrap:anywhere; }
 
 /* Força nova página antes da assinatura se restarem < 40mm */
 .footer-doc    { page-break-before: auto; }
@@ -1424,7 +1402,7 @@ function _abrirJanelaOrcamento(autoPrint = false) {
     const linksHtml = [...document.querySelectorAll('.input-link')]
         .map(i => i.value.trim()).filter(Boolean)
         .map(v => { const h = v.startsWith('http') ? v : 'https://'+v;
-            return `<div class="link-item">🔗 <a href="${h}" target="_blank" style="color:#2563eb;">${v}</a></div>`; })
+            return `<div>🔗 <a href="${h}" target="_blank" style="color:#2563eb;">${v}</a></div>`; })
         .join('') || '—';
 
     const itensHtml = [...document.querySelectorAll('#tabela-form tbody tr')].map(tr => {
@@ -1432,7 +1410,7 @@ function _abrirJanelaOrcamento(autoPrint = false) {
         const desc = tr.querySelector('.item-desc').value.trim() || '—';
         const qtd  = tr.querySelector('.item-qtd').value || '1';
         const pgto = tr.dataset.textoPgtoPDF || '—';
-        return `<tr><td>${nome}</td><td>${desc}</td><td style="text-align:center">${qtd}</td><td class="pgto-cell">${pgto}</td></tr>`;
+        return `<tr><td>${nome}</td><td>${desc}</td><td style="text-align:center">${qtd}</td><td>${pgto}</td></tr>`;
     }).join('');
 
     const mkBadge = txt => {
@@ -1457,17 +1435,14 @@ function _abrirJanelaOrcamento(autoPrint = false) {
         </div>
         <div class="section-title">ITENS DO ORÇAMENTO</div>
         <table class="orc">
-            <colgroup>
-                <col class="c-item"><col class="c-desc"><col class="c-qtd"><col class="c-pgto">
-            </colgroup>
-            <tr><th>Item</th><th>Descrição</th><th style="text-align:center">Qtd</th><th>Pagamento</th></tr>
+            <tr><th>Item</th><th>Descrição</th><th>Qtd</th><th>Pagamento</th></tr>
             ${itensHtml}
         </table>
         <div class="total-bar"><span>VALOR TOTAL</span><span>${total}</span></div>
         <div class="section-title">JUSTIFICATIVA TÉCNICA</div>
         <div class="section-body">${justif}</div>
         <div class="section-title">LINKS DOS PRODUTOS</div>
-        <div class="links-box" style="font-size:10pt;margin-bottom:3mm;">${linksHtml}</div>
+        <div style="font-size:10pt;margin-bottom:3mm;">${linksHtml}</div>
         <div class="section-title">GRAU DE IMPACTO</div>
         <div class="impact-row">
             <div class="impact-box"><div class="impact-lbl">Operacional</div>${mkBadge(op)}</div>
