@@ -1948,7 +1948,9 @@ const App = {
       <span class="rqs-sep">·</span>
       <span class="rqs-item rqs-com"><span class="rqs-dot"></span>${counts.Comprado} comprado${counts.Comprado!==1?'s':''}</span>
       <span class="rqs-sep">·</span>
-      <span class="rqs-item rqs-est"><span class="rqs-dot"></span>${counts.Estoque} do estoque</span>`;
+      <span class="rqs-item rqs-est"><span class="rqs-dot"></span>${counts.Estoque} do estoque</span>
+      ${negados ? `<span class="rqs-sep">·</span>
+      <span class="rqs-item rqs-neg"><span class="rqs-dot"></span>${negados} negado${negados!==1?'s':''}</span>` : ''}`;
 
     if (negados > 0) {
       const pct = Math.round(negados/total*100);
@@ -2080,7 +2082,9 @@ const App = {
       <span class="rqs-sep">·</span>
       <span class="rqs-item rqs-com"><span class="rqs-dot"></span>${counts.Comprado} comprado${counts.Comprado!==1?'s':''}</span>
       <span class="rqs-sep">·</span>
-      <span class="rqs-item rqs-est"><span class="rqs-dot"></span>${counts.Estoque} do estoque</span>`;
+      <span class="rqs-item rqs-est"><span class="rqs-dot"></span>${counts.Estoque} do estoque</span>
+      ${negados ? `<span class="rqs-sep">·</span>
+      <span class="rqs-item rqs-neg"><span class="rqs-dot"></span>${negados} negado${negados!==1?'s':''}</span>` : ''}`;
 
     if (negados > 0) {
       const pct = Math.round(negados/total*100);

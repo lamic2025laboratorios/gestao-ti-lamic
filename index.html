@@ -32,7 +32,7 @@
 </head>
 <body>
 
-<!-- ==.==.== TELA 1 ==?" HOME ==.==.== -->
+<!-- ══════ TELA 1 — HOME ══════ -->
 <div id="screen-home" class="screen active">
   <div class="home-bg">
     <div class="home-grid"></div>
@@ -88,7 +88,7 @@
     <div class="home-card-right">
       <img class="home-logo-main" src="img/LAMIC (VERTICAL).png" alt="LAMIC Laboratório" onerror="this.style.display='none'" />
       <div class="home-logo-strip">
-        <img src="img/R==?GUA DE LOGOS.png"    alt="LAMIC" onerror="this.style.display='none'" />
+        <img src="img/RÉGUA DE LOGOS.png"    alt="LAMIC" onerror="this.style.display='none'" />
         <img src="assets/logo-lamic-aquamed.png" alt="LAMIC Aquamed" onerror="this.style.display='none'" />
         <img src="assets/logo-lamic-kids.png"   alt="LAMIC Kids" onerror="this.style.display='none'" />
         <img src="assets/logo-lamic-vital.png"  alt="LAMIC Vital" onerror="this.style.display='none'" />
@@ -97,7 +97,7 @@
   </div>
 </div>
 
-<!-- ==.==.== TELA 2 ==?" LOGIN UNIDADES ==.==.== -->
+<!-- ══════ TELA 2 — LOGIN UNIDADES ══════ -->
 <div id="screen-units-login" class="screen">
   <div class="page-topbar">
     <button class="back-btn" onclick="App.goTo('screen-home')">
@@ -106,7 +106,7 @@
     </button>
     <div class="page-topbar-title">
       <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2"/></svg>
-      Acesso ==?" Unidades
+      Acesso — Unidades
     </div>
   </div>
   <div class="units-login-wrap">
@@ -116,7 +116,7 @@
       <div class="form-group">
         <label class="form-label">Unidade</label>
         <select id="unit-select" class="input-field select-styled" onchange="App.onUnitSelectChange()">
-          <option value="">==?" Selecione uma unidade ==?"</option>
+          <option value="">— Selecione uma unidade —</option>
         </select>
       </div>
       <div id="unit-selected-info" class="unit-selected-info hidden">
@@ -131,7 +131,7 @@
   </div>
 </div>
 
-<!-- ==.==.== TELA 3 ==?" LOGIN ADMIN ==.==.== -->
+<!-- ══════ TELA 3 — LOGIN ADMIN ══════ -->
 <div id="screen-admin-login" class="screen">
   <div class="page-topbar">
     <button class="back-btn" onclick="App.goTo('screen-home')">
@@ -178,7 +178,7 @@
   </div>
 </div>
 
-<!-- ==.==.== TELA 4 ==?" PAINEL SOLICITA==?==fO ==.==.== -->
+<!-- ══════ TELA 4 — PAINEL SOLICITAÇÃO ══════ -->
 <div id="screen-request" class="screen">
   <div class="req-topbar">
     <div class="req-topbar-left">
@@ -186,7 +186,7 @@
         <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="8" fill="#1a3a6b"/><rect x="6" y="6" width="10" height="10" rx="2" fill="#4a90d9"/><rect x="20" y="6" width="10" height="10" rx="2" fill="#4a90d9" opacity=".5"/><rect x="6" y="20" width="10" height="10" rx="2" fill="#4a90d9" opacity=".5"/><rect x="20" y="20" width="10" height="10" rx="2" fill="#fff" opacity=".9"/></svg>
         <div>
           <div class="req-brand-name">TI Compras</div>
-          <div class="req-brand-unit" id="topbar-unit-name">==?"</div>
+          <div class="req-brand-unit" id="topbar-unit-name">—</div>
         </div>
       </div>
     </div>
@@ -244,7 +244,7 @@
             <span class="urgency-thumb"></span>
           </span>
           <span class="urgency-text">
-            <span class="urgency-label">==Ys== Marcar como URGENTE</span>
+            <span class="urgency-label">Marcar como URGENTE</span>
             <span class="urgency-hint">O administrador será notificado da prioridade</span>
           </span>
         </label>
@@ -267,7 +267,7 @@
   </div>
 </div>
 
-<!-- ==.==.== TELA 5 ==?" PAINEL ADMIN ==.==.== -->
+<!-- ══════ TELA 5 — PAINEL ADMIN ══════ -->
 <div id="screen-admin" class="screen">
   <div class="admin-layout">
     <!-- SIDEBAR -->
@@ -284,7 +284,7 @@
       <!-- sidebar-brand mantido vazio para não quebrar seletores CSS existentes -->
       <div class="sidebar-brand" style="display:none"></div>
       <nav class="sidebar-nav">
-        <!-- ==.==.==.== MENU PRINCIPAL (some no modo Financeiro) ==.==.==.== -->
+        <!-- ══════ MENU PRINCIPAL (some no modo Financeiro) ══════ -->
         <div class="nav-section-label sb-txt menu-only">Menu principal</div>
         <button class="nav-item menu-only" data-tab="tab-unilamic" onclick="App.adminTab(this)" data-tip="Home">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M3 21h18M5 21V9l7-5 7 5v12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 21v-6h6v6" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
@@ -298,7 +298,7 @@
         </button>
         <div class="nav-section-label sb-txt menu-only">Gestão</div>
 
-        <!-- Financeiro ==?" abre o portal financeiro (mesma ideia do Inventário) -->
+        <!-- Financeiro — abre o portal financeiro (mesma ideia do Inventário) -->
         <button class="nav-item menu-only" id="nav-grp-financeiro" onclick="App.abrirFinanceiro()" data-tip="Financeiro">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg>
           <span class="ni-txt">Financeiro</span>
@@ -306,7 +306,7 @@
           <span class="ni-tip">Financeiro</span>
         </button>
 
-        <!-- ==.==.==.== PORTAL FINANCEIRO (só aparece dentro do modo) ==.==.==.== -->
+        <!-- ══════ PORTAL FINANCEIRO (só aparece dentro do modo) ══════ -->
         <div class="nav-section-label sb-txt fin-only">Financeiro</div>
         <div class="nav-subgroup" id="nav-sub-financeiro">
           <button class="nav-item nav-sub-item active" data-tab="tab-dashboard" onclick="App.adminTab(this)" data-tip="Dashboard">
@@ -378,7 +378,7 @@
     <!-- MAIN -->
     <main class="admin-main">
 
-      <!-- =="?=="? HOME ==?" Base de Problemas & Soluções =="?=="? -->
+      <!-- ══════ HOME — Base de Problemas & Soluções ══════ -->
       <div id="tab-unilamic" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
@@ -494,7 +494,7 @@
         </div>
       </div>
 
-      <!-- =="?=="? DETALHE DO PROBLEMA (página própria) =="?=="? -->
+      <!-- ══════ DETALHE DO PROBLEMA (página própria) ══════ -->
       <div id="tab-kb-detalhe" class="tab-panel">
         <div class="kbd-layout">
           <!-- Coluna lateral -->
@@ -511,7 +511,7 @@
               <div class="kbd-user">
                 <div class="kbd-avatar" id="kbd-avatar">A</div>
                 <div>
-                  <div class="kbd-user-nome" id="kbd-user-nome">==?"</div>
+                  <div class="kbd-user-nome" id="kbd-user-nome">—</div>
                   <div class="kbd-user-cargo" id="kbd-user-cargo">Administrador</div>
                 </div>
               </div>
@@ -572,7 +572,7 @@
           <section class="perfil-main" id="perfil-conteudo"></section>
         </div>
       </div>
-      <!-- =="?=="? CONFIGURA==?==.ES DA HOME =="?=="? -->
+      <!-- ══════ CONFIGURAÇÕES DA HOME ══════ -->
       <div id="tab-home-config" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
@@ -640,7 +640,7 @@
         </div>
       </div>
 
-      <!-- =="?=="? DASHBOARD FINANCEIRO =="?=="? -->
+      <!-- ══════ DASHBOARD FINANCEIRO ══════ -->
       <div id="tab-dashboard" class="tab-panel active">
         <div class="tab-header dash-topbar">
           <div>
@@ -659,15 +659,15 @@
         <div class="kpi-row">
           <div class="kpi-card k-blue kpi-clickable" onclick="App.showTotalKpi()" title="Clique para ver por unidade">
             <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado ==?-</div></div>
+            <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado</div></div>
           </div>
           <div class="kpi-card k-red kpi-clickable" onclick="App.showKpiList('Negado')" title="Clique para ver pedidos negados">
             <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados ==?-</div></div>
+            <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados</div></div>
           </div>
           <div class="kpi-card k-teal kpi-clickable" onclick="App.showKpiList('Comprado')" title="Clique para ver pedidos comprados">
             <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><polyline points="20 12 20 22 4 22 4 12" stroke="currentColor" stroke-width="2"/><rect x="2" y="7" width="20" height="5" stroke="currentColor" stroke-width="2"/><path d="M12 22V7" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados ==?-</div></div>
+            <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados</div></div>
           </div>
           <div class="kpi-card k-orange">
             <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2"/><line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="2"/></svg></div>
@@ -730,12 +730,12 @@
               <span>De</span>
               <input type="date" id="filter-date-from" class="input-field" onchange="App.clearYearSelect();App.renderDashboard()" />
             </label>
-            <span class="date-range-sep">==?'</span>
+            <span class="date-range-sep">→</span>
             <label class="date-range-field">
               <span>Até</span>
               <input type="date" id="filter-date-to" class="input-field" onchange="App.clearYearSelect();App.renderDashboard()" />
             </label>
-            <button class="btn-date-clear" onclick="App.clearDateRange()" title="Limpar datas">==o. Limpar</button>
+            <button class="btn-date-clear" onclick="App.clearDateRange()" title="Limpar datas">Limpar</button>
           </div>
           <div class="date-range-actions">
             <div class="dash-search-wrap">
@@ -812,7 +812,7 @@
             <!-- Central de Tratamento de Novas Solicitações -->
             <div class="chart-card mgmt-card mgmt-card-right">
               <div class="chart-card-header">
-                <span>Central de Tratamento ==?" Novas Solicitações</span>
+                <span>Central de Tratamento — Novas Solicitações</span>
                 <span class="chart-badge" id="novas-sol-count"></span>
               </div>
               <div id="novas-sol-feed" class="mgmt-feed"></div>
@@ -843,7 +843,7 @@
                 <div class="cmp-gauge-wrap">
                   <canvas id="chart-cmp-gauge"></canvas>
                   <div class="cmp-gauge-center">
-                    <div class="cmp-gauge-pct" id="cmp-gauge-pct">==?"</div>
+                    <div class="cmp-gauge-pct" id="cmp-gauge-pct">—</div>
                     <div class="cmp-gauge-lbl" id="cmp-gauge-lbl">da meta</div>
                   </div>
                 </div>
@@ -853,7 +853,7 @@
               <div class="cmp-years-row">
                 <div class="cmp-year-card cmp-year-card--cur">
                   <div class="cmp-year-top">
-                    <span class="cmp-year-num" id="cmp-cur-year">==?"</span>
+                    <span class="cmp-year-num" id="cmp-cur-year">—</span>
                     <span class="cmp-year-tag">Atual</span>
                   </div>
                   <div class="cmp-year-val" id="cmp-cur-val">R$ 0</div>
@@ -861,7 +861,7 @@
                 </div>
                 <div class="cmp-year-card cmp-year-card--prev">
                   <div class="cmp-year-top">
-                    <span class="cmp-year-num" id="cmp-prev-year">==?"</span>
+                    <span class="cmp-year-num" id="cmp-prev-year">—</span>
                     <span class="cmp-year-tag cmp-year-tag--prev">Anterior</span>
                   </div>
                   <div class="cmp-year-val" id="cmp-prev-val">R$ 0</div>
@@ -889,7 +889,7 @@
             <div id="unit-spending-list" class="unit-spending-list"></div>
           </div>
 
-          <!-- =="?=="? Parcelas + Log de Atividades (dentro da coluna esquerda) =="?=="? -->
+          <!-- ══════ Parcelas + Log de Atividades (dentro da coluna esquerda) ══════ -->
           <div class="dash-mgmt-grid">
 
           <!-- Card 1: Métrica de Compras Parceladas -->
@@ -967,7 +967,7 @@
         <div id="parcelas-modal" class="modal-overlay hidden">
           <div class="modal-card" style="max-width:760px">
             <div class="modal-header">
-              <h3>Compras Parceladas ==?" status das parcelas</h3>
+              <h3>Compras Parceladas — status das parcelas</h3>
               <button class="modal-close" onclick="document.getElementById('parcelas-modal').classList.add('hidden')">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
               </button>
@@ -993,7 +993,7 @@
                 </label>
 
                 <div class="meta-field">
-                  <span>Gasto do ano anterior (<b id="meta-prev-year-lbl">==?"</b>)</span>
+                  <span>Gasto do ano anterior (<b id="meta-prev-year-lbl">—</b>)</span>
                   <div class="meta-prev-wrap">
                     <input type="text" id="meta-prev-val" class="input-field" placeholder="R$ 0,00" oninput="App.recalcMetaPreview()">
                     <span class="meta-prev-src" id="meta-prev-src"></span>
@@ -1008,7 +1008,7 @@
 
                 <div class="meta-preview" id="meta-preview">
                   <div class="meta-preview-row">
-                    <span>Gasto atual (<b id="meta-cur-year-lbl">==?"</b>, automático)</span>
+                    <span>Gasto atual (<b id="meta-cur-year-lbl">—</b>, automático)</span>
                     <strong id="meta-cur-val">R$ 0,00</strong>
                   </div>
                   <div class="meta-preview-row meta-preview-target">
@@ -1022,7 +1022,7 @@
                   <div class="meta-status-box" id="meta-status-box"></div>
                 </div>
 
-                <!-- Histórico de metas por ano ==?" bateu / não bateu -->
+                <!-- Histórico de metas por ano — bateu / não bateu -->
                 <div class="meta-hist-section">
                   <div class="meta-hist-title">Histórico de Metas</div>
                   <div class="meta-hist-list" id="meta-hist-list"></div>
@@ -1036,7 +1036,7 @@
           </div>
         </div>
 
-        <!-- =="?=="? Cards de Consumo: Tintas e Pilhas/Baterias =="?=="? -->
+        <!-- ══════ Cards de Consumo: Tintas e Pilhas/Baterias ══════ -->
         <div class="consumo-grid">
 
           <!-- Card Tintas -->
@@ -1060,7 +1060,7 @@
               <div class="consumo-main">
                 <div class="consumo-big" id="ink-count">0</div>
                 <div class="consumo-big-lbl">tintas no período</div>
-                <span class="consumo-trend" id="ink-trend">==?"</span>
+                <span class="consumo-trend" id="ink-trend">—</span>
               </div>
               <div class="consumo-stats">
                 <div class="consumo-stat">
@@ -1069,15 +1069,15 @@
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Cor mais comprada</span>
-                  <span class="consumo-stat-val" id="ink-top-color">==?"</span>
+                  <span class="consumo-stat-val" id="ink-top-color">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Unidade que mais comprou</span>
-                  <span class="consumo-stat-val" id="ink-top-unit">==?"</span>
+                  <span class="consumo-stat-val" id="ink-top-unit">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="ink-top-solicitante">==?"</span>
+                  <span class="consumo-stat-val" id="ink-top-solicitante">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl" id="ink-prev-lbl">Período anterior</span>
@@ -1109,7 +1109,7 @@
               <div class="consumo-main">
                 <div class="consumo-big" id="bat-count">0</div>
                 <div class="consumo-big-lbl">unidades no período</div>
-                <span class="consumo-trend" id="bat-trend">==?"</span>
+                <span class="consumo-trend" id="bat-trend">—</span>
               </div>
               <div class="consumo-stats">
                 <div class="consumo-stat">
@@ -1118,15 +1118,15 @@
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Modelo mais comprado</span>
-                  <span class="consumo-stat-val" id="bat-top-model">==?"</span>
+                  <span class="consumo-stat-val" id="bat-top-model">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Unidade que mais comprou</span>
-                  <span class="consumo-stat-val" id="bat-top-unit">==?"</span>
+                  <span class="consumo-stat-val" id="bat-top-unit">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="bat-top-solicitante">==?"</span>
+                  <span class="consumo-stat-val" id="bat-top-solicitante">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl" id="bat-prev-lbl">Período anterior</span>
@@ -1158,7 +1158,7 @@
               <div class="consumo-main">
                 <div class="consumo-big" id="outros-count">0</div>
                 <div class="consumo-big-lbl">itens no período</div>
-                <span class="consumo-trend" id="outros-trend">==?"</span>
+                <span class="consumo-trend" id="outros-trend">—</span>
               </div>
               <div class="consumo-stats">
                 <div class="consumo-stat">
@@ -1167,15 +1167,15 @@
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Subgrupo mais comprado</span>
-                  <span class="consumo-stat-val" id="outros-top-subgrupo">==?"</span>
+                  <span class="consumo-stat-val" id="outros-top-subgrupo">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Unidade que mais comprou</span>
-                  <span class="consumo-stat-val" id="outros-top-unit">==?"</span>
+                  <span class="consumo-stat-val" id="outros-top-unit">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="outros-top-solicitante">==?"</span>
+                  <span class="consumo-stat-val" id="outros-top-solicitante">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl" id="outros-prev-lbl">Período anterior</span>
@@ -1207,7 +1207,7 @@
               <div class="consumo-main">
                 <div class="consumo-big" id="concerto-count">0</div>
                 <div class="consumo-big-lbl">consertos no período</div>
-                <span class="consumo-trend" id="concerto-trend">==?"</span>
+                <span class="consumo-trend" id="concerto-trend">—</span>
               </div>
               <div class="consumo-stats">
                 <div class="consumo-stat">
@@ -1216,15 +1216,15 @@
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Modelo que mais deu problema</span>
-                  <span class="consumo-stat-val" id="concerto-top-model">==?"</span>
+                  <span class="consumo-stat-val" id="concerto-top-model">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Unidade que mais deu problema</span>
-                  <span class="consumo-stat-val" id="concerto-top-unit">==?"</span>
+                  <span class="consumo-stat-val" id="concerto-top-unit">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="concerto-top-solicitante">==?"</span>
+                  <span class="consumo-stat-val" id="concerto-top-solicitante">—</span>
                 </div>
                 <div class="consumo-stat">
                   <span class="consumo-stat-lbl" id="concerto-prev-lbl">Período anterior</span>
@@ -1238,7 +1238,7 @@
         </div>
       </div>
 
-      <!-- =="?=="? ESTOQUE =="?=="? -->
+      <!-- ══════ ESTOQUE ══════ -->
       <div id="tab-estoque" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
@@ -1303,19 +1303,19 @@
         <!-- Card resumo de movimentação -->
         <div id="estoque-resumo-card" class="estoque-resumo-card hidden">
           <div class="resumo-box resumo-ent">
-            <div class="resumo-ico">==?"</div>
+            <div class="resumo-ico">—</div>
             <div><div class="resumo-val" id="resumo-entradas">0</div><div class="resumo-lbl">Entradas</div></div>
           </div>
           <div class="resumo-box resumo-sai">
-            <div class="resumo-ico">==?'</div>
+            <div class="resumo-ico"></div>
             <div><div class="resumo-val" id="resumo-saidas">0</div><div class="resumo-lbl">Saídas</div></div>
           </div>
           <div class="resumo-box resumo-sld">
-            <div class="resumo-ico">==^'</div>
+            <div class="resumo-ico"></div>
             <div><div class="resumo-val" id="resumo-saldo">0</div><div class="resumo-lbl">Saldo Total</div></div>
           </div>
           <div class="resumo-box resumo-zer">
-            <div class="resumo-ico">==s==</div>
+            <div class="resumo-ico"></div>
             <div><div class="resumo-val" id="resumo-zerados">0</div><div class="resumo-lbl">Zerados</div></div>
           </div>
         </div>
@@ -1342,9 +1342,9 @@
             </table>
           </div>
           <div id="estoque-pager" class="estoque-pager hidden">
-            <button id="estoque-prev" class="estoque-pager-btn" onclick="App.estoquePage('prev')">==?== Anterior</button>
+            <button id="estoque-prev" class="estoque-pager-btn" onclick="App.estoquePage('prev')">‹ Anterior</button>
             <span id="estoque-pager-info" class="estoque-pager-info">1 / 1</span>
-            <button id="estoque-next" class="estoque-pager-btn" onclick="App.estoquePage('next')">Próximo ==?==</button>
+            <button id="estoque-next" class="estoque-pager-btn" onclick="App.estoquePage('next')">Próximo ›</button>
           </div>
         </div>
 
@@ -1359,8 +1359,8 @@
               </div>
               <div class="emc-actions">
                 <div class="emc-sort">
-                  <button class="emc-sort-btn active" id="sort-ent-desc" onclick="App.setMovSort('entrada','desc',this)" title="Mais recente">==?"</button>
-                  <button class="emc-sort-btn" id="sort-ent-asc" onclick="App.setMovSort('entrada','asc',this)" title="Mais antiga">==?'</button>
+                  <button class="emc-sort-btn active" id="sort-ent-desc" onclick="App.setMovSort('entrada','desc',this)" title="Mais recente">—</button>
+                  <button class="emc-sort-btn" id="sort-ent-asc" onclick="App.setMovSort('entrada','asc',this)" title="Mais antiga">↑</button>
                 </div>
                 <button class="emc-ver-btn" onclick="App.openMovHist('entrada')">Histórico</button>
               </div>
@@ -1382,8 +1382,8 @@
               </div>
               <div class="emc-actions">
                 <div class="emc-sort">
-                  <button class="emc-sort-btn active" id="sort-sai-desc" onclick="App.setMovSort('saida','desc',this)" title="Mais recente">==?"</button>
-                  <button class="emc-sort-btn" id="sort-sai-asc" onclick="App.setMovSort('saida','asc',this)" title="Mais antiga">==?'</button>
+                  <button class="emc-sort-btn active" id="sort-sai-desc" onclick="App.setMovSort('saida','desc',this)" title="Mais recente">—</button>
+                  <button class="emc-sort-btn" id="sort-sai-asc" onclick="App.setMovSort('saida','asc',this)" title="Mais antiga">↑</button>
                 </div>
                 <button class="emc-ver-btn" onclick="App.openMovHist('saida')">Histórico</button>
               </div>
@@ -1418,9 +1418,9 @@
               </table>
             </div>
             <div class="estoque-pager" style="margin-top:14px">
-              <button id="mov-hist-prev" class="estoque-pager-btn" onclick="App.movHistPage('prev')">==?== Anterior</button>
+              <button id="mov-hist-prev" class="estoque-pager-btn" onclick="App.movHistPage('prev')">‹ Anterior</button>
               <span id="mov-hist-pager-info" class="estoque-pager-info">1 / 1</span>
-              <button id="mov-hist-next" class="estoque-pager-btn" onclick="App.movHistPage('next')">Próximo ==?==</button>
+              <button id="mov-hist-next" class="estoque-pager-btn" onclick="App.movHistPage('next')">Próximo ›</button>
             </div>
           </div>
         </div>
@@ -1468,7 +1468,7 @@
       </div>
 
       <!-- Modal: Novo/Editar Item de Estoque -->
-      <!-- =="?=="? MODAL: escolher tipo (Nova compra x Nova entrada) =="?=="? -->
+      <!-- ══════ MODAL: escolher tipo (Nova compra x Nova entrada) ══════ -->
       <div id="estoque-tipo-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:460px">
           <div class="modal-header">
@@ -1482,11 +1482,11 @@
             <div style="display:flex;flex-direction:column;gap:12px">
               <button type="button" class="estoque-tipo-opt" onclick="App.openEstoqueForm(null,'compra')">
                 <span class="estoque-tipo-ico" style="background:#dbeafe;color:#1d4ed8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
-                <span class="estoque-tipo-txt"><strong>Nova compra</strong><small>Produto comprado ==?" entra no total gasto do dashboard.</small></span>
+                <span class="estoque-tipo-txt"><strong>Nova compra</strong><small>Produto comprado — entra no total gasto do dashboard.</small></span>
               </button>
               <button type="button" class="estoque-tipo-opt" onclick="App.openEstoqueForm(null,'entrada')">
                 <span class="estoque-tipo-ico" style="background:#dcfce7;color:#059669"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg></span>
-                <span class="estoque-tipo-txt"><strong>Nova entrada</strong><small>Item que já existe fisicamente (não foi comprado) ==?" N==fO conta como gasto.</small></span>
+                <span class="estoque-tipo-txt"><strong>Nova entrada</strong><small>Item que já existe fisicamente (não foi comprado) — NÃO conta como gasto.</small></span>
               </button>
             </div>
           </div>
@@ -1507,20 +1507,20 @@
               <div class="form-group">
                 <label class="form-label">Grupo *</label>
                 <select id="estoque-grupo" class="input-field select-styled" onchange="App.onEstoqueGrupoChange()">
-                  <option value="">==?" Selecione ==?"</option>
+                  <option value="">— Selecione —</option>
                 </select>
               </div>
               <div class="form-group">
                 <label class="form-label">Subgrupo</label>
                 <select id="estoque-subgrupo" class="input-field select-styled">
-                  <option value="">==?" Selecione ==?"</option>
+                  <option value="">— Selecione —</option>
                 </select>
               </div>
             </div>
             <div class="form-group" style="margin-top:10px">
               <label class="form-label">Produto / Descrição *</label>
               <select id="estoque-produto-select" class="input-field select-styled hidden">
-                <option value="">==?" Selecione ==?"</option>
+                <option value="">— Selecione —</option>
               </select>
               <input type="text" id="estoque-produto" class="input-field" list="estoque-produto-list" placeholder="Ex: Tinta Ciano HP 122">
               <datalist id="estoque-produto-list"></datalist>
@@ -1529,7 +1529,7 @@
               <div class="form-group estoque-money">
                 <label class="form-label">Fornecedor</label>
                 <select id="estoque-fornecedor" class="input-field select-styled">
-                  <option value="">==?" Selecione ==?"</option>
+                  <option value="">— Selecione —</option>
                 </select>
               </div>
               <div class="form-group">
@@ -1542,7 +1542,7 @@
                 <div class="form-group">
                   <label class="form-label">Unidade de destino *</label>
                   <select id="estoque-unidade-destino" class="input-field select-styled">
-                    <option value="">==?" Selecione ==?"</option>
+                    <option value="">— Selecione —</option>
                   </select>
                 </div>
                 <div class="form-group estoque-money">
@@ -1597,11 +1597,11 @@
         </div>
       </div>
 
-      <!-- =="?=="? MODAL: COMPRA COMBINADA =="?=="? -->
+      <!-- ══════ MODAL: COMPRA COMBINADA ══════ -->
       <div id="compra-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:720px">
           <div class="modal-header">
-            <h3 id="compra-modal-title">Compra Combinada ==?" Seleção</h3>
+            <h3 id="compra-modal-title">Compra Combinada — Seleção</h3>
             <button class="modal-close" onclick="App.closeCompraModal()">
               <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
             </button>
@@ -1665,8 +1665,8 @@
               </div>
               <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <span style="font-size:.82rem;color:#6680a0;font-weight:500">Rastreabilidade do Envio:</span>
-                <span id="compra-envio-display" style="font-size:.82rem;font-weight:600;color:#1a3a6b">==?"</span>
-                <button class="btn-ghost" onclick="App.toggleEnvioEdit()" style="font-size:.72rem;padding:2px 8px" title="Editar data de envio">==sT</button>
+                <span id="compra-envio-display" style="font-size:.82rem;font-weight:600;color:#1a3a6b">—</span>
+                <button class="btn-ghost" onclick="App.toggleEnvioEdit()" style="font-size:.72rem;padding:2px 8px" title="Editar data de envio">✎</button>
               </div>
               <div id="compra-envio-edit-wrap" style="display:none;margin-top:6px">
                 <input type="date" id="compra-envio-data" class="input-field" style="max-width:180px;display:inline-block">
@@ -1677,7 +1677,7 @@
               <div id="compra-step2-resumo" class="compra-resumo" style="margin-top:12px;display:none"></div>
             </div>
             <div class="modal-footer">
-              <button class="btn-ghost" id="btn-compra-voltar" onclick="App.compraBackStep1()">==?== Voltar</button>
+              <button class="btn-ghost" id="btn-compra-voltar" onclick="App.compraBackStep1()">‹ Voltar</button>
               <button class="btn-ghost" id="btn-compra-descombinar" onclick="App.descombinarCompra()" style="display:none;color:#dc2626;border-color:#fecaca">Descombinar</button>
               <button class="btn-primary" id="btn-salvar-compra" onclick="App.saveCompraCombinada()">Registrar Compra</button>
             </div>
@@ -1685,7 +1685,7 @@
         </div>
       </div>
 
-      <!-- =="?=="? CALENDÁRIO =="?=="? -->
+      <!-- ══════ CALENDÁRIO ══════ -->
       <div id="tab-calendar" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
@@ -1715,10 +1715,10 @@
         <div id="cal-day-detail" class="cal-day-detail hidden"></div>
       </div>
 
-       <!-- =="?=="? geradorpdf =="?=="? -->
+       <!-- ══════ geradorpdf ══════ -->
 
 
-      <!-- =="?=="? INVENTÁRIO =="?=="? -->
+      <!-- ══════ INVENTÁRIO ══════ -->
 <div id="tab-inventario" class="tab-panel">
   <iframe src="inventario.html" class="iframe-container"></iframe>
 </div>
@@ -1727,7 +1727,7 @@
   <iframe src="Geradorpdf.html" class="iframe-container"></iframe>
 </div>
 
-      <!-- =="?=="? SOLICITA==?==.ES =="?=="? -->
+      <!-- ══════ SOLICITAÇÕES ══════ -->
       <div id="tab-requests" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
@@ -1750,10 +1750,10 @@
 
         </div>
 
-        <!-- =="?=="? Mini-KPIs (5 cards) =="?=="? -->
+        <!-- ══════ Mini-KPIs (5 cards) ══════ -->
         <div class="rk-grid">
 
-          <!-- Card 1: Unidade ==?" mais/menos solicitou -->
+          <!-- Card 1: Unidade — mais/menos solicitou -->
           <div class="rk-card rk-blue">
             <div class="rk-card-header">
               <div class="rk-card-icon">
@@ -1763,20 +1763,20 @@
             </div>
             <div class="rk-duo">
               <div class="rk-half">
-                <div class="rk-pill rk-pill-green">==?' Mais</div>
-                <div class="rk-name" id="rk-sol-max">==?"</div>
+                <div class="rk-pill rk-pill-green">Mais</div>
+                <div class="rk-name" id="rk-sol-max">—</div>
                 <div class="rk-count" id="rk-sol-max-n"></div>
               </div>
               <div class="rk-vsep"></div>
               <div class="rk-half">
-                <div class="rk-pill rk-pill-red">==?" Menos</div>
-                <div class="rk-name" id="rk-sol-min">==?"</div>
+                <div class="rk-pill rk-pill-red">— Menos</div>
+                <div class="rk-name" id="rk-sol-min">—</div>
                 <div class="rk-count" id="rk-sol-min-n"></div>
               </div>
             </div>
           </div>
 
-          <!-- Card 2: Unidade ==?" mais/menos comprou -->
+          <!-- Card 2: Unidade — mais/menos comprou -->
           <div class="rk-card rk-blue">
             <div class="rk-card-header">
               <div class="rk-card-icon">
@@ -1786,14 +1786,14 @@
             </div>
             <div class="rk-duo">
               <div class="rk-half">
-                <div class="rk-pill rk-pill-green">==?' Mais</div>
-                <div class="rk-name" id="rk-buy-max">==?"</div>
+                <div class="rk-pill rk-pill-green">Mais</div>
+                <div class="rk-name" id="rk-buy-max">—</div>
                 <div class="rk-count" id="rk-buy-max-n"></div>
               </div>
               <div class="rk-vsep"></div>
               <div class="rk-half">
-                <div class="rk-pill rk-pill-red">==?" Menos</div>
-                <div class="rk-name" id="rk-buy-min">==?"</div>
+                <div class="rk-pill rk-pill-red">— Menos</div>
+                <div class="rk-name" id="rk-buy-min">—</div>
                 <div class="rk-count" id="rk-buy-min-n"></div>
               </div>
             </div>
@@ -1809,7 +1809,7 @@
             </div>
             <div class="rk-single">
               <div class="rk-pill rk-pill-gold"><svg viewBox="0 0 24 24" fill="none" width="11" height="11"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM7 4H4a2 2 0 002 2v0a1 1 0 001-1V4zM17 4h3a2 2 0 01-2 2v0a1 1 0 01-1-1V4z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> Top</div>
-              <div class="rk-name rk-name-lg" id="rk-grp-top">==?"</div>
+              <div class="rk-name rk-name-lg" id="rk-grp-top">—</div>
               <div class="rk-count" id="rk-grp-top-n"></div>
             </div>
           </div>
@@ -1824,7 +1824,7 @@
             </div>
             <div class="rk-single">
               <div class="rk-pill rk-pill-blue"><svg viewBox="0 0 24 24" fill="none" width="11" height="11"><path d="M12 2l2.9 6.5 7.1.6-5.4 4.7 1.7 6.9L12 17.3 5.7 20.7l1.7-6.9L2 9.1l7.1-.6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg> Destaque</div>
-              <div class="rk-name rk-name-lg" id="rk-sup-top">==?"</div>
+              <div class="rk-name rk-name-lg" id="rk-sup-top">—</div>
               <div class="rk-count" id="rk-sup-top-n"></div>
             </div>
           </div>
@@ -1839,14 +1839,14 @@
             </div>
             <div class="rk-duo">
               <div class="rk-half">
-                <div class="rk-pill rk-pill-green">==?' Mais usada</div>
-                <div class="rk-name" id="rk-pag-max">==?"</div>
+                <div class="rk-pill rk-pill-green">Mais usada</div>
+                <div class="rk-name" id="rk-pag-max">—</div>
                 <div class="rk-count" id="rk-pag-max-n"></div>
               </div>
               <div class="rk-vsep"></div>
               <div class="rk-half">
-                <div class="rk-pill rk-pill-red">==?" Menos usada</div>
-                <div class="rk-name" id="rk-pag-min">==?"</div>
+                <div class="rk-pill rk-pill-red">— Menos usada</div>
+                <div class="rk-name" id="rk-pag-min">—</div>
                 <div class="rk-count" id="rk-pag-min-n"></div>
               </div>
             </div>
@@ -1881,13 +1881,13 @@
             <button class="btn-filter-toggle" id="btn-req-filter-toggle" onclick="App.toggleReqFilterPanel(event)" title="Filtros">
               <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
             </button>
-            <!-- =="?=="? Filtro completo =="?=="? -->
+            <!-- ══════ Filtro completo ══════ -->
             <div id="req-filter-panel" class="req-filter-panel">
               <div class="req-filter-panel-inner">
             <!-- Status chips -->
             <div class="req-filter-group">
               <span class="req-filter-label">Status</span>
-              <button class="btn-toggle-all-status" id="btn-toggle-all-status" onclick="App.toggleAllStatus(this)">Todos ==o"</button>
+              <button class="btn-toggle-all-status" id="btn-toggle-all-status" onclick="App.toggleAllStatus(this)">Todos</button>
               <button class="req-status-chip chip-sol active" data-status="Solicitado" onclick="App.toggleStatusFilter(this)">Solicitado</button>
               <button class="req-status-chip chip-agu active" data-status="Aguardando" onclick="App.toggleStatusFilter(this)">Aguardando</button>
               <button class="req-status-chip chip-com active" data-status="Comprado"   onclick="App.toggleStatusFilter(this)">Comprado</button>
@@ -1938,14 +1938,14 @@
             <div class="req-filter-group">
               <span class="req-filter-label">Data solicitação</span>
               <input type="date" id="req-date-from" class="req-filter-date" onchange="App.renderRequests()">
-              <span style="color:#8898b8">==?'</span>
+              <span style="color:#8898b8">→</span>
               <input type="date" id="req-date-to" class="req-filter-date" onchange="App.renderRequests()">
             </div>
             <!-- Data envio -->
             <div class="req-filter-group">
               <span class="req-filter-label">Data envio</span>
               <input type="date" id="req-sent-from" class="req-filter-date" onchange="App.renderRequests()">
-              <span style="color:#8898b8">==?'</span>
+              <span style="color:#8898b8">→</span>
               <input type="date" id="req-sent-to" class="req-filter-date" onchange="App.renderRequests()">
             </div>
             <!-- Limpar -->
@@ -1986,7 +1986,7 @@
         </div>
       </div>
 
-      <!-- =="?=="? CONFIGURA==?==.ES =="?=="? -->
+      <!-- ══════ CONFIGURAÇÕES ══════ -->
       <div id="tab-settings" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
@@ -2080,7 +2080,7 @@
             </div>
 
             <!-- selects ocultos, lidos pelas funções existentes -->
-            <select id="sel-group-sub" onchange="App.loadSubOpts()" style="display:none"><option value="">==?"</option></select>
+            <select id="sel-group-sub" onchange="App.loadSubOpts()" style="display:none"><option value="">—</option></select>
             <select id="sel-subgroup-filter" onchange="App.filterSubgroupsView()" style="display:none"><option value="">Todos os grupos</option></select>
             <select id="sel-subgroup-group" style="display:none"><option value="">Grupo pai</option></select>
 
@@ -2098,7 +2098,7 @@
 
         </div>
 
-        <!-- =="?=="? REGISTRO DE C=="DIGOS =="?=="? -->
+        <!-- ══════ REGISTRO DE CÓDIGOS ══════ -->
         <div class="codigos-section">
           <h3 class="codigos-section-title">Registro de Códigos</h3>
           <div class="codigos-grid">
@@ -2157,7 +2157,7 @@
           </div>
         </div>
 
-        <!-- =="?=="? FERRAMENTAS & BACKUP (2 cards) =="?=="? -->
+        <!-- ══════ FERRAMENTAS & BACKUP (2 cards) ══════ -->
         <div class="config-tools-section">
           <h3 class="codigos-section-title" style="margin-top:22px">Ferramentas & Backup</h3>
           <div class="config-tools-grid config-tools-2">
@@ -2172,11 +2172,11 @@
               </div>
               <p class="config-tools-desc">Baixe um arquivo com <strong>todos os dados</strong> (solicitações, estoque, compras, configurações, metas e logs). Guarde-o para não perder nada.</p>
               <div class="config-tools-actions">
-                <button class="btn-primary" onclick="App.exportBackupSistema()">==? Baixar backup</button>
-                <button class="btn-secondary" onclick="document.getElementById('restore-sys-file').click()">==? Restaurar</button>
+                <button class="btn-primary" onclick="App.exportBackupSistema()">Baixar backup</button>
+                <button class="btn-secondary" onclick="document.getElementById('restore-sys-file').click()">Restaurar</button>
                 <input type="file" id="restore-sys-file" accept=".json" style="display:none" onchange="App.importBackupSistema(event)">
               </div>
-              <p class="config-tools-warn">==s== Restaurar substitui os dados atuais pelos do arquivo.</p>
+              <p class="config-tools-warn">Restaurar substitui os dados atuais pelos do arquivo.</p>
             </div>
 
             <!-- Card 2: Logs completos -->
@@ -2189,8 +2189,8 @@
               </div>
               <p class="config-tools-desc">Veja <strong>todos os registros</strong> de quem fez o quê e quando, dia a dia. Clique num registro para o detalhamento completo.</p>
               <div class="config-tools-actions">
-                <button class="btn-primary" onclick="App.showLogsCompletos()">==Y"< Ver logs</button>
-                <button class="btn-secondary" onclick="App.baixarLogs()">==? Baixar logs</button>
+                <button class="btn-primary" onclick="App.showLogsCompletos()">Ver logs</button>
+                <button class="btn-secondary" onclick="App.baixarLogs()">Baixar logs</button>
               </div>
               <p class="config-tools-desc" id="config-logs-count" style="margin-top:8px"></p>
             </div>
@@ -2204,21 +2204,21 @@
         <div id="logs-full-modal" class="modal-overlay hidden">
           <div class="modal-card" style="max-width:760px">
             <div class="modal-header">
-              <h3>Logs de Atividade ==?" Histórico Completo</h3>
+              <h3>Logs de Atividade — Histórico Completo</h3>
               <button class="modal-close" onclick="document.getElementById('logs-full-modal').classList.add('hidden')">
                 <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
               </button>
             </div>
             <div class="modal-body" id="logs-full-body"></div>
             <div class="modal-footer" id="logs-full-footer" style="display:none">
-              <button class="btn-delete" onclick="App.apagarLogs()">==Y-' Apagar todos os logs</button>
+              <button class="btn-delete" onclick="App.apagarLogs()">Apagar todos os logs</button>
             </div>
           </div>
         </div>
 
       </div>
 
-      <!-- =="?=="? MODAL: EDITAR GRUPO (sub-opções + subgrupos) =="?=="? -->
+      <!-- ══════ MODAL: EDITAR GRUPO (sub-opções + subgrupos) ══════ -->
       <div id="modal-grupo-edit" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:560px">
           <div class="modal-header">
@@ -2250,7 +2250,7 @@
 
             <div class="cfg-block">
               <div class="cfg-block-head">
-                <span class="cfg-col-title">Subgrupos ==?" Mapeamento Interno</span>
+                <span class="cfg-col-title">Subgrupos — Mapeamento Interno</span>
               </div>
               <div class="settings-list-box">
                 <div id="list-subgroups-admin" class="settings-list"></div>
@@ -2266,7 +2266,7 @@
         </div>
       </div>
 
-      <!-- =="?=="? MODAL: NOVA SOLICITA==?==fO (ADMIN) =="?=="? -->
+      <!-- ══════ MODAL: NOVA SOLICITAÇÃO (ADMIN) ══════ -->
       <div id="modal-nova-solic" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:560px">
           <div class="modal-header">
@@ -2321,7 +2321,7 @@
             </div>
 
             <div class="form-group">
-              <label class="check-item"><input type="checkbox" id="nsol-urgency" /> ==Ys== Marcar como URGENTE</label>
+              <label class="check-item"><input type="checkbox" id="nsol-urgency" /> Marcar como URGENTE</label>
             </div>
             <div class="form-group">
               <label class="form-label">Observação <span class="opt-tag">opcional</span></label>
@@ -2335,7 +2335,7 @@
         </div>
       </div>
 
-      <!-- =="?=="? MODAL: DETALHE COMPRA COMBINADA =="?=="? -->
+      <!-- ══════ MODAL: DETALHE COMPRA COMBINADA ══════ -->
       <div id="compra-detalhe-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:600px">
           <div class="modal-header">
@@ -2351,7 +2351,7 @@
         </div>
       </div>
 
-      <!-- =="?=="? MODAL: INFO DO LOTE (ESTOQUE) =="?=="? -->
+      <!-- ══════ MODAL: INFO DO LOTE (ESTOQUE) ══════ -->
       <div id="lote-info-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:560px">
           <div class="modal-header">
@@ -2367,7 +2367,7 @@
         </div>
       </div>
 
-      <!-- =="?=="? MODAL: VER SOLICITA==?==fO (somente leitura) =="?=="? -->
+      <!-- ══════ MODAL: VER SOLICITAÇÃO (somente leitura) ══════ -->
       <div id="sol-view-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:540px">
           <div class="modal-header">
@@ -2383,11 +2383,11 @@
         </div>
       </div>
 
-      <!-- =="?=="? MODAL: TODAS AS SUB-OP==?==.ES =="?=="? -->
+      <!-- ══════ MODAL: TODAS AS SUB-OPÇÕES ══════ -->
       <div id="subopts-all-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:560px">
           <div class="modal-header">
-            <h3 id="subopts-all-titulo">Sub-opções ==?" Todas</h3>
+            <h3 id="subopts-all-titulo">Sub-opções — Todas</h3>
             <button class="modal-close" onclick="document.getElementById('subopts-all-modal').classList.add('hidden')">
               <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
             </button>
@@ -2399,7 +2399,7 @@
         </div>
       </div>
 
-      <!-- =="?=="? MODAL: ESCOLHER TIPO DE COMPRA =="?=="? -->
+      <!-- ══════ MODAL: ESCOLHER TIPO DE COMPRA ══════ -->
       <div id="add-compra-chooser" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:440px">
           <div class="modal-header">
@@ -2426,7 +2426,7 @@
         </div>
       </div>
 
-      <!-- =="?=="? MODAL: ADICIONAR ITEM PARCELADO =="?=="? -->
+      <!-- ══════ MODAL: ADICIONAR ITEM PARCELADO ══════ -->
       <div id="parcelada-add-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:600px">
           <div class="modal-header">
@@ -2439,11 +2439,11 @@
             <div class="form-row-2">
               <div class="form-group">
                 <label class="form-label">Grupo *</label>
-                <select id="parc-grupo" class="input-field select-styled" onchange="App.onParcGrupoChange()"><option value="">==?" Selecione ==?"</option></select>
+                <select id="parc-grupo" class="input-field select-styled" onchange="App.onParcGrupoChange()"><option value="">— Selecione —</option></select>
               </div>
               <div class="form-group">
                 <label class="form-label">Subgrupo</label>
-                <select id="parc-subgrupo" class="input-field select-styled"><option value="">==?" Selecione ==?"</option></select>
+                <select id="parc-subgrupo" class="input-field select-styled"><option value="">— Selecione —</option></select>
               </div>
             </div>
             <div class="form-group" style="margin-top:10px">
@@ -2453,7 +2453,7 @@
             <div class="form-row-2" style="margin-top:10px">
               <div class="form-group">
                 <label class="form-label">Fornecedor</label>
-                <select id="parc-fornecedor" class="input-field select-styled"><option value="">==?" Selecione ==?"</option></select>
+                <select id="parc-fornecedor" class="input-field select-styled"><option value="">— Selecione —</option></select>
               </div>
               <div class="form-group">
                 <label class="form-label">Quantidade *</label>
@@ -2501,12 +2501,12 @@
   </div>
 </div>
 
-<!-- ==.==.== MODAL: enviar para autorização (escolher gestor + valor) ==.==.== -->
+<!-- ══════ MODAL: enviar para autorização (escolher gestor + valor) ══════ -->
 <div id="autz-send-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width:480px">
     <div class="modal-header">
       <h3>Enviar para autorização</h3>
-      <button class="modal-close" onclick="document.getElementById('autz-send-modal').classList.add('hidden')">==o.</button>
+      <button class="modal-close" onclick="document.getElementById('autz-send-modal').classList.add('hidden')">✕</button>
     </div>
     <div class="modal-body">
       <p id="autz-send-resumo" style="font-weight:600;color:var(--ink-900);background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:14px"></p>
@@ -2532,8 +2532,8 @@
   </div>
 </div>
 
-<!-- ==.==.== MODAL: autorizar compra em LOTE (várias solicitações) ==.==.== -->
-<!-- ==.==.== MODAL: cadastrar / editar problema (base de soluções) ==.==.== -->
+<!-- ══════ MODAL: autorizar compra em LOTE (várias solicitações) ══════ -->
+<!-- ══════ MODAL: cadastrar / editar problema (base de soluções) ══════ -->
 <div id="kb-form-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width:640px">
     <div class="modal-header">
@@ -2888,8 +2888,8 @@
 <div id="autz-lote-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width:560px">
     <div class="modal-header">
-      <h3 id="autz-lote-title">Autorizar compra ==?" Solicitações</h3>
-      <button class="modal-close" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')">==o.</button>
+      <h3 id="autz-lote-title">Autorizar compra — Solicitações</h3>
+      <button class="modal-close" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')">✕</button>
     </div>
 
     <!-- PASSO 1: escolher solicitações -->
@@ -2909,11 +2909,11 @@
     <!-- PASSO 2: valor + quantidade por item -->
     <div id="autz-lote-step2" class="hidden">
       <div class="modal-body" style="max-height:70vh;overflow-y:auto">
-        <p style="color:var(--ink-500);margin-bottom:10px">Informe o valor de cada item. A quantidade vem do sistema ==?" clique no cadeado para editar.</p>
+        <p style="color:var(--ink-500);margin-bottom:10px">Informe o valor de cada item. A quantidade vem do sistema — clique no cadeado para editar.</p>
         <div id="autz-lote-itens"></div>
       </div>
       <div class="modal-footer">
-        <button class="btn-ghost" onclick="App._autzLoteBackStep1()">==?== Voltar</button>
+        <button class="btn-ghost" onclick="App._autzLoteBackStep1()">‹ Voltar</button>
         <button class="btn-primary" onclick="App._autzLoteStep3()" title="Próximo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
       </div>
     </div>
@@ -2931,18 +2931,18 @@
         <a id="autz-lote-enviar" class="btn-primary autz-enviar-btn is-disabled" href="#">Escolha o gestor</a>
       </div>
       <div class="modal-footer">
-        <button class="btn-ghost" onclick="App._autzLoteBackStep2()">==?== Voltar</button>
+        <button class="btn-ghost" onclick="App._autzLoteBackStep2()">‹ Voltar</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ==.==.== MODAL: decisão de autorização (gestor respondeu) ==.==.== -->
+<!-- ══════ MODAL: decisão de autorização (gestor respondeu) ══════ -->
 <div id="autorizacao-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width:460px">
     <div class="modal-header">
       <h3>Decisão de Autorização</h3>
-      <button class="modal-close" onclick="document.getElementById('autorizacao-modal').classList.add('hidden')">==o.</button>
+      <button class="modal-close" onclick="document.getElementById('autorizacao-modal').classList.add('hidden')">✕</button>
     </div>
     <div class="modal-body">
       <p style="color:var(--ink-500);margin-bottom:6px">O que o gestor decidiu?</p>
@@ -2956,7 +2956,7 @@
   </div>
 </div>
 
-<!-- ==.==.== MODAL SOLICITA==?==fO ==.==.== -->
+<!-- ══════ MODAL SOLICITAÇÃO ══════ -->
 <div id="modal-request" class="modal-overlay hidden">
   <div class="modal-card">
     <div class="modal-header">
@@ -3004,7 +3004,7 @@
           <div class="form-group">
             <label class="form-label">Fornecedor</label>
             <select id="modal-supplier-sel" class="input-field select-styled" onchange="App.onSupplierSelChange()">
-              <option value="">==?" Selecione ==?"</option>
+              <option value="">— Selecione —</option>
             </select>
             <input type="text" id="modal-supplier" class="input-field" placeholder="Ou digite o nome" style="margin-top:6px;display:none" />
           </div>
@@ -3068,7 +3068,7 @@
           </div>
         </div>
       </div>
-      <!-- Painel Estoque ==?" aparece só quando status = Estoque -->
+      <!-- Painel Estoque — aparece só quando status = Estoque -->
       <div id="modal-estoque-panel" class="modal-section hidden">
         <div class="modal-section-title">
           <svg viewBox="0 0 24 24" fill="none" style="width:16px"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
@@ -3078,7 +3078,7 @@
         <div id="modal-estoque-ja-retirado" class="hidden" style="background:var(--surf-2,#eef3fb);border:1px solid var(--surf-border,#c8d4e8);border-radius:var(--r-md,10px);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
           <div>
             <div style="font-size:.78rem;color:#6680a0;font-weight:600">Já retirado do estoque</div>
-            <div id="modal-estoque-ja-retirado-info" style="font-size:.88rem;font-weight:700;color:#1a3a6b;margin-top:2px">==?"</div>
+            <div id="modal-estoque-ja-retirado-info" style="font-size:.88rem;font-weight:700;color:#1a3a6b;margin-top:2px">—</div>
           </div>
           <button type="button" class="btn-ghost" onclick="App.cancelarRetiradaEstoque()" title="Devolve a quantidade ao estoque e permite escolher outro item">Cancelar retirada</button>
         </div>
@@ -3089,7 +3089,7 @@
           <div class="form-group" style="margin-top:8px">
             <label class="form-label">Item selecionado</label>
             <select id="modal-estoque-sel" class="input-field select-styled" onchange="App.onEstoqueSelChange()">
-              <option value="">==?" Selecione o item ==?"</option>
+              <option value="">— Selecione o item —</option>
             </select>
           </div>
           <div class="form-row-2" style="margin-top:8px">
@@ -3146,7 +3146,7 @@
             <div class="form-group">
               <label class="form-label">Item do estoque</label>
               <select id="modal-combo-estoque-sel" class="input-field select-styled" onchange="App.onComboEstoqueSelChange()">
-                <option value="">==?" Selecione ==?"</option>
+                <option value="">— Selecione —</option>
               </select>
             </div>
             <div class="form-row-2" style="margin-top:8px">

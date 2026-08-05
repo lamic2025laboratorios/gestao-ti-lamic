@@ -4604,3 +4604,6 @@ button.kbg-ico { cursor: pointer; }
   .crono-num { width: 32px; height: 32px; font-size: 1rem; }
   .crono-card-topo { flex-direction: column; }
 }
+/* Negados na barra de contagem — fecha a soma com o total de pedidos */
+.rqs-neg .rqs-dot { background: var(--red); }
+.rqs-neg { color: var(--red); }
