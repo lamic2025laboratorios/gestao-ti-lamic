@@ -3572,7 +3572,7 @@ const App = {
         if (r.nums && r.nums.includes(',')) r.nums.split(',').forEach(s=>{const v=s.trim();if(v)subC[v]=(subC[v]||0)+q;});
         if (r.cores && r.cores.includes(',')) r.cores.split(',').forEach(s=>{const v=s.trim();if(v)subC[v]=(subC[v]||0)+q;});
       } else if (rn.includes('pilha')||rn.includes('bateria')) {
-        if (r.batModels) r.batModels.forEach(b=>{ subC[b.modelo]=(subC[b.modelo]||0)+(parseInt(b.qty)||1); });
+        if (r.batModels) App._arr(r.batModels).forEach(b=>{ if (b?.modelo) subC[b.modelo]=(subC[b.modelo]||0)+(parseInt(b.qty)||1); });
         else if (r.modelo) subC[r.modelo]=(subC[r.modelo]||0)+q;
       } else {
         // Outros: mostra subgrupo, não o texto livre do produto
@@ -4235,9 +4235,12 @@ const App = {
       tbody.appendChild(tr);
      } catch (e) {
        console.error('[renderRequests] falha ao montar a linha', r?.seq ?? id, e);
+       // Mostra o motivo na própria linha: sem isso é preciso abrir o
+       // console pra descobrir qual campo do registro está inconsistente.
        const tr = document.createElement('tr');
        tr.innerHTML = '<td colspan="9" style="color:#b45309;background:#fffbeb;font-size:.8rem;padding:8px 16px">' +
-         'SL-' + (r?.seq ?? '?') + ' — não foi possível exibir esta linha (dado inconsistente).</td>';
+         '<strong>SL-' + (r?.seq ?? '?') + '</strong> — ' + (e && e.message ? e.message : 'dado inconsistente') +
+         (r?.compraCodigo ? ' · compra ' + r.compraCodigo : '') + '</td>';
        tbody.appendChild(tr);
      }
     });
@@ -4793,6 +4796,29 @@ const App = {
   },
 
   // Cor lilás por código de compra — mesma compra = mesmo tom
+  /* O Firebase guarda array com buracos como objeto ({0:…,2:…}).
+     Quando isso acontece, `parcelas.length` vira undefined e o gasto
+     simplesmente deixa de ser somado — o total fica errado sem erro
+     nenhum aparecer. Normaliza uma vez, na entrada, e todo o resto do
+     código volta a trabalhar com array de verdade. */
+  _normalizarRequests(v) {
+    Object.values(v).forEach(r => {
+      if (!r || typeof r !== 'object') return;
+      if (r.parcelas  && !Array.isArray(r.parcelas))  r.parcelas  = App._arr(r.parcelas);
+      if (r.batModels && !Array.isArray(r.batModels)) r.batModels = App._arr(r.batModels);
+      if (r.itens     && !Array.isArray(r.itens))     r.itens     = App._arr(r.itens);
+    });
+    return v;
+  },
+
+  // O Firebase devolve array com buracos como objeto ({0:…,2:…}).
+  // Sempre passar por aqui antes de .map/.forEach em dado vindo do banco.
+  _arr(v) {
+    if (Array.isArray(v)) return v.filter(x => x !== null && x !== undefined);
+    if (v && typeof v === 'object') return Object.values(v).filter(x => x !== null && x !== undefined);
+    return [];
+  },
+
   _compraColor(codigo) {
     const pal = [
       { b: '#7c52d4', g: '#f5f1fe' },
@@ -4839,7 +4865,12 @@ const App = {
       text = [eq, r.obs].filter(Boolean).join(' — ');
     } else if ((n.includes('pilha')||n.includes('bateria')||n.includes('conserto')||n.includes('concerto')) && (r.batModel||r.batModels||r.modelo)) {
       if (r.batModel)   text = `${r.batModel} ×${r.qty||1}`;
-      else if (r.batModels) text = r.batModels.map(b=>`${b.modelo} ×${b.qty}`).join(' | ');
+      else if (r.batModels) {
+        // O Firebase devolve array com buracos como objeto ({0:…,2:…}),
+        // e aí .map não existe. Normaliza antes de percorrer.
+        const lista = Array.isArray(r.batModels) ? r.batModels : Object.values(r.batModels || {});
+        text = lista.filter(Boolean).map(b => `${b?.modelo || '—'} ×${b?.qty || 1}`).join(' | ');
+      }
       else text = `${r.modelo||''} ×${r.qty||1}`;
     } else if (r.product || r.reason) {
       // Outros: mostra produto e motivo separados por " — "
@@ -7629,7 +7660,7 @@ const App = {
     safeListener('suppliers', v => { State.suppliers=v||{}; if(State.adminUser) App.renderSuppliersAdmin?.(); });
     safeListener('config',    v => { State.config   =v||{}; App._migrarGestorLegacy?.(); App._syncGestorField?.(); });
     safeListener('requests',  v => {
-      State.requests=v||{};
+      State.requests = App._normalizarRequests(v || {});
       App.updatePendingBadge();
       App.populateDashFilters();
       if (State.adminUser) {
