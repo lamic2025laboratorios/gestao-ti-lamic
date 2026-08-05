@@ -4145,7 +4145,20 @@ const App = {
     // Barra "De N pedidos" — reflete o conjunto já filtrado/pesquisado acima
     App._renderReqStats(reqs, 'dash-stats-bar', 'dash-negados-bar');
     if (!reqs.length) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray-500);padding:32px">Nenhuma solicitação encontrada.</td></tr>';
+      // Explica POR QUE está vazio: sem isso, um filtro esquecido parece
+      // "sumiram os dados". Mostra também o caminho de volta.
+      const nTotal = Object.keys(State.requests || {}).length;
+      const chips = document.querySelectorAll('.req-status-chip');
+      const todosOcultos = chips.length && App.reqHiddenStatuses?.size >= chips.length;
+      const temFiltro = fStatus || fUnit || fGroup || fReqFrom || fReqTo || fSentFrom || fSentTo || fParc || qLive || App.reqHiddenStatuses?.size;
+      let msg;
+      if (!nTotal) msg = 'Nenhuma solicitação cadastrada ainda.';
+      else if (todosOcultos) msg = 'Todos os status estão ocultos. Clique em <strong>Todos&nbsp;✓</strong> para exibir as ' + nTotal + ' solicitações.';
+      else if (temFiltro) msg = 'Nenhuma solicitação encontrada com os filtros atuais. ' +
+        '<button class="btn-ghost" style="margin-left:8px;font-size:.8rem;padding:4px 12px" onclick="App.clearAllReqFilters()">Limpar filtros</button>' +
+        '<div style="margin-top:6px;font-size:.8rem">' + nTotal + ' solicitação(ões) no total.</div>';
+      else msg = 'Nenhuma solicitação encontrada.';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray-500);padding:32px">' + msg + '</td></tr>';
       return;
     }
     reqs.forEach(([id,r]) => {
