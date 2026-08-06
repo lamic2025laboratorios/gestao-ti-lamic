@@ -1336,6 +1336,15 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 /* Tags estoque */
 .estoque-codigo { font-family: monospace; font-size: .78rem; font-weight: 700; color: #3a7ee8; background: #eef4ff; padding: 2px 8px; border-radius: 5px; }
 .estoque-lote   { font-family: monospace; font-size: .78rem; font-weight: 700; color: #1db87a; background: #e9f9f1; padding: 2px 8px; border-radius: 5px; }
+/* Lote de brinde: mesmo número da compra, em roxo, pra distinguir do lote comprado */
+.estoque-lote.lote-brinde { color: #7c52d4; background: #f3edff; }
+
+/* Caixa do brinde no formulário de Nova Compra */
+.estoque-brinde-box {
+  margin-top: 12px; padding: 14px;
+  background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: var(--r-md);
+}
+.estoque-brinde-hint { font-size: .78rem; color: #5a6a84; margin: 8px 0 12px; line-height: 1.45; }
 .estoque-destino { font-size: .8rem; font-weight: 600; color: #1a3a6b; background: #f0f6ff; padding: 2px 9px; border-radius: 100px; }
 .estoque-zerado-tag { font-size: .64rem; font-weight: 800; color: #fff; background: #d94040; padding: 1px 7px; border-radius: 100px; margin-left: 6px; vertical-align: middle; }
 .sec-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
@@ -2270,6 +2279,17 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .bat-check { flex: 1; }
 .bat-qty-wrap { display: flex; align-items: center; gap: 6px; }
 .bat-qty-input { width: 80px !important; padding: 7px 10px !important; }
+
+/* Cores da tinta: chip + caixinha de quantidade compacta logo abaixo, na largura
+   do próprio chip. Não reusa .bat-model-row (feita p/ linha larga de bateria),
+   que aqui deixaria a caixa desproporcional dentro do grid de chips. */
+.cor-item-wrap { display: flex; flex-direction: column; gap: 5px; }
+.cor-qty-wrap { display: flex; }
+.cor-qty-input {
+  width: 100% !important; height: 30px;
+  padding: 4px 8px !important; font-size: .8rem !important;
+  text-align: center; font-weight: 600;
+}
 
 /* Chart grid on white — fix axis label colors */
 

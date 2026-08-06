@@ -305,14 +305,14 @@ const App = {
     cores.forEach((c,i) => {
       const safeId = 'cor_'+i;
       const div = document.createElement('div');
-      div.className = 'bat-model-row';
+      div.className = 'cor-item-wrap';
       div.innerHTML = `
-        <label class="check-item bat-check">
+        <label class="check-item">
           <input type="checkbox" name="cor" value="${c}" id="${safeId}" onchange="App.toggleBatQty('${safeId}',this.checked);App.saveRequestForm()"/>
           ${c}
         </label>
-        <div class="bat-qty-wrap" id="qty_${safeId}" style="display:none">
-          <input type="number" class="input-field cor-qty-input" data-cor="${c}" min="1" value="1" placeholder="Qtd" onchange="App.saveRequestForm()" />
+        <div class="cor-qty-wrap" id="qty_${safeId}" style="display:none">
+          <input type="number" class="input-field cor-qty-input" data-cor="${c}" min="1" value="1" title="Quantidade" onchange="App.saveRequestForm()" />
         </div>`;
       colWrap.appendChild(div);
     });
@@ -589,14 +589,14 @@ const App = {
     cores.forEach((c,i) => {
       const safeId = 'nsolcor_'+i;
       const div = document.createElement('div');
-      div.className = 'bat-model-row';
+      div.className = 'cor-item-wrap';
       div.innerHTML = `
-        <label class="check-item bat-check">
+        <label class="check-item">
           <input type="checkbox" name="nsol-cor" value="${c}" id="${safeId}" onchange="App.toggleBatQty('${safeId}',this.checked)"/>
           ${c}
         </label>
-        <div class="bat-qty-wrap" id="qty_${safeId}" style="display:none">
-          <input type="number" class="input-field nsol-cor-qty-input" data-cor="${c}" min="1" value="1" placeholder="Qtd" />
+        <div class="cor-qty-wrap" id="qty_${safeId}" style="display:none">
+          <input type="number" class="input-field nsol-cor-qty-input" data-cor="${c}" min="1" value="1" title="Quantidade" />
         </div>`;
       cw.appendChild(div);
     });
@@ -5321,7 +5321,9 @@ const App = {
   // Comprado: cria UM item por compra (lote) com código próprio.
   // Registra entrada (comprada) + saída (enviada); saldo do lote = resto (0 = zerado).
   // NÃO mescla por nome — compras iguais em lotes diferentes têm códigos diferentes.
-  _processarCompraEstoque(reqId, upd) {
+  // loteOverride: usado pelo brinde, que herda o nº de lote da compra que o trouxe
+  // (marcado com REF) em vez de gerar um lote próprio.
+  _processarCompraEstoque(reqId, upd, loteOverride = null) {
     const r = (State.requests || {})[reqId] || {};
     if (r.estoqueProcessado) return Promise.resolve();
     const d = { ...r, ...upd };  // mescla dados salvos + atuais
@@ -5335,7 +5337,7 @@ const App = {
     const subgrupo = d.subgrupo || '';
     const produto  = (d.descricao || App.reqSummary(r) || grupo).trim();
     const dataMov  = (d.shippedAt || d.boughtAt || (d.createdAt||'').substring(0,10) || new Date().toISOString().substring(0,10)).substring(0,10) + 'T00:00:00.000Z';
-    const lote     = App._gerarLote(d);
+    const lote     = loteOverride || App._gerarLote(d);
 
     // 1 item de estoque por compra — push gera código único (EST-xxxxx)
     const ref = DB.push('estoque', {
@@ -6440,9 +6442,10 @@ const App = {
       const nParc = (itemReq && itemReq.parcelas && itemReq.parcelas.length) || (item.parcelas && item.parcelas.length) || 0;
       const parcTag = nParc
         ? ` <span class="mov-tag-parcelada" title="Compra parcelada em ${nParc}×">PARCELADA ${nParc}×</span>` : '';
+      const ehBrinde = App._isBrindeEstoque(item);
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><span class="estoque-lote">${App._loteDisplay(item)}</span></td>
+        <td><span class="estoque-lote${ehBrinde ? ' lote-brinde' : ''}"${ehBrinde ? ' title="Brinde: veio junto na compra do lote de mesmo número"' : ''}>${App._loteDisplay(item)}</span></td>
         <td style="font-weight:600">${item.produto || '—'}${zeradoTag}${parcTag}</td>
         <td>${item.grupo || '—'}</td>
         <td>${item.subgrupo || '—'}</td>
@@ -6868,6 +6871,7 @@ const App = {
     App._populateEstoqueGrupoSel();
     App._populateEstoqueFornecedor();
     App._populateEstoqueUnidade();
+    App._populateEstoqueBrindeGrupoSel();
 
     const item = id ? (State.estoque[id] || {}) : {};
     const reqLig = item.reqId ? (State.requests || {})[item.reqId] : null;
@@ -6888,6 +6892,9 @@ const App = {
     // Campos de DINHEIRO (valor/fornecedor/parcelas/forma pgto) somem na Nova entrada.
     const showMoney = mostrarCompra && !ehEntrada;
     document.querySelectorAll('.estoque-money').forEach(el => { el.style.display = showMoney ? '' : 'none'; });
+    // Brinde: só faz sentido numa Nova Compra criada do zero (não em Nova Entrada, nem editando).
+    const showBrinde = !id && !ehEntrada;
+    document.getElementById('estoque-brinde-wrap')?.classList.toggle('hidden', !showBrinde);
     const dataLabel = document.getElementById('estoque-data-label');
     if (dataLabel) dataLabel.textContent = !mostrarCompra ? 'Data da movimentação' : (ehEntrada ? 'Data da entrada' : 'Data da compra');
 
@@ -6922,10 +6929,14 @@ const App = {
       }
     } else {
       ['estoque-grupo','estoque-subgrupo','estoque-produto','estoque-produto-select','estoque-fornecedor','estoque-qtd',
-       'estoque-unidade-destino','estoque-valor','estoque-valor-total','estoque-parcelas-n','estoque-solicitante']
+       'estoque-unidade-destino','estoque-valor','estoque-valor-total','estoque-parcelas-n','estoque-solicitante',
+       'estoque-brinde-grupo','estoque-brinde-subgrupo','estoque-brinde-produto','estoque-brinde-qtd']
         .forEach(fid => { const el = document.getElementById(fid); if (el) el.value = ''; });
       document.getElementById('chk-estoque-parcelas').checked = false;
       document.getElementById('estoque-parcelas-wrap').style.display = 'none';
+      document.getElementById('chk-estoque-brinde').checked = false;
+      document.getElementById('estoque-brinde-fields').style.display = 'none';
+      App.onEstoqueBrindeGrupoChange();   // limpa subgrupos do brinde da sessão anterior
       const fpSelNovo = document.getElementById('estoque-forma-pagamento');
       if (fpSelNovo) fpSelNovo.value = 'dinheiro';
       const dEl = document.getElementById('estoque-data');
@@ -6987,6 +6998,33 @@ const App = {
     }
     const dl = document.getElementById('estoque-produto-list');
     if (dl) dl.innerHTML = subOptsUnicos.map(s => `<option value="${s}">`).join('');
+  },
+
+  /* ── Brinde (item extra sem custo, vinculado à Nova Compra) ─────── */
+  toggleEstoqueBrinde() {
+    const on = document.getElementById('chk-estoque-brinde')?.checked;
+    document.getElementById('estoque-brinde-fields').style.display = on ? '' : 'none';
+  },
+
+  _populateEstoqueBrindeGrupoSel() {
+    const sel = document.getElementById('estoque-brinde-grupo'); if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Selecione —</option>' +
+      Object.values(State.groups || {}).map(g => `<option value="${g}">${g}</option>`).join('');
+    sel.value = cur;
+  },
+
+  // Subgrupo do brinde: cascata simples pelo Mapeamento Interno do grupo (sem as
+  // sub-opções especiais de Tinta/Pilha — o produto do brinde é sempre texto livre).
+  onEstoqueBrindeGrupoChange() {
+    const grupo = document.getElementById('estoque-brinde-grupo')?.value || '';
+    const subSel = document.getElementById('estoque-brinde-subgrupo'); if (!subSel) return;
+    const gid = Object.keys(State.groups || {}).find(k => (State.groups[k] || '').toLowerCase() === grupo.toLowerCase());
+    const subgrupos = (gid && State.subgroups?.[gid]) ? [...State.subgroups[gid]] : [];
+    const cur = subSel.value;
+    subSel.innerHTML = '<option value="">— Selecione —</option>' +
+      subgrupos.map(v => `<option value="${v}">${v}</option>`).join('');
+    subSel.value = cur;
   },
 
   _populateEstoqueFornecedor() {
@@ -7132,8 +7170,10 @@ const App = {
       const reqId = reqRef.key;
 
       await App._processarCompraEstoque(reqId, reqData);
+      // Brinde que veio junto na mesma compra (opcional) — entrada sem custo própria
+      const brindeOk = await App._salvarBrindeDaCompra(reqId, reqData);
 
-      toast(`✓ Entrada de estoque registrada${seq != null ? ' · SL-' + seq : ''}.`);
+      toast(`✓ Entrada de estoque registrada${seq != null ? ' · SL-' + seq : ''}${brindeOk ? ' + brinde' : ''}.`);
       App.closeEstoqueForm();
       App.renderRequests(); App.renderDashboard(); App.updatePendingBadge(); App.renderEstoque?.();
     } catch (e) {
@@ -7142,6 +7182,56 @@ const App = {
     } finally {
       if (btn) { btn.innerHTML = orig; btn.disabled = false; }
     }
+  },
+
+  /* ── Brinde da compra ────────────────────────────────────────────
+     Item extra que veio junto na MESMA compra (ex.: comprei 1 alicate e vieram
+     20 pregos). O valor pago é do conjunto, não dá pra separar — então o brinde
+     entra como ENTRADA SEM CUSTO (valor 0, entradaSemCusto: true → fora do total
+     gasto), herdando fornecedor, unidade de destino, solicitante e data da compra.
+     Fica ligado à compra por brindeDeReqId e recebe o MESMO nº de lote com "REF".
+     Não ganha parcelas próprias: sem custo não há o que parcelar — criar parcelas
+     de R$ 0,00 poluiria o card "Compras Parceladas" com um lançamento fantasma.
+     Retorna true se um brinde foi realmente criado. */
+  async _salvarBrindeDaCompra(reqPaiId, reqPai) {
+    if (!document.getElementById('chk-estoque-brinde')?.checked) return false;
+    const grupo    = document.getElementById('estoque-brinde-grupo')?.value.trim()    || '';
+    const subgrupo = document.getElementById('estoque-brinde-subgrupo')?.value.trim() || '';
+    const produto  = document.getElementById('estoque-brinde-produto')?.value.trim()  || '';
+    const qtd      = parseFloat(document.getElementById('estoque-brinde-qtd')?.value) || 0;
+    if (!grupo || !produto || qtd <= 0) {
+      toast('Brinde não registrado: preencha grupo, produto e quantidade.', 'error');
+      return false;
+    }
+    const seqTx = await DB.tx('meta/lastSeq', cur => (cur || 0) + 1);
+    const seq = seqTx?.snapshot?.val() || null;
+
+    const reqData = {
+      seq, unitId: reqPai.unitId, unitName: reqPai.unitName,
+      groupName: grupo, subgrupo, descricao: produto,
+      solicitante: reqPai.solicitante || '', formaPagamento: reqPai.formaPagamento || 'dinheiro',
+      status: 'Comprado', createdAt: reqPai.createdAt,
+      boughtAt: reqPai.boughtAt, fornecedor: reqPai.fornecedor || '',
+      quantidade: String(qtd),
+      valor: '0.00', valorTotal: '0.00', parcelas: null,
+      shippedStatus: 'Não', shippedAt: null,
+      origemEstoque: true, entradaSemCusto: true,
+      brindeDeReqId: reqPaiId,
+      usuarioResp: State.adminUser || '—', usuarioRespAt: new Date().toISOString()
+    };
+    const reqRef = DB.push('requests', reqData);
+    await reqRef;
+    await App._processarCompraEstoque(reqRef.key, reqData, App._loteBrinde(App._gerarLote(reqPai)));
+    return true;
+  },
+
+  // Lote do brinde: mesmo número da compra + marca REF
+  _loteBrinde(lotePai) { return `${lotePai} REF`; },
+
+  // Item de estoque que entrou como brinde de uma compra (badge de lote roxo)
+  _isBrindeEstoque(item) {
+    const r = item?.reqId ? (State.requests || {})[item.reqId] : null;
+    return !!(r && r.brindeDeReqId);
   },
 
   // Nova ENTRADA (sem custo): item que já existe fisicamente, não foi comprado.
@@ -7565,7 +7655,14 @@ const App = {
       // perder a seleção em andamento do usuário.
       else if (!State.currentType) App.buildRequestPanel?.();
     });
-    safeListener('groupMeta', v => { State.groupMeta =v||{}; if(State.adminUser) App.renderGroupsAdmin?.(); });
+    safeListener('groupMeta', v => {
+      State.groupMeta = v||{};
+      if (State.adminUser) App.renderGroupsAdmin?.();
+      // Mesma razão do listener de 'groups': o painel da unidade é montado no boot,
+      // antes deste listener responder. Sem remontar aqui, grupo marcado como
+      // "interno" (que só o admin pode solicitar) continua aparecendo pra unidade.
+      else if (!State.currentType) App.buildRequestPanel?.();
+    });
     safeListener('subOpts',   v => { State.subOpts  =v||{}; });
     safeListener('subgroups', v => { State.subgroups=v||{}; if(State.adminUser) App.renderSubgroupsAdmin?.(); });
     safeListener('admins',    v => { State.admins   =v||{}; if(State.adminUser) App.renderAdminsCards?.(); });

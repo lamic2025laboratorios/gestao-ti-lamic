@@ -1163,6 +1163,41 @@
                 <label class="form-label">Nº de Parcelas</label>
                 <input type="number" id="estoque-parcelas-n" class="input-field" min="2" placeholder="Ex.: 3" oninput="App.calcEstoqueValorTotal()" style="max-width:130px">
               </div>
+              <!-- Brinde: item extra que veio junto na MESMA compra, sem custo próprio -->
+              <div id="estoque-brinde-wrap" class="estoque-brinde-box hidden">
+                <label class="toggle-label">
+                  <input type="checkbox" id="chk-estoque-brinde" onchange="App.toggleEstoqueBrinde()">
+                  <span class="toggle-switch"></span>
+                  Veio brinde / item extra nesta compra
+                </label>
+                <div id="estoque-brinde-fields" style="display:none">
+                  <p class="estoque-brinde-hint">Entra no estoque como <strong>entrada sem custo</strong>, herdando fornecedor, unidade, solicitante e data da compra acima. Recebe o mesmo nº de lote com a marca <strong>REF</strong>.</p>
+                  <div class="form-row-2">
+                    <div class="form-group">
+                      <label class="form-label">Grupo *</label>
+                      <select id="estoque-brinde-grupo" class="input-field select-styled" onchange="App.onEstoqueBrindeGrupoChange()">
+                        <option value="">— Selecione —</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Subgrupo</label>
+                      <select id="estoque-brinde-subgrupo" class="input-field select-styled">
+                        <option value="">— Selecione —</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-row-2" style="margin-top:10px">
+                    <div class="form-group">
+                      <label class="form-label">Produto / Descrição *</label>
+                      <input type="text" id="estoque-brinde-produto" class="input-field" placeholder="Ex: Prego 17x27">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Quantidade *</label>
+                      <input type="number" id="estoque-brinde-qtd" class="input-field" min="0" placeholder="0">
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="form-group" style="margin-top:10px">
               <label class="form-label" id="estoque-data-label">Data da compra</label>
