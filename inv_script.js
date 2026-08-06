@@ -99,6 +99,9 @@ function iniciarConexaoFirebase() {
     if (typeof migrarStockCodeAcs === 'function' && migrarStockCodeAcs()) equipConsolidado = true;
     // Licenças já cadastradas nas unidades entram no depósito de licenças (Em Uso)
     if (typeof migrarLicencasParaEstoque === 'function' && modelSettings && Object.keys(modelSettings).length && migrarLicencasParaEstoque()) equipConsolidado = true;
+    // Guichê marcado como "genuíno" (comp.license) sem registro nenhum de
+    // licença — vira licença de verdade no depósito do Estoque.
+    if (typeof puxarLicencasGenuinasDosGuiches === 'function' && modelSettings && Object.keys(modelSettings).length && puxarLicencasGenuinasDosGuiches()) equipConsolidado = true;
     // Modelos de AC já cadastrados sobem pros pré-definidos das Configurações
     if (typeof migrarModelosAc === 'function' && migrarModelosAc()) {
       if (typeof renderSettingsList === 'function') renderSettingsList();
@@ -6065,6 +6068,72 @@ function migrarLicencasParaEstoque() {
             stock.push(item);
             lic.stockId = item.id;
             changed = true;
+        });
+    });
+    if (changed) { saveSettings(); saveToStorage(); }
+    return changed;
+}
+
+/* Puxa pro depósito as licenças genuínas que só existiam como MARCA no guichê.
+   O dashboard conta "genuínas" por comp.license === 'original' — uma flag no
+   computador. O Estoque lista modelSettings.stockLicenses — registros de
+   verdade. migrarLicencasParaEstoque() só olhava unit.licenses, então guichê
+   marcado como original sem registro nenhum nunca virava licença no Estoque:
+   dava 8 no dashboard e 0 no depósito.
+   Cria 1 registro por guichê marcado, com o software vindo do SO do próprio
+   guichê. A CHAVE não existe em lugar nenhum (a flag não guarda isso), então
+   entra vazia pra ser preenchida à mão — por isso a licença nasce marcada com
+   semChave. Idempotente: comp.licStockId trava a re-criação. */
+function puxarLicencasGenuinasDosGuiches() {
+    if (!inventoryData.length) return false;
+    const stock = _stockLicenses();
+    let changed = false;
+    let n = 0;
+    const novoId = (p) => `${p}_${Date.now().toString(36)}${(n++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+    inventoryData.forEach(unit => {
+        (unit.computers || []).forEach(comp => {
+            if (comp.license !== 'original') return;
+            // Já puxada antes (e o item ainda existe no depósito)
+            if (comp.licStockId && stock.some(l => l.id === comp.licStockId)) return;
+            // Já existe licença desta unidade amarrada a este guichê: não duplica
+            if ((unit.licenses || []).some(l => l.stockId && l.computer === comp.name)) return;
+            // Guichê cujo Template já carrega uma licença: nada a puxar
+            const pi = _presetIndexForComp(unit.id, comp.id);
+            const preset = pi > -1 ? modelSettings.compPresets[pi] : null;
+            if (preset && preset.licenseStockId) return;
+
+            const software = comp.os || 'Windows';
+            const nota = 'Puxada do guichê (marcado como genuíno) — informe a chave';
+            const item = {
+                id: novoId('lc'), serial: _nextSerialFor('LIC', stock),
+                software, type: 'oem', key: '', seats: 1, expiry: '', notes: nota,
+                status: 'em_uso', usedBy: `${comp.name} (${unit.name})`,
+                dataEntrada: new Date().toISOString(), semChave: true
+            };
+            stock.push(item);
+            comp.licStockId = item.id;
+
+            // Espelha no registro de Licenças da unidade — é o que mantém o item
+            // como "Em uso" (repararLicencasEstoque solta o que ninguém usa).
+            if (!unit.licenses) unit.licenses = [];
+            const licUnidade = {
+                id: novoId('lu'), software, type: 'oem', key: '', seats: 1,
+                expiry: '', computer: comp.name, notes: nota, stockId: item.id
+            };
+            unit.licenses.push(licUnidade);
+
+            // Se o guichê tem Template, amarra os dois pra não divergirem
+            if (preset) {
+                preset.licenseStockId = item.id;
+                preset.lic_status = 'original';
+                preset.license = { key: '', type: 'oem', seats: 1, expiry: '', notes: nota };
+                preset.licenseId = licUnidade.id;
+            }
+            changed = true;
+            if (typeof registrarLog === 'function') {
+                registrarLog(item.serial, 'licenca', 'Licença puxada do guichê', `${comp.name} (${unit.name}) · ${software} — chave a preencher`);
+            }
         });
     });
     if (changed) { saveSettings(); saveToStorage(); }
