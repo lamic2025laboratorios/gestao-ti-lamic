@@ -300,13 +300,21 @@ const App = {
       l.querySelector('input').onchange=()=>App.saveRequestForm();
       numWrap.appendChild(l);
     });
-    // Cor: checkbox (múltipla escolha)
+    // Cor: checkbox (múltipla escolha) + quantidade por cor (igual ao padrão de Pilha/Bateria)
     const colWrap = document.getElementById('ink-colors'); colWrap.innerHTML = '';
-    cores.forEach(c => {
-      const l=document.createElement('label'); l.className='check-item';
-      l.innerHTML=`<input type="checkbox" name="cor" value="${c}"/> ${c}`;
-      l.querySelector('input').onchange=()=>App.saveRequestForm();
-      colWrap.appendChild(l);
+    cores.forEach((c,i) => {
+      const safeId = 'cor_'+i;
+      const div = document.createElement('div');
+      div.className = 'bat-model-row';
+      div.innerHTML = `
+        <label class="check-item bat-check">
+          <input type="checkbox" name="cor" value="${c}" id="${safeId}" onchange="App.toggleBatQty('${safeId}',this.checked);App.saveRequestForm()"/>
+          ${c}
+        </label>
+        <div class="bat-qty-wrap" id="qty_${safeId}" style="display:none">
+          <input type="number" class="input-field cor-qty-input" data-cor="${c}" min="1" value="1" placeholder="Qtd" onchange="App.saveRequestForm()" />
+        </div>`;
+      colWrap.appendChild(div);
     });
   },
 
@@ -374,9 +382,12 @@ const App = {
     const d = { type: State.currentType, urgency: document.getElementById('chk-urgency').checked, obs: document.getElementById('req-obs').value };
     if (norm.includes('tinta')) {
       const nr = document.querySelector('input[name="num"]:checked');
-      const crs = [...document.querySelectorAll('input[name="cor"]:checked')].map(i=>i.value);
+      const crs = [...document.querySelectorAll('input[name="cor"]:checked')];
       d.num  = nr ? nr.value : '';
-      d.cors = crs; // array
+      d.cors = crs.map(cb => {
+        const qtyEl = document.querySelector(`.cor-qty-input[data-cor="${cb.value}"]`);
+        return { cor: cb.value, qty: qtyEl ? parseInt(qtyEl.value)||1 : 1 };
+      });
     } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
       const checked = [...document.querySelectorAll('input[name="bat"]:checked')];
       d.batModels = checked.map(cb => {
@@ -401,7 +412,18 @@ const App = {
         const norm = d.type.name.toLowerCase();
         if (norm.includes('tinta')) {
           if (d.num) { const r=document.querySelector(`input[name="num"][value="${d.num}"]`); if(r) r.checked=true; }
-          (d.cors||[]).forEach(c => { const cb=document.querySelector(`input[name="cor"][value="${c}"]`); if(cb) cb.checked=true; });
+          (d.cors||[]).forEach(item => {
+            // Compat: rascunhos antigos guardavam d.cors como array de strings (sem qty)
+            const corVal = typeof item === 'string' ? item : item.cor;
+            const qty    = typeof item === 'string' ? 1   : (item.qty || 1);
+            const cb = document.querySelector(`input[name="cor"][value="${corVal}"]`);
+            if (cb) {
+              cb.checked = true;
+              App.toggleBatQty(cb.id, true);
+              const qtyEl = document.querySelector(`.cor-qty-input[data-cor="${corVal}"]`);
+              if (qtyEl) qtyEl.value = qty;
+            }
+          });
         } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
           const motivoEl = document.getElementById('conserto-motivo');
           if (motivoEl) motivoEl.value = d.motivoConserto || '';
@@ -432,6 +454,7 @@ const App = {
     document.getElementById('chk-urgency').checked = false;
     document.getElementById('req-obs').value = '';
     document.querySelectorAll('input[name="bat"]').forEach(c=>c.checked=false);
+    document.querySelectorAll('input[name="cor"]').forEach(c=>c.checked=false);
     document.querySelectorAll('.bat-qty-wrap').forEach(w=>w.style.display='none');
     document.getElementById('other-product').value = '';
     document.getElementById('other-reason').value = '';
@@ -463,7 +486,9 @@ const App = {
       if (!crs.length) { toast('Selecione ao menos uma cor.','error'); return; }
       // 1 row per color combination
       crs.forEach(c => {
-        rows.push({...base, num: nr.value, cor: c.value, nums: nr.value, cores: c.value});
+        const qtyEl = document.querySelector(`.cor-qty-input[data-cor="${c.value}"]`);
+        const qty = parseInt(qtyEl?.value) || 1;
+        rows.push({...base, num: nr.value, cor: c.value, nums: nr.value, cores: c.value, qty});
       });
     } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
       const checked = [...document.querySelectorAll('input[name="bat"]:checked')];
@@ -561,7 +586,20 @@ const App = {
     const nw = document.getElementById('nsol-ink-numbers'); nw.innerHTML = '';
     nums.forEach(n => { const l = document.createElement('label'); l.className = 'check-item'; l.innerHTML = `<input type="radio" name="nsol-num" value="${n}"/> ${n}`; nw.appendChild(l); });
     const cw = document.getElementById('nsol-ink-colors'); cw.innerHTML = '';
-    cores.forEach(c => { const l = document.createElement('label'); l.className = 'check-item'; l.innerHTML = `<input type="checkbox" name="nsol-cor" value="${c}"/> ${c}`; cw.appendChild(l); });
+    cores.forEach((c,i) => {
+      const safeId = 'nsolcor_'+i;
+      const div = document.createElement('div');
+      div.className = 'bat-model-row';
+      div.innerHTML = `
+        <label class="check-item bat-check">
+          <input type="checkbox" name="nsol-cor" value="${c}" id="${safeId}" onchange="App.toggleBatQty('${safeId}',this.checked)"/>
+          ${c}
+        </label>
+        <div class="bat-qty-wrap" id="qty_${safeId}" style="display:none">
+          <input type="number" class="input-field nsol-cor-qty-input" data-cor="${c}" min="1" value="1" placeholder="Qtd" />
+        </div>`;
+      cw.appendChild(div);
+    });
   },
 
   _nsolBuildBattery(gid) {
@@ -612,7 +650,11 @@ const App = {
       const crs = [...document.querySelectorAll('input[name="nsol-cor"]:checked')];
       if (!nr) { toast('Selecione a numeração da tinta.', 'error'); return; }
       if (!crs.length) { toast('Selecione ao menos uma cor.', 'error'); return; }
-      crs.forEach(c => rows.push({ ...base, num: nr.value, cor: c.value, nums: nr.value, cores: c.value }));
+      crs.forEach(c => {
+        const qtyEl = document.querySelector(`.nsol-cor-qty-input[data-cor="${c.value}"]`);
+        const qty = parseInt(qtyEl?.value) || 1;
+        rows.push({ ...base, num: nr.value, cor: c.value, nums: nr.value, cores: c.value, qty });
+      });
     } else if (norm.includes('pilha') || norm.includes('bateria') || norm.includes('conserto') || norm.includes('concerto')) {
       const checked = [...document.querySelectorAll('input[name="nsol-bat"]:checked')];
       if (!checked.length) { toast('Selecione ao menos um modelo.', 'error'); return; }
