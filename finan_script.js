@@ -969,7 +969,11 @@ const App = {
             <strong style="font-size:.84rem;color:#1a3a6b">${r.unitName || '—'}</strong>
             <span style="font-size:.78rem;color:#6680a0">${r.groupName || ''} · ${App.reqSummary(r)}</span>
           </div>
-          <div class="form-row-2" style="margin-top:8px">
+          <div class="form-row-3" style="margin-top:8px">
+            <div class="form-group">
+              <label class="form-label">Grupo</label>
+              <input type="text" class="input-field" value="${r.groupName || '—'}" readonly style="background:#f8fafc">
+            </div>
             <div class="form-group">
               <label class="form-label">Subgrupo</label>
               <select class="input-field select-styled compra-item-subgrupo" data-id="${id}">${App._compraSubgroupOpts(r)}</select>
@@ -5723,7 +5727,6 @@ const App = {
     document.getElementById('compra-detalhe-body').innerHTML = `
       <div class="compra-detalhe-meta">
         <div><span class="cdm-label">Unidade</span><span class="cdm-val">${r.unitName||'—'}</span></div>
-        <div><span class="cdm-label">Grupo</span><span class="cdm-val">${r.groupName||'—'}</span></div>
         <div><span class="cdm-label">Forma de Pagamento</span><span class="cdm-val">${App._pagLabel(r.formaPagamento)}</span></div>
         <div><span class="cdm-label">Fornecedor</span><span class="cdm-val">${r.fornecedor||'—'}</span></div>
         <div><span class="cdm-label">Data</span><span class="cdm-val">${fmt(r.boughtAt)}</span></div>
@@ -5734,7 +5737,11 @@ const App = {
         <span>Qtd: <strong>${r.quantidade||'—'}</strong></span>
         <span>Unit: <strong>${r.valor ? fmtR(r.valor) : '—'}</strong></span>
       </div>
-      <div class="form-row-2" style="margin-top:12px">
+      <div class="form-row-3" style="margin-top:12px">
+        <div class="form-group">
+          <label class="form-label">Grupo</label>
+          <input type="text" class="input-field" value="${r.groupName || '—'}" readonly style="background:#f8fafc">
+        </div>
         <div class="form-group">
           <label class="form-label">Subgrupo</label>
           <select id="pinfo-subgrupo" class="input-field select-styled">${App._compraSubgroupOpts(r)}</select>
