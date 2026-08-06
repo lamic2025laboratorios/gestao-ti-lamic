@@ -1861,7 +1861,6 @@ const App = {
       ['Total de solicitações', g('kpi-total')],
       ['Compradas',             g('kpi-bought')],
       ['Negadas',               g('kpi-negado')],
-      ['Urgentes',              g('kpi-urgent')],
       ['Gasto do período',      g('kpi-month-spent')],
     ];
     const data  = new Date().toLocaleDateString('pt-BR');
@@ -2950,58 +2949,6 @@ const App = {
     modal.classList.remove('hidden');
   },
 
-  /* Detalhamento por status × urgência — explica o card "Urgentes":
-     é uma marcação independente do status, não um resíduo do total.
-     Um pedido Comprado ou Negado pode estar marcado urgente também. */
-  showKpiBreakdown() {
-    const modal = document.getElementById('kpi-list-modal');
-    const title = document.getElementById('kpi-list-title');
-    const tbody = document.getElementById('kpi-list-tbody');
-    const thead = document.getElementById('kpi-list-thead');
-    const filters = App._getKpiFilters();
-    const { fUnit, fGroup, fFrom, fTo } = filters;
-
-    const reqs = App._applyKpiFilters(Object.values(State.requests||{}), filters);
-
-    // Ordem conhecida primeiro; qualquer status fora dela cai em "Outro/Sem status"
-    // (assim a soma da tabela nunca deixa nenhum registro de fora).
-    const ordem = ['Solicitado', 'Aguardando', 'Comprado', 'Estoque', 'Negado'];
-    const porStatus = {};
-    let totalUrgente = 0;
-    reqs.forEach(r => {
-      const st = ordem.includes(r.status) ? r.status : 'Outro / sem status';
-      porStatus[st] = porStatus[st] || { total: 0, urgente: 0 };
-      porStatus[st].total++;
-      if (r.urgent) { porStatus[st].urgente++; totalUrgente++; }
-    });
-
-    const rangeStr = (fFrom||fTo) ? ` · ${App._fmtDate(fFrom)} → ${App._fmtDate(fTo)}` : '';
-    const filterDesc = [fUnit||'Todas as unidades', fGroup||'Todos os grupos'].join(' · ') + rangeStr;
-    title.textContent = `Urgentes por status — ${filterDesc}`;
-
-    if (thead) thead.innerHTML = `<tr><th>Status</th><th>Total</th><th>Urgentes</th><th>% urgente no status</th></tr>`;
-    // Ordem fixa e previsível na tela, não a ordem de iteração dos dados
-    const linhasOrdenadas = [...ordem, 'Outro / sem status'].filter(st => porStatus[st]);
-    tbody.innerHTML = linhasOrdenadas
-      .map(st => {
-        const { total, urgente } = porStatus[st];
-        const pct = total ? Math.round(urgente/total*100) : 0;
-        return `<tr>
-          <td style="font-weight:600">${st}</td>
-          <td style="font-size:1.05rem;font-weight:700;color:#1a3a6b">${total}</td>
-          <td style="font-size:1.05rem;font-weight:700;color:${urgente?'#c0392b':'#8898b8'}">${urgente}</td>
-          <td>${pct}%</td>
-        </tr>`;
-      }).join('') || '<tr><td colspan="4" style="text-align:center;color:#8898b8;padding:20px">Nenhuma solicitação.</td></tr>';
-    tbody.innerHTML += `<tr style="border-top:2px solid #d4dff0">
-      <td style="font-weight:700">Total Geral</td>
-      <td style="font-size:1.05rem;font-weight:700;color:#1a3a6b">${reqs.length}</td>
-      <td style="font-size:1.05rem;font-weight:700;color:#c0392b">${totalUrgente}</td>
-      <td>—</td>
-    </tr>`;
-    modal.classList.remove('hidden');
-  },
-
   /* ── Extrato de Compras (estilo extrato de banco) ─────────── */
   _extratoPeriodo: 'tudo',
 
@@ -3220,7 +3167,6 @@ const App = {
     document.getElementById('kpi-total').textContent = reqs.length;
     document.getElementById('kpi-negado').textContent = reqs.filter(r=>r.status==='Negado').length;
     document.getElementById('kpi-bought').textContent = reqs.filter(r=>r.status==='Comprado').length;
-    document.getElementById('kpi-urgent').textContent = reqs.filter(r=>r.urgent).length;
     document.getElementById('kpi-month-spent').textContent = fmt(periodSpent);
   },
 

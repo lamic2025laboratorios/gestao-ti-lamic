@@ -1186,7 +1186,14 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
   background: #eef2f8; color: #5a6a84;
 }
-.consumo-head-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Controles (ano/mês/período) sempre na linha de baixo, em todo card —
+   sem isso, títulos mais compridos ("Pilhas & Baterias") empurram os
+   controles pra quebrar enquanto títulos curtos ("Outros") não, e cada
+   card acaba com o filtro num lugar diferente. */
+.consumo-head-controls {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  flex-basis: 100%; justify-content: flex-end;
+}
 .cons-year-sel, .cons-month-sel {
   padding: 5px 8px; border-radius: 8px; border: 1.5px solid #d0d9ea;
   background: #fff; color: #1a3a6b; font-size: .78rem; font-weight: 600; cursor: pointer;
