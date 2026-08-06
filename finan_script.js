@@ -4106,7 +4106,7 @@ const App = {
     else if (st === 'Negado')
       mid = `<button class="btn-ico btn-ico-neg" onclick="App._reabrirNegada('${id}')" title="Negado — clique para tentar autorizar de novo${gestor}">${S('x')}</button>`;
     else  // Comprado / Estoque = autorizado/concluído → abre SÓ a aba de compra
-      mid = `<button class="btn-ico btn-ico-ok" onclick="App.openModal('${id}',{soloCompra:true,preStatus:'${st}'})" title="Autorizado — ver compra (mudar outros dados: Gerenciar)${gestor}">${S('check')}</button>`;
+      mid = `<button class="btn-ico btn-ico-ok" onclick="App.openModal('${id}',{soloCompra:true,preStatus:'${st}',readOnly:true})" title="Autorizado — ver compra, somente leitura (mudar dados: Gerenciar)${gestor}">${S('check')}</button>`;
     // Ordem: autorizar/decidir primeiro, depois Gerenciar, depois Apagar
     return `${mid}${editar}${del}`;
   },
@@ -4852,7 +4852,33 @@ const App = {
       }
     }
 
+    // ── Modo somente-leitura (autorização já concluída, botão ✓ da linha) ──
+    // Esconde os botões de status por trás de um "olhinho" (sempre oculto ao
+    // abrir) e trava toda a edição — só o Gerenciar (lápis) permite alterar.
+    const readOnly = !!opts.readOnly;
+    State.modalReadOnly = readOnly;
+    document.getElementById('modal-status-group')?.classList.toggle('hidden', readOnly);
+    document.getElementById('modal-status-readonly-group')?.classList.toggle('hidden', !readOnly);
+    const statusReadonlyBadge = document.getElementById('modal-status-readonly-badge');
+    if (statusReadonlyBadge) { statusReadonlyBadge.innerHTML = App.statusBadge(r.status); statusReadonlyBadge.classList.add('hidden'); }
+    const eyeBtn = document.getElementById('modal-status-eye');
+    if (eyeBtn) eyeBtn.title = 'Mostrar status';
+    document.querySelector('#modal-request .modal-card')?.classList.toggle('modal-readonly', readOnly);
+    document.querySelectorAll('#modal-request input, #modal-request select, #modal-request textarea').forEach(el => { el.disabled = readOnly; });
+    document.getElementById('modal-btn-delete')?.classList.toggle('hidden', readOnly);
+    document.getElementById('modal-btn-save')?.classList.toggle('hidden', readOnly);
+
     document.getElementById('modal-request').classList.remove('hidden');
+  },
+
+  // Olhinho do status no modo somente-leitura: sempre começa oculto ao abrir o modal.
+  toggleModalStatusVisibility() {
+    const badge = document.getElementById('modal-status-readonly-badge');
+    const btn = document.getElementById('modal-status-eye');
+    if (!badge) return;
+    const vaiMostrar = badge.classList.contains('hidden');
+    badge.classList.toggle('hidden', !vaiMostrar);
+    if (btn) btn.title = vaiMostrar ? 'Ocultar status' : 'Mostrar status';
   },
 
   closeModal() {

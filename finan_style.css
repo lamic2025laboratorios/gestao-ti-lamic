@@ -2091,6 +2091,13 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .status-btn.est.active { background: rgba(124,82,212,.15); border-color: var(--status-est); color: var(--status-est); }
 .status-btn.neg.active { background: rgba(217,64,64,.15);  border-color: var(--status-neg); color: var(--status-neg); }
 
+/* Modo somente-leitura do modal de solicitação (botão de autorização já concluída) */
+.modal-readonly input:disabled, .modal-readonly select:disabled, .modal-readonly textarea:disabled {
+  background: #f4f6fa; color: #5a6a84; opacity: 1; cursor: default;
+}
+#modal-status-eye { padding: 3px; border: none; background: none; color: #6680a0; cursor: pointer; border-radius: 6px; }
+#modal-status-eye:hover { color: #3a7ee8; background: #eef4ff; }
+
 .toggle-label {
   display: flex; align-items: center; gap: 10px;
   cursor: pointer; font-size: .88rem; color: #1a3050;

@@ -2210,7 +2210,7 @@
         <label class="form-label">Subgrupo</label>
         <select id="modal-subgroup-always-sel" class="input-field select-styled"></select>
       </div>
-      <div class="form-group">
+      <div class="form-group" id="modal-status-group">
         <label class="form-label">Status da Solicitação</label>
         <div class="status-btn-row">
           <button class="status-btn sol" data-s="Solicitado"  onclick="App.setModalStatus(this)">Solicitado</button>
@@ -2219,6 +2219,15 @@
           <button class="status-btn est" data-s="Estoque"     onclick="App.setModalStatus(this)">Estoque</button>
           <button class="status-btn neg" data-s="Negado"      onclick="App.setModalStatus(this)">Negado</button>
         </div>
+      </div>
+      <div class="form-group hidden" id="modal-status-readonly-group">
+        <label class="form-label" style="display:flex;align-items:center;gap:8px">
+          Status da Solicitação
+          <button type="button" class="btn-ico" id="modal-status-eye" onclick="App.toggleModalStatusVisibility()" title="Mostrar status">
+            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+        </label>
+        <div id="modal-status-readonly-badge" class="hidden"></div>
       </div>
       <div id="modal-bought-fields" class="modal-section hidden">
         <div class="modal-section-title">
@@ -2402,7 +2411,7 @@
       </div>
       <div class="modal-footer-right">
         <button class="btn-ghost" onclick="App.closeModal()">Cancelar</button>
-        <button class="btn-primary" onclick="App.saveModalRequest()">
+        <button class="btn-primary" id="modal-btn-save" onclick="App.saveModalRequest()">
           <svg viewBox="0 0 24 24" fill="none"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2"/><polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" stroke-width="2"/><polyline points="7 3 7 8 15 8" stroke="currentColor" stroke-width="2"/></svg>
           Salvar Alterações
         </button>
