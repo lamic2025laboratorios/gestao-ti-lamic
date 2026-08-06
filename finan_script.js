@@ -1699,10 +1699,10 @@ const App = {
     ['req-date-from','req-date-to','req-sent-from','req-sent-to'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
-    ['filter-status','filter-unit-req','filter-group-req'].forEach(id => {
+    ['filter-status','filter-unit-req','filter-group-req','filter-subgroup-req'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
-    ['req-filter-unit-vis','req-filter-group-vis'].forEach(id => {
+    ['req-filter-unit-vis','req-filter-group-vis','req-filter-subgroup-vis'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     // Reativa todos os chips rosca
@@ -1769,6 +1769,13 @@ const App = {
       const cur = groupVis.value;
       groupVis.innerHTML = groupHid.innerHTML;
       groupVis.value = cur;
+    }
+    const subgroupVis = document.getElementById('req-filter-subgroup-vis');
+    const subgroupHid = document.getElementById('filter-subgroup-req');
+    if (subgroupVis && subgroupHid) {
+      const cur = subgroupVis.value;
+      subgroupVis.innerHTML = subgroupHid.innerHTML;
+      subgroupVis.value = cur;
     }
   },
 
@@ -2973,16 +2980,18 @@ const App = {
   },
 
   // Mostra só o seletor do período escolhido (Ano/Mês/Semana/Dia) e, na primeira vez,
-  // pré-preenche com o período atual — mas o usuário pode trocar livremente.
+  // pré-preenche com o período atual (hoje) — mas o usuário pode trocar livremente.
   _showExtratoPicker(per) {
     const hoje = new Date();
     const pad = n => String(n).padStart(2, '0');
     const hojeStr = `${hoje.getFullYear()}-${pad(hoje.getMonth()+1)}-${pad(hoje.getDate())}`;
-    const selAno    = document.getElementById('extrato-ano-select');
-    const inpMes    = document.getElementById('extrato-mes-input');
-    const inpSemana = document.getElementById('extrato-semana-input');
-    const inpDia    = document.getElementById('extrato-dia-input');
-    [selAno, inpMes, inpSemana, inpDia].forEach(el => { if (el) el.style.display = 'none'; });
+    const selAno     = document.getElementById('extrato-ano-select');
+    const inpMes     = document.getElementById('extrato-mes-input');
+    const wrapSemana = document.getElementById('extrato-semana-wrap');
+    const inpSemana  = document.getElementById('extrato-semana-input');
+    const wrapDia    = document.getElementById('extrato-dia-wrap');
+    const inpDia     = document.getElementById('extrato-dia-input');
+    [selAno, inpMes, wrapSemana, wrapDia].forEach(el => { if (el) el.style.display = 'none'; });
 
     if (per === 'ano') {
       App._populateExtratoAnos();
@@ -2990,16 +2999,45 @@ const App = {
     } else if (per === 'mes') {
       if (inpMes) { inpMes.style.display = ''; if (!inpMes.value) inpMes.value = hojeStr.substring(0, 7); }
     } else if (per === 'semana') {
-      if (inpSemana) {
-        inpSemana.style.display = '';
-        if (!inpSemana.value) {
+      if (wrapSemana) {
+        wrapSemana.style.display = '';
+        if (inpSemana && !inpSemana.value) {
           const ini = new Date(hoje); ini.setDate(hoje.getDate() - 6);
           inpSemana.value = `${ini.getFullYear()}-${pad(ini.getMonth()+1)}-${pad(ini.getDate())}`;
         }
+        App._updateExtratoSemanaRange();
       }
     } else if (per === 'dia') {
-      if (inpDia) { inpDia.style.display = ''; if (!inpDia.value) inpDia.value = hojeStr; }
+      if (wrapDia) { wrapDia.style.display = ''; if (inpDia && !inpDia.value) inpDia.value = hojeStr; }
     }
+  },
+
+  // Semana: usuário escolhe 1 dia no calendário nativo do input; calcula e mostra
+  // a janela de 7 dias a partir dele (mesma janela usada pelo filtro).
+  _updateExtratoSemanaRange() {
+    const inp = document.getElementById('extrato-semana-input');
+    const out = document.getElementById('extrato-semana-range');
+    if (!inp || !out) return;
+    if (!inp.value) { out.textContent = ''; return; }
+    const fmtD = d => { const p = n => String(n).padStart(2,'0'); return `${p(d.getDate())}/${p(d.getMonth()+1)}`; };
+    const ini = new Date(inp.value + 'T00:00:00');
+    const fim = new Date(ini); fim.setDate(ini.getDate() + 6);
+    out.textContent = `${fmtD(ini)} → ${fmtD(fim)}`;
+  },
+
+  _onExtratoSemanaChange() {
+    App._updateExtratoSemanaRange();
+    App._renderExtrato();
+  },
+
+  // Dia: seta anterior/próximo — sempre parte do dia atualmente escolhido (padrão: hoje).
+  extratoDiaMover(delta) {
+    const inp = document.getElementById('extrato-dia-input'); if (!inp) return;
+    const base = inp.value ? new Date(inp.value + 'T00:00:00') : new Date();
+    base.setDate(base.getDate() + delta);
+    const pad = n => String(n).padStart(2, '0');
+    inp.value = `${base.getFullYear()}-${pad(base.getMonth()+1)}-${pad(base.getDate())}`;
+    App._renderExtrato();
   },
 
   // Popula o select de anos do Extrato com os anos que têm compra + ano atual, preservando a seleção
@@ -3013,12 +3051,37 @@ const App = {
     if (prevVal && [...anos].map(String).includes(prevVal)) sel.value = prevVal;
   },
 
-  // Monta os lançamentos: cada compra (combinada = 1 linha por CMP; avulsa = SL),
-  // ordenadas por data, com saldo corrente antes/depois (acumulado de gastos).
+  // Monta os lançamentos: compra à vista (combinada = 1 linha por CMP; avulsa = SL)
+  // data na data da compra. Compra PARCELADA: 1 linha por parcela, datada no
+  // vencimento dela (mesma lógica do gráfico "Gastos por Período") — assim o
+  // extrato filtrado por mês bate com o que o gráfico mostra pra aquele mês,
+  // em vez de jogar o valor inteiro no mês da compra original.
+  // Ordenadas por data, com saldo corrente antes/depois (acumulado de gastos).
   _extratoEventos() {
-    const cmpMap = {};
+    const cmpMap = {};       // à vista combinada: 1 linha por compraCodigo
+    const cmpParcMap = {};   // parcelada combinada: 1 linha por compraCodigo + nº da parcela
     const eventos = [];
     Object.values(State.requests || {}).filter(r => r.status === 'Comprado' && !r.entradaSemCusto).forEach(r => {
+      const isParceled = r.parcelas && r.parcelas.length > 0;
+
+      if (isParceled) {
+        r.parcelas.forEach(p => {
+          const dt = (p.date || (p.month ? p.month + '-01' : '')).substring(0, 10);
+          const v  = parseFloat(p.valor || 0);
+          if (r.compraCodigo) {
+            const chave = `${r.compraCodigo}#${p.num}`;
+            if (!cmpParcMap[chave]) {
+              cmpParcMap[chave] = { codigo: `${r.compraCodigo} (${p.num}/${p.total})`, data: dt, valor: 0, itens: 0 };
+              eventos.push(cmpParcMap[chave]);
+            }
+            cmpParcMap[chave].valor += v; cmpParcMap[chave].itens++;
+          } else {
+            eventos.push({ codigo: `${r.seq != null ? 'SL-' + r.seq : '—'} (${p.num}/${p.total})`, data: dt, valor: v, itens: 1 });
+          }
+        });
+        return;
+      }
+
       const v = parseFloat(r.valorTotal || 0);
       const dt = (r.boughtAt || '').substring(0, 10);
       if (r.compraCodigo) {
@@ -3078,7 +3141,7 @@ const App = {
 
     const resumo = document.getElementById('extrato-resumo');
     const gastoPeriodo = evs.reduce((s, e) => s + e.valor, 0);
-    if (resumo) resumo.innerHTML = `${evs.length} compra(s) · <strong>${fmt(gastoPeriodo)}</strong>`;
+    if (resumo) resumo.innerHTML = `<span>${evs.length} lançamento${evs.length!==1?'s':''} no período</span><span>Total gasto: <strong>${fmt(gastoPeriodo)}</strong></span>`;
 
     if (!evs.length) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8898b8;padding:24px">Nenhuma compra no período.</td></tr>';
@@ -3783,6 +3846,7 @@ const App = {
     const fStatus  = document.getElementById('filter-status')?.value || '';
     const fUnit    = document.getElementById('filter-unit-req')?.value || '';
     const fGroup   = document.getElementById('filter-group-req')?.value || '';
+    const fSubgroup = document.getElementById('filter-subgroup-req')?.value || '';
     // Populate filters
     App._populateReqFilters();
     App._syncReqFilterSelects();
@@ -3794,6 +3858,7 @@ const App = {
     if (fStatus) reqs = reqs.filter(([,r]) => r.status===fStatus);
     if (fUnit)   reqs = reqs.filter(([,r]) => r.unitName===fUnit);
     if (fGroup)  reqs = reqs.filter(([,r]) => r.groupName===fGroup);
+    if (fSubgroup) reqs = reqs.filter(([,r]) => r.subgrupo===fSubgroup);
     if (fReqFrom || fReqTo) {
       reqs = reqs.filter(([,r]) => {
         const ds = (r.createdAt||'').substring(0,10);
@@ -4518,6 +4583,23 @@ const App = {
     if (fg) {
       const cur=fg.value; fg.innerHTML='<option value="">Todos os grupos</option>';
       groups.forEach(g => { const o=document.createElement('option'); o.value=o.textContent=g; if(g===cur)o.selected=true; fg.appendChild(o); });
+    }
+    // Subgrupo: catálogo de State.subgroups (Mapeamento Interno), filtrado pelo
+    // grupo selecionado no filtro (se nenhum grupo escolhido, mostra todos).
+    const fsg = document.getElementById('filter-subgroup-req');
+    if (fsg) {
+      const cur = fsg.value;
+      const fGroupSel = document.getElementById('filter-group-req')?.value || '';
+      const nomes = new Set();
+      Object.entries(State.subgroups||{}).forEach(([gid, list]) => {
+        const gname = State.groups?.[gid] || '';
+        if (fGroupSel && gname !== fGroupSel) return;
+        (list||[]).forEach(sg => { if (sg) nomes.add(sg); });
+      });
+      fsg.innerHTML = '<option value="">Todos</option>';
+      [...nomes].sort((a,b)=>a.localeCompare(b)).forEach(sg => {
+        const o=document.createElement('option'); o.value=o.textContent=sg; if(sg===cur)o.selected=true; fsg.appendChild(o);
+      });
     }
   },
 

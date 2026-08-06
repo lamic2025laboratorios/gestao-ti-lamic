@@ -2257,16 +2257,36 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .kpi-period-sub-hidden { display: none; }
 
 /* ── Extrato de Compras ── */
-.extrato-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.extrato-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .extrato-periodo { display: inline-flex; gap: 0; border: 1.5px solid var(--surf-border); border-radius: var(--r-md); overflow: hidden; }
 .extrato-per-btn { padding: 6px 14px; border: none; background: var(--surf-0); color: #5a6a84; font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s var(--ease); }
 .extrato-per-btn:not(:last-child) { border-right: 1px solid var(--surf-border); }
 .extrato-per-btn:hover { background: #eef4ff; color: #3a7ee8; }
 .extrato-per-btn.active { background: var(--blue-500, #2a68d4); color: #fff; }
-.extrato-resumo { font-size: .85rem; color: #6680a0; }
-.extrato-resumo strong { color: #1a3050; }
 .extrato-periodo-picker { display: flex; align-items: center; gap: 8px; }
 .extrato-picker-input { height: 34px; padding: 6px 10px; font-size: .82rem; }
+
+/* Barra de total — abaixo dos filtros, em linha própria, visual "cartão" */
+.extrato-resumo-bar {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  background: var(--surf-1, #f8fafd); border: 1px solid var(--surf-border);
+  border-radius: var(--r-md); padding: 10px 16px; margin-bottom: 14px;
+  font-size: .85rem; color: #5a6a84;
+}
+.extrato-resumo-bar strong { color: #1a3050; font-size: 1rem; font-weight: 800; }
+
+/* Semana: input + faixa de 7 dias calculada ao lado */
+.extrato-semana-picker { display: flex; align-items: center; gap: 8px; }
+.extrato-semana-range { font-size: .78rem; color: #6680a0; font-weight: 600; white-space: nowrap; }
+
+/* Dia: setas de navegação dia a dia ao redor do input */
+.extrato-dia-picker { display: flex; align-items: center; gap: 4px; }
+.extrato-dia-nav {
+  width: 30px; height: 30px; border-radius: var(--r-md); border: 1.5px solid var(--surf-border);
+  background: var(--surf-0); color: #5a6a84; font-size: 1.1rem; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all .15s var(--ease);
+}
+.extrato-dia-nav:hover { border-color: #3a7ee8; color: #3a7ee8; background: #eef4ff; }
 .extrato-table td { font-size: .84rem; }
 .extrato-cod { font-weight: 800; font-size: .74rem; padding: 2px 8px; border-radius: 6px; }
 .extrato-cod.cod-cmp { background: #f5f1fe; color: #7c52d4; }

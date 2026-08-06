@@ -267,11 +267,18 @@
                 <div class="extrato-periodo-picker" id="extrato-periodo-picker">
                   <select id="extrato-ano-select" class="input-field extrato-picker-input" style="display:none" onchange="App._renderExtrato()"></select>
                   <input type="month" id="extrato-mes-input" class="input-field extrato-picker-input" style="display:none" onchange="App._renderExtrato()" />
-                  <input type="date" id="extrato-semana-input" class="input-field extrato-picker-input" style="display:none" onchange="App._renderExtrato()" title="Início da semana (7 dias)" />
-                  <input type="date" id="extrato-dia-input" class="input-field extrato-picker-input" style="display:none" onchange="App._renderExtrato()" />
+                  <div class="extrato-semana-picker" id="extrato-semana-wrap" style="display:none">
+                    <input type="date" id="extrato-semana-input" class="input-field extrato-picker-input" onchange="App._onExtratoSemanaChange()" title="Escolha um dia — a semana inteira (7 dias) é calculada a partir dele" />
+                    <span class="extrato-semana-range" id="extrato-semana-range"></span>
+                  </div>
+                  <div class="extrato-dia-picker" id="extrato-dia-wrap" style="display:none">
+                    <button type="button" class="extrato-dia-nav" onclick="App.extratoDiaMover(-1)" title="Dia anterior">‹</button>
+                    <input type="date" id="extrato-dia-input" class="input-field extrato-picker-input" onchange="App._renderExtrato()" />
+                    <button type="button" class="extrato-dia-nav" onclick="App.extratoDiaMover(1)" title="Próximo dia">›</button>
+                  </div>
                 </div>
-                <div class="extrato-resumo" id="extrato-resumo"></div>
               </div>
+              <div class="extrato-resumo-bar" id="extrato-resumo"></div>
               <div class="table-wrap">
                 <table class="data-table extrato-table">
                   <thead><tr><th>Data</th><th>Compra</th><th>Valor</th><th>Saldo antes</th><th>Saldo depois</th></tr></thead>
@@ -1308,6 +1315,7 @@
             </select>
             <select id="filter-unit-req" style="display:none" onchange="App.renderRequests()"></select>
             <select id="filter-group-req" style="display:none" onchange="App.renderRequests()"></select>
+            <select id="filter-subgroup-req" style="display:none" onchange="App.renderRequests()"></select>
           </div>
 
         </div>
@@ -1472,6 +1480,10 @@
               </select>
               <span class="req-filter-label" style="margin-left:12px">Grupo</span>
               <select id="req-filter-group-vis" class="req-filter-select" onchange="document.getElementById('filter-group-req').value=this.value; App.renderRequests()">
+                <option value="">Todos</option>
+              </select>
+              <span class="req-filter-label" style="margin-left:12px">Subgrupo</span>
+              <select id="req-filter-subgroup-vis" class="req-filter-select" onchange="document.getElementById('filter-subgroup-req').value=this.value; App.renderRequests()">
                 <option value="">Todos</option>
               </select>
             </div>
