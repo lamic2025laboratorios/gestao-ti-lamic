@@ -1077,7 +1077,15 @@ function _escolherHardware(idx) {
     // Transferência: hardware já em uso em outro guichê exige confirmação
     if (p.unitId && p.compId) {
         const compIdAtual = document.getElementById('comp-id')?.value;
-        if (p.compId !== compIdAtual && !confirm(`"${p.serial || p.name}" já está em uso em ${p.unitName} · ${p.compName}.\n\nTransferir pra este Guichê? (o guichê antigo fica sem hardware)`)) return;
+        // O aviso precisa dizer TUDO que _limparGuicheCompleto() faz no guichê de
+        // origem — antes falava só "fica sem hardware", mas ele também solta os
+        // periféricos de volta pro estoque e zera acessos e autorizações.
+        if (p.compId !== compIdAtual && !confirm(
+            `"${p.serial || p.name}" já está em uso em ${p.unitName} · ${p.compName}.\n\n` +
+            `Transferir pra este Guichê?\n\nO guichê de origem (${p.compName}) será ESVAZIADO:\n` +
+            `• hardware e acessos/senhas apagados\n` +
+            `• periféricos desvinculados (voltam pro estoque)\n` +
+            `• autorizações do guichê zeradas`)) return;
     }
     const r = (i, v = '') => { const e = document.getElementById(i); if (e) e.value = v; };
     r('hw-preset-idx', String(idx));
@@ -5150,6 +5158,13 @@ function recuperarTemplatesDosGuiches() {
         (unit.computers || []).forEach(comp => {
             if (!_compHasHw(comp)) return;                          // guichê sem hardware: nada a recuperar
             if (_presetIndexForComp(unit.id, comp.id) > -1) return; // já tem Template ligado
+            // Trava anti-loop: repararTemplatesDuplicadosGuiche() casa só por
+            // compId, enquanto _presetIndexForComp casa por unitId+compId. Um
+            // Template com compId certo e unitId vazio/errado passaria batido
+            // ali em cima; eu criaria outro, o reparo soltaria o novo por ser
+            // duplicata do mesmo compId, e a cada carga nasceria mais um.
+            // Checando por compId sozinho, uso a mesma chave do reparo.
+            if ((modelSettings.compPresets || []).some(p => p && p.compId === comp.id)) return;
             const code = _nextSerial();
             modelSettings.compPresets.push({
                 name: code, serial: code,
