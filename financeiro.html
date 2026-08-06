@@ -219,13 +219,9 @@
 
         <!-- KPI Row -->
         <div class="kpi-row">
-          <div class="kpi-card k-red kpi-clickable" onclick="App.showKpiList('Negado')" title="Clique para ver pedidos negados">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados ↗</div></div>
-          </div>
-          <div class="kpi-card k-teal kpi-clickable" onclick="App.showKpiList('Comprado')" title="Clique para ver pedidos comprados">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><polyline points="20 12 20 22 4 22 4 12" stroke="currentColor" stroke-width="2"/><rect x="2" y="7" width="20" height="5" stroke="currentColor" stroke-width="2"/><path d="M12 22V7" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados ↗</div></div>
+          <div class="kpi-card k-blue kpi-clickable" onclick="App.showTotalKpi()" title="Clique para ver por unidade">
+            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg></div>
+            <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado ↗</div></div>
           </div>
           <!-- Só informativo: não é clicável nem soma no Comprados/Gasto —
                mostra quantos dos solicitados saíram do estoque (sem compra nova) -->
@@ -233,9 +229,13 @@
             <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg></div>
             <div class="kpi-body"><div class="kpi-val" id="kpi-estoque">0</div><div class="kpi-lbl">Do Estoque<small style="display:block;font-weight:600;opacity:.75">não foram comprados</small></div></div>
           </div>
-          <div class="kpi-card k-blue kpi-clickable" onclick="App.showTotalKpi()" title="Clique para ver por unidade">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado ↗</div></div>
+          <div class="kpi-card k-teal kpi-clickable" onclick="App.showKpiList('Comprado')" title="Clique para ver pedidos comprados">
+            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><polyline points="20 12 20 22 4 22 4 12" stroke="currentColor" stroke-width="2"/><rect x="2" y="7" width="20" height="5" stroke="currentColor" stroke-width="2"/><path d="M12 22V7" stroke="currentColor" stroke-width="2"/></svg></div>
+            <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados ↗</div></div>
+          </div>
+          <div class="kpi-card k-red kpi-clickable" onclick="App.showKpiList('Negado')" title="Clique para ver pedidos negados">
+            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2"/></svg></div>
+            <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados ↗</div></div>
           </div>
           <div class="kpi-card k-purple kpi-clickable" onclick="App.showExtrato()" title="Clique para ver o extrato de compras">
             <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg></div>
