@@ -3202,13 +3202,15 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
    entre os módulos é o index.html. */
 .admin-layout.em-iframe .sidebar-nav .menu-only { display: none !important; }
 
-/* Log de Atividades Recentes: tamanho fixo e previsível.
-   Causa da desproporção: #activity-log-feed não tinha limite de
-   altura, então crescia junto com o log inteiro (293+ registros) em
+/* Log de Atividades Recentes: preenche a coluna inteira do grid
+   (700px fixo deixava sobrar uma faixa vazia até a borda da coluna,
+   já que ela é mais larga que isso), com altura fixa e previsível.
+   Causa da desproporção original: #activity-log-feed não tinha limite
+   de altura, então crescia junto com o log inteiro (293+ registros) em
    vez de rolar por dentro — o card ficava enorme, bem diferente do
    vizinho (Compras Parceladas, que é um gráfico pequeno e fixo). */
 .mgmt-card-log {
-  width: 700px; max-width: 100%; height: 300px;
+  width: 100%; height: 300px;
   box-sizing: border-box; overflow: hidden;
 }
 .mgmt-card-log #activity-log-feed {
