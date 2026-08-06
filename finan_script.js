@@ -313,6 +313,16 @@ const App = {
   // Grupo de conserto (aceita grafia antiga "concerto")
   _isConserto(name) { const n = (name || '').toLowerCase(); return n.includes('conserto') || n.includes('concerto'); },
 
+  // Nome de grupo pra exibição: pedidos antigos podem ter gravado "Concerto" (grafia
+  // antiga) enquanto o grupo cadastrado hoje é "Conserto" — sem isso viravam 2 barras
+  // separadas no gráfico Por Grupo. Unifica na grafia que está cadastrada em State.groups
+  // (ou "Conserto" se não achar nenhum grupo cadastrado com esse nome).
+  _displayGroupName(name) {
+    if (!App._isConserto(name)) return name || '?';
+    const cadastrado = Object.values(State.groups || {}).find(g => App._isConserto(g));
+    return cadastrado || 'Conserto';
+  },
+
   buildBatteryPanel(groupId) {
     const opts = (State.subOpts||{})[groupId] || {};
     const gname = (State.groups?.[groupId]||'').toLowerCase();
@@ -3325,7 +3335,8 @@ const App = {
     App._drawBar('chart-units', unitC, App._distinctColors(Object.keys(unitC).length));
 
     // Groups bar — ordenado por mais pedidos, com cor distinta por grupo (não fica limitado a 4 cores)
-    const grpCRaw = {}; reqs.forEach(r => grpCRaw[r.groupName||'?']=(grpCRaw[r.groupName||'?']||0)+1);
+    // Unifica grafias antigas de Conserto/Concerto num único grupo (App._displayGroupName)
+    const grpCRaw = {}; reqs.forEach(r => { const g = App._displayGroupName(r.groupName); grpCRaw[g]=(grpCRaw[g]||0)+1; });
     const grpC = Object.fromEntries(Object.entries(grpCRaw).sort((a,b)=>b[1]-a[1]));
     App._drawBar('chart-groups', grpC, App._distinctColors(Object.keys(grpC).length));
 
@@ -3336,28 +3347,30 @@ const App = {
     reqs.forEach(r => {
       const rn = (r.groupName||'').toLowerCase();
       if (fGrpDash && r.groupName !== fGrpDash) return;
-      const q = App._qtyComprada(r);   // quantidade pedida (não nº de solicitações)
+      // Conta por SOLICITAÇÃO (1 por pedido), não pela quantidade dentro dele —
+      // pedir 50 tintas pretas numa solicitação só soma 1 pra "Preta", não 50.
+      // O objetivo aqui é o quanto cada sub-opção/subgrupo é PEDIDO, não o volume.
       if (rn.includes('tinta')) {
         // New format: single num + single cor combined
         const num = r.num || (r.nums && !r.nums.includes(',') ? r.nums : '');
         const cor = r.cor || (r.cores && !r.cores.includes(',') ? r.cores : '');
-        if (num && cor) { const k=`${num} ${cor}`; subC[k]=(subC[k]||0)+q; }
-        else if (num)   { subC[num]=(subC[num]||0)+q; }
-        else if (cor)   { subC[cor]=(subC[cor]||0)+q; }
+        if (num && cor) { const k=`${num} ${cor}`; subC[k]=(subC[k]||0)+1; }
+        else if (num)   { subC[num]=(subC[num]||0)+1; }
+        else if (cor)   { subC[cor]=(subC[cor]||0)+1; }
         // Legacy multi
-        if (r.nums && r.nums.includes(',')) r.nums.split(',').forEach(s=>{const v=s.trim();if(v)subC[v]=(subC[v]||0)+q;});
-        if (r.cores && r.cores.includes(',')) r.cores.split(',').forEach(s=>{const v=s.trim();if(v)subC[v]=(subC[v]||0)+q;});
+        if (r.nums && r.nums.includes(',')) r.nums.split(',').forEach(s=>{const v=s.trim();if(v)subC[v]=(subC[v]||0)+1;});
+        if (r.cores && r.cores.includes(',')) r.cores.split(',').forEach(s=>{const v=s.trim();if(v)subC[v]=(subC[v]||0)+1;});
       } else if (rn.includes('pilha')||rn.includes('bateria')) {
-        if (r.batModels) r.batModels.forEach(b=>{ subC[b.modelo]=(subC[b.modelo]||0)+(parseInt(b.qty)||1); });
-        else if (r.modelo) subC[r.modelo]=(subC[r.modelo]||0)+q;
+        if (r.batModels) r.batModels.forEach(b=>{ subC[b.modelo]=(subC[b.modelo]||0)+1; });
+        else if (r.modelo) subC[r.modelo]=(subC[r.modelo]||0)+1;
       } else if (App._isConserto(r.groupName)) {
         // Conserto conta pela sub-opção (equipamento/modelo), igual tinta/pilha — não pelo subgrupo
         const eq = r.equipamento || r.batModel || r.modelo || '';
-        if (eq) subC[eq] = (subC[eq]||0) + q;
+        if (eq) subC[eq] = (subC[eq]||0) + 1;
       } else {
         // Outros: mostra subgrupo, não o texto livre do produto
         const sg = r.subgrupo || '';
-        if (sg) subC[sg] = (subC[sg]||0) + q;
+        if (sg) subC[sg] = (subC[sg]||0) + 1;
         // Se não tem subgrupo, não contabiliza (evita poluição com textos livres)
       }
     });
@@ -5682,15 +5695,52 @@ const App = {
     document.getElementById('compra-detalhe-body').innerHTML = `
       <div class="compra-detalhe-meta">
         <div><span class="cdm-label">Unidade</span><span class="cdm-val">${r.unitName||'—'}</span></div>
+        <div><span class="cdm-label">Grupo</span><span class="cdm-val">${r.groupName||'—'}</span></div>
         <div><span class="cdm-label">Fornecedor</span><span class="cdm-val">${r.fornecedor||'—'}</span></div>
         <div><span class="cdm-label">Data</span><span class="cdm-val">${fmt(r.boughtAt)}</span></div>
         <div><span class="cdm-label">Total</span><span class="cdm-val" style="color:#1a7a4a;font-weight:700">${fmtR(r.valorTotal)}</span></div>
       </div>
-      <div style="margin-top:12px;font-size:.8rem;font-weight:700;color:#1a3a6b;display:flex;align-items:center;gap:8px">${r.parcelas.length}× parcelas ${App._tagParcelaStatus(r.parcelas)}</div>
+      <div class="form-row-2" style="margin-top:12px">
+        <div class="form-group">
+          <label class="form-label">Subgrupo</label>
+          <select id="pinfo-subgrupo" class="input-field select-styled">${App._compraSubgroupOpts(r)}</select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descrição</label>
+          <input type="text" id="pinfo-desc" class="input-field" value="${r.descricao || ''}" placeholder="Descrição">
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:8px">
+        <label class="form-label">Descrição Técnica</label>
+        <input type="text" id="pinfo-desctec" class="input-field" value="${r.descTecnica || ''}" placeholder="Descrição técnica">
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:10px">
+        <button class="btn-secondary" onclick="App.saveParceladaSubinfo('${reqId}')">Salvar</button>
+      </div>
+      <div style="margin-top:14px;font-size:.8rem;font-weight:700;color:#1a3a6b;display:flex;align-items:center;gap:8px">${r.parcelas.length}× parcelas ${App._tagParcelaStatus(r.parcelas)}</div>
       <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px">
         ${r.parcelas.map(p => App._parcelaRowHtml(p)).join('')}
       </div>`;
+    // Pré-seleciona o subgrupo já gravado (depois de popular as opções, evita race com o.selected)
+    const sel = document.getElementById('pinfo-subgrupo');
+    if (sel) sel.value = r.subgrupo || '';
     document.getElementById('compra-detalhe-modal').classList.remove('hidden');
+  },
+
+  // Salva Subgrupo/Descrição/Descrição Técnica de uma parcelada avulsa a partir do
+  // popup de detalhe (showParceladaInfo) — os únicos campos editáveis ali; o Grupo
+  // é fixo desde a criação da solicitação e não muda por aqui.
+  saveParceladaSubinfo(reqId) {
+    const r = (State.requests || {})[reqId]; if (!r) return;
+    const subgrupo    = document.getElementById('pinfo-subgrupo')?.value  || '';
+    const descricao    = document.getElementById('pinfo-desc')?.value      || '';
+    const descTecnica  = document.getElementById('pinfo-desctec')?.value   || '';
+    DB.update(`requests/${reqId}`, { subgrupo, descricao, descTecnica })
+      .then(() => {
+        toast('✓ Dados atualizados.');
+        App._logActivity('Solicitações', 'Subgrupo/descrição atualizados', `SL-${r.seq ?? reqId}`);
+      })
+      .catch(() => toast('Erro ao salvar.', 'error'));
   },
 
   showCompraDetalhe(codigo) {
@@ -5719,7 +5769,7 @@ const App = {
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
               <span class="req-seq-badge">SL-${r.seq ?? '—'}</span>
               <strong style="font-size:.84rem;color:#111827">${r.unitName||'—'}</strong>
-              <span style="font-size:.78rem;color:#6680a0">${r.groupName||''}</span>
+              <span style="font-size:.78rem;color:#6680a0">${r.groupName||''}${r.subgrupo ? ' · '+r.subgrupo : ''}</span>
               <span class="codigos-badge lote" style="font-size:.65rem;padding:1px 6px">${lote}</span>
             </div>
             <div style="margin-top:4px;font-size:.8rem;color:#334155;display:flex;gap:12px;flex-wrap:wrap">
@@ -5729,6 +5779,7 @@ const App = {
               ${parLine}
             </div>
             ${r.descricao ? `<div style="font-size:.76rem;color:#6680a0;margin-top:2px">${r.descricao}</div>` : ''}
+            ${r.descTecnica ? `<div style="font-size:.76rem;color:#8898b8;margin-top:2px"><em>Téc.:</em> ${r.descTecnica}</div>` : ''}
             ${r.parcelas?.length ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">
               ${[...r.parcelas].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(p => {
                 const paga = App._parcelaPaga([p]);
@@ -7782,7 +7833,7 @@ App.toggleSidebar = function() {
 
     /* Grupo mais solicitado */
     const byGrp = {};
-    reqs.forEach(r => { const g = r.groupName||'?'; byGrp[g] = (byGrp[g]||0)+1; });
+    reqs.forEach(r => { const g = App._displayGroupName(r.groupName); byGrp[g] = (byGrp[g]||0)+1; });
     const gArr = Object.entries(byGrp).sort((a,b) => b[1]-a[1]);
     _s('rk-grp-top',   gArr[0]?.[0] || '—');
     _s('rk-grp-top-n', gArr[0] ? gArr[0][1] + ' solicitações' : '');
