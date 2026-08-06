@@ -51,8 +51,12 @@ const App = {
 
   /* ══ NAVEGAÇÃO ENTRE TELAS ══ */
   goTo(screenId) {
+    // Só troca de tela se o destino existir — senão esconderia todas e deixaria
+    // a página em branco silenciosamente (o `?.` sozinho não evitava isso).
+    const alvo = document.getElementById(screenId);
+    if (!alvo) { console.error('[goTo] tela inexistente nesta casca:', screenId); return; }
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(screenId)?.classList.add('active');
+    alvo.classList.add('active');
   },
 
   /* ══ MENU PRINCIPAL ══

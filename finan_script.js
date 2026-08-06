@@ -105,8 +105,13 @@ const App = {
   },
 
   goTo(id) {
+    // Só troca de tela se o destino existir. As telas de login vivem na casca
+    // (index.html); apontar pra uma delas aqui esconderia tudo e deixaria a
+    // página em branco, sem erro visível.
+    const alvo = document.getElementById(id);
+    if (!alvo) { console.error('[goTo] tela inexistente neste módulo:', id); return; }
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    alvo.classList.add('active');
   },
 
   /* ── UNITS ────────────────────────────────── */
