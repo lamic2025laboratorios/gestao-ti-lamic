@@ -81,6 +81,12 @@ function iniciarConexaoFirebase() {
     if (currentUnitId !== null) {
       renderComputers();
     }
+    // Reconstrói Templates sumidos assim que o inventário chega (ver comentário
+    // da função). Guardado por modelSettings já carregado.
+    if (typeof recuperarTemplatesDosGuiches === 'function' && modelSettings && Object.keys(modelSettings).length
+        && recuperarTemplatesDosGuiches()) {
+      if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
+    }
     // Puxa Acessos & Senhas já cadastrados nos computadores pros Modelos deles em Estoque
     if (typeof puxarAcessosCadastradosParaEstoque === 'function' && puxarAcessosCadastradosParaEstoque()) {
       if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
@@ -128,6 +134,12 @@ function iniciarConexaoFirebase() {
       if (!modelSettings.compPresets) modelSettings.compPresets = [];
     } else {
       modelSettings = JSON.parse(JSON.stringify(defaultModels));
+    }
+    // Reconstrói Templates que sumiram, a partir do hardware que ficou no guichê.
+    // Roda aqui e no listener de itInventory porque depende dos dois nós, e a
+    // ordem de chegada não é garantida — é idempotente, então rodar 2x não duplica.
+    if (typeof recuperarTemplatesDosGuiches === 'function' && recuperarTemplatesDosGuiches()) {
+      if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
     }
     // Migra Templates de PC já cadastrados (manuais ou gerados antes desta
     // mudança) pra terem também o Código do Produto de 10 dígitos.
@@ -5117,6 +5129,55 @@ function _nextSerial() {
 // gerado antes desta mudança) também tenha um Código do Produto válido de
 // 10 dígitos. Quem já tem código válido não é mexido (não sobrescreve
 // código editado manualmente). Roda automaticamente ao carregar os dados.
+/* RECUPERAÇÃO — Templates de PC que existiam e sumiram do Estoque.
+   O hardware nunca se perdeu: _syncPresetToComputer() sempre espelhou tudo no
+   próprio guichê (hw_model/cpu/mobo/ram/disk/gpu/monitor, SO e os Acessos &
+   Senhas). Quando o registro do Template some de compPresets, o guichê continua
+   com os dados e passa a aparecer como "Sem modelo" — e o Gráfico do Estoque
+   fica vazio, porque ele lista Templates, não guichês.
+   Esta rotina reconstrói o Template a partir do que está no guichê. É
+   idempotente: só cria pra guichê que TEM hardware e NÃO tem Template ligado,
+   então rodar de novo não duplica nada. Depois dela o
+   migrarPecasDosTemplates() recria as peças a partir dos mesmos campos.
+   Ressalva: licença de SO não era espelhada no guichê — Template recuperado
+   volta sem licença, e ela precisa ser reatribuída à mão. */
+function recuperarTemplatesDosGuiches() {
+    if (!Array.isArray(inventoryData) || !inventoryData.length) return false;
+    if (!modelSettings.compPresets) modelSettings.compPresets = [];
+    let changed = false;
+
+    inventoryData.forEach(unit => {
+        (unit.computers || []).forEach(comp => {
+            if (!_compHasHw(comp)) return;                          // guichê sem hardware: nada a recuperar
+            if (_presetIndexForComp(unit.id, comp.id) > -1) return; // já tem Template ligado
+            const code = _nextSerial();
+            modelSettings.compPresets.push({
+                name: code, serial: code,
+                unitId: unit.id, compId: comp.id,
+                unitName: unit.name, compName: comp.name,
+                hw_model: comp.hw_model || '', hw_cpu: comp.hw_cpu || '', hw_mobo: comp.hw_mobo || '',
+                hw_ram: comp.hw_ram || '', hw_disk: comp.hw_disk || '', hw_gpu: comp.hw_gpu || '',
+                hw_monitor: comp.hw_monitor || '',
+                os: comp.os || 'Windows 11', os_arch: comp.os_arch || 'x64',
+                access_pc_pass:  comp.access_pc_pass  || '', access_any_id:   comp.access_any_id   || '',
+                access_any_pass: comp.access_any_pass || '', access_rdp_user: comp.access_rdp_user || '',
+                access_rdp_pass: comp.access_rdp_pass || '',
+                lic_status: 'pirata', licenseStockId: null, license: null,
+                dataEntrada: new Date().toISOString(),
+                recuperado: true   // marca de auditoria: veio da reconstrução, não de cadastro manual
+            });
+            changed = true;
+            if (typeof registrarLog === 'function') {
+                registrarLog(code, 'pc', 'Template recuperado a partir do guichê',
+                             `${comp.name} (${unit.name}) — hardware restaurado do proprio guiche`);
+            }
+        });
+    });
+
+    if (changed) saveSettings();
+    return changed;
+}
+
 function migrarCodigosProduto() {
     const presets = modelSettings.compPresets || [];
     if (!presets.length) return false;
