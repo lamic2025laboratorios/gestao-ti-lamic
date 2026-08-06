@@ -1174,8 +1174,12 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 /* ── Cards de Consumo (Tintas / Pilhas) ── */
 .consumo-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 18px; margin-top: 18px;
+  align-items: stretch;
 }
-.consumo-card { display: flex; flex-direction: column; }
+/* Altura fixa — sem isso cada card fica do tamanho do próprio conteúdo (nº de
+   linhas em "Por Cor/Modelo/Subgrupo" varia muito entre os 4), ficando
+   desproporcional. O que não cabe rola dentro do bloco de detalhamento. */
+.consumo-card { display: flex; flex-direction: column; height: 620px; }
 .consumo-card-head {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
@@ -1240,7 +1244,10 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .consumo-stat-val { font-size: .92rem; font-weight: 700; color: #1a3a6b; }
 .consumo-stat-muted { color: #8898b8; font-weight: 600; font-size: .82rem; }
 
-.consumo-breakdown { margin-top: 16px; padding-top: 14px; border-top: 1px solid #eef2f8; }
+.consumo-breakdown {
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid #eef2f8;
+  flex: 1; min-height: 0; overflow-y: auto;
+}
 .consumo-bd-title { font-size: .72rem; font-weight: 700; color: #6680a0; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
 .consumo-bd-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .consumo-bd-name { font-size: .8rem; font-weight: 600; color: #1a3a6b; min-width: 80px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1265,6 +1272,7 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 
 @media (max-width: 900px) {
   .consumo-grid { grid-template-columns: 1fr; }
+  .consumo-card { height: auto; }
   .consumo-body { flex-direction: column; gap: 14px; }
   .consumo-main { border-right: none; border-bottom: 1px solid #eef2f8; padding-right: 0; padding-bottom: 14px; }
 }
