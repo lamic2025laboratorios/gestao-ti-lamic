@@ -4863,7 +4863,7 @@ const App = {
     if (dadosLabel) dadosLabel.textContent = 'Dados da compra/estoque ocultos';
     const dadosEye = document.getElementById('modal-dados-eye');
     if (dadosEye) dadosEye.title = 'Mostrar dados da compra/estoque';
-    ['modal-bought-fields', 'modal-estoque-panel'].forEach(fid => {
+    ['modal-bought-fields', 'modal-estoque-panel', 'modal-shipping-fields'].forEach(fid => {
       document.getElementById(fid)?.classList.toggle('dados-readonly-hidden', readOnly);
     });
     document.querySelector('#modal-request .modal-card')?.classList.toggle('modal-readonly', readOnly);
@@ -4877,12 +4877,13 @@ const App = {
   // Olhinho dos Dados da Compra/Estoque no modo somente-leitura: sempre começa
   // oculto ao abrir o modal (só esconde/mostra, não altera nada).
   toggleModalDadosVisibility() {
-    const bought  = document.getElementById('modal-bought-fields');
-    const estoque = document.getElementById('modal-estoque-panel');
-    const label   = document.getElementById('modal-dados-toggle-label');
-    const btn     = document.getElementById('modal-dados-eye');
-    const estavaOculto = bought?.classList.contains('dados-readonly-hidden') || estoque?.classList.contains('dados-readonly-hidden');
-    [bought, estoque].forEach(el => el?.classList.toggle('dados-readonly-hidden', !estavaOculto));
+    const bought   = document.getElementById('modal-bought-fields');
+    const estoque  = document.getElementById('modal-estoque-panel');
+    const shipping = document.getElementById('modal-shipping-fields');
+    const label    = document.getElementById('modal-dados-toggle-label');
+    const btn      = document.getElementById('modal-dados-eye');
+    const estavaOculto = bought?.classList.contains('dados-readonly-hidden') || estoque?.classList.contains('dados-readonly-hidden') || shipping?.classList.contains('dados-readonly-hidden');
+    [bought, estoque, shipping].forEach(el => el?.classList.toggle('dados-readonly-hidden', !estavaOculto));
     if (label) label.textContent = estavaOculto ? 'Dados da compra/estoque visíveis' : 'Dados da compra/estoque ocultos';
     if (btn) btn.title = estavaOculto ? 'Ocultar dados da compra/estoque' : 'Mostrar dados da compra/estoque';
   },
