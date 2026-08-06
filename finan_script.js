@@ -3192,16 +3192,16 @@ const App = {
     const palette = ['#3a7ee8','#1db87a','#e8830a','#7c52d4','#00b8a2','#d94040','#e879b0','#f7c84a'];
     const chartDefs = { responsive:true, plugins:{ legend:{ display:false } } };
 
-    // Units bar — cada unidade com uma cor distinta (hues espaçados por ângulo áureo)
+    // Units bar — soma de TODAS as solicitações por unidade (ranking com "ver todas")
     const unitC = {}; reqs.forEach(r => unitC[r.unitName||'?']=(unitC[r.unitName||'?']||0)+1);
     const topUnit = Object.entries(unitC).sort((a,b)=>b[1]-a[1])[0];
     const topBadge = document.getElementById('chart-units-top');
     if (topBadge && topUnit) topBadge.textContent = `🏆 ${topUnit[0]}`;
-    App._drawBar('chart-units', unitC, App._distinctColors(Object.keys(unitC).length));
+    App._renderUnitsHeat(unitC);
 
-    // Groups bar
+    // Groups bar — soma de TODAS as solicitações por grupo (ranking com "ver todas")
     const grpC = {}; reqs.forEach(r => grpC[r.groupName||'?']=(grpC[r.groupName||'?']||0)+1);
-    App._drawBar('chart-groups', grpC, ['#1db87a','#3a7ee8','#e8830a','#7c52d4']);
+    App._renderGroupsHeat(grpC);
 
     // Sub-opts bar — combine num+cor as one key for tinta, multi-model for batteries
     const subC = {};
@@ -3224,6 +3224,10 @@ const App = {
       } else if (rn.includes('pilha')||rn.includes('bateria')) {
         if (r.batModels) r.batModels.forEach(b=>{ subC[b.modelo]=(subC[b.modelo]||0)+(parseInt(b.qty)||1); });
         else if (r.modelo) subC[r.modelo]=(subC[r.modelo]||0)+q;
+      } else if (App._isConserto(r.groupName)) {
+        // Conserto conta pela sub-opção (equipamento/modelo), igual tinta/pilha — não pelo subgrupo
+        const eq = r.equipamento || r.batModel || r.modelo || '';
+        if (eq) subC[eq] = (subC[eq]||0) + q;
       } else {
         // Outros: mostra subgrupo, não o texto livre do produto
         const sg = r.subgrupo || '';
@@ -3529,6 +3533,137 @@ const App = {
       }</div>`;
     }
     document.getElementById('subopts-all-modal').classList.remove('hidden');
+  },
+
+  _unitsData: [],   // cache do ranking completo por unidade (p/ popup "todas")
+  _groupsData: [],  // cache do ranking completo por grupo (p/ popup "todas")
+
+  // Card "Por Unidade": mesmo padrão do card Sub-opções — top 8 em barra de calor + "ver todas"
+  _renderUnitsHeat(data) {
+    const canvas = document.getElementById('chart-units');
+    const moreLine = document.getElementById('units-more-line');
+    if (!canvas) return;
+    const entries = Object.entries(data).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    App._unitsData = entries;
+
+    App._destroyChart('chart-units');
+    if (!entries.length) {
+      canvas.style.display = 'none';
+      if (moreLine) moreLine.innerHTML = '<div class="subopts-empty">Sem solicitações no período/filtro.</div>';
+      return;
+    }
+    canvas.style.display = '';
+
+    const max = entries[0][1] || 1;
+    const TOP = 8;
+    const visiveis = entries.slice(0, TOP);
+    const labels = visiveis.map(([name]) => name);
+    const vals   = visiveis.map(([, v]) => v);
+    const cores  = vals.map(v => App._heatColor(v / max));
+
+    State.charts['chart-units'] = new Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ data: vals, backgroundColor: cores, borderRadius: 6, maxBarThickness: 18 }] },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw} pedido(s)` } } },
+        scales: {
+          x: { beginAtZero: true, ticks: { color: '#6680a0', font: { size: 10 } }, grid: { color: '#eef2f8' } },
+          y: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } }
+        }
+      }
+    });
+
+    if (moreLine) {
+      moreLine.innerHTML = `<button class="subopt-vermais" onclick="App.showUnitsAll()" title="Ver todas as unidades">
+             <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+             Ver todas as unidades
+             <span class="subopt-vermais-badge">${entries.length}</span>
+           </button>`;
+    }
+  },
+
+  // Popup: todas as unidades (ranking completo por total de solicitações)
+  showUnitsAll() {
+    const entries = App._unitsData || [];
+    const body = document.getElementById('units-all-body'); if (!body) return;
+    const titulo = document.getElementById('units-all-titulo');
+    const total = entries.reduce((s, [, v]) => s + v, 0);
+    if (titulo) titulo.textContent = `Por Unidade — ${entries.length} unidades · ${total} pedido(s)`;
+    if (!entries.length) {
+      body.innerHTML = '<div class="subopts-empty">Sem solicitações no período/filtro.</div>';
+    } else {
+      const max = entries[0][1] || 1;
+      body.innerHTML = `<div class="subopts-heat" style="max-height:none">${
+        entries.map(([name, val], i) => App._suboptRowHtml(name, val, i, max)).join('')
+      }</div>`;
+    }
+    document.getElementById('units-all-modal').classList.remove('hidden');
+  },
+
+  // Card "Por Grupo": mesmo padrão — top 8 em barra de calor + "ver todos"
+  _renderGroupsHeat(data) {
+    const canvas = document.getElementById('chart-groups');
+    const moreLine = document.getElementById('groups-more-line');
+    const badge = document.getElementById('chart-groups-total');
+    if (!canvas) return;
+    const entries = Object.entries(data).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    App._groupsData = entries;
+    if (badge) badge.textContent = entries.length ? `${entries.length} grupos` : '';
+
+    App._destroyChart('chart-groups');
+    if (!entries.length) {
+      canvas.style.display = 'none';
+      if (moreLine) moreLine.innerHTML = '<div class="subopts-empty">Sem solicitações no período/filtro.</div>';
+      return;
+    }
+    canvas.style.display = '';
+
+    const max = entries[0][1] || 1;
+    const TOP = 8;
+    const visiveis = entries.slice(0, TOP);
+    const labels = visiveis.map(([name]) => name);
+    const vals   = visiveis.map(([, v]) => v);
+    const cores  = vals.map(v => App._heatColor(v / max));
+
+    State.charts['chart-groups'] = new Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ data: vals, backgroundColor: cores, borderRadius: 6, maxBarThickness: 18 }] },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw} pedido(s)` } } },
+        scales: {
+          x: { beginAtZero: true, ticks: { color: '#6680a0', font: { size: 10 } }, grid: { color: '#eef2f8' } },
+          y: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } }
+        }
+      }
+    });
+
+    if (moreLine) {
+      moreLine.innerHTML = `<button class="subopt-vermais" onclick="App.showGroupsAll()" title="Ver todos os grupos">
+             <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+             Ver todos os grupos
+             <span class="subopt-vermais-badge">${entries.length}</span>
+           </button>`;
+    }
+  },
+
+  // Popup: todos os grupos (ranking completo por total de solicitações)
+  showGroupsAll() {
+    const entries = App._groupsData || [];
+    const body = document.getElementById('groups-all-body'); if (!body) return;
+    const titulo = document.getElementById('groups-all-titulo');
+    const total = entries.reduce((s, [, v]) => s + v, 0);
+    if (titulo) titulo.textContent = `Por Grupo — ${entries.length} grupos · ${total} pedido(s)`;
+    if (!entries.length) {
+      body.innerHTML = '<div class="subopts-empty">Sem solicitações no período/filtro.</div>';
+    } else {
+      const max = entries[0][1] || 1;
+      body.innerHTML = `<div class="subopts-heat" style="max-height:none">${
+        entries.map(([name, val], i) => App._suboptRowHtml(name, val, i, max)).join('')
+      }</div>`;
+    }
+    document.getElementById('groups-all-modal').classList.remove('hidden');
   },
 
   // Número total + "TOTAL" centralizado no buraco da rosca — soma só as fatias visíveis

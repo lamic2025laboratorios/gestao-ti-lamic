@@ -357,10 +357,15 @@
                 <span class="chart-badge" id="chart-units-top"></span>
               </div>
               <canvas id="chart-units"></canvas>
+              <div id="units-more-line"></div>
             </div>
             <div class="chart-card">
-              <div class="chart-card-header"><span>Grupo</span></div>
+              <div class="chart-card-header">
+                <span>Grupo</span>
+                <span class="chart-badge" id="chart-groups-total"></span>
+              </div>
               <canvas id="chart-groups"></canvas>
+              <div id="groups-more-line"></div>
             </div>
             <div class="chart-card">
               <div class="chart-card-header">
@@ -1949,6 +1954,38 @@
           <div class="modal-body" id="subopts-all-body" style="max-height:68vh;overflow-y:auto"></div>
           <div class="modal-footer">
             <button class="btn-ghost" onclick="document.getElementById('subopts-all-modal').classList.add('hidden')">Fechar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: TODAS AS UNIDADES ── -->
+      <div id="units-all-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:560px">
+          <div class="modal-header">
+            <h3 id="units-all-titulo">Por Unidade — Todas</h3>
+            <button class="modal-close" onclick="document.getElementById('units-all-modal').classList.add('hidden')">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+          <div class="modal-body" id="units-all-body" style="max-height:68vh;overflow-y:auto"></div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="document.getElementById('units-all-modal').classList.add('hidden')">Fechar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: TODOS OS GRUPOS ── -->
+      <div id="groups-all-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:560px">
+          <div class="modal-header">
+            <h3 id="groups-all-titulo">Por Grupo — Todos</h3>
+            <button class="modal-close" onclick="document.getElementById('groups-all-modal').classList.add('hidden')">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+          <div class="modal-body" id="groups-all-body" style="max-height:68vh;overflow-y:auto"></div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="document.getElementById('groups-all-modal').classList.add('hidden')">Fechar</button>
           </div>
         </div>
       </div>
