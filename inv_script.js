@@ -6391,7 +6391,7 @@ function _renderEquipCard(reg, type, unit, soLeitura = false) {
     else if (type === 'ac') { clickAction = `_openAcFromEstoque('${unitId}','${reg.id}',${soLeitura})`; delAction = `_deleteAcFromEstoque('${unitId}','${reg.id}')`; }
     else { clickAction = `openEquipPresetModal('${type}','${unitId}','${reg.id}',false,${soLeitura})`; delAction = `_deleteEquipRegistro('${type}','${unitId}','${reg.id}')`; }
     return `
-    <div class="estoque-modelo-card" onclick="${clickAction}" title="${soLeitura ? 'Visualização (somente leitura — editar é pela Lista)' : 'Clique para ver / editar'}">
+    <div class="estoque-modelo-card${soLeitura ? ' card-sem-del' : ''}" onclick="${clickAction}" title="${soLeitura ? 'Visualização (somente leitura — editar é pela Lista)' : 'Clique para ver / editar'}">
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
         ${soLeitura ? '' : `<button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); ${delAction}" title="Excluir"><i class="ph ph-trash"></i></button>`}
@@ -6557,6 +6557,34 @@ function _coletarPerifericosMobileAc(tipoFiltro, statusFiltro) {
 }
 
 let _graficoBusca = '';
+/* Conta por cor do semáforo respeitando o TIPO filtrado no Gráfico, usando as
+   mesmas fontes que montam os cards — Templates de PC, periféricos/celulares/
+   ACs e licenças. Sempre ignora o filtro de status: os números mostram a
+   composição completa daquele tipo, que é o que o usuário clica pra filtrar. */
+function _contarPorLedGrafico(tipoFiltro) {
+    const c = { azul: 0, verde: 0, amarelo: 0, vermelho: 0 };
+    const add = led => { if (c[led] !== undefined) c[led]++; };
+
+    if (tipoFiltro === 'todos' || tipoFiltro === 'pc') {
+        (modelSettings.compPresets || []).forEach(p => add(_dotLedTemplate(p)));
+    }
+    if (tipoFiltro !== 'pc' && tipoFiltro !== 'licenca') {
+        _coletarPerifericosMobileAc(tipoFiltro, 'todos').forEach(({ reg }) => add(_statusToLed(reg.status)));
+    }
+    if (tipoFiltro === 'todos' || tipoFiltro === 'licenca') {
+        _stockLicenses().forEach(l => add(_statusToLed(l.status)));
+    }
+    return c;
+}
+
+// Clique nos contadores do Gráfico: filtra por status e mantém os chips do
+// popover em sincronia. Clicar no que já está ativo volta pra "todos".
+function setFiltroStatusGrafico(val) {
+    _filtrosGrafico.status = (_filtrosGrafico.status === val && val !== 'todos') ? 'todos' : val;
+    if (typeof _aplicarChipsDoFiltro === 'function') _aplicarChipsDoFiltro();
+    renderEstoqueCatalogo();
+}
+
 function renderEstoqueCatalogo() {
     const panel = document.getElementById('estoque-comps-panel');
     if (!panel) return;
@@ -6594,19 +6622,24 @@ function renderEstoqueCatalogo() {
         });
     }
 
-    // Contadores de Templates de PC montados (não é por peça — cada Template
-    // equivale a 1 PC montado): disponíveis, em uso, manutenção e inativos.
-    const tCounts = { azul: 0, verde: 0, amarelo: 0, vermelho: 0 };
-    (modelSettings.compPresets || []).forEach(p => {
-        const led = _dotLedTemplate(p);
-        if (tCounts[led] !== undefined) tCounts[led]++;
-    });
+    // Contadores do Gráfico — contam exatamente o TIPO que está filtrado
+    // (antes contavam só Templates de PC, então escolher "Impressoras" mantinha
+    // os números dos PCs na tela). Cada um é clicável e filtra por status;
+    // clicar no que já está ativo volta pra "todos".
+    const tCounts = _contarPorLedGrafico(tipoFiltro);
+    const totalG = tCounts.azul + tCounts.verde + tCounts.amarelo + tCounts.vermelho;
+    const chipCont = (val, dotCls, rotulo, n) =>
+        `<button type="button" class="lista-counter lista-counter-btn${statusFiltro === val ? ' active' : ''}"
+                 onclick="setFiltroStatusGrafico('${val}')" title="${val === 'todos' ? 'Mostrar todos os status' : 'Filtrar por ' + rotulo}">
+            ${dotCls ? `<span class="equip-status-dot equip-status-dot-inline ${dotCls}"></span>` : ''} ${n} ${rotulo}
+         </button>`;
     const contadores = `
     <div class="estoque-lista-counters" style="margin-bottom:12px; justify-content:flex-end;">
-        <span class="lista-counter"><span class="equip-status-dot equip-status-dot-inline dot-disp"></span> ${tCounts.azul} disponíveis</span>
-        <span class="lista-counter"><span class="equip-status-dot equip-status-dot-inline dot-uso"></span> ${tCounts.verde} em uso</span>
-        <span class="lista-counter"><span class="equip-status-dot equip-status-dot-inline dot-manut"></span> ${tCounts.amarelo} manutenção</span>
-        <span class="lista-counter"><span class="equip-status-dot equip-status-dot-inline dot-inativo"></span> ${tCounts.vermelho} inativos</span>
+        ${chipCont('todos', '', 'todos', totalG)}
+        ${chipCont('azul', 'dot-disp', 'disponíveis', tCounts.azul)}
+        ${chipCont('verde', 'dot-uso', 'em uso', tCounts.verde)}
+        ${chipCont('amarelo', 'dot-manut', 'manutenção', tCounts.amarelo)}
+        ${chipCont('vermelho', 'dot-inativo', 'inativos', tCounts.vermelho)}
     </div>`;
 
     if (!cards.length) {
@@ -6642,8 +6675,9 @@ function _renderLicencaCard(l) {
     const preset = l.status === 'em_uso' ? (modelSettings.compPresets || []).find(p => p.licenseStockId === l.id) : null;
     const local = preset ? `${preset.serial || preset.name}${preset.compName ? ' · ' + preset.compName + ' (' + preset.unitName + ')' : ''}` : 'Estoque';
     return `
-    <div class="estoque-modelo-card" onclick="abrirEntradaLicenca('${l.id}', false, true)" title="Visualização (somente leitura — editar é pela Lista)">
+    <div class="estoque-modelo-card card-sem-del" onclick="abrirEntradaLicenca('${l.id}', false, true)" title="Visualização (somente leitura — editar é pela Lista)">
         <div class="equip-status-dot ${dotClass}"></div>
+        <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${l.serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
         <div class="estoque-comp-head">
             <i class="ph ph-certificate"></i>
             <strong>${l.serial || '—'}</strong>

@@ -641,6 +641,13 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 100px; padding: 4px 10px;
 }
+/* Contadores clicáveis do Gráfico (filtram por status) */
+.lista-counter-btn { cursor: pointer; font-family: inherit; transition: all .15s; }
+.lista-counter-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-pale); }
+.lista-counter-btn.active {
+  border-color: var(--blue); background: var(--blue); color: #fff;
+  box-shadow: 0 2px 8px rgba(30,58,138,.25);
+}
 
 /* Destaques do popup de Template de PC: Localização em azul bem claro e
    Acessos & Senhas num cinza mais escuro, pra diferenciar as seções */
@@ -669,6 +676,9 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
    pra não deixar buraco onde ficava a lixeira/lápis */
 .estoque-modelo-card.card-pc-preset .estoque-modelo-log  { right: 8px; }
 .estoque-modelo-card.card-pc-preset .estoque-modelo-info { right: 40px; }
+/* Mesma regra pros demais cards do Gráfico (periféricos, celulares, ACs e
+   licenças): lá não existe lixeira, então o relógio encosta na direita. */
+.estoque-modelo-card.card-sem-del .estoque-modelo-log { right: 8px; }
 
 /* Botão de editar Template (lápis) — no canto direito do card do Gráfico */
 .estoque-modelo-edit {
