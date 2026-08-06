@@ -7511,7 +7511,17 @@ const App = {
     };
 
     safeListener('units',     v => { State.units    =v||{}; App.renderUnitsDropdown(); if(State.adminUser) App.renderUnitsAdmin?.(); });
-    safeListener('groups',    v => { State.groups   =v||{}; App._migrarGrupoConserto?.(); App.populateGroupSelects?.(); if(State.adminUser) App.renderGroupsAdmin?.(); });
+    safeListener('groups',    v => {
+      State.groups = v||{};
+      App._migrarGrupoConserto?.();
+      App.populateGroupSelects?.();
+      if (State.adminUser) App.renderGroupsAdmin?.();
+      // Unidade: o boot chama buildRequestPanel() antes dos grupos chegarem do
+      // Firebase (listener é assíncrono), então o painel nasce vazio. Remonta
+      // aqui quando os dados chegam — só se nada foi escolhido ainda, pra não
+      // perder a seleção em andamento do usuário.
+      else if (!State.currentType) App.buildRequestPanel?.();
+    });
     safeListener('groupMeta', v => { State.groupMeta =v||{}; if(State.adminUser) App.renderGroupsAdmin?.(); });
     safeListener('subOpts',   v => { State.subOpts  =v||{}; });
     safeListener('subgroups', v => { State.subgroups=v||{}; if(State.adminUser) App.renderSubgroupsAdmin?.(); });
