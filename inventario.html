@@ -929,9 +929,10 @@
                         <strong>Logs do Dashboard</strong>
                         <span>O que foi adicionado, editado ou retirado nas unidades: guichês, templates e acessos</span>
                     </div>
-                    <button class="btn-secondary" onclick="abrirLogsEquipamento(null,'dashboard')">
-                        <i class="ph ph-clock-counter-clockwise"></i> Ver
-                    </button>
+                    <div class="cfg-log-btns">
+                        <button class="btn-icon-only" onclick="abrirLogsEquipamento(null,'dashboard')" title="Ver logs"><i class="ph ph-eye"></i></button>
+                        <button class="btn-icon-only" onclick="baixarLogsInventario()" title="Baixar logs"><i class="ph ph-download-simple"></i></button>
+                    </div>
                 </div>
                 <div class="backup-card">
                     <div class="backup-card-icon"><i class="ph ph-desktop-tower"></i></div>
@@ -939,9 +940,10 @@
                         <strong>Logs de Equipamentos</strong>
                         <span>Da seção Equipamentos: cadastro, edição e exclusão dos equipamentos</span>
                     </div>
-                    <button class="btn-secondary" onclick="abrirLogsEquipamento(null,'equip')">
-                        <i class="ph ph-clock-counter-clockwise"></i> Ver
-                    </button>
+                    <div class="cfg-log-btns">
+                        <button class="btn-icon-only" onclick="abrirLogsEquipamento(null,'equip')" title="Ver logs"><i class="ph ph-eye"></i></button>
+                        <button class="btn-icon-only" onclick="baixarLogsInventario()" title="Baixar logs"><i class="ph ph-download-simple"></i></button>
+                    </div>
                 </div>
                 <div class="backup-card">
                     <div class="backup-card-icon"><i class="ph ph-package"></i></div>
@@ -949,9 +951,10 @@
                         <strong>Logs do Estoque</strong>
                         <span>Peças, licenças, celulares, ACs, periféricos e a lixeira</span>
                     </div>
-                    <button class="btn-secondary" onclick="abrirLogsEquipamento(null,'estoque')">
-                        <i class="ph ph-clock-counter-clockwise"></i> Ver
-                    </button>
+                    <div class="cfg-log-btns">
+                        <button class="btn-icon-only" onclick="abrirLogsEquipamento(null,'estoque')" title="Ver logs"><i class="ph ph-eye"></i></button>
+                        <button class="btn-icon-only" onclick="baixarLogsInventario()" title="Baixar logs"><i class="ph ph-download-simple"></i></button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -2461,3 +2461,15 @@ main.main-expanded {
 .backup-card-info { flex: 1; }
 .backup-card-info strong { display: block; font-size: .9rem; font-weight: 700; color: var(--navy); margin-bottom: 3px; }
 .backup-card-info span { font-size: .8rem; color: var(--text-muted); }
+
+/* Logs: botões só-ícone (ver / baixar) */
+.cfg-log-btns { display: flex; gap: 8px; flex-shrink: 0; }
+.btn-icon-only {
+  width: 36px; height: 36px; border-radius: var(--r); flex-shrink: 0;
+  border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.btn-icon-only:hover { border-color: var(--blue); color: var(--blue); background: #eef4ff; }
+.btn-icon-only i { font-size: 1.05rem; }

@@ -6304,7 +6304,11 @@ const App = {
   renderAdminsCards() {
     // Atualiza o contador de logs no card de Ferramentas (mesma aba)
     const logCountEl = document.getElementById('config-logs-count');
-    if (logCountEl) { const n = Object.keys(State.activityLog || {}).length; logCountEl.textContent = n ? `${n} registro${n!==1?'s':''} no total` : ''; }
+    if (logCountEl) {
+      const n = Object.keys(State.activityLog || {}).length;
+      // Sem logs, mantém a descrição do card — antes ficava um espaço vazio
+      logCountEl.textContent = n ? `${n} registro${n!==1?'s':''} no total` : 'Quem fez o quê e quando, dia a dia';
+    }
     // A gestão de administradores saiu daqui: passou para Configurações da Home.
     // Sem o elemento na tela, a rotina apenas não faz nada.
     const wrap=document.getElementById('admin-cards-grid'); if (!wrap) return; wrap.innerHTML='';

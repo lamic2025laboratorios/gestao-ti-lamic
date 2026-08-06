@@ -5875,6 +5875,24 @@ function abrirLogsEquipamento(equipCode) {
     modal.classList.remove('hidden');
 }
 
+// Baixa os logs do inventário em CSV (mesmo formato usado no Financeiro:
+// separador ';' e BOM, pro Excel abrir com acento correto).
+function baixarLogsInventario() {
+    if (!invLogs.length) { alert('Nenhum log para baixar.'); return; }
+    const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const linhas = [['Data/Hora', 'Quem', 'Perfil', 'Código', 'Ação', 'Detalhe'].join(';')];
+    invLogs.slice().sort((a, b) => String(a.ts || '').localeCompare(String(b.ts || ''))).forEach(l => {
+        const dh = l.ts ? new Date(l.ts).toLocaleString('pt-BR') : '';
+        linhas.push([dh, l.user || '', l.admin ? 'Administrador' : 'Usuário',
+                     l.equipCode || '', l.acao || '', l.detalhe || ''].map(esc).join(';'));
+    });
+    const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `logs-inventario-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
 // Depósito de Licenças de Software do estoque — licença nova só entra por
 // aqui (Lista → Entrada de Novo Item); é atrelada a um PC na montagem do
 // Template e vai pro registro de Licenças da unidade quando ele é vinculado.
