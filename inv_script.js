@@ -5848,15 +5848,41 @@ function registrarLog(equipCode, tipo, acao, detalhe) {
     DB.set('itLogs', invLogs);
 }
 
+/* ── Seção de origem de cada log ─────────────────────────────────────────
+   Os 3 cards de Logs (Dashboard / Equipamentos / Estoque) filtram por aqui.
+   registrarLog() guarda o TIPO do equipamento, não a seção — então a seção é
+   derivada: tipo fixo quando não há dúvida e, nos tipos que aparecem nas duas
+   pontas (PC, celular, AC, periférico), quem decide é a ação envolver ou não
+   um guichê/unidade. Derivar na leitura (em vez de gravar um campo novo) faz
+   valer também pros logs que já existem. */
+const LOG_SECAO_FIXA  = { guiche: 'dashboard', peca: 'estoque', licenca: 'estoque', lixeira: 'estoque' };
+const LOG_PERIFERICOS = ['printer', 'label', 'thermal', 'webcam', 'tv'];
+const _LOG_RE_UNIDADE = /guich|atribu[ií]|vinculad|desvinculad|movido/i;
+
+function _secaoDoLog(l) {
+    if (l.secao) return l.secao;                    // marcação explícita, se algum dia houver
+    const fixa = LOG_SECAO_FIXA[l.tipo];
+    if (fixa) return fixa;
+    if (_LOG_RE_UNIDADE.test(l.acao || '')) return 'dashboard';   // entrou/saiu de um guichê
+    return LOG_PERIFERICOS.includes(l.tipo) ? 'equip' : 'estoque';
+}
+
+const LOG_SECAO_TITULO = { dashboard: 'Logs do Dashboard', equip: 'Logs de Equipamentos', estoque: 'Logs do Estoque' };
+
+// Linhas de log de uma seção (sem seção = tudo). Usada pelo modal e pelo download.
+function _logsDaSecao(secao) {
+    return secao ? invLogs.filter(l => _secaoDoLog(l) === secao) : invLogs;
+}
+
 // Abre o modal de logs — com equipCode mostra só o histórico daquele
-// equipamento; sem código mostra TODOS os movimentos do inventário.
-function abrirLogsEquipamento(equipCode) {
+// equipamento; sem código mostra os movimentos da seção pedida (ou todos).
+function abrirLogsEquipamento(equipCode, secao) {
     const modal = document.getElementById('logs-modal');
     if (!modal) return;
     document.getElementById('logs-modal-title').innerHTML = equipCode
         ? `<i class="ph ph-clock-counter-clockwise"></i> Histórico — ${equipCode}`
-        : `<i class="ph ph-clock-counter-clockwise"></i> Logs do Inventário`;
-    const linhas = equipCode ? invLogs.filter(l => l.equipCode === equipCode) : invLogs;
+        : `<i class="ph ph-clock-counter-clockwise"></i> ${LOG_SECAO_TITULO[secao] || 'Logs do Inventário'}`;
+    const linhas = equipCode ? invLogs.filter(l => l.equipCode === equipCode) : _logsDaSecao(secao);
     const body = document.getElementById('logs-modal-body');
     if (!linhas.length) {
         body.innerHTML = '<div class="estoque-empty">Nenhuma modificação registrada ainda.</div>';
@@ -5877,11 +5903,12 @@ function abrirLogsEquipamento(equipCode) {
 
 // Baixa os logs do inventário em CSV (mesmo formato usado no Financeiro:
 // separador ';' e BOM, pro Excel abrir com acento correto).
-function baixarLogsInventario() {
-    if (!invLogs.length) { alert('Nenhum log para baixar.'); return; }
+function baixarLogsInventario(secao) {
+    const dados = _logsDaSecao(secao);
+    if (!dados.length) { alert('Nenhum log para baixar nesta seção.'); return; }
     const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
     const linhas = [['Data/Hora', 'Quem', 'Perfil', 'Código', 'Ação', 'Detalhe'].join(';')];
-    invLogs.slice().sort((a, b) => String(a.ts || '').localeCompare(String(b.ts || ''))).forEach(l => {
+    dados.slice().sort((a, b) => String(a.ts || '').localeCompare(String(b.ts || ''))).forEach(l => {
         const dh = l.ts ? new Date(l.ts).toLocaleString('pt-BR') : '';
         linhas.push([dh, l.user || '', l.admin ? 'Administrador' : 'Usuário',
                      l.equipCode || '', l.acao || '', l.detalhe || ''].map(esc).join(';'));
@@ -5889,7 +5916,7 @@ function baixarLogsInventario() {
     const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `logs-inventario-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.href = url; a.download = `logs-${secao || 'inventario'}-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
