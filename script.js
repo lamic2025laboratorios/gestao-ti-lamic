@@ -380,15 +380,27 @@ const App = {
       if (!e.target.closest('.sidebar-account')) App.closeUserMenu();
     });
 
-    // ESC: primeiro os modais e a página do registro (UniLAMIC TI);
-    // se não houver nada aberto, volta ao menu principal.
+    // ESC em cascata: passo 1 fecha o pop-up aberto; passo 2 sai da guia atual (volta pra UniLAMIC TI);
+    // passo 3, sem pop-up nem guia aberta, garante que está na UniLAMIC TI (menu principal)
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;
+
+      // Menu de conta na sidebar
+      const userMenu = document.getElementById('sb-user-menu');
+      if (userMenu && !userMenu.classList.contains('hidden')) { App.closeUserMenu(); return; }
+
+      // Popovers com padrão .open (filtros, notificações do guia, etc.)
+      const popoverAberto = document.querySelector('.open');
+      if (popoverAberto) { document.querySelectorAll('.open').forEach(el => el.classList.remove('open')); return; }
+
+      // Modais e navegação interna da UniLAMIC TI (guias, comentários, formulários)
       const antes = document.querySelector('.tab-panel.active')?.id;
       App._kbdEscClose?.();
       const depois = document.querySelector('.tab-panel.active')?.id;
       if (antes !== depois) return;              // a seção tratou o ESC
       if (document.querySelector('.modal-overlay:not(.hidden)')) return;
+
+      // Sem pop-up nem guia aberta: volta para a UniLAMIC TI
       if (antes && antes !== 'tab-unilamic') App.voltarAoMenu();
     });
   },

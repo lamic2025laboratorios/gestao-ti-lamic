@@ -2959,6 +2959,7 @@ const App = {
   showExtrato() {
     App._extratoPeriodo = 'tudo';
     document.querySelectorAll('.extrato-per-btn').forEach(b => b.classList.toggle('active', b.dataset.per === 'tudo'));
+    App._showExtratoPicker('tudo');
     App._renderExtrato();
     document.getElementById('extrato-modal').classList.remove('hidden');
   },
@@ -2967,7 +2968,49 @@ const App = {
     App._extratoPeriodo = per;
     document.querySelectorAll('.extrato-per-btn').forEach(b => b.classList.remove('active'));
     btn?.classList.add('active');
+    App._showExtratoPicker(per);
     App._renderExtrato();
+  },
+
+  // Mostra só o seletor do período escolhido (Ano/Mês/Semana/Dia) e, na primeira vez,
+  // pré-preenche com o período atual — mas o usuário pode trocar livremente.
+  _showExtratoPicker(per) {
+    const hoje = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const hojeStr = `${hoje.getFullYear()}-${pad(hoje.getMonth()+1)}-${pad(hoje.getDate())}`;
+    const selAno    = document.getElementById('extrato-ano-select');
+    const inpMes    = document.getElementById('extrato-mes-input');
+    const inpSemana = document.getElementById('extrato-semana-input');
+    const inpDia    = document.getElementById('extrato-dia-input');
+    [selAno, inpMes, inpSemana, inpDia].forEach(el => { if (el) el.style.display = 'none'; });
+
+    if (per === 'ano') {
+      App._populateExtratoAnos();
+      if (selAno) { selAno.style.display = ''; if (!selAno.value) selAno.value = String(hoje.getFullYear()); }
+    } else if (per === 'mes') {
+      if (inpMes) { inpMes.style.display = ''; if (!inpMes.value) inpMes.value = hojeStr.substring(0, 7); }
+    } else if (per === 'semana') {
+      if (inpSemana) {
+        inpSemana.style.display = '';
+        if (!inpSemana.value) {
+          const ini = new Date(hoje); ini.setDate(hoje.getDate() - 6);
+          inpSemana.value = `${ini.getFullYear()}-${pad(ini.getMonth()+1)}-${pad(ini.getDate())}`;
+        }
+      }
+    } else if (per === 'dia') {
+      if (inpDia) { inpDia.style.display = ''; if (!inpDia.value) inpDia.value = hojeStr; }
+    }
+  },
+
+  // Popula o select de anos do Extrato com os anos que têm compra + ano atual, preservando a seleção
+  _populateExtratoAnos() {
+    const sel = document.getElementById('extrato-ano-select'); if (!sel) return;
+    const prevVal = sel.value;
+    const anos = new Set([new Date().getFullYear()]);
+    App._extratoEventos().forEach(e => { const y = (e.data||'').substring(0,4); if (/^\d{4}$/.test(y)) anos.add(parseInt(y)); });
+    sel.innerHTML = '';
+    [...anos].sort((a,b)=>b-a).forEach(y => { const o = document.createElement('option'); o.value = o.textContent = y; sel.appendChild(o); });
+    if (prevVal && [...anos].map(String).includes(prevVal)) sel.value = prevVal;
   },
 
   // Monta os lançamentos: cada compra (combinada = 1 linha por CMP; avulsa = SL),
@@ -2998,12 +3041,30 @@ const App = {
 
   _extratoNoPeriodo(dataStr) {
     if (App._extratoPeriodo === 'tudo' || !dataStr) return true;
-    const hoje = new Date(); const d = new Date(dataStr + 'T00:00:00');
-    if (App._extratoPeriodo === 'ano')  return d.getFullYear() === hoje.getFullYear();
-    if (App._extratoPeriodo === 'mes')  return d.getFullYear() === hoje.getFullYear() && d.getMonth() === hoje.getMonth();
+    const d = new Date(dataStr + 'T00:00:00');
+
+    if (App._extratoPeriodo === 'ano') {
+      const v = document.getElementById('extrato-ano-select')?.value;
+      if (!v) return true;
+      return d.getFullYear() === parseInt(v);
+    }
+    if (App._extratoPeriodo === 'mes') {
+      const v = document.getElementById('extrato-mes-input')?.value; // "AAAA-MM"
+      if (!v) return true;
+      const [y, m] = v.split('-').map(Number);
+      return d.getFullYear() === y && (d.getMonth() + 1) === m;
+    }
     if (App._extratoPeriodo === 'semana') {
-      const ini = new Date(hoje); ini.setDate(hoje.getDate() - 6); ini.setHours(0,0,0,0);
-      return d >= ini && d <= hoje;
+      const v = document.getElementById('extrato-semana-input')?.value; // início da janela de 7 dias
+      if (!v) return true;
+      const ini = new Date(v + 'T00:00:00');
+      const fim = new Date(ini); fim.setDate(ini.getDate() + 6);
+      return d >= ini && d <= fim;
+    }
+    if (App._extratoPeriodo === 'dia') {
+      const v = document.getElementById('extrato-dia-input')?.value;
+      if (!v) return true;
+      return dataStr === v;
     }
     return true;
   },
@@ -3192,16 +3253,18 @@ const App = {
     const palette = ['#3a7ee8','#1db87a','#e8830a','#7c52d4','#00b8a2','#d94040','#e879b0','#f7c84a'];
     const chartDefs = { responsive:true, plugins:{ legend:{ display:false } } };
 
-    // Units bar — soma de TODAS as solicitações por unidade (ranking com "ver todas")
-    const unitC = {}; reqs.forEach(r => unitC[r.unitName||'?']=(unitC[r.unitName||'?']||0)+1);
-    const topUnit = Object.entries(unitC).sort((a,b)=>b[1]-a[1])[0];
+    // Units bar — cada unidade com uma cor distinta (hues espaçados por ângulo áureo), ordenado por mais pedidos
+    const unitCRaw = {}; reqs.forEach(r => unitCRaw[r.unitName||'?']=(unitCRaw[r.unitName||'?']||0)+1);
+    const unitC = Object.fromEntries(Object.entries(unitCRaw).sort((a,b)=>b[1]-a[1]));
+    const topUnit = Object.entries(unitC)[0];
     const topBadge = document.getElementById('chart-units-top');
     if (topBadge && topUnit) topBadge.textContent = `🏆 ${topUnit[0]}`;
-    App._renderUnitsHeat(unitC);
+    App._drawBar('chart-units', unitC, App._distinctColors(Object.keys(unitC).length));
 
-    // Groups bar — soma de TODAS as solicitações por grupo (ranking com "ver todas")
-    const grpC = {}; reqs.forEach(r => grpC[r.groupName||'?']=(grpC[r.groupName||'?']||0)+1);
-    App._renderGroupsHeat(grpC);
+    // Groups bar — ordenado por mais pedidos, com cor distinta por grupo (não fica limitado a 4 cores)
+    const grpCRaw = {}; reqs.forEach(r => grpCRaw[r.groupName||'?']=(grpCRaw[r.groupName||'?']||0)+1);
+    const grpC = Object.fromEntries(Object.entries(grpCRaw).sort((a,b)=>b[1]-a[1]));
+    App._drawBar('chart-groups', grpC, App._distinctColors(Object.keys(grpC).length));
 
     // Sub-opts bar — combine num+cor as one key for tinta, multi-model for batteries
     const subC = {};
@@ -3533,137 +3596,6 @@ const App = {
       }</div>`;
     }
     document.getElementById('subopts-all-modal').classList.remove('hidden');
-  },
-
-  _unitsData: [],   // cache do ranking completo por unidade (p/ popup "todas")
-  _groupsData: [],  // cache do ranking completo por grupo (p/ popup "todas")
-
-  // Card "Por Unidade": mesmo padrão do card Sub-opções — top 8 em barra de calor + "ver todas"
-  _renderUnitsHeat(data) {
-    const canvas = document.getElementById('chart-units');
-    const moreLine = document.getElementById('units-more-line');
-    if (!canvas) return;
-    const entries = Object.entries(data).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-    App._unitsData = entries;
-
-    App._destroyChart('chart-units');
-    if (!entries.length) {
-      canvas.style.display = 'none';
-      if (moreLine) moreLine.innerHTML = '<div class="subopts-empty">Sem solicitações no período/filtro.</div>';
-      return;
-    }
-    canvas.style.display = '';
-
-    const max = entries[0][1] || 1;
-    const TOP = 8;
-    const visiveis = entries.slice(0, TOP);
-    const labels = visiveis.map(([name]) => name);
-    const vals   = visiveis.map(([, v]) => v);
-    const cores  = vals.map(v => App._heatColor(v / max));
-
-    State.charts['chart-units'] = new Chart(canvas, {
-      type: 'bar',
-      data: { labels, datasets: [{ data: vals, backgroundColor: cores, borderRadius: 6, maxBarThickness: 18 }] },
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw} pedido(s)` } } },
-        scales: {
-          x: { beginAtZero: true, ticks: { color: '#6680a0', font: { size: 10 } }, grid: { color: '#eef2f8' } },
-          y: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } }
-        }
-      }
-    });
-
-    if (moreLine) {
-      moreLine.innerHTML = `<button class="subopt-vermais" onclick="App.showUnitsAll()" title="Ver todas as unidades">
-             <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-             Ver todas as unidades
-             <span class="subopt-vermais-badge">${entries.length}</span>
-           </button>`;
-    }
-  },
-
-  // Popup: todas as unidades (ranking completo por total de solicitações)
-  showUnitsAll() {
-    const entries = App._unitsData || [];
-    const body = document.getElementById('units-all-body'); if (!body) return;
-    const titulo = document.getElementById('units-all-titulo');
-    const total = entries.reduce((s, [, v]) => s + v, 0);
-    if (titulo) titulo.textContent = `Por Unidade — ${entries.length} unidades · ${total} pedido(s)`;
-    if (!entries.length) {
-      body.innerHTML = '<div class="subopts-empty">Sem solicitações no período/filtro.</div>';
-    } else {
-      const max = entries[0][1] || 1;
-      body.innerHTML = `<div class="subopts-heat" style="max-height:none">${
-        entries.map(([name, val], i) => App._suboptRowHtml(name, val, i, max)).join('')
-      }</div>`;
-    }
-    document.getElementById('units-all-modal').classList.remove('hidden');
-  },
-
-  // Card "Por Grupo": mesmo padrão — top 8 em barra de calor + "ver todos"
-  _renderGroupsHeat(data) {
-    const canvas = document.getElementById('chart-groups');
-    const moreLine = document.getElementById('groups-more-line');
-    const badge = document.getElementById('chart-groups-total');
-    if (!canvas) return;
-    const entries = Object.entries(data).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-    App._groupsData = entries;
-    if (badge) badge.textContent = entries.length ? `${entries.length} grupos` : '';
-
-    App._destroyChart('chart-groups');
-    if (!entries.length) {
-      canvas.style.display = 'none';
-      if (moreLine) moreLine.innerHTML = '<div class="subopts-empty">Sem solicitações no período/filtro.</div>';
-      return;
-    }
-    canvas.style.display = '';
-
-    const max = entries[0][1] || 1;
-    const TOP = 8;
-    const visiveis = entries.slice(0, TOP);
-    const labels = visiveis.map(([name]) => name);
-    const vals   = visiveis.map(([, v]) => v);
-    const cores  = vals.map(v => App._heatColor(v / max));
-
-    State.charts['chart-groups'] = new Chart(canvas, {
-      type: 'bar',
-      data: { labels, datasets: [{ data: vals, backgroundColor: cores, borderRadius: 6, maxBarThickness: 18 }] },
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw} pedido(s)` } } },
-        scales: {
-          x: { beginAtZero: true, ticks: { color: '#6680a0', font: { size: 10 } }, grid: { color: '#eef2f8' } },
-          y: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } }
-        }
-      }
-    });
-
-    if (moreLine) {
-      moreLine.innerHTML = `<button class="subopt-vermais" onclick="App.showGroupsAll()" title="Ver todos os grupos">
-             <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-             Ver todos os grupos
-             <span class="subopt-vermais-badge">${entries.length}</span>
-           </button>`;
-    }
-  },
-
-  // Popup: todos os grupos (ranking completo por total de solicitações)
-  showGroupsAll() {
-    const entries = App._groupsData || [];
-    const body = document.getElementById('groups-all-body'); if (!body) return;
-    const titulo = document.getElementById('groups-all-titulo');
-    const total = entries.reduce((s, [, v]) => s + v, 0);
-    if (titulo) titulo.textContent = `Por Grupo — ${entries.length} grupos · ${total} pedido(s)`;
-    if (!entries.length) {
-      body.innerHTML = '<div class="subopts-empty">Sem solicitações no período/filtro.</div>';
-    } else {
-      const max = entries[0][1] || 1;
-      body.innerHTML = `<div class="subopts-heat" style="max-height:none">${
-        entries.map(([name, val], i) => App._suboptRowHtml(name, val, i, max)).join('')
-      }</div>`;
-    }
-    document.getElementById('groups-all-modal').classList.remove('hidden');
   },
 
   // Número total + "TOTAL" centralizado no buraco da rosca — soma só as fatias visíveis
@@ -7606,35 +7538,43 @@ const App = {
     // Edit item enter key
     document.getElementById('edit-item-value').addEventListener('keydown',e=>{ if(e.key==='Enter') App.confirmEditItem(); });
 
-    // ESC fecha qualquer card/modal aberto
+    // ESC em cascata: passo 1 fecha o pop-up aberto; passo 2 sai da aba atual (volta ao Dashboard);
+    // passo 3, sem pop-up e já no Dashboard, volta para a UniLAMIC TI
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;
+
       // Menu de conta na sidebar
       const userMenu = document.getElementById('sb-user-menu');
       if (userMenu && !userMenu.classList.contains('hidden')) { App.closeUserMenu(); return; }
-      // 0. Modais simples do dashboard (parcelas, meta, extrato, sub-opções) — fecham direto
-      for (const mid of ['parcelas-modal', 'meta-modal', 'activity-detail-modal', 'extrato-modal', 'subopts-all-modal', 'logs-full-modal', 'modal-nova-solic', 'modal-grupo-edit']) {
-        const m = document.getElementById(mid);
-        if (m && !m.classList.contains('hidden')) { m.classList.add('hidden'); return; }
-      }
-      // 1. Modal KPI (negados, comprados, total)
-      const kpiModal = document.getElementById('kpi-list-modal');
-      if (kpiModal && !kpiModal.classList.contains('hidden')) {
-        kpiModal.classList.add('hidden'); return;
-      }
-      // 2. Modal editar item (configurações)
-      const editModal = document.getElementById('modal-edit-item');
-      if (editModal && !editModal.classList.contains('hidden')) {
-        App.closeEditModal(); return;
-      }
-      // 3. Modal gerenciar solicitação
-      const reqModal = document.getElementById('modal-request');
-      if (reqModal && !reqModal.classList.contains('hidden')) {
-        App.closeModal(); return;
-      }
-      // 4. Popup flutuante do calendário
+
+      // Popovers com padrão .open (filtro do dashboard, etc.)
+      const popoverAberto = document.querySelector('.open');
+      if (popoverAberto) { document.querySelectorAll('.open').forEach(el => el.classList.remove('open')); return; }
+
+      // Popup flutuante do calendário
       const popup = document.querySelector('.cal-popup');
       if (popup) { popup.remove(); return; }
+
+      // Modais com fechamento próprio (fazem mais que só esconder)
+      const editModal = document.getElementById('modal-edit-item');
+      if (editModal && !editModal.classList.contains('hidden')) { App.closeEditModal(); return; }
+      const reqModal = document.getElementById('modal-request');
+      if (reqModal && !reqModal.classList.contains('hidden')) { App.closeModal(); return; }
+
+      // Qualquer outro modal ainda aberto (todos usam o mesmo padrão .modal-overlay)
+      const modal = document.querySelector('.modal-overlay:not(.hidden)');
+      if (modal) { modal.classList.add('hidden'); return; }
+
+      // Sem pop-up: se estiver numa aba diferente do Dashboard, sai dela e volta pro Dashboard
+      const painel = document.querySelector('.tab-panel.active');
+      if (painel && painel.id !== 'tab-dashboard') {
+        const dashBtn = document.querySelector('.nav-item[data-tab="tab-dashboard"]');
+        if (dashBtn) App.adminTab(dashBtn);
+        return;
+      }
+
+      // Já no Dashboard sem pop-up: sai do Financeiro e volta para a UniLAMIC TI
+      App.backToCompras();
     });
 
     App.startIdleWatch();   // auto-logout por inatividade

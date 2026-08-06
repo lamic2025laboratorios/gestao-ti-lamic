@@ -679,7 +679,27 @@
     var c = document.querySelector('.sidebar-user'); if (c) c.classList.remove('open');
   }
   document.addEventListener('click', function (e) { if (!e.target.closest('.sidebar-account')) closeRelUserMenu(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeRelUserMenu(); });
+
+  // ESC em cascata: passo 1 fecha o pop-up aberto; passo 2 sai da aba atual (volta pro Dashboard);
+  // passo 3, sem pop-up e já no Dashboard, volta para a UniLAMIC TI
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+
+    var userMenu = document.getElementById('sb-user-menu');
+    if (userMenu && !userMenu.classList.contains('hidden')) { closeRelUserMenu(); return; }
+
+    var popoverAberto = document.querySelector('.open');
+    if (popoverAberto) { document.querySelectorAll('.open').forEach(function (el) { el.classList.remove('open'); }); return; }
+
+    var modal = document.getElementById('modal');
+    if (modal && modal.style.display !== 'none') { if (typeof fecharModal === 'function') fecharModal(); return; }
+
+    var painel = document.querySelector('.section.active');
+    if (painel && painel.id !== 'dashboard') { if (typeof showSection === 'function') showSection('dashboard'); return; }
+
+    relBackToMenu();
+  });
+
   function relBackToMenu() { window.location.href = 'index.html'; }
   function relLogout() { try { localStorage.removeItem('tic_adminUser'); } catch (_) {} window.location.href = 'index.html'; }
 </script>

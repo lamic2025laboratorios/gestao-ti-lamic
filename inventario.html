@@ -1771,7 +1771,27 @@
     var c = document.querySelector('.sidebar-user'); if (c) c.classList.remove('open');
   }
   document.addEventListener('click', function (e) { if (!e.target.closest('.sidebar-account')) closeInvUserMenu(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeInvUserMenu(); });
+
+  // ESC em cascata: passo 1 fecha o pop-up aberto; passo 2 sai da aba atual (volta pra Unidades);
+  // passo 3, sem pop-up e já em Unidades, volta para a UniLAMIC TI
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+
+    var userMenu = document.getElementById('sb-user-menu');
+    if (userMenu && !userMenu.classList.contains('hidden')) { closeInvUserMenu(); return; }
+
+    var popoverAberto = document.querySelector('.open');
+    if (popoverAberto) { document.querySelectorAll('.open').forEach(function (el) { el.classList.remove('open'); }); return; }
+
+    var modal = document.querySelector('.modal:not(.hidden)');
+    if (modal) { if (typeof closeModals === 'function') closeModals(); else modal.classList.add('hidden'); return; }
+
+    var painel = document.querySelector('.view.active');
+    if (painel && painel.id !== 'units-view') { if (typeof showUnitsView === 'function') showUnitsView(); return; }
+
+    invBackToMenu();
+  });
+
   function invBackToMenu() { try { (window.parent || window).postMessage('fecharInventario', '*'); } catch (_) {} }
   function invLogout() { try { localStorage.removeItem('tic_adminUser'); } catch (_) {} try { (window.top || window).location.href = 'index.html'; } catch (_) { window.location.href = 'index.html'; } }
 </script>

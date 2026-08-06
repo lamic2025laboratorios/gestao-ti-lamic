@@ -2265,6 +2265,8 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .extrato-per-btn.active { background: var(--blue-500, #2a68d4); color: #fff; }
 .extrato-resumo { font-size: .85rem; color: #6680a0; }
 .extrato-resumo strong { color: #1a3050; }
+.extrato-periodo-picker { display: flex; align-items: center; gap: 8px; }
+.extrato-picker-input { height: 34px; padding: 6px 10px; font-size: .82rem; }
 .extrato-table td { font-size: .84rem; }
 .extrato-cod { font-weight: 800; font-size: .74rem; padding: 2px 8px; border-radius: 6px; }
 .extrato-cod.cod-cmp { background: #f5f1fe; color: #7c52d4; }
