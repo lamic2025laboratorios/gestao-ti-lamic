@@ -323,6 +323,9 @@ const App = {
     return cadastrado || 'Conserto';
   },
 
+  // Rótulo de exibição da forma de pagamento (dinheiro/boleto/cartão)
+  _pagLabel(fp) { return { dinheiro: 'Dinheiro', boleto: 'Boleto', cartao: 'Cartão' }[fp] || (fp || '—'); },
+
   buildBatteryPanel(groupId) {
     const opts = (State.subOpts||{})[groupId] || {};
     const gname = (State.groups?.[groupId]||'').toLowerCase();
@@ -330,8 +333,10 @@ const App = {
     const isBat = gname.includes('pilha')||gname.includes('bateria');
     const modelos = opts.modelos || (isBat ? ["AAA","AA","Bateria de balança 2032","Bateria do cronômetro 1210"] : []);
     const wrap = document.getElementById('battery-models'); wrap.innerHTML = '';
+    const motivoWrap = document.getElementById('conserto-motivo-wrap');
+    if (motivoWrap) motivoWrap.classList.toggle('hidden', !isConserto);
     if (!modelos.length) { wrap.innerHTML = `<p style="color:var(--gray-500);font-size:.82rem;padding:6px">Nenhum ${isConserto?'equipamento':'modelo'} cadastrado. Cadastre em Configurações → Grupos → este grupo → Sub-opções.</p>`; return; }
-    // Conserto: escolhe o EQUIPAMENTO consertado — SEM quantidade
+    // Conserto: escolhe o EQUIPAMENTO consertado — SEM quantidade, COM motivo (obrigatório)
     if (isConserto) {
       modelos.forEach(m => {
         const l = document.createElement('label'); l.className = 'check-item';
@@ -378,6 +383,7 @@ const App = {
         const qtyEl = document.querySelector(`.bat-qty-input[data-model="${cb.value}"]`);
         return { modelo: cb.value, qty: qtyEl ? parseInt(qtyEl.value)||1 : 1 };
       });
+      if (App._isConserto(norm)) d.motivoConserto = document.getElementById('conserto-motivo')?.value || '';
     } else {
       d.product = document.getElementById('other-product').value;
       d.reason  = document.getElementById('other-reason').value;
@@ -397,6 +403,8 @@ const App = {
           if (d.num) { const r=document.querySelector(`input[name="num"][value="${d.num}"]`); if(r) r.checked=true; }
           (d.cors||[]).forEach(c => { const cb=document.querySelector(`input[name="cor"][value="${c}"]`); if(cb) cb.checked=true; });
         } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
+          const motivoEl = document.getElementById('conserto-motivo');
+          if (motivoEl) motivoEl.value = d.motivoConserto || '';
           (d.batModels||[]).forEach(bm => {
             const cb=document.querySelector(`input[name="bat"][value="${bm.modelo}"]`);
             if (cb) {
@@ -427,6 +435,9 @@ const App = {
     document.querySelectorAll('.bat-qty-wrap').forEach(w=>w.style.display='none');
     document.getElementById('other-product').value = '';
     document.getElementById('other-reason').value = '';
+    const motivoEl = document.getElementById('conserto-motivo');
+    if (motivoEl) motivoEl.value = '';
+    document.getElementById('conserto-motivo-wrap')?.classList.add('hidden');
     State.currentType = null;
     LS.remove('requestForm');
   },
@@ -457,11 +468,17 @@ const App = {
     } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
       const checked = [...document.querySelectorAll('input[name="bat"]:checked')];
       if (!checked.length) { toast('Selecione ao menos um modelo.','error'); return; }
+      const isConserto = App._isConserto(norm);
+      let motivoConserto = '';
+      if (isConserto) {
+        motivoConserto = document.getElementById('conserto-motivo')?.value.trim() || '';
+        if (!motivoConserto) { toast('Informe o motivo do conserto.','error'); return; }
+      }
       // 1 row per model
       checked.forEach(cb => {
         const qtyEl = document.querySelector(`.bat-qty-input[data-model="${cb.value}"]`);
         const qty = parseInt(qtyEl?.value)||1;
-        rows.push({...base, modelo: cb.value, qty, batModel: cb.value});
+        rows.push({...base, modelo: cb.value, qty, batModel: cb.value, ...(isConserto ? { reason: motivoConserto } : {})});
       });
     } else {
       const product = document.getElementById('other-product').value.trim();
@@ -506,6 +523,9 @@ const App = {
     document.getElementById('nsol-reason').value = '';
     document.getElementById('nsol-urgency').checked = false;
     document.getElementById('nsol-obs').value = '';
+    const nsolMotivoEl = document.getElementById('nsol-conserto-motivo');
+    if (nsolMotivoEl) nsolMotivoEl.value = '';
+    document.getElementById('nsol-conserto-motivo-wrap')?.classList.add('hidden');
     document.getElementById('modal-nova-solic').classList.remove('hidden');
   },
   closeNovaSolic() { document.getElementById('modal-nova-solic').classList.add('hidden'); },
@@ -551,8 +571,10 @@ const App = {
     const isBat = gname.includes('pilha')||gname.includes('bateria');
     const modelos = opts.modelos || (isBat ? ["AAA", "AA", "Bateria de balança 2032", "Bateria do cronômetro 1210"] : []);
     const wrap = document.getElementById('nsol-battery-models'); wrap.innerHTML = '';
+    const motivoWrap = document.getElementById('nsol-conserto-motivo-wrap');
+    if (motivoWrap) motivoWrap.classList.toggle('hidden', !isConserto);
     if (!modelos.length) { wrap.innerHTML = `<p style="color:var(--gray-500);font-size:.82rem;padding:6px">Nenhum ${isConserto?'equipamento':'modelo'} cadastrado. Cadastre em Configurações → Grupos → este grupo → Sub-opções.</p>`; return; }
-    // Conserto: escolhe o EQUIPAMENTO consertado — SEM quantidade
+    // Conserto: escolhe o EQUIPAMENTO consertado — SEM quantidade, COM motivo (obrigatório)
     if (isConserto) {
       modelos.forEach(m => {
         const l = document.createElement('label'); l.className = 'check-item';
@@ -594,9 +616,15 @@ const App = {
     } else if (norm.includes('pilha') || norm.includes('bateria') || norm.includes('conserto') || norm.includes('concerto')) {
       const checked = [...document.querySelectorAll('input[name="nsol-bat"]:checked')];
       if (!checked.length) { toast('Selecione ao menos um modelo.', 'error'); return; }
+      const isConserto = App._isConserto(norm);
+      let motivoConserto = '';
+      if (isConserto) {
+        motivoConserto = document.getElementById('nsol-conserto-motivo')?.value.trim() || '';
+        if (!motivoConserto) { toast('Informe o motivo do conserto.', 'error'); return; }
+      }
       checked.forEach(cb => {
         const qtyEl = document.querySelector(`.nsol-bat-qty[data-model="${cb.value}"]`);
-        rows.push({ ...base, modelo: cb.value, qty: parseInt(qtyEl?.value) || 1, batModel: cb.value });
+        rows.push({ ...base, modelo: cb.value, qty: parseInt(qtyEl?.value) || 1, batModel: cb.value, ...(isConserto ? { reason: motivoConserto } : {}) });
       });
     } else {
       const product = document.getElementById('nsol-product').value.trim();
@@ -4623,9 +4651,9 @@ const App = {
       const num = r.num||r.nums||''; const cor = r.cor||r.cores||'';
       text = [num, cor].filter(Boolean).join(' · ') || 'TINTA';
     } else if (App._isConserto(n) && (r.equipamento||r.batModel||r.modelo)) {
-      // Conserto: equipamento consertado + observação (sem quantidade)
+      // Conserto: equipamento consertado + motivo do conserto (observação fica separada, não entra aqui)
       const eq = r.equipamento || r.batModel || r.modelo || '';
-      text = [eq, r.obs].filter(Boolean).join(' — ');
+      text = [eq, r.reason].filter(Boolean).join(' — ');
     } else if ((n.includes('pilha')||n.includes('bateria')||n.includes('conserto')||n.includes('concerto')) && (r.batModel||r.batModels||r.modelo)) {
       if (r.batModel)   text = `${r.batModel} ×${r.qty||1}`;
       else if (r.batModels) text = r.batModels.map(b=>`${b.modelo} ×${b.qty}`).join(' | ');
@@ -5696,9 +5724,15 @@ const App = {
       <div class="compra-detalhe-meta">
         <div><span class="cdm-label">Unidade</span><span class="cdm-val">${r.unitName||'—'}</span></div>
         <div><span class="cdm-label">Grupo</span><span class="cdm-val">${r.groupName||'—'}</span></div>
+        <div><span class="cdm-label">Forma de Pagamento</span><span class="cdm-val">${App._pagLabel(r.formaPagamento)}</span></div>
         <div><span class="cdm-label">Fornecedor</span><span class="cdm-val">${r.fornecedor||'—'}</span></div>
         <div><span class="cdm-label">Data</span><span class="cdm-val">${fmt(r.boughtAt)}</span></div>
         <div><span class="cdm-label">Total</span><span class="cdm-val" style="color:#1a7a4a;font-weight:700">${fmtR(r.valorTotal)}</span></div>
+      </div>
+      <div style="margin-top:10px;font-size:.8rem;color:#334155">${App.reqSummary(r)}</div>
+      <div style="margin-top:4px;font-size:.8rem;color:#334155;display:flex;gap:12px;flex-wrap:wrap">
+        <span>Qtd: <strong>${r.quantidade||'—'}</strong></span>
+        <span>Unit: <strong>${r.valor ? fmtR(r.valor) : '—'}</strong></span>
       </div>
       <div class="form-row-2" style="margin-top:12px">
         <div class="form-group">
@@ -5706,13 +5740,19 @@ const App = {
           <select id="pinfo-subgrupo" class="input-field select-styled">${App._compraSubgroupOpts(r)}</select>
         </div>
         <div class="form-group">
+          <label class="form-label">Solicitante</label>
+          <input type="text" id="pinfo-solicitante" class="input-field" value="${r.solicitante || ''}" placeholder="Nome do solicitante">
+        </div>
+      </div>
+      <div class="form-row-2" style="margin-top:8px">
+        <div class="form-group">
           <label class="form-label">Descrição</label>
           <input type="text" id="pinfo-desc" class="input-field" value="${r.descricao || ''}" placeholder="Descrição">
         </div>
-      </div>
-      <div class="form-group" style="margin-top:8px">
-        <label class="form-label">Descrição Técnica</label>
-        <input type="text" id="pinfo-desctec" class="input-field" value="${r.descTecnica || ''}" placeholder="Descrição técnica">
+        <div class="form-group">
+          <label class="form-label">Descrição Técnica</label>
+          <input type="text" id="pinfo-desctec" class="input-field" value="${r.descTecnica || ''}" placeholder="Descrição técnica">
+        </div>
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:10px">
         <button class="btn-secondary" onclick="App.saveParceladaSubinfo('${reqId}')">Salvar</button>
@@ -5727,15 +5767,16 @@ const App = {
     document.getElementById('compra-detalhe-modal').classList.remove('hidden');
   },
 
-  // Salva Subgrupo/Descrição/Descrição Técnica de uma parcelada avulsa a partir do
-  // popup de detalhe (showParceladaInfo) — os únicos campos editáveis ali; o Grupo
-  // é fixo desde a criação da solicitação e não muda por aqui.
+  // Salva Subgrupo/Solicitante/Descrição/Descrição Técnica de uma parcelada avulsa a
+  // partir do popup de detalhe (showParceladaInfo) — os únicos campos editáveis ali;
+  // o Grupo e a Forma de Pagamento são fixos e não mudam por aqui.
   saveParceladaSubinfo(reqId) {
     const r = (State.requests || {})[reqId]; if (!r) return;
-    const subgrupo    = document.getElementById('pinfo-subgrupo')?.value  || '';
-    const descricao    = document.getElementById('pinfo-desc')?.value      || '';
-    const descTecnica  = document.getElementById('pinfo-desctec')?.value   || '';
-    DB.update(`requests/${reqId}`, { subgrupo, descricao, descTecnica })
+    const subgrupo     = document.getElementById('pinfo-subgrupo')?.value    || '';
+    const solicitante  = document.getElementById('pinfo-solicitante')?.value || '';
+    const descricao    = document.getElementById('pinfo-desc')?.value        || '';
+    const descTecnica  = document.getElementById('pinfo-desctec')?.value     || '';
+    DB.update(`requests/${reqId}`, { subgrupo, solicitante, descricao, descTecnica })
       .then(() => {
         toast('✓ Dados atualizados.');
         App._logActivity('Solicitações', 'Subgrupo/descrição atualizados', `SL-${r.seq ?? reqId}`);
@@ -5756,6 +5797,7 @@ const App = {
       <div class="compra-detalhe-meta">
         <div><span class="cdm-label">Fornecedor</span><span class="cdm-val">${primeiraCompra.fornecedor || '—'}</span></div>
         <div><span class="cdm-label">Data</span><span class="cdm-val">${fmt(primeiraCompra.boughtAt)}</span></div>
+        <div><span class="cdm-label">Forma de Pagamento</span><span class="cdm-val">${App._pagLabel(primeiraCompra.formaPagamento)}</span></div>
         <div><span class="cdm-label">Parcelas</span><span class="cdm-val">${hasParc ? `${reqs[0]?.parcelas?.length}× parcelas ${App._tagParcelaStatus(reqs[0]?.parcelas)}` : 'À vista'}</span></div>
         <div><span class="cdm-label">Total Geral</span><span class="cdm-val" style="color:#1a7a4a;font-weight:700">${fmtR(grandTotal)}</span></div>
       </div>
@@ -5772,10 +5814,12 @@ const App = {
               <span style="font-size:.78rem;color:#6680a0">${r.groupName||''}${r.subgrupo ? ' · '+r.subgrupo : ''}</span>
               <span class="codigos-badge lote" style="font-size:.65rem;padding:1px 6px">${lote}</span>
             </div>
+            <div style="margin-top:2px;font-size:.8rem;color:#334155">${App.reqSummary(r)}</div>
             <div style="margin-top:4px;font-size:.8rem;color:#334155;display:flex;gap:12px;flex-wrap:wrap">
               <span>Qtd: <strong>${r.quantidade||'—'}</strong></span>
               <span>Unit: <strong>${r.valor ? fmtR(r.valor) : '—'}</strong></span>
               <span>Total: <strong style="color:#1a7a4a">${fmtR(r.valorTotal)}</strong></span>
+              ${r.solicitante ? `<span>Solicitante: <strong>${r.solicitante}</strong></span>` : ''}
               ${parLine}
             </div>
             ${r.descricao ? `<div style="font-size:.76rem;color:#6680a0;margin-top:2px">${r.descricao}</div>` : ''}
@@ -5814,6 +5858,7 @@ const App = {
         ${linha('Resumo', App.reqSummary(r))}
         ${linha('Solicitante', r.solicitante || '—')}
         ${linha('Fornecedor', r.fornecedor || '—')}
+        ${r.status === 'Comprado' ? linha('Forma de Pagamento', App._pagLabel(r.formaPagamento)) : ''}
         ${linha('Data solicitação', fmt(r.createdAt))}
         ${linha('Data compra', fmt(r.boughtAt))}
         ${linha('Quantidade', r.quantidade || '—')}
