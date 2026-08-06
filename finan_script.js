@@ -1724,10 +1724,10 @@ const App = {
     const negados = counts.Negado;
 
     const statsBar = document.getElementById(statsId);
-    const negBar   = document.getElementById(negId);
-    if (!statsBar || !negBar) return;
+    const negBar   = document.getElementById(negId);   // opcional: nem toda tela tem essa faixa extra
+    if (!statsBar) return;
 
-    if (total === 0) { statsBar.innerHTML = ''; statsBar.style.display = 'none'; negBar.style.display = 'none'; return; }
+    if (total === 0) { statsBar.innerHTML = ''; statsBar.style.display = 'none'; if (negBar) negBar.style.display = 'none'; return; }
 
     statsBar.style.display = 'flex';
     statsBar.innerHTML = `
@@ -1738,13 +1738,17 @@ const App = {
       <span class="rqs-sep">·</span>
       <span class="rqs-item rqs-com"><span class="rqs-dot"></span>${counts.Comprado} comprado${counts.Comprado!==1?'s':''}</span>
       <span class="rqs-sep">·</span>
-      <span class="rqs-item rqs-est"><span class="rqs-dot"></span>${counts.Estoque} do estoque</span>`;
+      <span class="rqs-item rqs-est"><span class="rqs-dot"></span>${counts.Estoque} do estoque</span>
+      <span class="rqs-sep">·</span>
+      <span class="rqs-item rqs-neg"><span class="rqs-dot"></span>${counts.Negado} negado${counts.Negado!==1?'s':''}</span>`;
 
+    // Faixa extra (se a tela tiver): destaque do % negado, sem emoji — SVG do sistema
+    if (!negBar) return;
     if (negados > 0) {
       const pct = Math.round(negados/total*100);
       negBar.style.display = 'flex';
       negBar.innerHTML = `
-        <span class="rqn-icon">⚠</span>
+        <span class="rqn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></span>
         <span><strong>${negados}</strong> pedido${negados!==1?'s':''} negado${negados!==1?'s':''} — <strong>${pct}%</strong> do total de ${total}</span>`;
     } else {
       negBar.style.display = 'none';
@@ -3168,6 +3172,9 @@ const App = {
     document.getElementById('kpi-negado').textContent = reqs.filter(r=>r.status==='Negado').length;
     document.getElementById('kpi-bought').textContent = reqs.filter(r=>r.status==='Comprado').length;
     document.getElementById('kpi-month-spent').textContent = fmt(periodSpent);
+    // Só informativo: atendidos com item do estoque, sem compra nova
+    const elEst = document.getElementById('kpi-estoque');
+    if (elEst) elEst.textContent = reqs.filter(r=>r.status==='Estoque').length;
   },
 
   // Helper: convert a date string to a grouping key for a given periodView
