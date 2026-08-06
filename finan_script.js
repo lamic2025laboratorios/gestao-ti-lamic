@@ -4853,32 +4853,38 @@ const App = {
     }
 
     // ── Modo somente-leitura (autorização já concluída, botão ✓ da linha) ──
-    // Esconde os botões de status por trás de um "olhinho" (sempre oculto ao
-    // abrir) e trava toda a edição — só o Gerenciar (lápis) permite alterar.
+    // Status continua visível (só trava, não esconde). Quem some por trás de
+    // um "olhinho" — sempre oculto ao abrir — são os Dados da Compra/Estoque.
+    // Trava toda a edição: só o Gerenciar (lápis) permite alterar.
     const readOnly = !!opts.readOnly;
     State.modalReadOnly = readOnly;
-    document.getElementById('modal-status-group')?.classList.toggle('hidden', readOnly);
-    document.getElementById('modal-status-readonly-group')?.classList.toggle('hidden', !readOnly);
-    const statusReadonlyBadge = document.getElementById('modal-status-readonly-badge');
-    if (statusReadonlyBadge) { statusReadonlyBadge.innerHTML = App.statusBadge(r.status); statusReadonlyBadge.classList.add('hidden'); }
-    const eyeBtn = document.getElementById('modal-status-eye');
-    if (eyeBtn) eyeBtn.title = 'Mostrar status';
+    document.getElementById('modal-dados-toggle-row')?.classList.toggle('hidden', !readOnly);
+    const dadosLabel = document.getElementById('modal-dados-toggle-label');
+    if (dadosLabel) dadosLabel.textContent = 'Dados da compra/estoque ocultos';
+    const dadosEye = document.getElementById('modal-dados-eye');
+    if (dadosEye) dadosEye.title = 'Mostrar dados da compra/estoque';
+    ['modal-bought-fields', 'modal-estoque-panel'].forEach(fid => {
+      document.getElementById(fid)?.classList.toggle('dados-readonly-hidden', readOnly);
+    });
     document.querySelector('#modal-request .modal-card')?.classList.toggle('modal-readonly', readOnly);
-    document.querySelectorAll('#modal-request input, #modal-request select, #modal-request textarea').forEach(el => { el.disabled = readOnly; });
+    document.querySelectorAll('#modal-request input, #modal-request select, #modal-request textarea, #modal-request .status-btn').forEach(el => { el.disabled = readOnly; });
     document.getElementById('modal-btn-delete')?.classList.toggle('hidden', readOnly);
     document.getElementById('modal-btn-save')?.classList.toggle('hidden', readOnly);
 
     document.getElementById('modal-request').classList.remove('hidden');
   },
 
-  // Olhinho do status no modo somente-leitura: sempre começa oculto ao abrir o modal.
-  toggleModalStatusVisibility() {
-    const badge = document.getElementById('modal-status-readonly-badge');
-    const btn = document.getElementById('modal-status-eye');
-    if (!badge) return;
-    const vaiMostrar = badge.classList.contains('hidden');
-    badge.classList.toggle('hidden', !vaiMostrar);
-    if (btn) btn.title = vaiMostrar ? 'Ocultar status' : 'Mostrar status';
+  // Olhinho dos Dados da Compra/Estoque no modo somente-leitura: sempre começa
+  // oculto ao abrir o modal (só esconde/mostra, não altera nada).
+  toggleModalDadosVisibility() {
+    const bought  = document.getElementById('modal-bought-fields');
+    const estoque = document.getElementById('modal-estoque-panel');
+    const label   = document.getElementById('modal-dados-toggle-label');
+    const btn     = document.getElementById('modal-dados-eye');
+    const estavaOculto = bought?.classList.contains('dados-readonly-hidden') || estoque?.classList.contains('dados-readonly-hidden');
+    [bought, estoque].forEach(el => el?.classList.toggle('dados-readonly-hidden', !estavaOculto));
+    if (label) label.textContent = estavaOculto ? 'Dados da compra/estoque visíveis' : 'Dados da compra/estoque ocultos';
+    if (btn) btn.title = estavaOculto ? 'Ocultar dados da compra/estoque' : 'Mostrar dados da compra/estoque';
   },
 
   closeModal() {

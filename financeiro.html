@@ -2220,14 +2220,11 @@
           <button class="status-btn neg" data-s="Negado"      onclick="App.setModalStatus(this)">Negado</button>
         </div>
       </div>
-      <div class="form-group hidden" id="modal-status-readonly-group">
-        <label class="form-label" style="display:flex;align-items:center;gap:8px">
-          Status da Solicitação
-          <button type="button" class="btn-ico" id="modal-status-eye" onclick="App.toggleModalStatusVisibility()" title="Mostrar status">
-            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
-          </button>
-        </label>
-        <div id="modal-status-readonly-badge" class="hidden"></div>
+      <div class="form-group hidden" id="modal-dados-toggle-row" style="display:flex;align-items:center;gap:8px">
+        <button type="button" class="btn-ico" id="modal-dados-eye" onclick="App.toggleModalDadosVisibility()" title="Mostrar dados da compra/estoque">
+          <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <span id="modal-dados-toggle-label" style="font-size:.8rem;color:#6680a0">Dados da compra/estoque ocultos</span>
       </div>
       <div id="modal-bought-fields" class="modal-section hidden">
         <div class="modal-section-title">
