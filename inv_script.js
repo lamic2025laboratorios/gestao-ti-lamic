@@ -39,6 +39,36 @@ const parseArray = data => {
   return Object.values(data);
 };
 
+/* Normaliza os arrays de dentro de itSettings.
+   O Firebase NÃO guarda array esparso como array: apagar um item do meio
+   (splice) faz o nó voltar como objeto {0:…, 2:…}. Aí compPresets deixa de
+   ter .forEach/.map/.sort, o render do Estoque estoura no meio e os
+   Templates somem DA TELA — mesmo com os dados intactos no banco.
+   itInventory/itAccesses/itLogs já passavam por parseArray(); os arrays
+   dentro de itSettings não passavam. Isto é leitura: não reescreve nada
+   no Firebase, só devolve o formato certo pra memória. */
+function _normalizarModelSettings() {
+  if (!modelSettings || typeof modelSettings !== 'object') return;
+  // Listas de modelos + presets + licenças do estoque
+  ['printer','label','thermal','webcam','tv','mobile','ac','compPresets','stockLicenses']
+    .forEach(k => { if (modelSettings[k] !== undefined) modelSettings[k] = parseArray(modelSettings[k]); });
+
+  // Peças avulsas: modelSettings.parts.{model,cpu,mobo,ram,disk,gpu,monitor}
+  if (modelSettings.parts && typeof modelSettings.parts === 'object') {
+    Object.keys(modelSettings.parts).forEach(t => {
+      modelSettings.parts[t] = parseArray(modelSettings.parts[t]);
+    });
+  }
+
+  // partIds.ram / partIds.disk são arrays dentro de cada Template
+  (modelSettings.compPresets || []).forEach(p => {
+    if (p && p.partIds) {
+      if (p.partIds.ram  !== undefined) p.partIds.ram  = parseArray(p.partIds.ram);
+      if (p.partIds.disk !== undefined) p.partIds.disk = parseArray(p.partIds.disk);
+    }
+  });
+}
+
 /* ══════════════════════════════════════════════
    LISTENERS DE SINCRONIZAÇÃO EM TEMPO REAL
    ══════════════════════════════════════════════ */
@@ -93,6 +123,7 @@ function iniciarConexaoFirebase() {
   DB.listen('itSettings', data => {
     if (data) {
       modelSettings = data;
+      _normalizarModelSettings();   // Firebase devolve array esparso como objeto — ver função
       if (!modelSettings.mobile) modelSettings.mobile = [];
       if (!modelSettings.compPresets) modelSettings.compPresets = [];
     } else {
@@ -5856,7 +5887,6 @@ function registrarLog(equipCode, tipo, acao, detalhe) {
    um guichê/unidade. Derivar na leitura (em vez de gravar um campo novo) faz
    valer também pros logs que já existem. */
 const LOG_SECAO_FIXA  = { guiche: 'dashboard', peca: 'estoque', licenca: 'estoque', lixeira: 'estoque' };
-const LOG_PERIFERICOS = ['printer', 'label', 'thermal', 'webcam', 'tv'];
 const _LOG_RE_UNIDADE = /guich|atribu[ií]|vinculad|desvinculad|movido/i;
 
 function _secaoDoLog(l) {
@@ -5864,7 +5894,9 @@ function _secaoDoLog(l) {
     const fixa = LOG_SECAO_FIXA[l.tipo];
     if (fixa) return fixa;
     if (_LOG_RE_UNIDADE.test(l.acao || '')) return 'dashboard';   // entrou/saiu de um guichê
-    return LOG_PERIFERICOS.includes(l.tipo) ? 'equip' : 'estoque';
+    // Todo o resto é movimento DENTRO do Estoque: Templates de PC, celulares,
+    // ACs, periféricos, licenças — cada equipamento de lá, como pedido.
+    return 'estoque';
 }
 
 const LOG_SECAO_TITULO = { dashboard: 'Logs do Dashboard', equip: 'Logs de Equipamentos', estoque: 'Logs do Estoque' };
@@ -6413,7 +6445,10 @@ function abrirInfoTemplate(idx) {
 // verdade (comp.status), não existe status próprio no Modelo.
 function _coletarPcsFiltrados(statusFiltro) {
     const presets = modelSettings.compPresets || [];
-    const sorted = presets.map((p, idx) => ({ p, idx })).sort((a, b) => a.p.name.localeCompare(b.p.name, undefined, { numeric: true, sensitivity: 'base' }));
+    // String(...) obrigatório: um único preset sem `name` fazia o sort estourar
+    // e derrubava o render inteiro do Estoque (todos os Templates sumiam da tela).
+    const sorted = presets.map((p, idx) => ({ p, idx }))
+        .sort((a, b) => String(a.p.name || a.p.serial || '').localeCompare(String(b.p.name || b.p.serial || ''), undefined, { numeric: true, sensitivity: 'base' }));
     if (statusFiltro === 'todos') return sorted;
     return sorted.filter(({ p }) => {
         // Mesma regra da bolinha do card (defeito→amarelo, falta principal→vermelho)
