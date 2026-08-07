@@ -336,6 +336,7 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
 .units-scroll-area::-webkit-scrollbar { width: 5px; }
 .units-scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
+.unit-card-acts { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 2; }
 .unit-card {
   background: var(--surface);
   border-top: 4px solid var(--navy);

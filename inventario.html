@@ -1306,7 +1306,10 @@
     <div class="modal-content medium-modal">
         <div class="modal-header-row">
             <h3 id="logs-modal-title"><i class="ph ph-clock-counter-clockwise"></i> Logs do Inventário</h3>
-            <button class="btn-icon" onclick="document.getElementById('logs-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+            <div style="display:flex;gap:6px;">
+                <button class="btn-icon" onclick="baixarLogsModalAtual()" title="Baixar este histórico"><i class="ph ph-download-simple"></i></button>
+                <button class="btn-icon" onclick="document.getElementById('logs-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+            </div>
         </div>
         <div id="logs-nav-inv" class="logs-nav-inv"></div>
         <div id="logs-modal-body" class="logs-modal-body"></div>

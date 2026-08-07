@@ -590,12 +590,12 @@ function savePcPresetModal() {
                 }
                 ocupante.unitId = ''; ocupante.compId = ''; ocupante.unitName = ''; ocupante.compName = '';
                 _removerLicencaDaUnidade(ocupante, newUnitObj); // licença do ocupante sai junto
-                if (typeof registrarLog === 'function') registrarLog(ocupante.serial || ocupante.name, 'pc', 'Desvinculado (troca de guichê)', `Saiu de ${newCompObj?.name || ''} (${newUnitObj?.name || ''}) — substituído por ${saved.serial || saved.name}`);
+                if (typeof registrarLog === 'function') registrarLog(ocupante.serial || ocupante.name, 'pc', 'Desvinculado (troca de guichê)', `Saiu de ${newCompObj?.name || ''} (${newUnitObj?.name || ''}) — substituído por ${saved.serial || saved.name}`, newUnitObj?.id);
             }
             const origem = `${old.compName} (${old.unitName})`;
             const destino = `${newCompObj?.name || ''} (${newUnitObj?.name || ''})`;
             _moverPresetParaGuiche(saved, old.unitId, old.compId, newUnitId, newCompId);
-            if (typeof registrarLog === 'function') registrarLog(saved.serial || saved.name, 'pc', 'Movido de guichê', `${origem} → ${destino}`);
+            if (typeof registrarLog === 'function') registrarLog(saved.serial || saved.name, 'pc', 'Movido de guichê', `${origem} → ${destino}`, newUnitObj?.id);
             alert(`${saved.serial || saved.name} movido:\n\nSaindo de: ${origem}\nIndo para: ${destino}`);
         }
         // Status vive no computador de verdade (comp.status) — grava direto nele.
@@ -992,7 +992,7 @@ function saveComputer() {
     renderComputers();
     renderUnits();
 
-    if (typeof registrarLog === 'function') registrarLog('', 'guiche', id ? 'Guichê editado' : 'Guichê criado', `${d.name} (${u.name}) · status ${d.status}`);
+    if (typeof registrarLog === 'function') registrarLog('', 'guiche', id ? 'Guichê editado' : 'Guichê criado', `${d.name} (${u.name}) · status ${d.status}`, u.id);
 
     // Vincula/desvincula o Hardware e os Periféricos escolhidos no seletor do
     // Estoque a este Guichê — é isso que "mapeia automaticamente lá no estoque".
@@ -1285,7 +1285,7 @@ function _vincularHardwareDoGuiche(u, d) {
         const comp = (u.computers || []).find(c => c.id === d.id);
         if (comp) comp.license = novo.lic_status || 'pirata';
         _criarLicencaDoTemplate(novo, u, d);
-        if (typeof registrarLog === 'function') registrarLog(novo.serial || novo.name, 'pc', 'Hardware vinculado ao guichê', `${d.name} (${u.name})`);
+        if (typeof registrarLog === 'function') registrarLog(novo.serial || novo.name, 'pc', 'Hardware vinculado ao guichê', `${d.name} (${u.name})`, u.id);
         if (typeof _recalcularStatusTemplate === 'function') _recalcularStatusTemplate(novo);
     }
     saveSettings();
@@ -1509,7 +1509,7 @@ function _vincularPerifericosDoGuiche(u, d) {
                 prevLoc.arr.splice(prevLoc.idx, 1);
                 _stockStore()[arrKey].push(previous);
             }
-            if (typeof registrarLog === 'function') registrarLog(previous.serial, type, `${TIPO_LABEL[type]} desvinculado(a)`, `Saiu de ${d.name} (${u.name}) — voltou pro estoque`);
+            if (typeof registrarLog === 'function') registrarLog(previous.serial, type, `${TIPO_LABEL[type]} desvinculado(a)`, `Saiu de ${d.name} (${u.name}) — voltou pro estoque`, u.id);
             changed = true;
         }
         if (pickedId) {
@@ -1529,7 +1529,7 @@ function _vincularPerifericosDoGuiche(u, d) {
                 found.reg.connType = document.getElementById(`per-${type}-type`)?.value || 'usb';
                 found.reg.ip = document.getElementById(`ip-${type}`)?.value || '';
                 delete found.reg.manual;
-                if (typeof registrarLog === 'function') registrarLog(found.reg.serial, type, `${TIPO_LABEL[type]} vinculado(a)`, `${d.name} (${u.name}) · ${found.reg.connType}${found.reg.ip ? ' · ' + found.reg.ip : ''}`);
+                if (typeof registrarLog === 'function') registrarLog(found.reg.serial, type, `${TIPO_LABEL[type]} vinculado(a)`, `${d.name} (${u.name}) · ${found.reg.connType}${found.reg.ip ? ' · ' + found.reg.ip : ''}`, u.id);
                 changed = true;
             }
         }
@@ -1582,7 +1582,7 @@ function _anexarModeloAoGuiche(idx) {
     comp.license = p.lic_status || 'pirata';
     if (typeof _syncPresetToComputer === 'function') _syncPresetToComputer(p);
     _criarLicencaDoTemplate(p, unit, comp);
-    if (typeof registrarLog === 'function') registrarLog(p.serial || p.name, 'pc', 'Hardware vinculado ao guichê', `${comp.name} (${unit.name}) — pelo card do Estoque`);
+    if (typeof registrarLog === 'function') registrarLog(p.serial || p.name, 'pc', 'Hardware vinculado ao guichê', `${comp.name} (${unit.name}) — pelo card do Estoque`, unit.id);
     if (typeof _recalcularStatusTemplate === 'function') _recalcularStatusTemplate(p);
     saveSettings(); saveToStorage();
     if (typeof updateCompPresetSelect === 'function') updateCompPresetSelect();
@@ -1606,7 +1606,7 @@ function _limparGuicheCompleto(unit, comp) {
         reg.status = 'disponivel'; reg.connType = ''; reg.ip = ''; reg.unitName = '';
         const loc = _acharRegistroGlobal(arrKey, reg.id);
         if (loc && loc.unit) { loc.arr.splice(loc.idx, 1); _stockStore()[arrKey].push(reg); }
-        if (typeof registrarLog === 'function') registrarLog(reg.serial, type, `${TIPO_LABEL[type]} desvinculado(a)`, `Guichê ${comp.name} (${unit.name}) foi esvaziado`);
+        if (typeof registrarLog === 'function') registrarLog(reg.serial, type, `${TIPO_LABEL[type]} desvinculado(a)`, `Guichê ${comp.name} (${unit.name}) foi esvaziado`, unit.id);
     });
     ['hw_model', 'hw_cpu', 'hw_mobo', 'hw_ram', 'hw_disk', 'hw_gpu', 'hw_monitor', 'os', 'os_arch',
      'access_pc_pass', 'access_any_id', 'access_any_pass', 'access_rdp_user', 'access_rdp_pass',
@@ -1651,7 +1651,7 @@ function deleteGuicheDoModal() {
         if (typeof registrarLog === 'function') registrarLog(reg.serial, type, `${TIPO_LABEL[type]} apagado(a) junto com o guichê`, `${comp.name} (${u.name})`);
     });
 
-    if (typeof registrarLog === 'function') registrarLog('', 'guiche', 'Guichê APAGADO (com os dados dentro)', `${comp.name} (${u.name})`);
+    if (typeof registrarLog === 'function') registrarLog('', 'guiche', 'Guichê APAGADO (com os dados dentro)', `${comp.name} (${u.name})`, u.id);
     u.computers = u.computers.filter(c => c.id !== id);
 
     if (typeof reindexarCodigos === 'function') reindexarCodigos();
@@ -1730,7 +1730,7 @@ function deleteComputer(id) {
     });
     if (typeof registrarLog === 'function') {
         const comp = u.computers.find(c => c.id === id);
-        registrarLog('', 'guiche', 'Guichê removido', `${comp ? comp.name : id} (${u.name}) — equipamentos desvinculados de volta pro estoque`);
+        registrarLog('', 'guiche', 'Guichê removido', `${comp ? comp.name : id} (${u.name}) — equipamentos desvinculados de volta pro estoque`, u.id);
     }
 
     u.computers = u.computers.filter(c => c.id !== id);
@@ -2360,7 +2360,7 @@ function saveAc() {
             found.arr.splice(found.idx, 1);
             if (!u.acs) u.acs = [];
             u.acs.push(existing);
-            if (typeof registrarLog === 'function') registrarLog(existing.stockCode, 'ac', 'Ar-Condicionado atribuído', `${u.name} · ${existing.location || '—'}`);
+            if (typeof registrarLog === 'function') registrarLog(existing.stockCode, 'ac', 'Ar-Condicionado atribuído', `${u.name} · ${existing.location || '—'}`, u.id);
         }
         saveToStorage(); saveSettings(); closeModals(); renderAcs(); renderUnits();
         if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
@@ -2408,7 +2408,7 @@ function saveAc() {
         const iDx = found.arr.indexOf(d);
         if (iDx > -1) found.arr.splice(iDx, 1);
         _stockStore().acs.push(d);
-        if (typeof registrarLog === 'function') registrarLog(d.stockCode, 'ac', 'Ar-Condicionado desvinculado (status Disponível)', `Saiu de ${found.unit.name} — voltou pro estoque`);
+        if (typeof registrarLog === 'function') registrarLog(d.stockCode, 'ac', 'Ar-Condicionado desvinculado (status Disponível)', `Saiu de ${found.unit.name} — voltou pro estoque`, found.unit.id);
     }
     if (typeof registrarLog === 'function') {
         if (statusAntigoAc && statusAntigoAc !== novoStatusAc) {
@@ -2449,7 +2449,7 @@ function desvincularAc(id) {
     if (found.unit) {
         found.arr.splice(found.idx, 1);
         _stockStore().acs.push(reg);
-        if (typeof registrarLog === 'function') registrarLog(reg.stockCode, 'ac', 'Ar-Condicionado desvinculado', `Saiu de ${found.unit.name} — voltou pro estoque`);
+        if (typeof registrarLog === 'function') registrarLog(reg.stockCode, 'ac', 'Ar-Condicionado desvinculado', `Saiu de ${found.unit.name} — voltou pro estoque`, found.unit.id);
     }
     saveToStorage(); saveSettings(); renderAcs(); renderUnits();
     if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
@@ -2621,7 +2621,8 @@ function renderUnits() {
         if (licCount > 0) subInfo += `<div class="unit-sub-info unit-sub-lic"><i class="ph ph-certificate"></i> ${licCount} licença(s)</div>`;
         if (inativoCount > 0) subInfo += `<div class="unit-sub-info unit-sub-alert"><i class="ph ph-warning"></i> ${inativoCount} fora de operação</div>`;
         card.innerHTML = `
-            <div style="position:absolute;top:10px;right:10px;display:flex;gap:5px;z-index:2;">
+            <div class="unit-card-acts">
+                <button class="btn-icon" onclick="abrirLogsUnidade('${unit.id}')" title="Histórico desta unidade"><i class="ph ph-clock-counter-clockwise"></i></button>
                 <button class="btn-icon" onclick="editUnit('${unit.id}')"><i class="ph ph-pencil-simple"></i></button>
                 <button class="btn-icon btn-delete" onclick="deleteUnit('${unit.id}')"><i class="ph ph-trash"></i></button>
             </div>
@@ -2825,7 +2826,7 @@ function saveMobile() {
             const iDx = found.arr.indexOf(d);
             if (iDx > -1) found.arr.splice(iDx, 1);
             _stockStore().mobiles.push(d);
-            if (typeof registrarLog === 'function') registrarLog(d.serial, 'mobile', 'Celular desvinculado (status Disponível)', `Saiu de ${found.unit.name} — voltou pro estoque`);
+            if (typeof registrarLog === 'function') registrarLog(d.serial, 'mobile', 'Celular desvinculado (status Disponível)', `Saiu de ${found.unit.name} — voltou pro estoque`, found.unit.id);
         }
         if (typeof registrarLog === 'function') {
             if (statusAntigoMob && statusAntigoMob !== novoStatusMob) {
@@ -2849,7 +2850,7 @@ function saveMobile() {
             found.arr.splice(found.idx, 1);
             if (!u.mobiles) u.mobiles = [];
             u.mobiles.push(existing);
-            if (typeof registrarLog === 'function') registrarLog(existing.serial, 'mobile', 'Celular atribuído', `${u.name} · usuário ${existing.user || '—'}`);
+            if (typeof registrarLog === 'function') registrarLog(existing.serial, 'mobile', 'Celular atribuído', `${u.name} · usuário ${existing.user || '—'}`, u.id);
         }
     }
     saveToStorage(); saveSettings(); closeModals(); renderComputers(); renderUnits();
@@ -2882,7 +2883,7 @@ function desvincularMobile(id) {
     if (found.unit) {
         found.arr.splice(found.idx, 1);
         _stockStore().mobiles.push(reg);
-        if (typeof registrarLog === 'function') registrarLog(reg.serial, 'mobile', 'Celular desvinculado', `Saiu de ${found.unit.name} — voltou pro estoque`);
+        if (typeof registrarLog === 'function') registrarLog(reg.serial, 'mobile', 'Celular desvinculado', `Saiu de ${found.unit.name} — voltou pro estoque`, found.unit.id);
     }
     saveToStorage(); saveSettings(); renderComputers();
     if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
@@ -6153,7 +6154,10 @@ function _usuarioAtual() {
     return nome && nome.trim() ? { nome: nome.trim(), admin: true } : { nome: '(não identificado)', admin: false };
 }
 
-function registrarLog(equipCode, tipo, acao, detalhe) {
+// unitId (5º parâmetro, opcional): amarra o log à unidade — é o que permite
+// o histórico "por card" no Dashboard. Parâmetro novo com default undefined,
+// então as chamadas antigas (sem ele) continuam funcionando exatamente igual.
+function registrarLog(equipCode, tipo, acao, detalhe, unitId) {
     const u = _usuarioAtual();
     invLogs.unshift({
         ts: new Date().toISOString(),
@@ -6162,7 +6166,8 @@ function registrarLog(equipCode, tipo, acao, detalhe) {
         equipCode: equipCode || '',
         tipo: tipo || '',
         acao: acao || '',
-        detalhe: detalhe || ''
+        detalhe: detalhe || '',
+        unitId: unitId || null
     });
     if (invLogs.length > 2000) invLogs.length = 2000; // não cresce pra sempre
     DB.set('itLogs', invLogs);
@@ -6197,13 +6202,27 @@ function _logsDaSecao(secao) {
 
 // Abre o modal de logs — com equipCode mostra só o histórico daquele
 // equipamento; sem código mostra os movimentos da seção pedida (ou todos).
-function abrirLogsEquipamento(equipCode, secao) {
+// Botão relógio do card de unidade no Dashboard
+function abrirLogsUnidade(unitId) {
+    const unit = inventoryData.find(u => u.id === unitId);
+    abrirLogsEquipamento(null, null, unitId, unit ? unit.name : '');
+}
+
+// unitId (3º parâmetro, opcional): histórico "por card" do Dashboard — mostra
+// só as ações amarradas àquela unidade (ver registrarLog/unitId).
+let _logsModalFiltro = null;   // { equipCode, secao, unitId, nome } — o que o botão Baixar do modal usa
+function abrirLogsEquipamento(equipCode, secao, unitId, unitName) {
     const modal = document.getElementById('logs-modal');
     if (!modal) return;
-    document.getElementById('logs-modal-title').innerHTML = equipCode
+    document.getElementById('logs-modal-title').innerHTML = unitId
+        ? `<i class="ph ph-clock-counter-clockwise"></i> Histórico — ${unitName || 'Unidade'}`
+        : equipCode
         ? `<i class="ph ph-clock-counter-clockwise"></i> Histórico — ${equipCode}`
         : `<i class="ph ph-clock-counter-clockwise"></i> ${LOG_SECAO_TITULO[secao] || 'Logs do Inventário'}`;
-    const linhas = equipCode ? invLogs.filter(l => l.equipCode === equipCode) : _logsDaSecao(secao);
+    const linhas = unitId ? invLogs.filter(l => l.unitId === unitId)
+                 : equipCode ? invLogs.filter(l => l.equipCode === equipCode)
+                 : _logsDaSecao(secao);
+    _logsModalFiltro = { equipCode, secao, unitId, nome: unitId ? (unitName || 'unidade') : (equipCode || secao || 'inventario') };
     const body = document.getElementById('logs-modal-body');
     if (!linhas.length) {
         body.innerHTML = '<div class="estoque-empty">Nenhuma modificação registrada ainda.</div>';
@@ -6224,9 +6243,12 @@ function abrirLogsEquipamento(equipCode, secao) {
 
 // Baixa os logs do inventário em CSV (mesmo formato usado no Financeiro:
 // separador ';' e BOM, pro Excel abrir com acento correto).
-function baixarLogsInventario(secao) {
-    const dados = _logsDaSecao(secao);
-    if (!dados.length) { alert('Nenhum log para baixar nesta seção.'); return; }
+// Exportador genérico — usado tanto pelos botões de Configurações (baixa a
+// seção inteira) quanto pelo botão dentro do modal de histórico (baixa
+// exatamente o que está sendo mostrado ali: por unidade, por equipamento ou
+// por seção).
+function _exportarLogsCSV(dados, nomeArquivo) {
+    if (!dados.length) { alert('Nenhum log para baixar aqui.'); return; }
     const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
     const linhas = [['Data/Hora', 'Quem', 'Perfil', 'Código', 'Ação', 'Detalhe'].join(';')];
     dados.slice().sort((a, b) => String(a.ts || '').localeCompare(String(b.ts || ''))).forEach(l => {
@@ -6237,8 +6259,23 @@ function baixarLogsInventario(secao) {
     const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `logs-${secao || 'inventario'}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.href = url; a.download = `${nomeArquivo}-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+function baixarLogsInventario(secao) {
+    _exportarLogsCSV(_logsDaSecao(secao), `logs-${secao || 'inventario'}`);
+}
+
+// Baixa exatamente o que o modal de histórico está mostrando agora (unidade,
+// equipamento ou seção — o que tiver sido aberto por último).
+function baixarLogsModalAtual() {
+    if (!_logsModalFiltro) return;
+    const { equipCode, secao, unitId, nome } = _logsModalFiltro;
+    const dados = unitId ? invLogs.filter(l => l.unitId === unitId)
+                : equipCode ? invLogs.filter(l => l.equipCode === equipCode)
+                : _logsDaSecao(secao);
+    _exportarLogsCSV(dados, `logs-${nome}`);
 }
 
 // Depósito de Licenças de Software do estoque — licença nova só entra por
@@ -6342,7 +6379,7 @@ function puxarLicencasGenuinasDosGuiches() {
             }
             changed = true;
             if (typeof registrarLog === 'function') {
-                registrarLog(item.serial, 'licenca', 'Licença puxada do guichê', `${comp.name} (${unit.name}) · ${software} — chave a preencher`);
+                registrarLog(item.serial, 'licenca', 'Licença puxada do guichê', `${comp.name} (${unit.name}) · ${software} — chave a preencher`, unit.id);
             }
         });
     });
@@ -7599,7 +7636,7 @@ function _saveEquipModal() {
         const snapshot = afetados.map(c => ({ compId: c.id, model: c[fModelD] || '', connType: c[fTypeD] || 'usb', ip: c[fIpD] || '', host: c[fHostD] || '' }));
         const guicheAntigo = { unitId: found.unit.id, ownerCompId: reg.sourceCompId, comps: snapshot };
         afetados.forEach(c => { c[fModelD] = ''; c[fTypeD] = 'usb'; c[fIpD] = ''; c[fHostD] = ''; });
-        if (typeof registrarLog === 'function') registrarLog(reg.serial, type, `${TIPO_LABEL[type]} desvinculado(a) do guichê (${_LABEL_STATUS(novoStatusEq)})`, `Saiu de ${afetados.length} guichê(s) em ${found.unit.name}`);
+        if (typeof registrarLog === 'function') registrarLog(reg.serial, type, `${TIPO_LABEL[type]} desvinculado(a) do guichê (${_LABEL_STATUS(novoStatusEq)})`, `Saiu de ${afetados.length} guichê(s) em ${found.unit.name}`, found.unit.id);
         reg.sourceCompId = null; reg.sourceCompName = ''; reg.connType = ''; reg.ip = ''; reg.sharedBy = [];
         if (novoStatusEq === 'disponivel') {
             // vai pro depósito global (fica livre)
@@ -7649,7 +7686,7 @@ function _saveEquipModal() {
                     ocupante.status = 'disponivel'; ocupante.connType = ''; ocupante.ip = ''; ocupante.unitName = '';
                     const locOc = _acharRegistroGlobal(arrKey, ocupante.id);
                     if (locOc && locOc.unit) { locOc.arr.splice(locOc.idx, 1); _stockStore()[arrKey].push(ocupante); }
-                    if (typeof registrarLog === 'function') registrarLog(ocupante.serial, type, `${TIPO_LABEL[type]} desvinculado(a) (troca)`, `Saiu de ${novoComp.name} (${novaUnit.name}) — substituído por ${reg.serial}`);
+                    if (typeof registrarLog === 'function') registrarLog(ocupante.serial, type, `${TIPO_LABEL[type]} desvinculado(a) (troca)`, `Saiu de ${novoComp.name} (${novaUnit.name}) — substituído por ${reg.serial}`, novaUnit.id);
                 }
                 // Limpa o guichê antigo e grava no novo
                 const antigoComp = (found.unit.computers || []).find(c => c.id === reg.sourceCompId);
@@ -7669,7 +7706,7 @@ function _saveEquipModal() {
                 reg.sourceCompName = novoComp.name;
                 reg.unitName = novaUnit.name;
                 reg.sharedBy = [];
-                if (typeof registrarLog === 'function') registrarLog(reg.serial, type, 'Movido de guichê', `${origem} → ${novoComp.name} (${novaUnit.name})`);
+                if (typeof registrarLog === 'function') registrarLog(reg.serial, type, 'Movido de guichê', `${origem} → ${novoComp.name} (${novaUnit.name})`, novaUnit.id);
                 alert(`${reg.serial} movido:\n\nSaindo de: ${origem}\nIndo para: ${novoComp.name} (${novaUnit.name})`);
             }
         }
