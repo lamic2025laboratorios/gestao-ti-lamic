@@ -3725,6 +3725,14 @@ function excluirCategoriaAcesso(id) {
     renderAccesses();
 }
 
+// Selo COM/SEM de um recurso do acesso (assinatura, 2FA) — ícone Phosphor,
+// nunca emoji, seguindo o padrão do resto do sistema.
+function _tagAcesso(ativo, rotulo) {
+    const cor = ativo ? '#28a745' : '#6c757d';
+    const ico = ativo ? 'ph-check-circle' : 'ph-x-circle';
+    return `<span style="background:${cor}; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold; display:inline-flex; align-items:center; gap:4px;"><i class="ph ${ico}"></i> ${ativo ? 'COM' : 'SEM'} ${rotulo}</span>`;
+}
+
 function renderAccesses() {
     const container = document.getElementById('access-categories-container');
     if (!container) return;
@@ -3872,8 +3880,8 @@ function renderAccesses() {
                                 </td>
                                 <td style="padding: 10px; border-bottom: 1px solid #eee; font-size: 0.85rem; vertical-align: middle; word-break: break-word;">
                                     <div style="display:flex; gap:5px; margin-bottom: 8px; flex-wrap: wrap;">
-                                        ${acc.assinatura ? '<span style="background:#28a745; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">✅ COM ASSINATURA</span>' : '<span style="background:#6c757d; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">❌ SEM ASSINATURA</span>'}
-                                        ${acc.twoFA ? '<span style="background:#28a745; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">✅ COM 2FA</span>' : '<span style="background:#6c757d; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">❌ SEM 2FA</span>'}
+                                        ${_tagAcesso(acc.assinatura, 'ASSINATURA')}
+                                        ${_tagAcesso(acc.twoFA, '2FA')}
                                     </div>
                                     <div>
                                         ${acc.linkDrive ? `<a href="${acc.linkDrive}" target="_blank" style="background:#e8f0fe; color:#0b4a99; padding:4px 8px; border-radius:4px; text-decoration:none; font-weight:bold; border:1px solid #0b4a99; display:inline-block;"><i class="ph ph-link"></i> Ver Senha no Drive</a>` : '<span style="color:#999; font-style:italic;">Sem link do Drive</span>'}
