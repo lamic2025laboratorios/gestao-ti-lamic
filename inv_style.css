@@ -1840,6 +1840,21 @@ select { appearance: none; cursor: pointer; }
 }
 .equip-block-hint { font-weight: 400; font-size: .75rem; color: #94a3b8; }
 
+/* Status do Equipamento — 3 botões (Em Uso/Em Manutenção/Inativo) em vez de
+   select; equip-status (hidden input) continua guardando o valor de sempre,
+   então saveEquipamento()/openEquipModal()/_checkEquipChanges() não mudam. */
+.equip-status-btns { display: flex; gap: 8px; }
+.equip-status-btn {
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: .6rem .75rem; border-radius: var(--r); border: 1.5px solid var(--border);
+    background: var(--surface); color: var(--text-mid); font-size: .85rem; font-weight: 700;
+    cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.equip-status-btn:hover { border-color: var(--border-2); }
+.equip-status-btn.st-uso.active     { border-color: var(--green); background: #ecfdf5; color: var(--green); }
+.equip-status-btn.st-manut.active   { border-color: var(--amber); background: #fffbeb; color: #b45309; }
+.equip-status-btn.st-inativo.active { border-color: var(--red);   background: #fef2f2; color: var(--red); }
+
 /* Lista de docs no modal de edição */
 .equip-docs-edit-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .equip-docs-edit-item {

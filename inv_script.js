@@ -8333,6 +8333,23 @@ function _equipPassesFilters(e) {
     return true;
 }
 
+// Status do Equipamento — 3 botões no lugar do select; equip-status continua
+// um input (agora hidden) com o mesmo valor de sempre, então tudo que já lia
+// document.getElementById('equip-status').value (salvar, filtro, detecção de
+// mudança) não precisou mudar.
+function setEquipStatus(val) {
+    const inp = document.getElementById('equip-status');
+    if (inp) inp.value = val;
+    _syncEquipStatusBtns();
+    if (typeof _checkEquipChanges === 'function') _checkEquipChanges();
+}
+function _syncEquipStatusBtns() {
+    const val = document.getElementById('equip-status')?.value || 'Em Uso';
+    document.querySelectorAll('#equip-status-btns .equip-status-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === val);
+    });
+}
+
 // ── Abrir modal criar/editar ──────────────────────────────────
 function openEquipModal(id) {
     _populateEquipUnidades();
@@ -8347,6 +8364,7 @@ function openEquipModal(id) {
     document.getElementById('equip-serie').value      = e?.serie  || '';
     document.getElementById('equip-unidade').value    = e?.unidade || '';
     document.getElementById('equip-status').value     = e?.status  || 'Em Uso';
+    _syncEquipStatusBtns();
     document.getElementById('equip-observacoes').value = e?.observacoes || '';
 
     // Categoria: select
