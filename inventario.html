@@ -351,9 +351,36 @@
                 <h2>Equipamentos</h2>
             </div>
             <div class="header-controls">
-                <button class="btn-filter-toggle" id="btn-equip-filter" onclick="toggleFilterPanel('equip-filter-panel', this)" title="Filtros">
-                    <i class="ph ph-faders"></i>
-                </button>
+                <div class="filter-popover-wrap">
+                    <button class="btn-filter-toggle" id="btn-equip-filter" onclick="toggleEquipFilterPanel()" title="Filtros">
+                        <i class="ph ph-funnel"></i>
+                    </button>
+                    <div class="filter-popover" id="equip-filter-panel">
+                        <div class="filter-popover-row">
+                            <span class="filter-chip-label">Categoria</span>
+                            <div class="filter-chip-group">
+                                <button class="filter-chip active" data-filter="equip" data-key="categoria" data-val="" onclick="toggleEquipFilterChip(this)">Todas</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Bioquímica" onclick="toggleEquipFilterChip(this)">Bioquímica</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Citologia" onclick="toggleEquipFilterChip(this)">Citologia</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Hematologia" onclick="toggleEquipFilterChip(this)">Hematologia</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Imuno-Hormônios" onclick="toggleEquipFilterChip(this)">Imuno-Hormônios</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Microbiologia" onclick="toggleEquipFilterChip(this)">Microbiologia</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Parasitologia" onclick="toggleEquipFilterChip(this)">Parasitologia</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Urianálise" onclick="toggleEquipFilterChip(this)">Urianálise</button>
+                            </div>
+                        </div>
+                        <div class="filter-popover-row">
+                            <span class="filter-chip-label">Status</span>
+                            <div class="filter-chip-group">
+                                <button class="filter-chip active" data-filter="equip" data-key="status" data-val="" onclick="toggleEquipFilterChip(this)">Todos</button>
+                                <button class="filter-chip" data-filter="equip" data-key="status" data-val="Em Uso" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-uso"></span> Em Uso</button>
+                                <button class="filter-chip" data-filter="equip" data-key="status" data-val="Em Manutenção" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-manut"></span> Em Manutenção</button>
+                                <button class="filter-chip" data-filter="equip" data-key="status" data-val="Inativo" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-inativo"></span> Inativo</button>
+                            </div>
+                        </div>
+                        <button class="filter-clear-btn" onclick="clearEquipFilters()"><i class="ph ph-arrow-counter-clockwise"></i> Limpar filtros</button>
+                    </div>
+                </div>
                 <div class="estoque-mode-toggle">
                     <button class="estoque-mode-btn active" id="equip-mode-btn-ativos" onclick="setEquipMode('ativos')">
                         <i class="ph ph-desktop-tower"></i> Ativos
@@ -377,31 +404,6 @@
                 <button class="btn-icon" id="equip-trash-btn" onclick="abrirLixeiraEquip()" title="Lixeira — equipamentos apagados ficam 30 dias aqui antes de sumir de vez">
                     <i class="ph ph-trash"></i>
                 </button>
-            </div>
-        </div>
-
-        <!-- Painel de filtros — Equipamentos -->
-        <div id="equip-filter-panel" class="filter-panel hidden">
-            <div class="filter-panel-inner">
-                <div class="filter-chip-group">
-                    <span class="filter-chip-label">Categoria</span>
-                    <button class="filter-chip active" data-filter="equip" data-key="categoria" data-val="" onclick="toggleEquipFilterChip(this)">Todas</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Bioquímica" onclick="toggleEquipFilterChip(this)">Bioquímica</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Citologia" onclick="toggleEquipFilterChip(this)">Citologia</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Hematologia" onclick="toggleEquipFilterChip(this)">Hematologia</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Imuno-Hormônios" onclick="toggleEquipFilterChip(this)">Imuno-Hormônios</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Microbiologia" onclick="toggleEquipFilterChip(this)">Microbiologia</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Parasitologia" onclick="toggleEquipFilterChip(this)">Parasitologia</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Urianálise" onclick="toggleEquipFilterChip(this)">Urianálise</button>
-                </div>
-                <div class="filter-chip-group">
-                    <span class="filter-chip-label">Status</span>
-                    <button class="filter-chip active" data-filter="equip" data-key="status" data-val="" onclick="toggleEquipFilterChip(this)">Todos</button>
-                    <button class="filter-chip" data-filter="equip" data-key="status" data-val="Em Uso" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-uso"></span> Em Uso</button>
-                    <button class="filter-chip" data-filter="equip" data-key="status" data-val="Em Manutenção" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-manut"></span> Em Manutenção</button>
-                    <button class="filter-chip" data-filter="equip" data-key="status" data-val="Inativo" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-inativo"></span> Inativo</button>
-                </div>
-                <button class="filter-clear-btn" onclick="clearEquipFilters()"><i class="ph ph-arrow-counter-clockwise"></i> Limpar filtros</button>
             </div>
         </div>
 
@@ -451,21 +453,21 @@
                         <div class="filter-popover-row">
                             <span class="filter-chip-label">Status</span>
                             <div class="filter-chip-group">
-                                <button class="filter-chip active" data-key="status" data-val="todos" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-list"></i> Todos</button>
-                                <button class="filter-chip" data-key="status" data-val="azul" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-package"></i> Disponíveis</button>
-                                <button class="filter-chip" data-key="status" data-val="verde" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-check-circle"></i> Em uso</button>
-                                <button class="filter-chip" data-key="status" data-val="amarelo" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-wrench"></i> Manutenção</button>
-                                <button class="filter-chip" data-key="status" data-val="vermelho" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-warning-octagon"></i> Danificados</button>
+                                <button class="filter-chip active" data-key="status" data-val="todos" onclick="toggleEstoqueFilterChip(this)">Todos</button>
+                                <button class="filter-chip" data-key="status" data-val="azul" onclick="toggleEstoqueFilterChip(this)"><span class="status-dot-mini dot-disp"></span> Disponíveis</button>
+                                <button class="filter-chip" data-key="status" data-val="verde" onclick="toggleEstoqueFilterChip(this)"><span class="status-dot-mini dot-uso"></span> Em uso</button>
+                                <button class="filter-chip" data-key="status" data-val="amarelo" onclick="toggleEstoqueFilterChip(this)"><span class="status-dot-mini dot-manut"></span> Manutenção</button>
+                                <button class="filter-chip" data-key="status" data-val="vermelho" onclick="toggleEstoqueFilterChip(this)"><span class="status-dot-mini dot-inativo"></span> Danificados</button>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="estoque-mode-toggle">
                     <button class="estoque-mode-btn" id="estoque-mode-btn-catalogo" onclick="setEstoqueMode('catalogo')">
-                        <i class="ph ph-cube"></i> Estoque
+                        <i class="ph ph-cube"></i> Ativos
                     </button>
                     <button class="estoque-mode-btn active" id="estoque-mode-btn-unidades" onclick="setEstoqueMode('unidades')">
-                        <i class="ph ph-buildings"></i> Unidades
+                        <i class="ph ph-buildings"></i> Dashboard
                     </button>
                 </div>
             </div>
@@ -473,7 +475,7 @@
         <div class="estoque-catalog-subbar hidden" id="estoque-catalog-view-toggle">
             <div class="estoque-mode-toggle estoque-mode-toggle-sm">
                 <button class="estoque-mode-btn active" id="estoque-catalog-view-btn-grafico" onclick="setEstoqueCatalogView('grafico')">
-                    <i class="ph ph-squares-four"></i> Gráfico
+                    <i class="ph ph-squares-four"></i> Templates
                 </button>
                 <button class="estoque-mode-btn" id="estoque-catalog-view-btn-lista" onclick="setEstoqueCatalogView('lista')">
                     <i class="ph ph-table"></i> Lista

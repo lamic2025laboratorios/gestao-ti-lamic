@@ -1930,6 +1930,7 @@ select { appearance: none; cursor: pointer; }
 .status-dot-mini {
     width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0;
 }
+.status-dot-mini.dot-disp    { background: #3b82f6; }
 .status-dot-mini.dot-uso     { background: #22c55e; }
 .status-dot-mini.dot-manut   { background: #f59e0b; }
 .status-dot-mini.dot-inativo { background: #ef4444; }

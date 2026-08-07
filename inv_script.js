@@ -5013,6 +5013,29 @@ function clearEquipFilters() {
     renderEquipGrid();
 }
 
+// Painel flutuante (popover) do filtro de Equipamentos — mesmo padrão do
+// filtro de Estoque (toggleEstoqueFilterPanel): não empurra o layout, some
+// ao clicar fora. Os dados filtrados continuam os de Equipamentos
+// (Categoria/Status próprios) — só a moldura mudou.
+function toggleEquipFilterPanel() {
+    const pop = document.getElementById('equip-filter-panel');
+    const btn = document.getElementById('btn-equip-filter');
+    if (!pop) return;
+    const wasOpen = pop.classList.contains('open');
+    pop.classList.toggle('open', !wasOpen);
+    btn?.classList.toggle('active', !wasOpen);
+    if (!wasOpen) {
+        const closeOnOutside = (e) => {
+            if (!pop.contains(e.target) && e.target !== btn && !btn?.contains(e.target)) {
+                pop.classList.remove('open');
+                btn?.classList.remove('active');
+                document.removeEventListener('click', closeOnOutside);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
+    }
+}
+
 // ── Filtros de Acessos ───────────────────────────────────────
 function toggleAccessFilterChip(btn) {
     const key = btn.dataset.key;
@@ -5071,7 +5094,7 @@ function setEquipMode(mode) {
     document.getElementById('equip-grid')?.classList.toggle('hidden', mode !== 'ativos');
     document.getElementById('equip-dashboard-view')?.classList.toggle('hidden', mode !== 'dashboard');
     if (mode !== 'ativos') {
-        document.getElementById('equip-filter-panel')?.classList.add('hidden');
+        document.getElementById('equip-filter-panel')?.classList.remove('open');
         document.getElementById('btn-equip-filter')?.classList.remove('active');
     } else {
         renderEquipGrid();
