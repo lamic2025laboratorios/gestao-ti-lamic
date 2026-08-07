@@ -6197,10 +6197,38 @@ function _secaoDoLog(l) {
     return 'estoque';
 }
 
-const LOG_SECAO_TITULO = { dashboard: 'Logs do Dashboard', equip: 'Logs de Equipamentos', estoque: 'Logs do Estoque' };
+/* ── Logs de Manutenção (4º card) ────────────────────────────────────────
+   Não é uma seção nova pro _secaoDoLog acima — aqueles 3 cards continuam
+   classificando os MESMOS logs em dashboard/equip/estoque exatamente como
+   antes (Estoque continua sendo "qualquer movimento relacionado a estoque,
+   ou seja tudo"). Manutenção é uma 2ª lente, em paralelo: pega só os
+   eventos que mexem na SAÚDE ou POSIÇÃO de um Template de PC já montado —
+   peça com problema/consertada, desmontagem e transferência — reaproveitando
+   o texto da ação já gravada por registrarLog, sem precisar mexer em nenhuma
+   das chamadas existentes (zero risco de desalinhar o parâmetro unitId). */
+const _LOG_MANUT_PREFIXOS = [
+    'Peça trocada', 'Desvinculado (troca de guichê)', 'Movido de guichê',
+    'Template desmontado', 'Hardware desvinculado do guichê',
+    'Template desvinculado do guichê', 'Template religado ao guichê',
+    'Peça removida da montagem', 'Peça descartada',
+    'Peça voltou pro último Template', 'Peça retirada (voltou pro estoque)'
+];
+function _ehLogManutencao(l) {
+    if (l.tipo !== 'pc' && l.tipo !== 'peca') return false;
+    const a = l.acao || '';
+    if (a.startsWith('Status alterado')) return true;   // saúde do Template/peça (Ativo/Manutenção/Inativo, Danificado/Consertado...)
+    return _LOG_MANUT_PREFIXOS.some(pref => a.startsWith(pref));
+}
+function _logsManutencao() {
+    return invLogs.filter(_ehLogManutencao);
+}
+
+const LOG_SECAO_TITULO = { dashboard: 'Logs do Dashboard', equip: 'Logs de Equipamentos', estoque: 'Logs do Estoque', manutencao: 'Logs de Manutenção' };
 
 // Linhas de log de uma seção (sem seção = tudo). Usada pelo modal e pelo download.
+// 'manutencao' não é uma seção do _secaoDoLog (é a 2ª lente, ver acima).
 function _logsDaSecao(secao) {
+    if (secao === 'manutencao') return _logsManutencao();
     return secao ? invLogs.filter(l => _secaoDoLog(l) === secao) : invLogs;
 }
 
