@@ -1166,6 +1166,7 @@ select { appearance: none; cursor: pointer; }
     display: flex; align-items: flex-start; gap: 8px;
     background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--r-md, 8px);
     padding: .65rem .85rem; font-size: .78rem; color: #1e40af; line-height: 1.5;
+    margin-top: .75rem;
 }
 .equip-cfg-notice i { font-size: 1rem; flex-shrink: 0; color: var(--blue); margin-top: 1px; }
 .grid-peripherals { display: grid; grid-template-columns: 1fr; gap: 1rem; }
@@ -1828,6 +1829,16 @@ select { appearance: none; cursor: pointer; }
     margin-top: 4px;
 }
 .equip-section-divider i { font-size: 1rem; color: var(--blue); }
+
+/* Blocos do form de Novo/Editar Equipamento — Identificação, Especificações
+   Técnicas, Observações, Imagens, Documentos e Anexos. Todos usam o mesmo
+   cabeçalho (.equip-section-divider) e o mesmo grid de 2 colunas, pra manter
+   fonte/tamanho padronizados entre os 5 blocos. */
+.equip-form-block { margin-bottom: 2px; }
+.equip-form-block:first-of-type .equip-section-divider {
+    border-top: none; margin-top: 0; padding-top: 0;
+}
+.equip-block-hint { font-weight: 400; font-size: .75rem; color: #94a3b8; }
 
 /* Lista de docs no modal de edição */
 .equip-docs-edit-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }

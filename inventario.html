@@ -378,7 +378,6 @@
                                 <button class="filter-chip" data-filter="equip" data-key="status" data-val="Inativo" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-inativo"></span> Inativo</button>
                             </div>
                         </div>
-                        <button class="filter-clear-btn" onclick="clearEquipFilters()"><i class="ph ph-arrow-counter-clockwise"></i> Limpar filtros</button>
                     </div>
                 </div>
                 <div class="estoque-mode-toggle">
@@ -1505,75 +1504,103 @@
         </div>
         <input type="hidden" id="equip-id">
 
-        <div class="grid-3-col">
-            <div class="form-group">
-                <label>Categoria</label>
-                <select id="equip-categoria" onchange="onEquipCategoriaChange(this.value)">
-                    <option value="">— Selecione —</option>
-                </select>
+        <!-- ── BLOCO 1 · IDENTIFICAÇÃO ── -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-identification-badge"></i> Identificação
             </div>
-            <div class="form-group">
-                <label>Código / Patrimônio</label>
-                <input type="text" id="equip-codigo" placeholder="Selecione uma categoria" readonly style="background:var(--surface-2);cursor:default;">
-            </div>
-            <div class="form-group"><label>Status</label>
-                <select id="equip-status">
-                    <option value="Em Uso">Em Uso</option>
-                    <option value="Em Manutenção">Em Manutenção</option>
-                    <option value="Inativo">Inativo</option>
-                </select>
-            </div>
-
-            <div class="equip-cfg-notice" style="grid-column:1/-1;">
-                <i class="ph ph-info"></i>
-                <span>Categoria, Fabricante/Marca, Fornecedor e Tipo/Subtipo são cadastrados em <strong>Configurações → Informações dos Equipamentos</strong></span>
-            </div>
-
-            <div class="form-group"><label>Nome do Equipamento *</label><input type="text" id="equip-nome" placeholder="Ex: LABMAX 400"></div>
-            <div class="form-group"><label>Modelo *</label><input type="text" id="equip-modelo" placeholder="Ex: Labmax 400 TS"></div>
-            <div class="form-group"><label>Número de Série *</label><input type="text" id="equip-serie" placeholder="Ex: 2230.131.010"></div>
-
-            <div class="form-group">
-                <label>Fabricante / Marca</label>
-                <select id="equip-fabricante"><option value="">— Selecione —</option></select>
-            </div>
-            <div class="form-group">
-                <label>Fornecedor</label>
-                <select id="equip-fornecedor"><option value="">— Selecione —</option></select>
-            </div>
-            <div class="form-group">
-                <label>Tipo / Subtipo</label>
-                <div class="equip-tipo-wrap">
-                    <select id="equip-tipo" style="flex:1;"><option value="">— Selecione —</option></select>
-                    <button type="button" class="equip-lock-btn" id="equip-tipo-lock" onclick="toggleTipoLock()" title="Travar / Destravar">
-                        <i class="ph ph-lock-simple" id="equip-tipo-lock-icon"></i>
-                    </button>
+            <div class="grid-2-col">
+                <div class="form-group"><label>Nome do Ativo *</label><input type="text" id="equip-nome" placeholder="Ex: LABMAX 400"></div>
+                <div class="form-group">
+                    <label>Código / Patrimônio</label>
+                    <input type="text" id="equip-codigo" placeholder="Selecione um Setor" readonly style="background:var(--surface-2);cursor:default;">
+                </div>
+                <div class="form-group">
+                    <label>Tipo / Subtipo</label>
+                    <div class="equip-tipo-wrap">
+                        <select id="equip-tipo" style="flex:1;"><option value="">— Selecione —</option></select>
+                        <button type="button" class="equip-lock-btn" id="equip-tipo-lock" onclick="toggleTipoLock()" title="Travar / Destravar">
+                            <i class="ph ph-lock-simple" id="equip-tipo-lock-icon"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Setor *</label>
+                    <select id="equip-categoria" onchange="onEquipCategoriaChange(this.value)">
+                        <option value="">— Selecione —</option>
+                    </select>
                 </div>
             </div>
-
-            <div class="form-group" style="grid-column:1/-1;"><label>Localização</label>
-                <select id="equip-unidade"><option value="">— Selecione —</option></select>
+            <div class="equip-cfg-notice">
+                <i class="ph ph-info"></i>
+                <span>Setor, Fabricante/Marca, Fornecedor e Tipo/Subtipo são cadastrados em <strong>Configurações → Informações dos Equipamentos</strong></span>
             </div>
         </div>
-        <!-- ── IMAGENS ── -->
-        <div class="equip-section-divider">
-            <i class="ph ph-images"></i> Imagens do Equipamento
-            <span style="font-weight:400;font-size:.75rem;color:#94a3b8;">máx. 1MB · JPG, PNG, WEBP</span>
-        </div>
-        <div class="equip-thumbs-grid" id="equip-thumbs-grid">
-            <div class="equip-thumb-add" onclick="document.getElementById('equip-img-file').click()">
-                <i class="ph ph-plus"></i><span>Adicionar</span>
+
+        <!-- ── BLOCO 2 · ESPECIFICAÇÕES TÉCNICAS ── -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-wrench"></i> Especificações Técnicas
+            </div>
+            <div class="grid-2-col">
+                <div class="form-group">
+                    <label>Marca</label>
+                    <select id="equip-fabricante"><option value="">— Selecione —</option></select>
+                </div>
+                <div class="form-group"><label>Modelo *</label><input type="text" id="equip-modelo" placeholder="Ex: Labmax 400 TS"></div>
+                <div class="form-group">
+                    <label>Fornecedor</label>
+                    <select id="equip-fornecedor"><option value="">— Selecione —</option></select>
+                </div>
+                <div class="form-group"><label>Número de Série *</label><input type="text" id="equip-serie" placeholder="Ex: 2230.131.010"></div>
             </div>
         </div>
-        <input type="file" id="equip-img-file" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handleEquipImgUpload(this)">
 
-        <!-- ── DOCUMENTOS ── -->
-        <div class="equip-section-divider" style="margin-top:12px;">
-            <i class="ph ph-paperclip"></i> Documentos / Anexos
-            <span style="font-weight:400;font-size:.75rem;color:#94a3b8;">enviados ao Google Drive</span>
+        <!-- ── BLOCO 3 · OBSERVAÇÕES ── -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-clipboard-text"></i> Observações
+            </div>
+            <div class="grid-2-col">
+                <div class="form-group"><label>Status</label>
+                    <select id="equip-status">
+                        <option value="Em Uso">Em Uso</option>
+                        <option value="Em Manutenção">Em Manutenção</option>
+                        <option value="Inativo">Inativo</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Localização</label>
+                    <select id="equip-unidade"><option value="">— Selecione —</option></select>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label>Observações</label>
+                    <textarea id="equip-observacoes" rows="3" placeholder="Ex: Registro ANVISA, particularidades do equipamento..."></textarea>
+                </div>
+            </div>
         </div>
-        <!-- Lista de docs já salvos + pendentes -->
-        <div id="equip-docs-edit-list" class="equip-docs-edit-list"></div>
+
+        <!-- ── BLOCO 4 · IMAGENS ── -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-images"></i> Imagens do Equipamento
+                <span class="equip-block-hint">máx. 1MB · JPG, PNG, WEBP</span>
+            </div>
+            <div class="equip-thumbs-grid" id="equip-thumbs-grid">
+                <div class="equip-thumb-add" onclick="document.getElementById('equip-img-file').click()">
+                    <i class="ph ph-plus"></i><span>Adicionar</span>
+                </div>
+            </div>
+            <input type="file" id="equip-img-file" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handleEquipImgUpload(this)">
+        </div>
+
+        <!-- ── BLOCO 5 · DOCUMENTOS E ANEXOS ── -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-paperclip"></i> Documentos e Anexos
+                <span class="equip-block-hint">enviados ao Google Drive</span>
+            </div>
+            <!-- Lista de docs já salvos + pendentes -->
+            <div id="equip-docs-edit-list" class="equip-docs-edit-list"></div>
 
         <!-- Painel de nome: aparece ao selecionar arquivo -->
         <div id="equip-doc-name-panel" class="equip-doc-name-panel" style="display:none;">
@@ -1594,11 +1621,12 @@
             <span id="equip-docs-progress-label">Enviando...</span>
         </div>
 
-        <!-- Botão selecionar -->
-        <button type="button" class="equip-docs-add-file-btn" id="equip-docs-select-btn" onclick="document.getElementById('equip-docs-file-input').click()">
-            <i class="ph ph-paperclip"></i> Selecionar arquivo
-        </button>
-        <input type="file" id="equip-docs-file-input" accept="*/*" style="display:none;" onchange="selecionarDocParaAnexar(this)">
+            <!-- Botão selecionar -->
+            <button type="button" class="equip-docs-add-file-btn" id="equip-docs-select-btn" onclick="document.getElementById('equip-docs-file-input').click()">
+                <i class="ph ph-paperclip"></i> Selecionar arquivo
+            </button>
+            <input type="file" id="equip-docs-file-input" accept="*/*" style="display:none;" onchange="selecionarDocParaAnexar(this)">
+        </div>
 
         <div class="modal-actions">
             <button class="btn-secondary" onclick="closeEquipModal()">Cancelar</button>
@@ -1623,7 +1651,6 @@
                 </div>
             </div>
             <div class="eqd-header-right">
-                <button class="eqd-icon-btn" onclick="editEquipFromDetail()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
                 <button class="eqd-icon-btn" onclick="closeModals()" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
@@ -1667,6 +1694,10 @@
                 <div class="eqd-info-card" style="grid-column:1/-1;">
                     <div class="eqd-info-lbl"><i class="ph ph-map-pin"></i> LOCALIZAÇÃO</div>
                     <div class="eqd-info-val" id="eqd-unidade">—</div>
+                </div>
+                <div class="eqd-info-card" id="eqd-observacoes-card" style="grid-column:1/-1;display:none;">
+                    <div class="eqd-info-lbl"><i class="ph ph-clipboard-text"></i> OBSERVAÇÕES</div>
+                    <div class="eqd-info-val" id="eqd-observacoes">—</div>
                 </div>
             </div>
 

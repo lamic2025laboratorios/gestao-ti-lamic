@@ -8347,6 +8347,7 @@ function openEquipModal(id) {
     document.getElementById('equip-serie').value      = e?.serie  || '';
     document.getElementById('equip-unidade').value    = e?.unidade || '';
     document.getElementById('equip-status').value     = e?.status  || 'Em Uso';
+    document.getElementById('equip-observacoes').value = e?.observacoes || '';
 
     // Categoria: select
     document.getElementById('equip-categoria').value = e?.categoria || '';
@@ -8410,6 +8411,7 @@ function saveEquipamento() {
         tipo       : document.getElementById('equip-tipo').value.trim(),
         unidade    : document.getElementById('equip-unidade').value,
         status     : document.getElementById('equip-status').value,
+        observacoes: document.getElementById('equip-observacoes').value.trim(),
         imagens    : [..._equipImagens],
         // Preserva os anexos existentes — DB.set substitui o objeto inteiro
         // sem isso, salvar o equipamento apagaria todos os anexos
@@ -8518,6 +8520,12 @@ function openEquipDetail(id, equipSnap) {
         _set('eqd-fornecedor', e.fornecedor || '—');
         _set('eqd-unidade',    e.unidade    || '—');
 
+        // Observações — campo novo; card só aparece pra quem já tem preenchido
+        // (equipamento antigo, cadastrado antes desse campo existir, fica sem)
+        _set('eqd-observacoes', e.observacoes || '');
+        const obsCard = document.getElementById('eqd-observacoes-card');
+        if (obsCard) obsCard.style.display = e.observacoes ? '' : 'none';
+
         // Documentos
         renderEquipDocs(e.anexos || {});
 
@@ -8568,14 +8576,14 @@ let _equipFormSnapshot = '';
 function _captureEquipSnapshot() {
     const ids = ['equip-nome','equip-codigo','equip-status','equip-fabricante',
                  'equip-modelo','equip-fornecedor','equip-serie','equip-categoria',
-                 'equip-tipo','equip-unidade'];
+                 'equip-tipo','equip-unidade','equip-observacoes'];
     _equipFormSnapshot = ids.map(id => document.getElementById(id)?.value || '').join('|');
     _setEquipSaveBtn(false);
 }
 function _checkEquipChanges() {
     const ids = ['equip-nome','equip-codigo','equip-status','equip-fabricante',
                  'equip-modelo','equip-fornecedor','equip-serie','equip-categoria',
-                 'equip-tipo','equip-unidade'];
+                 'equip-tipo','equip-unidade','equip-observacoes'];
     const current = ids.map(id => document.getElementById(id)?.value || '').join('|');
     _setEquipSaveBtn(current !== _equipFormSnapshot || _equipImagens.length > 0);
 }
