@@ -6807,7 +6807,7 @@ function _renderEquipCard(reg, type, unit, soLeitura = false) {
     <div class="estoque-modelo-card${soLeitura ? ' card-grafico' : ''}" onclick="${clickAction}" title="${soLeitura ? 'Visualização (somente leitura — editar é pela Lista)' : 'Clique para ver / editar'}">
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
-        <button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); ${delAction}" title="Excluir${soLeitura ? ' (vai pra lixeira, 30 dias pra restaurar)' : ''}"><i class="ph ph-trash"></i></button>
+        ${!soLeitura ? `<button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); ${delAction}" title="Excluir (vai pra lixeira, 30 dias pra restaurar)"><i class="ph ph-trash"></i></button>` : ''}
         <div class="estoque-comp-head">
             <i class="ph ${TIPO_ICON[type]}"></i>
             <strong>${serial || titulo || '—'}</strong>
@@ -6860,7 +6860,6 @@ function _renderPcPresetCard(p, idx) {
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-info" onclick="event.stopPropagation(); abrirInfoTemplate(${idx})" title="Informações (peças, licença, danos)"><i class="ph ph-info"></i></button>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${p.serial || p.name}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
-        <button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); deleteCompPreset(${idx})" title="Desmontar Template — peças voltam pro Estoque"><i class="ph ph-trash"></i></button>
         <div class="estoque-comp-head">
             <i class="ph ph-cube"></i>
             <strong>${p.serial || p.name}</strong>
@@ -7092,7 +7091,6 @@ function _renderLicencaCard(l) {
     <div class="estoque-modelo-card card-grafico" onclick="abrirEntradaLicenca('${l.id}', false, true)" title="Visualização (somente leitura — editar é pela Lista)">
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${l.serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
-        <button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); _deleteLicencaLista('${l.id}')" title="Excluir (vai pra lixeira, 30 dias pra restaurar)"><i class="ph ph-trash"></i></button>
         <div class="estoque-comp-head">
             <i class="ph ph-certificate"></i>
             <strong>${l.serial || '—'}</strong>
