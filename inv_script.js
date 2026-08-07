@@ -8492,12 +8492,21 @@ function deleteEquip(id) {
     }
 }
 
+// Abas do popup de detalhe (Informações/Documentos/Atividades) — Atividades
+// por enquanto é só a estrutura (placeholder), o checklist de manutenção
+// entra depois.
+function setEqdTab(tab) {
+    document.querySelectorAll('#eqd-tabs .eqd-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.eqd-tab-panel').forEach(p => p.classList.toggle('active', p.id === 'eqd-panel-' + tab));
+}
+
 // ── Detalhe ao clicar no card ─────────────────────────────────
 function openEquipDetail(id, equipSnap) {
     // Usa o snapshot passado pelo card, ou tenta buscar no array (fallback)
     const e = equipSnap || equipData.find(x => x.id === id);
     if (!e) { console.warn('[openEquipDetail] Equipamento não encontrado:', id); return; }
     equipDetailId = id;
+    setEqdTab('info'); // sempre abre em Informações, mesmo se saiu em outra aba da última vez
 
     try {
         const _set = (elId, val) => { const el = document.getElementById(elId); if (el) el.textContent = val; };

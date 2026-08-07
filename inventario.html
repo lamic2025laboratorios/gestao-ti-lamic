@@ -1664,10 +1664,17 @@
             </div>
         </div>
 
+        <!-- Abas -->
+        <div class="eqd-tabs" id="eqd-tabs">
+            <button class="eqd-tab active" data-tab="info" onclick="setEqdTab('info')"><i class="ph ph-info"></i> Informações</button>
+            <button class="eqd-tab" data-tab="docs" onclick="setEqdTab('docs')"><i class="ph ph-folder-open"></i> Documentos</button>
+            <button class="eqd-tab" data-tab="activities" onclick="setEqdTab('activities')"><i class="ph ph-list-checks"></i> Atividades</button>
+        </div>
+
         <!-- Conteúdo -->
         <div class="eqd-body">
 
-            <!-- Carrossel de imagens -->
+            <!-- Carrossel de imagens — fica fixo em cima, em qualquer aba -->
             <div class="eqd-car-wrap" id="eqd-car-wrap" style="display:none;">
                 <img id="eqd-car-img" class="eqd-car-img-el" src="" alt="">
                 <button class="eqd-car-nav prev" id="eqd-car-prev" onclick="equipCarNav(-1)">&#8249;</button>
@@ -1676,52 +1683,63 @@
                 <div class="eqd-car-counter" id="eqd-car-counter" style="display:none;"></div>
             </div>
 
-            <!-- Área rolável: tags + infos + documentos -->
+            <!-- Área rolável: o conteúdo troca conforme a aba escolhida -->
             <div class="eqd-scroll">
 
-            <!-- Tags de status e categoria -->
-            <div class="eqd-tags-row" id="eqd-hero-tags"></div>
+            <!-- Aba Informações -->
+            <div class="eqd-tab-panel active" id="eqd-panel-info">
+                <!-- Tags de status e categoria -->
+                <div class="eqd-tags-row" id="eqd-hero-tags"></div>
 
-            <!-- Grid de informações -->
-            <div class="eqd-info-grid">
-                <div class="eqd-info-card">
-                    <div class="eqd-info-lbl"><i class="ph ph-buildings"></i> MARCA</div>
-                    <div class="eqd-info-val" id="eqd-fabricante">—</div>
+                <!-- Grid de informações -->
+                <div class="eqd-info-grid">
+                    <div class="eqd-info-card">
+                        <div class="eqd-info-lbl"><i class="ph ph-buildings"></i> MARCA</div>
+                        <div class="eqd-info-val" id="eqd-fabricante">—</div>
+                    </div>
+                    <div class="eqd-info-card">
+                        <div class="eqd-info-lbl"><i class="ph ph-package"></i> MODELO</div>
+                        <div class="eqd-info-val" id="eqd-modelo">—</div>
+                    </div>
+                    <div class="eqd-info-card">
+                        <div class="eqd-info-lbl"><i class="ph ph-barcode"></i> Nº DE SÉRIE</div>
+                        <div class="eqd-info-val" id="eqd-serie">—</div>
+                    </div>
+                    <div class="eqd-info-card">
+                        <div class="eqd-info-lbl"><i class="ph ph-storefront"></i> FORNECEDOR</div>
+                        <div class="eqd-info-val" id="eqd-fornecedor">—</div>
+                    </div>
+                    <div class="eqd-info-card" style="grid-column:1/-1;">
+                        <div class="eqd-info-lbl"><i class="ph ph-map-pin"></i> LOCALIZAÇÃO</div>
+                        <div class="eqd-info-val" id="eqd-unidade">—</div>
+                    </div>
+                    <div class="eqd-info-card" id="eqd-observacoes-card" style="grid-column:1/-1;display:none;">
+                        <div class="eqd-info-lbl"><i class="ph ph-clipboard-text"></i> OBSERVAÇÕES</div>
+                        <div class="eqd-info-val" id="eqd-observacoes">—</div>
+                    </div>
                 </div>
-                <div class="eqd-info-card">
-                    <div class="eqd-info-lbl"><i class="ph ph-package"></i> MODELO</div>
-                    <div class="eqd-info-val" id="eqd-modelo">—</div>
+            </div><!-- /eqd-panel-info -->
+
+            <!-- Aba Documentos -->
+            <div class="eqd-tab-panel" id="eqd-panel-docs">
+                <div class="eqd-docs-section" id="eqd-docs-section">
+                    <div class="eqd-docs-header">
+                        <div class="eqd-info-lbl"><i class="ph ph-folder-open"></i> DOCUMENTOS</div>
+                        <span style="font-size:.72rem;color:var(--text-muted);">Adicione documentos no modo Editar</span>
+                    </div>
+                    <div id="eqd-docs-list" class="eqd-docs-list">
+                        <div class="eqd-docs-empty"><i class="ph ph-files"></i><span>Nenhum documento</span></div>
+                    </div>
                 </div>
-                <div class="eqd-info-card">
-                    <div class="eqd-info-lbl"><i class="ph ph-barcode"></i> Nº DE SÉRIE</div>
-                    <div class="eqd-info-val" id="eqd-serie">—</div>
-                </div>
-                <div class="eqd-info-card">
-                    <div class="eqd-info-lbl"><i class="ph ph-storefront"></i> FORNECEDOR</div>
-                    <div class="eqd-info-val" id="eqd-fornecedor">—</div>
-                </div>
-                <div class="eqd-info-card" style="grid-column:1/-1;">
-                    <div class="eqd-info-lbl"><i class="ph ph-map-pin"></i> LOCALIZAÇÃO</div>
-                    <div class="eqd-info-val" id="eqd-unidade">—</div>
-                </div>
-                <div class="eqd-info-card" id="eqd-observacoes-card" style="grid-column:1/-1;display:none;">
-                    <div class="eqd-info-lbl"><i class="ph ph-clipboard-text"></i> OBSERVAÇÕES</div>
-                    <div class="eqd-info-val" id="eqd-observacoes">—</div>
-                </div>
-            </div>
+            </div><!-- /eqd-panel-docs -->
+
+            <!-- Aba Atividades — só a estrutura por enquanto (checklist de
+                 manutenção e afins vem depois, ainda é teoria) -->
+            <div class="eqd-tab-panel" id="eqd-panel-activities">
+                <div class="estoque-empty"><i class="ph ph-list-checks"></i> Atividades — em construção.</div>
+            </div><!-- /eqd-panel-activities -->
 
             </div><!-- /eqd-scroll -->
-
-            <!-- Documentos — fixo no rodapé do body, sempre visível -->
-            <div class="eqd-docs-section" id="eqd-docs-section">
-                <div class="eqd-docs-header">
-                    <div class="eqd-info-lbl"><i class="ph ph-folder-open"></i> DOCUMENTOS</div>
-                    <span style="font-size:.72rem;color:var(--text-muted);">Adicione documentos no modo Editar</span>
-                </div>
-                <div id="eqd-docs-list" class="eqd-docs-list">
-                    <div class="eqd-docs-empty"><i class="ph ph-files"></i><span>Nenhum documento</span></div>
-                </div>
-            </div><!-- /eqd-docs-section -->
         </div><!-- /eqd-body -->
 
         <!-- Rodapé -->

@@ -1529,20 +1529,27 @@ select { appearance: none; cursor: pointer; }
 }
 .eqd-icon-btn:hover { background: #334155; color: #fff; }
 
-/* Tabs */
+/* Tabs — faixa cinza logo abaixo do cabeçalho escuro */
 .eqd-tabs {
-    display: flex; gap: 0;
+    display: flex; gap: 4px;
     border-bottom: 1px solid var(--border);
-    padding: 0 18px; background: var(--surface);
+    padding: 0 18px; background: var(--surface-2);
+    flex-shrink: 0;
 }
 .eqd-tab {
-    padding: 11px 16px; font-size: .83rem; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 11px 14px; font-size: .83rem; font-weight: 600;
     color: var(--text-muted); background: none; border: none; cursor: pointer;
     border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s;
     font-family: inherit;
 }
+.eqd-tab i { font-size: 1rem; }
 .eqd-tab:hover { color: var(--navy); }
 .eqd-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+/* Conteúdo de cada aba — só a ativa aparece */
+.eqd-tab-panel { display: none; flex-direction: column; gap: 12px; }
+.eqd-tab-panel.active { display: flex; }
 
 /* Corpo — flex:1 + min-height:0 obrigatório para overflow-y funcionar em flex child */
 .eqd-body { padding: 16px; overflow: hidden; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
