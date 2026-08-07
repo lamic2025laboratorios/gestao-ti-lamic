@@ -179,6 +179,7 @@ function iniciarConexaoFirebase() {
   // Escuta os Setores / Categorias de Acessos (nome + cor de cada pasta)
   DB.listen('itCategoriasAcesso', data => {
     categoriasAcesso = parseArray(data);
+    _catAcessoCarregado = true;   // a partir daqui, lista vazia = nada cadastrado mesmo
     if (typeof semearCategoriasAcesso === 'function') semearCategoriasAcesso();
     if (typeof renderCategoriasAcesso === 'function') renderCategoriasAcesso();
     renderAccesses();
@@ -3549,16 +3550,19 @@ accessToggleStates = {};
    itCategoriasAcesso ({id, nome, cor}) e o render dos Acessos lê daqui.
    ══════════════════════════════════════════════════════════════ */
 let categoriasAcesso = [];
+// Vira true quando o nó itCategoriasAcesso responde — antes disso, lista vazia
+// significa "ainda não carregou", não "não existe nada cadastrado".
+let _catAcessoCarregado = false;
 
 // Cores prontas oferecidas no modal (a paleta livre fica no input color)
 const CORES_CATEGORIA_ACESSO = [
-    '#1e3a8a', '#0369a1', '#0e7490', '#0f766e', '#15803d',
+    '#0b1a33', '#0369a1', '#0e7490', '#0f766e', '#15803d',
     '#a16207', '#b45309', '#b91c1c', '#9333ea', '#be185d', '#334155'
 ];
 
 // Pastas que já existiam fixas no código — viram o cadastro inicial
 const CATEGORIAS_ACESSO_PADRAO = [
-    { nome: 'Administrativo',             cor: '#1e3a8a' },
+    { nome: 'Administrativo',             cor: '#0b1a33' },
     { nome: 'Biomedicos',                 cor: '#0369a1' },
     { nome: 'Diretoria',                  cor: '#0f766e' },
     { nome: 'Lamic viva+',                cor: '#15803d' },
@@ -3577,6 +3581,12 @@ function _novoIdCatAcesso() {
 // nos acessos cadastrados (assim nada que existe hoje fica de fora).
 // Idempotente — só adiciona o que falta.
 function semearCategoriasAcesso() {
+    // TRAVA: só semeia depois que itCategoriasAcesso realmente respondeu.
+    // Sem isto, o listener de itAccesses (registrado antes) rodava primeiro com
+    // categoriasAcesso ainda vazio, concluía "não tem nada cadastrado", gravava
+    // os padrões por cima — e as cores editadas eram perdidas a cada carga.
+    if (!_catAcessoCarregado) return false;
+
     let changed = false;
     const temNome = n => categoriasAcesso.some(c => (c.nome || '').toLowerCase() === (n || '').toLowerCase());
 
