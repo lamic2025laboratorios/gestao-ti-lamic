@@ -351,15 +351,31 @@
                 <h2>Equipamentos</h2>
             </div>
             <div class="header-controls">
-                <div class="search-wrap">
-                    <i class="ph ph-magnifying-glass search-icon"></i>
-                    <input type="text" id="equip-search-input" placeholder="Buscar equipamento..." class="search-input" oninput="filterEquipamentos()">
-                </div>
                 <button class="btn-filter-toggle" id="btn-equip-filter" onclick="toggleFilterPanel('equip-filter-panel', this)" title="Filtros">
                     <i class="ph ph-faders"></i>
                 </button>
+                <div class="estoque-mode-toggle">
+                    <button class="estoque-mode-btn active" id="equip-mode-btn-ativos" onclick="setEquipMode('ativos')">
+                        <i class="ph ph-desktop-tower"></i> Ativos
+                    </button>
+                    <button class="estoque-mode-btn" id="equip-mode-btn-dashboard" onclick="setEquipMode('dashboard')">
+                        <i class="ph ph-gauge"></i> Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="estoque-catalog-subbar" id="equip-ativos-subbar">
+            <div class="search-wrap">
+                <i class="ph ph-magnifying-glass search-icon"></i>
+                <input type="text" id="equip-search-input" placeholder="Buscar equipamento..." class="search-input" oninput="filterEquipamentos()">
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
                 <button class="btn-primary" onclick="openEquipModal()">
-                    <i class="ph ph-plus"></i> Novo Equipamento
+                    <i class="ph ph-plus"></i> Adicionar Equipamento
+                </button>
+                <button class="btn-icon" id="equip-trash-btn" onclick="abrirLixeiraEquip()" title="Lixeira — equipamentos apagados ficam 30 dias aqui antes de sumir de vez">
+                    <i class="ph ph-trash"></i>
                 </button>
             </div>
         </div>
@@ -390,6 +406,11 @@
         </div>
 
         <div id="equip-grid" class="equip-grid"></div>
+
+        <!-- Dashboard de Equipamentos — estrutura por enquanto, conteúdo vem depois -->
+        <div id="equip-dashboard-view" class="hidden">
+            <div class="estoque-empty"><i class="ph ph-gauge"></i> Dashboard de Equipamentos — em construção.</div>
+        </div>
     </section>
 
     <!-- ===== ESTOQUE VIEW ===== -->
@@ -1305,7 +1326,7 @@
 <div id="trash-modal" class="modal hidden">
     <div class="modal-content medium-modal">
         <div class="modal-header-row">
-            <h3><i class="ph ph-trash"></i> Lixeira <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(itens ficam 30 dias antes de sumir de vez)</span></h3>
+            <h3 id="trash-modal-title"><i class="ph ph-trash"></i> Lixeira <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(itens ficam 30 dias antes de sumir de vez)</span></h3>
             <button class="btn-icon" onclick="document.getElementById('trash-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
         </div>
         <div id="trash-modal-body" class="logs-modal-body"></div>
@@ -1600,7 +1621,8 @@
                 </div>
             </div>
             <div class="eqd-header-right">
-                <button class="eqd-icon-btn" onclick="closeModals()"><i class="ph ph-x"></i></button>
+                <button class="eqd-icon-btn" onclick="editEquipFromDetail()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="eqd-icon-btn" onclick="closeModals()" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
 
@@ -1664,7 +1686,6 @@
         <div class="eqd-footer">
             <button class="btn-secondary" onclick="closeModals()">Fechar</button>
             <button class="eqd-btn-delete" onclick="deleteEquipFromDetail()"><i class="ph ph-trash"></i> Excluir</button>
-            <button class="eqd-btn-edit" onclick="editEquipFromDetail()"><i class="ph ph-pencil-simple"></i> Editar</button>
         </div>
     </div>
 </div>

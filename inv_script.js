@@ -5054,8 +5054,28 @@ function showEquipamentosView() {
     const ev = document.getElementById('equip-view');
     ev.classList.remove('hidden');
     ev.classList.add('active');
-    renderEquipGrid();
+    setEquipMode('ativos'); // sempre entra pelos Ativos, mesmo se saiu no Dashboard da última vez
     _populateEquipUnidades();
+}
+
+// Alterna entre "Ativos" (grade dos equipamentos cadastrados — comportamento
+// de sempre) e "Dashboard" (por enquanto só a estrutura; o conteúdo vem
+// depois). Busca/Adicionar/Lixeira/filtro só fazem sentido nos Ativos.
+let _equipMode = 'ativos';
+function setEquipMode(mode) {
+    _equipMode = mode;
+    document.getElementById('equip-mode-btn-ativos')?.classList.toggle('active', mode === 'ativos');
+    document.getElementById('equip-mode-btn-dashboard')?.classList.toggle('active', mode === 'dashboard');
+    document.getElementById('btn-equip-filter')?.classList.toggle('hidden', mode !== 'ativos');
+    document.getElementById('equip-ativos-subbar')?.classList.toggle('hidden', mode !== 'ativos');
+    document.getElementById('equip-grid')?.classList.toggle('hidden', mode !== 'ativos');
+    document.getElementById('equip-dashboard-view')?.classList.toggle('hidden', mode !== 'dashboard');
+    if (mode !== 'ativos') {
+        document.getElementById('equip-filter-panel')?.classList.add('hidden');
+        document.getElementById('btn-equip-filter')?.classList.remove('active');
+    } else {
+        renderEquipGrid();
+    }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -6015,9 +6035,25 @@ function purgarLixeira() {
     return false;
 }
 
-function abrirLixeira() {
+// categoria (opcional): sem ela mostra a lixeira toda (uso de Estoque, como
+// sempre foi); com ela ('equip-analitico') filtra só aquele tipo — é o que a
+// Lixeira de Equipamentos usa, pra não misturar peça/licença/mobile/AC do
+// Estoque com o que foi apagado em Equipamentos. Guarda o filtro pra
+// restaurar/apagar de vez reabrirem já filtrados do mesmo jeito.
+let _trashModalFiltro = null;
+const _TRASH_TITULOS = { 'equip-analitico': 'Lixeira — Equipamentos' };
+function abrirLixeira(categoria) {
+    _trashModalFiltro = categoria || null;
+    const titleEl = document.getElementById('trash-modal-title');
+    if (titleEl) {
+        titleEl.innerHTML = `<i class="ph ph-trash"></i> ${_TRASH_TITULOS[categoria] || 'Lixeira'} <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(itens ficam 30 dias antes de sumir de vez)</span>`;
+    }
     const body = document.getElementById('trash-modal-body');
-    const lista = _trashStore();
+    // Sem categoria (botão de Estoque) mostra tudo, MENOS equipamentos — essa
+    // lixeira tem botão e lista próprios lá em Equipamentos, pra não misturar.
+    const lista = categoria
+        ? _trashStore().filter(t => t.categoria === categoria)
+        : _trashStore().filter(t => t.categoria !== 'equip-analitico');
     if (!lista.length) {
         body.innerHTML = '<div class="estoque-empty">Lixeira vazia.</div>';
     } else {
@@ -6134,6 +6170,12 @@ function restaurarDaLixeira(trashId) {
             item.status = 'disponivel'; item.manual = true; item.sourceCompId = null; item.sourceCompName = ''; item.unitName = ''; item.connType = ''; item.ip = '';
             _stockStore()[arrKey].push(item);
         }
+    } else if (t.categoria === 'equip-analitico') {
+        // Sem unidade/guichê pra devolver — o único lugar de um equipamento
+        // analítico é o cadastro em Equipamentos mesmo.
+        equipData.push(item);
+        DB.set('itEquipamentos/' + item.id, item);
+        voltouProLugar = true;
     }
 
     lista.splice(idx, 1);
@@ -6141,7 +6183,8 @@ function restaurarDaLixeira(trashId) {
     if (typeof reindexarCodigos === 'function') reindexarCodigos();
     saveSettings(); saveToStorage();
     renderComputers(); renderUnits();
-    abrirLixeira();
+    if (typeof renderEquipGrid === 'function') renderEquipGrid();
+    abrirLixeira(_trashModalFiltro);
     if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
 }
 
@@ -6149,8 +6192,11 @@ function excluirDaLixeira(trashId) {
     if (!confirm('Apagar definitivamente? Não dá pra restaurar depois.')) return;
     modelSettings.trash = _trashStore().filter(t => t.id !== trashId);
     saveSettings();
-    abrirLixeira();
+    abrirLixeira(_trashModalFiltro);
 }
+
+// Atalho do botão de lixeira em Equipamentos — mesma lixeira, só filtrada.
+function abrirLixeiraEquip() { abrirLixeira('equip-analitico'); }
 
 // ══════════════════════════════════════════════════════════════
 // REINDEXAÇÃO DE CÓDIGOS — os códigos de cada família são sempre
@@ -8392,12 +8438,14 @@ function saveEquipamento() {
 // ── Excluir direto pelo card ──────────────────────────────────
 function deleteEquip(id) {
     const e = equipData.find(x => x.id === id);
-    if (!e || !confirm(`Excluir permanentemente "${e.nome}"?`)) return;
+    if (!e || !confirm(`Mandar "${e.nome}" pra lixeira?\n\nFica ${TRASH_DIAS} dias disponível pra restaurar.`)) return;
     equipData = equipData.filter(x => x.id !== id); // eco local ignorado — atualiza aqui
     renderEquipGrid();
     DB.remove('itEquipamentos/' + id);
+    _enviarParaLixeira('equip-analitico', e, e.nome || 'Equipamento', e.codigo || e.serie || '');
+    saveSettings();
     if (typeof registrarLog === 'function') {
-        registrarLog(e.codigo || e.serie, 'equip-analitico', 'Equipamento excluído', `${e.nome}${e.unidade ? ' · ' + e.unidade : ''}`);
+        registrarLog(e.codigo || e.serie, 'equip-analitico', 'Equipamento enviado pra lixeira', `${e.nome}${e.unidade ? ' · ' + e.unidade : ''}`);
     }
 }
 
@@ -8470,10 +8518,15 @@ function editEquipFromDetail() {
 function deleteEquipFromDetail() {
     if (!equipDetailId) return;
     const e = equipData.find(x => x.id === equipDetailId);
-    if (!e || !confirm(`Excluir permanentemente "${e.nome}"?`)) return;
+    if (!e || !confirm(`Mandar "${e.nome}" pra lixeira?\n\nFica ${TRASH_DIAS} dias disponível pra restaurar.`)) return;
     equipData = equipData.filter(x => x.id !== equipDetailId); // eco local ignorado — atualiza aqui
     renderEquipGrid();
     DB.remove('itEquipamentos/' + equipDetailId);
+    _enviarParaLixeira('equip-analitico', e, e.nome || 'Equipamento', e.codigo || e.serie || '');
+    saveSettings();
+    if (typeof registrarLog === 'function') {
+        registrarLog(e.codigo || e.serie, 'equip-analitico', 'Equipamento enviado pra lixeira', `${e.nome}${e.unidade ? ' · ' + e.unidade : ''}`);
+    }
     closeModals();
 }
 
