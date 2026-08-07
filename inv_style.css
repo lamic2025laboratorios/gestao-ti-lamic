@@ -1529,21 +1529,27 @@ select { appearance: none; cursor: pointer; }
 }
 .eqd-icon-btn:hover { background: #334155; color: #fff; }
 
-/* Tabs — faixa cinza logo abaixo do cabeçalho escuro */
+/* Listra de destaque entre o cabeçalho escuro e a faixa de abas */
+.eqd-stripe {
+    height: 4px; flex-shrink: 0;
+    background: linear-gradient(90deg, #38bdf8, var(--blue));
+}
+
+/* Tabs — faixa cinza logo abaixo da listra */
 .eqd-tabs {
-    display: flex; gap: 4px;
+    display: flex; gap: 6px;
     border-bottom: 1px solid var(--border);
     padding: 0 18px; background: var(--surface-2);
     flex-shrink: 0;
 }
 .eqd-tab {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 11px 14px; font-size: .83rem; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 15px 18px; font-size: .92rem; font-weight: 700;
     color: var(--text-muted); background: none; border: none; cursor: pointer;
     border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s;
     font-family: inherit;
 }
-.eqd-tab i { font-size: 1rem; }
+.eqd-tab i { font-size: 1.1rem; }
 .eqd-tab:hover { color: var(--navy); }
 .eqd-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
 
@@ -1592,6 +1598,15 @@ select { appearance: none; cursor: pointer; }
 .eqd-status-tag.manut { background: rgba(245,158,11,.15); color: #fbbf24; border-color: rgba(245,158,11,.3); }
 .eqd-status-tag.inativo { background: rgba(239,68,68,.15); color: #f87171; border-color: rgba(239,68,68,.3); }
 
+/* Etiqueta de Setor/Tipo (Bioquímica, Equipamentos Analíticos) — quadrada,
+   pra diferenciar da etiqueta de Status (essa sim em pílula/arredondada) */
+.eqd-tag {
+    display: inline-flex; align-items: center;
+    background: var(--blue-pale); color: var(--navy);
+    border: 1px solid #bfdbfe; border-radius: 5px;
+    font-size: .72rem; font-weight: 700; padding: 3px 11px;
+}
+
 /* Grid de info cards */
 .eqd-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .eqd-info-card {
@@ -1624,6 +1639,13 @@ select { appearance: none; cursor: pointer; }
     cursor: pointer; transition: all .15s; font-family: inherit;
 }
 .eqd-btn-delete:hover { background: var(--red); color: #fff; border-color: var(--red); }
+.eqd-btn-edit {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: var(--r); border: 1.5px solid #93c5fd;
+    background: #eff6ff; color: var(--blue); font-size: .85rem; font-weight: 700;
+    cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.eqd-btn-edit:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
 
 
 /* ── Upload de imagem no formulário ── */

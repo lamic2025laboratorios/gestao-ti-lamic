@@ -1664,6 +1664,9 @@
             </div>
         </div>
 
+        <!-- Listra de destaque entre o cabeçalho e as abas -->
+        <div class="eqd-stripe"></div>
+
         <!-- Abas -->
         <div class="eqd-tabs" id="eqd-tabs">
             <button class="eqd-tab active" data-tab="info" onclick="setEqdTab('info')"><i class="ph ph-info"></i> Informações</button>
@@ -1674,20 +1677,20 @@
         <!-- Conteúdo -->
         <div class="eqd-body">
 
-            <!-- Carrossel de imagens — fica fixo em cima, em qualquer aba -->
-            <div class="eqd-car-wrap" id="eqd-car-wrap" style="display:none;">
-                <img id="eqd-car-img" class="eqd-car-img-el" src="" alt="">
-                <button class="eqd-car-nav prev" id="eqd-car-prev" onclick="equipCarNav(-1)">&#8249;</button>
-                <button class="eqd-car-nav next" id="eqd-car-next" onclick="equipCarNav(1)">&#8250;</button>
-                <div class="eqd-car-dots" id="eqd-car-dots"></div>
-                <div class="eqd-car-counter" id="eqd-car-counter" style="display:none;"></div>
-            </div>
-
             <!-- Área rolável: o conteúdo troca conforme a aba escolhida -->
             <div class="eqd-scroll">
 
             <!-- Aba Informações -->
             <div class="eqd-tab-panel active" id="eqd-panel-info">
+                <!-- Carrossel de imagens — só aparece aqui, nas outras abas some -->
+                <div class="eqd-car-wrap" id="eqd-car-wrap" style="display:none;">
+                    <img id="eqd-car-img" class="eqd-car-img-el" src="" alt="">
+                    <button class="eqd-car-nav prev" id="eqd-car-prev" onclick="equipCarNav(-1)">&#8249;</button>
+                    <button class="eqd-car-nav next" id="eqd-car-next" onclick="equipCarNav(1)">&#8250;</button>
+                    <div class="eqd-car-dots" id="eqd-car-dots"></div>
+                    <div class="eqd-car-counter" id="eqd-car-counter" style="display:none;"></div>
+                </div>
+
                 <!-- Tags de status e categoria -->
                 <div class="eqd-tags-row" id="eqd-hero-tags"></div>
 
@@ -1745,7 +1748,7 @@
         <!-- Rodapé -->
         <div class="eqd-footer">
             <button class="btn-secondary" onclick="closeModals()">Fechar</button>
-            <button class="eqd-btn-delete" onclick="deleteEquipFromDetail()"><i class="ph ph-trash"></i> Excluir</button>
+            <button class="eqd-btn-edit" onclick="editEquipFromDetail()"><i class="ph ph-pencil-simple"></i> Editar</button>
         </div>
     </div>
 </div>
