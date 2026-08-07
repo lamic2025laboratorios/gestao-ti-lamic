@@ -60,6 +60,15 @@ function _normalizarModelSettings() {
     });
   }
 
+  // Depósito do Estoque (itens sem unidade ainda): mesma corrida — .splice()
+  // em qualquer um desses (ex.: _consolidarTipo reaproveitando item avulso,
+  // desvincular periférico) esparsa o array no Firebase.
+  if (modelSettings.stockEquip && typeof modelSettings.stockEquip === 'object') {
+    Object.keys(modelSettings.stockEquip).forEach(k => {
+      modelSettings.stockEquip[k] = parseArray(modelSettings.stockEquip[k]);
+    });
+  }
+
   // partIds.ram / partIds.disk são arrays dentro de cada Template
   (modelSettings.compPresets || []).forEach(p => {
     if (p && p.partIds) {
@@ -102,10 +111,13 @@ function iniciarConexaoFirebase() {
     // Guichê marcado como "genuíno" (comp.license) sem registro nenhum de
     // licença — vira licença de verdade no depósito do Estoque.
     if (typeof puxarLicencasGenuinasDosGuiches === 'function' && modelSettings && Object.keys(modelSettings).length && puxarLicencasGenuinasDosGuiches()) equipConsolidado = true;
-    // Modelos de AC já cadastrados sobem pros pré-definidos das Configurações
-    if (typeof migrarModelosAc === 'function' && migrarModelosAc()) {
-      if (typeof renderSettingsList === 'function') renderSettingsList();
-    }
+    // Modelos de AC/Impressora/Etiquetadora/Térmica/Webcam/TV já cadastrados
+    // sobem pros pré-definidos das Configurações (Modelos e Templates)
+    let modelosSubiram = false;
+    if (typeof migrarModelosAc === 'function' && migrarModelosAc()) modelosSubiram = true;
+    if (typeof migrarModelosPerifericos === 'function' && migrarModelosPerifericos()) modelosSubiram = true;
+    if (typeof migrarModelosMobile === 'function' && migrarModelosMobile()) modelosSubiram = true;
+    if (modelosSubiram && typeof renderSettingsList === 'function') renderSettingsList();
     // Repara licenças Em Uso órfãs (sem template nem unidade usando)
     if (typeof repararLicencasEstoque === 'function' && modelSettings && Object.keys(modelSettings).length && repararLicencasEstoque()) equipConsolidado = true;
     // Conserta buracos na numeração de códigos (sequência sempre contínua)
@@ -2302,6 +2314,59 @@ function migrarModelosAc() {
     if (changed) saveSettings();
     if (mudouAc) saveToStorage();
     return changed || mudouAc;
+}
+
+// Backfill: mesma ideia do migrarModelosAc(), só que pros 5 tipos de
+// periférico (Impressora/Etiquetadora/Térmica/Webcam/TV) — sobe o Modelo já
+// cadastrado em cada guichê (unit[arrKey]) e no depósito (_stockStore())
+// pra lista de Modelos pré-definidos das Configurações, um por tipo.
+function migrarModelosPerifericos() {
+    if (!modelSettings || !Object.keys(modelSettings).length) return false;
+    let changed = false;
+    let mudouEstoque = false;
+    PERIF_TYPES.forEach(type => {
+        const arrKey = PERIF_ARRAY_KEY[type];
+        if (!modelSettings[type]) modelSettings[type] = [];
+        // Carimbo modeloMigrado: cada item sobe o modelo dele UMA vez só — sem
+        // isso, apagar o modelo nas Configurações ressuscitava a cada load
+        // enquanto existisse equipamento daquele modelo (mesmo bug do AC).
+        const adiciona = (r) => {
+            if (r.modeloMigrado) return;
+            const nome = (r.model || '').trim();
+            if (nome && !modelSettings[type].includes(nome)) { modelSettings[type].push(nome); changed = true; }
+            r.modeloMigrado = true;
+            mudouEstoque = true;
+        };
+        inventoryData.forEach(u => (u[arrKey] || []).forEach(adiciona));
+        (_stockStore()[arrKey] || []).forEach(adiciona);
+    });
+    if (changed) saveSettings();
+    if (mudouEstoque) saveToStorage();
+    return changed || mudouEstoque;
+}
+
+// Backfill do Celular: modelSettings.mobile é lista de {name,rom,ram,cpu} —
+// não string simples como os outros tipos — mas a ideia é a mesma.
+function migrarModelosMobile() {
+    if (!modelSettings || !Object.keys(modelSettings).length) return false;
+    if (!modelSettings.mobile) modelSettings.mobile = [];
+    let changed = false;
+    let mudouEstoque = false;
+    const adiciona = (r) => {
+        if (r.modeloMigrado) return;
+        const nome = (r.model || '').trim();
+        if (nome && !modelSettings.mobile.some(t => t.name === nome)) {
+            modelSettings.mobile.push({ name: nome, rom: r.rom || '', ram: r.ram || '', cpu: r.cpu || '' });
+            changed = true;
+        }
+        r.modeloMigrado = true;
+        mudouEstoque = true;
+    };
+    inventoryData.forEach(u => (u.mobiles || []).forEach(adiciona));
+    (_stockStore().mobiles || []).forEach(adiciona);
+    if (changed) saveSettings();
+    if (mudouEstoque) saveToStorage();
+    return changed || mudouEstoque;
 }
 
 // Preenche o AC a partir de um modelo pré-definido (Configurações) —
