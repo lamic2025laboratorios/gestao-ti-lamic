@@ -661,25 +661,45 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
   padding: 12px 14px;
 }
 
-/* Botão de histórico (relógio) nos cards do Estoque — ao lado da lixeira */
+/* Botão de histórico (relógio) nos cards do Estoque — ao lado da lixeira.
+   Base pensada pro card da aba Unidades (log + del, sem info). */
 .estoque-modelo-log {
   position: absolute; top: 8px; right: 40px; z-index: 1;
   width: 26px; height: 26px; padding: 0;
   display: flex; align-items: center; justify-content: center;
 }
-/* Botão de informações do Template — à esquerda do relógio */
+/* Botão de informações do Template — só existe no card do Gráfico */
 .estoque-modelo-info {
-  position: absolute; top: 8px; right: 72px; z-index: 1;
+  position: absolute; top: 8px; right: 104px; z-index: 1;
   width: 26px; height: 26px; padding: 0;
   display: flex; align-items: center; justify-content: center;
 }
-/* Card de Template (Gráfico) tem só info + log — encosta os dois na direita
-   pra não deixar buraco onde ficava a lixeira/lápis */
-.estoque-modelo-card.card-pc-preset .estoque-modelo-log  { right: 8px; }
-.estoque-modelo-card.card-pc-preset .estoque-modelo-info { right: 40px; }
-/* Mesma regra pros demais cards do Gráfico (periféricos, celulares, ACs e
-   licenças): lá não existe lixeira, então o relógio encosta na direita. */
-.estoque-modelo-card.card-sem-del .estoque-modelo-log { right: 8px; }
+/* Card do Gráfico (card-pc-preset = Template; card-grafico = periférico/
+   celular/AC/licença): lixeira sempre no canto — info e log (quando têm)
+   ficam à esquerda dela, um slot de 32px por ícone. */
+.estoque-modelo-card.card-pc-preset .estoque-modelo-del  { right: 8px; }
+.estoque-modelo-card.card-pc-preset .estoque-modelo-log  { right: 40px; }
+.estoque-modelo-card.card-pc-preset .estoque-modelo-info { right: 72px; }
+.estoque-modelo-card.card-grafico   .estoque-modelo-del  { right: 8px; }
+.estoque-modelo-card.card-grafico   .estoque-modelo-log  { right: 40px; }
+
+/* Só no Gráfico (card-pc-preset / card-grafico identificam essas telas — a
+   aba Unidades reusa os mesmos cards SEM essas classes, então fica de fora):
+   histórico/informações/lixeira ocultos por padrão, aparecem só no hover. */
+.estoque-modelo-card.card-pc-preset .estoque-modelo-info,
+.estoque-modelo-card.card-pc-preset .estoque-modelo-log,
+.estoque-modelo-card.card-pc-preset .estoque-modelo-del,
+.estoque-modelo-card.card-grafico .estoque-modelo-log,
+.estoque-modelo-card.card-grafico .estoque-modelo-del {
+  opacity: 0; transition: opacity .15s;
+}
+.estoque-modelo-card.card-pc-preset:hover .estoque-modelo-info,
+.estoque-modelo-card.card-pc-preset:hover .estoque-modelo-log,
+.estoque-modelo-card.card-pc-preset:hover .estoque-modelo-del,
+.estoque-modelo-card.card-grafico:hover .estoque-modelo-log,
+.estoque-modelo-card.card-grafico:hover .estoque-modelo-del {
+  opacity: 1;
+}
 
 /* Botão de editar Template (lápis) — no canto direito do card do Gráfico */
 .estoque-modelo-edit {

@@ -700,12 +700,16 @@ function deleteMobileModel(index) {
     }
 }
 
+// Apagar um Template NÃO apaga peça nenhuma — significa "desmontei esse PC
+// fisicamente": as peças (Modelo, CPU, Placa Mãe, RAM, Disco, Vídeo, Monitor)
+// voltam sozinhas pro Estoque → Lista como Disponível, prontas pra montar um
+// Template novo. Só o "molde" (o Template em si, o vínculo entre elas) some.
 function deleteCompPreset(index) {
     const p = modelSettings.compPresets[index];
     const linked = p && p.unitId && p.compId;
     const msg = linked
-        ? `Excluir o Modelo "${p.name}"?\n\nEle está em uso no guichê "${p.compName}" (${p.unitName}) — o guichê continua existindo, só fica sem Hardware.\n\nEssa ação não pode ser desfeita.`
-        : 'Excluir definitivamente este Template de PC da lista?';
+        ? `Desmontar o Template "${p.name}"?\n\nIsso representa desmontar o PC fisicamente. Ele está no guichê "${p.compName}" (${p.unitName}) — o guichê continua existindo, só fica sem Hardware.\n\nAs peças (Modelo, CPU, Placa Mãe, RAM, Disco, Vídeo, Monitor) voltam pro Estoque → Lista como Disponível, prontas pra montar um Template novo.`
+        : `Desmontar o Template "${p.name || p.serial}"?\n\nAs peças voltam pro Estoque → Lista como Disponível, prontas pra montar um Template novo.`;
     if (!confirm(msg)) return;
 
     // Apagar o Modelo no Estoque NÃO apaga o guichê — só limpa o Hardware/
@@ -723,7 +727,7 @@ function deleteCompPreset(index) {
         }
     }
     if (typeof registrarLog === 'function' && p) {
-        registrarLog(p.serial || p.name, 'pc', 'Modelo excluído do Estoque', linked ? `Estava no guichê ${p.compName} (${p.unitName})` : 'Estava disponível');
+        registrarLog(p.serial || p.name, 'pc', 'Template desmontado — peças voltaram pro Estoque', linked ? `Estava no guichê ${p.compName} (${p.unitName})` : 'Estava disponível');
     }
 
     // Libera as peças e a licença que este Template usava — voltam pra
@@ -6707,10 +6711,10 @@ function _renderEquipCard(reg, type, unit, soLeitura = false) {
     else if (type === 'ac') { clickAction = `_openAcFromEstoque('${unitId}','${reg.id}',${soLeitura})`; delAction = `_deleteAcFromEstoque('${unitId}','${reg.id}')`; }
     else { clickAction = `openEquipPresetModal('${type}','${unitId}','${reg.id}',false,${soLeitura})`; delAction = `_deleteEquipRegistro('${type}','${unitId}','${reg.id}')`; }
     return `
-    <div class="estoque-modelo-card${soLeitura ? ' card-sem-del' : ''}" onclick="${clickAction}" title="${soLeitura ? 'Visualização (somente leitura — editar é pela Lista)' : 'Clique para ver / editar'}">
+    <div class="estoque-modelo-card${soLeitura ? ' card-grafico' : ''}" onclick="${clickAction}" title="${soLeitura ? 'Visualização (somente leitura — editar é pela Lista)' : 'Clique para ver / editar'}">
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
-        ${soLeitura ? '' : `<button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); ${delAction}" title="Excluir"><i class="ph ph-trash"></i></button>`}
+        <button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); ${delAction}" title="Excluir${soLeitura ? ' (vai pra lixeira, 30 dias pra restaurar)' : ''}"><i class="ph ph-trash"></i></button>
         <div class="estoque-comp-head">
             <i class="ph ${TIPO_ICON[type]}"></i>
             <strong>${serial || titulo || '—'}</strong>
@@ -6763,6 +6767,7 @@ function _renderPcPresetCard(p, idx) {
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-info" onclick="event.stopPropagation(); abrirInfoTemplate(${idx})" title="Informações (peças, licença, danos)"><i class="ph ph-info"></i></button>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${p.serial || p.name}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
+        <button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); deleteCompPreset(${idx})" title="Desmontar Template — peças voltam pro Estoque"><i class="ph ph-trash"></i></button>
         <div class="estoque-comp-head">
             <i class="ph ph-cube"></i>
             <strong>${p.serial || p.name}</strong>
@@ -6991,9 +6996,10 @@ function _renderLicencaCard(l) {
     const preset = l.status === 'em_uso' ? (modelSettings.compPresets || []).find(p => p.licenseStockId === l.id) : null;
     const local = preset ? `${preset.serial || preset.name}${preset.compName ? ' · ' + preset.compName + ' (' + preset.unitName + ')' : ''}` : 'Estoque';
     return `
-    <div class="estoque-modelo-card card-sem-del" onclick="abrirEntradaLicenca('${l.id}', false, true)" title="Visualização (somente leitura — editar é pela Lista)">
+    <div class="estoque-modelo-card card-grafico" onclick="abrirEntradaLicenca('${l.id}', false, true)" title="Visualização (somente leitura — editar é pela Lista)">
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${l.serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
+        <button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); _deleteLicencaLista('${l.id}')" title="Excluir (vai pra lixeira, 30 dias pra restaurar)"><i class="ph ph-trash"></i></button>
         <div class="estoque-comp-head">
             <i class="ph ph-certificate"></i>
             <strong>${l.serial || '—'}</strong>
