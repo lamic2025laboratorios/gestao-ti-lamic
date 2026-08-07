@@ -6180,7 +6180,7 @@ function registrarLog(equipCode, tipo, acao, detalhe, unitId) {
    pontas (PC, celular, AC, periférico), quem decide é a ação envolver ou não
    um guichê/unidade. Derivar na leitura (em vez de gravar um campo novo) faz
    valer também pros logs que já existem. */
-const LOG_SECAO_FIXA  = { guiche: 'dashboard', peca: 'estoque', licenca: 'estoque', lixeira: 'estoque' };
+const LOG_SECAO_FIXA  = { guiche: 'dashboard', peca: 'estoque', licenca: 'estoque', lixeira: 'estoque', 'equip-analitico': 'equip' };
 const _LOG_RE_UNIDADE = /guich|atribu[ií]|vinculad|desvinculad|movido/i;
 
 function _secaoDoLog(l) {
@@ -8143,6 +8143,7 @@ function renderEquipGrid() {
         card.innerHTML = `
             <div class="equip-status-dot ${dotClass}"></div>
             <div class="card-actions">
+                <button class="btn-icon" title="Histórico" onclick="event.stopPropagation();abrirLogsEquipamento('${e.codigo || e.serie || ''}')"><i class="ph ph-clock-counter-clockwise"></i></button>
                 <button class="btn-icon" title="Editar" onclick="event.stopPropagation();openEquipModal('${e.id}')"><i class="ph ph-pencil-simple"></i></button>
                 <button class="btn-icon btn-delete" title="Excluir" onclick="event.stopPropagation();deleteEquip('${e.id}')"><i class="ph ph-trash"></i></button>
             </div>
@@ -8253,8 +8254,18 @@ function saveEquipamento() {
 
     // Atualiza o array local imediatamente (não espera o Firebase)
     const idx = equipData.findIndex(e => e.id === id);
-    if (idx !== -1) equipData[idx] = { ...equipData[idx], ...data };
-    else            equipData.push(data);
+    const isEdit = idx !== -1;
+    if (isEdit) equipData[idx] = { ...equipData[idx], ...data };
+    else        equipData.push(data);
+
+    // Log: só agora existe. saveEquipamento/deleteEquip nunca chamavam
+    // registrarLog, então o card "Logs de Equipamentos" das Configurações
+    // sempre esteve vazio, sem fonte nenhuma.
+    if (typeof registrarLog === 'function') {
+        registrarLog(data.codigo || data.serie, 'equip-analitico',
+            isEdit ? 'Equipamento editado' : 'Equipamento cadastrado',
+            `${data.nome}${data.unidade ? ' · ' + data.unidade : ''}`);
+    }
 
     // Fecha o modal
     document.getElementById('equip-modal').classList.add('hidden');
@@ -8288,6 +8299,9 @@ function deleteEquip(id) {
     equipData = equipData.filter(x => x.id !== id); // eco local ignorado — atualiza aqui
     renderEquipGrid();
     DB.remove('itEquipamentos/' + id);
+    if (typeof registrarLog === 'function') {
+        registrarLog(e.codigo || e.serie, 'equip-analitico', 'Equipamento excluído', `${e.nome}${e.unidade ? ' · ' + e.unidade : ''}`);
+    }
 }
 
 // ── Detalhe ao clicar no card ─────────────────────────────────
