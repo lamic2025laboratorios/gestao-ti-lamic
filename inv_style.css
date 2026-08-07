@@ -2478,6 +2478,31 @@ main.main-expanded {
 .cfg-cols-2 .config-section { margin-bottom: 0; }
 @media (max-width: 1100px) { .cfg-cols-2 { grid-template-columns: 1fr; } }
 
+/* Setores / Categorias de Acessos (Configurações) */
+.cat-acesso-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 2px; border-bottom: 1px solid var(--border);
+}
+.cat-acesso-item:last-child { border-bottom: none; }
+.cat-acesso-cor-dot {
+  width: 16px; height: 16px; border-radius: 5px; flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
+}
+.cat-acesso-nome { flex: 1; font-size: .92rem; font-weight: 600; color: var(--navy); }
+.cat-acesso-count { font-size: .74rem; color: var(--text-muted); white-space: nowrap; }
+.cat-acesso-acts { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* Cores prontas do modal de setor */
+.cat-acesso-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.cat-swatch {
+  width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
+  border: 2px solid transparent; padding: 0;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
+  transition: transform .12s, border-color .12s;
+}
+.cat-swatch:hover { transform: scale(1.1); }
+.cat-swatch.active { border-color: var(--navy); transform: scale(1.1); }
+
 /* Logs: botões só-ícone (ver / baixar) */
 .cfg-log-btns { display: flex; gap: 8px; flex-shrink: 0; }
 .btn-icon-only {

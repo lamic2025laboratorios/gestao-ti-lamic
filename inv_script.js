@@ -170,6 +170,17 @@ function iniciarConexaoFirebase() {
   // Escuta a Base de Acessos Corporativos
   DB.listen('itAccesses', data => {
     globalAccessData = parseArray(data);
+    // Categoria usada por um acesso mas ainda sem cadastro entra automaticamente
+    if (typeof semearCategoriasAcesso === 'function') semearCategoriasAcesso();
+    renderAccesses();
+    if (typeof renderCategoriasAcesso === 'function') renderCategoriasAcesso();
+  });
+
+  // Escuta os Setores / Categorias de Acessos (nome + cor de cada pasta)
+  DB.listen('itCategoriasAcesso', data => {
+    categoriasAcesso = parseArray(data);
+    if (typeof semearCategoriasAcesso === 'function') semearCategoriasAcesso();
+    if (typeof renderCategoriasAcesso === 'function') renderCategoriasAcesso();
     renderAccesses();
   });
 
@@ -3531,16 +3542,199 @@ function filterUnitItems() {
 globalAccessData = [];
 accessToggleStates = {};
 
+/* ══════════════════════════════════════════════════════════════
+   SETORES / CATEGORIAS DE ACESSOS
+   As pastas da Gestão de Acessos eram uma lista fixa no código, sem
+   como criar, renomear, excluir ou trocar cor. Agora vivem em
+   itCategoriasAcesso ({id, nome, cor}) e o render dos Acessos lê daqui.
+   ══════════════════════════════════════════════════════════════ */
+let categoriasAcesso = [];
+
+// Cores prontas oferecidas no modal (a paleta livre fica no input color)
+const CORES_CATEGORIA_ACESSO = [
+    '#1e3a8a', '#0369a1', '#0e7490', '#0f766e', '#15803d',
+    '#a16207', '#b45309', '#b91c1c', '#9333ea', '#be185d', '#334155'
+];
+
+// Pastas que já existiam fixas no código — viram o cadastro inicial
+const CATEGORIAS_ACESSO_PADRAO = [
+    { nome: 'Administrativo',             cor: '#1e3a8a' },
+    { nome: 'Biomedicos',                 cor: '#0369a1' },
+    { nome: 'Diretoria',                  cor: '#0f766e' },
+    { nome: 'Lamic viva+',                cor: '#15803d' },
+    { nome: 'Triagem coletas e vacinas',  cor: '#a16207' },
+    { nome: 'Unidade externas',           cor: '#b45309' },
+    { nome: 'Links',                      cor: '#9333ea' },
+    { nome: 'Atendimento UNILAB',         cor: '#be185d' },
+    { nome: 'Outros',                     cor: '#334155' }
+];
+
+function _novoIdCatAcesso() {
+    return 'ca_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+// Semeia o cadastro: as pastas padrão + qualquer categoria que já apareça
+// nos acessos cadastrados (assim nada que existe hoje fica de fora).
+// Idempotente — só adiciona o que falta.
+function semearCategoriasAcesso() {
+    let changed = false;
+    const temNome = n => categoriasAcesso.some(c => (c.nome || '').toLowerCase() === (n || '').toLowerCase());
+
+    if (!categoriasAcesso.length) {
+        categoriasAcesso = CATEGORIAS_ACESSO_PADRAO.map(c => ({ id: _novoIdCatAcesso(), nome: c.nome, cor: c.cor }));
+        changed = true;
+    }
+    // Categoria usada por algum acesso mas sem cadastro: entra com cor neutra
+    (globalAccessData || []).forEach(acc => {
+        const nome = acc.categoria;
+        if (!nome || temNome(nome)) return;
+        categoriasAcesso.push({ id: _novoIdCatAcesso(), nome, cor: '#334155' });
+        changed = true;
+    });
+    if (changed) DB.set('itCategoriasAcesso', categoriasAcesso);
+    return changed;
+}
+
+function _corDaCategoriaAcesso(nome) {
+    const c = categoriasAcesso.find(x => (x.nome || '').toLowerCase() === (nome || '').toLowerCase());
+    return (c && c.cor) || '#334155';
+}
+
+// Clareia um hex — usado pra montar o degradê do cabeçalho a partir de 1 cor só
+function _clarearCor(hex, pct) {
+    const h = (hex || '').replace('#', '');
+    if (h.length !== 6) return hex;
+    const sobe = v => Math.min(255, Math.round(v + (255 - v) * (pct / 100)));
+    const r = sobe(parseInt(h.slice(0, 2), 16));
+    const g = sobe(parseInt(h.slice(2, 4), 16));
+    const b = sobe(parseInt(h.slice(4, 6), 16));
+    return `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+// Lista no card de Configurações
+function renderCategoriasAcesso() {
+    const ul = document.getElementById('list-categorias-acesso');
+    if (!ul) return;
+    if (!categoriasAcesso.length) {
+        ul.innerHTML = '<li class="ecl-empty">Nenhum setor cadastrado ainda.</li>';
+        return;
+    }
+    ul.innerHTML = categoriasAcesso.map(c => {
+        const usados = (globalAccessData || []).filter(a => (a.categoria || '') === c.nome).length;
+        return `
+        <li class="cat-acesso-item">
+            <span class="cat-acesso-cor-dot" style="background:${c.cor || '#334155'}"></span>
+            <span class="cat-acesso-nome">${c.nome}</span>
+            <span class="cat-acesso-count">${usados} acesso${usados !== 1 ? 's' : ''}</span>
+            <span class="cat-acesso-acts">
+                <button class="btn-icon" onclick="abrirCategoriaAcesso('${c.id}')" title="Editar setor"><i class="ph ph-pencil-simple"></i></button>
+                <button class="btn-icon btn-delete" onclick="excluirCategoriaAcesso('${c.id}')" title="Excluir setor"><i class="ph ph-trash"></i></button>
+            </span>
+        </li>`;
+    }).join('');
+}
+
+function abrirCategoriaAcesso(id) {
+    const c = id ? categoriasAcesso.find(x => x.id === id) : null;
+    document.getElementById('cat-acesso-title').textContent = c ? 'Editar Setor / Categoria' : 'Novo Setor / Categoria';
+    document.getElementById('cat-acesso-id').value = c ? c.id : '';
+    document.getElementById('cat-acesso-nome').value = c ? c.nome : '';
+    const cor = c ? (c.cor || '#334155') : CORES_CATEGORIA_ACESSO[0];
+    document.getElementById('cat-acesso-cor').value = cor;
+    _renderSwatchesCatAcesso(cor);
+    document.getElementById('cat-acesso-modal').classList.remove('hidden');
+}
+
+function fecharCategoriaAcesso() {
+    document.getElementById('cat-acesso-modal').classList.add('hidden');
+}
+
+// Cores prontas; clicar numa delas joga o valor no input color
+function _renderSwatchesCatAcesso(corAtual) {
+    const box = document.getElementById('cat-acesso-swatches');
+    if (!box) return;
+    box.innerHTML = CORES_CATEGORIA_ACESSO.map(cor => `
+        <button type="button" class="cat-swatch${cor.toLowerCase() === (corAtual || '').toLowerCase() ? ' active' : ''}"
+                style="background:${cor}" title="${cor}"
+                onclick="_escolherCorCatAcesso('${cor}')"></button>`).join('');
+}
+
+function _escolherCorCatAcesso(cor) {
+    document.getElementById('cat-acesso-cor').value = cor;
+    _renderSwatchesCatAcesso(cor);
+}
+
+function salvarCategoriaAcesso() {
+    const id   = document.getElementById('cat-acesso-id').value;
+    const nome = document.getElementById('cat-acesso-nome').value.trim();
+    const cor  = document.getElementById('cat-acesso-cor').value || '#334155';
+    if (!nome) return alert('Informe o nome do setor / categoria.');
+
+    // Nome repetido (ignorando o próprio registro em edição)
+    const repetido = categoriasAcesso.some(c => c.id !== id && (c.nome || '').toLowerCase() === nome.toLowerCase());
+    if (repetido) return alert(`Já existe um setor chamado "${nome}".`);
+
+    if (id) {
+        const c = categoriasAcesso.find(x => x.id === id);
+        if (!c) return;
+        const nomeAntigo = c.nome;
+        c.nome = nome; c.cor = cor;
+        // Renomear precisa levar junto os acessos: cada acesso guarda o NOME da
+        // categoria (acc.categoria), não o id — sem isto eles ficariam órfãos e
+        // cairiam em "Outros".
+        if (nomeAntigo !== nome) {
+            let mexeu = 0;
+            (globalAccessData || []).forEach(a => { if (a.categoria === nomeAntigo) { a.categoria = nome; mexeu++; } });
+            if (mexeu) DB.set('itAccesses', globalAccessData);
+            // Preserva o estado aberto/fechado da pasta renomeada
+            if (accessToggleStates[nomeAntigo] !== undefined) {
+                accessToggleStates[nome] = accessToggleStates[nomeAntigo];
+                delete accessToggleStates[nomeAntigo];
+            }
+        }
+    } else {
+        categoriasAcesso.push({ id: _novoIdCatAcesso(), nome, cor });
+        accessToggleStates[nome] = true;   // nasce fechada, como as demais
+    }
+
+    DB.set('itCategoriasAcesso', categoriasAcesso);
+    fecharCategoriaAcesso();
+    renderCategoriasAcesso();
+    renderAccesses();
+}
+
+function excluirCategoriaAcesso(id) {
+    const c = categoriasAcesso.find(x => x.id === id);
+    if (!c) return;
+    const usados = (globalAccessData || []).filter(a => (a.categoria || '') === c.nome).length;
+    if ((c.nome || '').toLowerCase() === 'outros') {
+        return alert('"Outros" não pode ser excluído — é onde os acessos sem setor ficam guardados.');
+    }
+    const msg = usados
+        ? `Excluir o setor "${c.nome}"?\n\n${usados} acesso(s) estão nele e serão movidos para "Outros" — nenhum acesso é apagado.`
+        : `Excluir o setor "${c.nome}"?`;
+    if (!confirm(msg)) return;
+
+    if (usados) {
+        (globalAccessData || []).forEach(a => { if (a.categoria === c.nome) a.categoria = 'Outros'; });
+        DB.set('itAccesses', globalAccessData);
+    }
+    categoriasAcesso = categoriasAcesso.filter(x => x.id !== id);
+    DB.set('itCategoriasAcesso', categoriasAcesso);
+    renderCategoriasAcesso();
+    renderAccesses();
+}
+
 function renderAccesses() {
     const container = document.getElementById('access-categories-container');
     if (!container) return;
     container.innerHTML = '';
 
-    const grouped = {
-        'Administrativo': [], 'Biomedicos': [], 'Diretoria': [],
-        'Lamic viva+': [], 'Triagem coletas e vacinas': [],
-        'Unidade externas': [], 'Links': [], 'Atendimento UNILAB': [], 'Outros': []
-    };
+    // Pastas vêm do cadastro de Setores (Configurações), na ordem cadastrada —
+    // não mais de uma lista fixa aqui dentro.
+    const grouped = {};
+    categoriasAcesso.forEach(c => { grouped[c.nome] = []; });
+    if (!grouped['Outros']) grouped['Outros'] = [];   // destino dos acessos sem setor
 
     globalAccessData.forEach(acc => {
         if (!_accessPassesFilters(acc)) return; // aplica filtros ativos
@@ -3573,6 +3767,9 @@ function renderAccesses() {
         
         const header = document.createElement('div');
         header.className = 'collapsible-header';
+        // Cor definida no cadastro do setor (Configurações), degradê a partir dela
+        const corCat = _corDaCategoriaAcesso(cat);
+        header.style.background = `linear-gradient(90deg, ${corCat} 0%, ${_clarearCor(corCat, 22)} 100%)`;
         header.onclick = () => {
             const el = document.getElementById(sectionId);
             el.classList.toggle('hidden');
@@ -3789,16 +3986,11 @@ function showAccessesView() {
     const b = document.getElementById('btn-nav-accesses'); if(b) { document.querySelectorAll('.sidebar-nav .nav-item').forEach(x=>x.classList.remove('active')); b.classList.add('active'); }
     closeModals();
 
-    const categorias = [
-        'Administrativo', 'Biomedicos', 'Diretoria', 
-        'Lamic viva+', 'Triagem coletas e vacinas', 
-        'Unidade externas', 'Links', 'Atendimento UNILAB', 'Outros'
-    ];
-    
+    // Toda pasta começa FECHADA ao abrir a seção — a lista vem do cadastro de
+    // Setores (antes era fixa aqui, então setor novo nascia aberto).
     accessToggleStates = {};
-    categorias.forEach(cat => {
-        accessToggleStates[cat] = true;
-    });
+    categoriasAcesso.forEach(c => { accessToggleStates[c.nome] = true; });
+    accessToggleStates['Outros'] = true;
 
     document.getElementById('accesses-view').classList.remove('hidden');
     document.getElementById('accesses-view').classList.add('active');
