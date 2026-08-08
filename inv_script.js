@@ -406,6 +406,22 @@ function updateDashboard() { renderDashboardCards(); }
 // SETTINGS
 // =============================================
 
+// Status do Template de PC (Bloco 1) — 3 botões no lugar do select;
+// inl-pc-status continua um input (agora hidden) com o mesmo valor de
+// sempre ('ativo'/'inativo'/'manutencao'), então savePcPresetModal() não
+// precisou mudar (ainda lê .value igual).
+function setPcPresetStatus(val) {
+    const inp = document.getElementById('inl-pc-status');
+    if (inp) inp.value = val;
+    _syncPcPresetStatusBtns();
+}
+function _syncPcPresetStatusBtns() {
+    const val = document.getElementById('inl-pc-status')?.value || 'ativo';
+    document.querySelectorAll('#pc-preset-status-btns .equip-status-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === val);
+    });
+}
+
 function openInlineForm(type, index = null) {
     const isEdit = index !== null;
 
@@ -480,6 +496,7 @@ function openInlineForm(type, index = null) {
             const unitObj = inventoryData.find(u => u.id === t.unitId);
             const compObj = unitObj && (unitObj.computers || []).find(c => c.id === t.compId);
             document.getElementById('inl-pc-status').value = (compObj && compObj.status) || 'ativo';
+            _syncPcPresetStatusBtns();
         }
 
         document.getElementById('pc-preset-modal').classList.remove('hidden');
@@ -6557,7 +6574,7 @@ function abrirEntradaLicenca(licId = null, editavel = false, soLeitura = false) 
     const lic = licId ? _stockLicenses().find(l => l.id === licId) : null;
     const isView = lic && !editavel;
     document.getElementById('add-equip-chooser-modal')?.classList.add('hidden');
-    document.getElementById('lic-entry-title').innerHTML = `<i class="ph ph-certificate"></i> ${lic ? (isView ? 'Licença de Software' : 'Editar Licença') : 'Entrada de Licença de Software'}`;
+    document.getElementById('lic-entry-title').textContent = lic ? (isView ? 'Licença de Software' : 'Editar Licença') : 'Entrada de Licença de Software';
     document.getElementById('lic-entry-id').value = lic ? lic.id : '';
     document.getElementById('lic-entry-serial').value = lic ? lic.serial : _nextSerialFor('LIC', _stockLicenses());
     document.getElementById('lic-entry-software').value = lic ? (lic.software || '') : '';
@@ -7592,7 +7609,10 @@ function openEquipPresetModal(type, unitId, regId, editavel = false, soLeitura =
     };
     roCampos(isView);
 
-    document.getElementById('equip-preset-title').innerHTML = `<i class="ph ${TIPO_ICON[type]}"></i> ${isNew ? 'Novo(a) ' + TIPO_LABEL[type] : TIPO_LABEL[type]}`;
+    // Ícone do cabeçalho (caixinha) muda por tipo de periférico; o texto é só o nome.
+    const eqPresetTitleIcon = document.getElementById('equip-preset-title-icon');
+    if (eqPresetTitleIcon) eqPresetTitleIcon.className = `ph ${TIPO_ICON[type]}`;
+    document.getElementById('equip-preset-title').textContent = isNew ? 'Novo(a) ' + TIPO_LABEL[type] : TIPO_LABEL[type];
     document.getElementById('eq-preset-type').value = type;
     document.getElementById('eq-preset-id').value = isNew ? '' : regId;
     document.getElementById('eq-preset-serial').value = isNew ? _nextSerialFor(EQUIP_SERIAL_PREFIX[type], _flattenUnitArray(arrKey)) : (reg.serial || '');
@@ -8002,7 +8022,10 @@ function abrirEntradaPeca(tipo, pecaId = null, editavel = null) {
     const peca = pecaId ? _acharPeca(tipo, pecaId) : null;
     const isView = peca && editavel !== true;
     document.getElementById('add-equip-chooser-modal')?.classList.add('hidden');
-    document.getElementById('part-entry-title').innerHTML = `<i class="ph ${cfg.icon}"></i> ${peca ? (isView ? '' : 'Editar ') + cfg.label : 'Entrada de ' + cfg.label}`;
+    // Ícone do cabeçalho (caixinha) muda por tipo de peça; o texto é só o nome.
+    const partTitleIcon = document.getElementById('part-entry-title-icon');
+    if (partTitleIcon) partTitleIcon.className = `ph ${cfg.icon}`;
+    document.getElementById('part-entry-title').textContent = peca ? (isView ? '' : 'Editar ') + cfg.label : 'Entrada de ' + cfg.label;
     document.getElementById('part-entry-tipo').value = tipo;
     document.getElementById('part-entry-id').value = peca ? peca.id : '';
     document.getElementById('part-entry-serial').value = peca ? peca.serial : _nextPartSerial(tipo);

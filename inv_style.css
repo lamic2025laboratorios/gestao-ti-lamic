@@ -664,6 +664,12 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
   background: #e2e8f0; border: 1px solid #cbd5e1; border-radius: var(--r-lg);
   padding: 12px 14px;
 }
+/* Dentro de uma caixa já destacada (fundo + borda própria), o traço de cima
+   do cabeçalho do bloco fica redundante — a própria caixa já separa. */
+.pc-preset-loc-highlight .equip-section-divider,
+.pc-preset-acessos-highlight .equip-section-divider {
+  border-top: none; margin-top: 0; padding-top: 0;
+}
 
 /* Botão de histórico (relógio) nos cards do Estoque — ao lado da lixeira.
    Base pensada pro card da aba Unidades (log + del, sem info). */
@@ -1255,6 +1261,22 @@ select { appearance: none; cursor: pointer; }
 .medium-modal { max-width: 1000px; width: 95%; }
 .large-modal  { max-width: 1050px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+/* Cabeçalho azul-escuro dos popups de criar/editar do Estoque — mesmo
+   visual do popup de detalhe de Equipamentos (fundo escuro, ícone numa
+   caixinha — reaproveita .eqd-header-left/-icon-box/-name/-right/.eqd-icon-btn
+   direto), só que sangrando até a borda do .modal-content normal (que tem
+   padding, diferente do .eqd-modal que já nasce com padding:0). */
+.form-modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #0f172a; padding: 14px 18px; gap: 12px;
+    margin: -2rem -2rem 0 -2rem;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.form-modal-stripe {
+    height: 4px; margin: 0 -2rem .75rem;
+    background: linear-gradient(90deg, #38bdf8, var(--blue));
+}
 
 /* ============================================================
    SETTINGS

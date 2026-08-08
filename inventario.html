@@ -651,13 +651,17 @@
 <!-- Mobile Modal -->
 <div id="mobile-modal" class="modal hidden">
     <div class="modal-content medium-modal">
-        <div class="modal-header-row">
-            <h3 id="mob-modal-title">Novo Celular</h3>
-            <div style="display:flex;gap:8px;">
-                <button class="btn-icon hidden" id="mob-edit-btn" onclick="_editarMobileModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
-                <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-device-mobile"></i></div>
+                <div class="eqd-header-name" id="mob-modal-title">Novo Celular</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn hidden" id="mob-edit-btn" onclick="_editarMobileModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="eqd-icon-btn" onclick="closeModals()" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
+        <div class="form-modal-stripe"></div>
         <input type="hidden" id="mob-id">
         <div class="form-group preset-bar" id="mob-preset-bar">
             <label>Modelo Pré-Cadastrado <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerenciados em Configurações)</span></label>
@@ -766,13 +770,17 @@
 <!-- AC Modal -->
 <div id="ac-modal" class="modal hidden">
     <div class="modal-content medium-modal">
-        <div class="modal-header-row">
-            <h3 id="ac-modal-title">Novo Ar-Condicionado</h3>
-            <div style="display:flex;gap:8px;">
-                <button class="btn-icon hidden" id="ac-edit-btn" onclick="_editarAcModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
-                <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-snowflake"></i></div>
+                <div class="eqd-header-name" id="ac-modal-title">Novo Ar-Condicionado</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn hidden" id="ac-edit-btn" onclick="_editarAcModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="eqd-icon-btn" onclick="closeModals()" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
+        <div class="form-modal-stripe"></div>
         <input type="hidden" id="ac-id">
         <div class="form-group preset-bar" id="ac-preset-bar">
             <label>Modelo Pré-Cadastrado <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerenciados em Configurações)</span></label>
@@ -1172,25 +1180,46 @@
 <!-- Modal: Criar / Editar Template de PC -->
 <div id="pc-preset-modal" class="modal hidden">
     <div class="modal-content large-modal">
-        <div class="modal-header-row">
-            <h3 id="pc-preset-title"><i class="ph ph-desktop"></i> Novo Template de PC</h3>
-            <button class="btn-icon" onclick="document.getElementById('pc-preset-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-desktop"></i></div>
+                <div class="eqd-header-name" id="pc-preset-title">Novo Template de PC</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('pc-preset-modal').classList.add('hidden')" title="Fechar"><i class="ph ph-x"></i></button>
+            </div>
         </div>
+        <div class="form-modal-stripe"></div>
+
         <input type="hidden" id="inl-pc-index">
         <input type="hidden" id="inl-pc-orig-unitid">
         <input type="hidden" id="inl-pc-orig-compid">
-        <div class="grid-2-col">
-            <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="inl-pc-name" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
-            <div class="form-group" id="pc-preset-status-group" style="display:none;"><label>Status</label>
-                <select id="inl-pc-status">
-                    <option value="ativo">Ativo</option>
-                    <option value="inativo">Inativo</option>
-                    <option value="manutencao">Em Manutenção</option>
-                </select>
+
+        <!-- BLOCO 1 · INFORMAÇÃO -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-identification-badge"></i> Informação
+            </div>
+            <div class="grid-2-col">
+                <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="inl-pc-name" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
+                <div class="form-group" id="pc-preset-status-group" style="display:none;">
+                    <label>Status</label>
+                    <input type="hidden" id="inl-pc-status" value="ativo">
+                    <div class="equip-status-btns" id="pc-preset-status-btns">
+                        <button type="button" class="equip-status-btn st-uso" data-val="ativo" onclick="setPcPresetStatus('ativo')"><i class="ph ph-check-circle"></i> Ativo</button>
+                        <button type="button" class="equip-status-btn st-manut" data-val="manutencao" onclick="setPcPresetStatus('manutencao')"><i class="ph ph-wrench"></i> Manutenção</button>
+                        <button type="button" class="equip-status-btn st-inativo" data-val="inativo" onclick="setPcPresetStatus('inativo')"><i class="ph ph-prohibit"></i> Inativo</button>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="form-section pc-preset-loc-highlight" id="pc-preset-location-section" style="display:none;">
-            <h4><i class="ph ph-map-pin"></i> Localização <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(pra qual Guichê já cadastrado este Hardware vai)</span></h4>
+
+        <!-- BLOCO 2 · LOCALIZAÇÃO -->
+        <div class="equip-form-block pc-preset-loc-highlight" id="pc-preset-location-section" style="display:none;">
+            <div class="equip-section-divider">
+                <i class="ph ph-map-pin"></i> Localização
+                <span class="equip-block-hint">pra qual Guichê já cadastrado este Hardware vai</span>
+            </div>
             <p class="cfg-eq-hint" id="inl-pc-local-atual" style="margin-bottom:8px;"></p>
             <div class="grid-2-col">
                 <div class="form-group"><label>Unidade</label><select id="inl-pc-unit" onchange="_atualizarSelectGuiche()"></select></div>
@@ -1198,8 +1227,13 @@
             </div>
             <p class="cfg-eq-hint" id="inl-pc-compname-warning" style="display:none;color:var(--red);"></p>
         </div>
-        <div class="form-section">
-            <h4><i class="ph ph-cpu"></i> Peças <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(escolhidas do que está Disponível na Lista do Estoque)</span></h4>
+
+        <!-- BLOCO 3 · PEÇAS -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-cpu"></i> Peças
+                <span class="equip-block-hint">escolhidas do que está Disponível na Lista do Estoque</span>
+            </div>
             <div class="grid-2-col">
                 <div class="periph-preview-item"><label>Modelo da Máquina</label><div class="periph-preview-box" id="part-preview-model"><span class="hw-preview-empty">Nenhuma</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('model')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
                 <div class="periph-preview-item"><label>Processador</label><div class="periph-preview-box" id="part-preview-cpu"><span class="hw-preview-empty">Nenhuma</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('cpu')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
@@ -1210,8 +1244,12 @@
                 <div class="periph-preview-item"><label>Monitor</label><div class="periph-preview-box" id="part-preview-monitor"><span class="hw-preview-empty">Nenhum</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('monitor')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
             </div>
         </div>
-        <div class="form-section">
-            <h4><i class="ph ph-windows-logo"></i> Software</h4>
+
+        <!-- BLOCO 4 · SOFTWARE E LICENÇA -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-windows-logo"></i> Software e Licença
+            </div>
             <div class="grid-3-col">
                 <div class="form-group"><label>Sistema Operacional</label>
                     <select id="inl-pc-os">
@@ -1242,8 +1280,13 @@
                 <div id="inl-pc-license-preview" class="hw-preview-box"><span class="hw-preview-empty">Nenhuma licença selecionada.</span></div>
             </div>
         </div>
-        <div class="form-section pc-preset-acessos-highlight">
-            <h4><i class="ph ph-key"></i> Acessos &amp; Senhas <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(deste computador — vai junto com o Hardware)</span></h4>
+
+        <!-- BLOCO 5 · ACESSOS E SENHAS -->
+        <div class="equip-form-block pc-preset-acessos-highlight">
+            <div class="equip-section-divider">
+                <i class="ph ph-key"></i> Acessos e Senhas
+                <span class="equip-block-hint">deste computador — vai junto com o Hardware</span>
+            </div>
             <div class="grid-3-col">
                 <div class="form-group"><label>Senha Guichê</label><input type="text" id="inl-pc-pcpass"></div>
                 <div class="form-group"><label>AnyDesk ID</label><input type="text" id="inl-pc-anyid"></div>
@@ -1252,6 +1295,7 @@
                 <div class="form-group"><label>Senha RDP</label><input type="text" id="inl-pc-rdppass"></div>
             </div>
         </div>
+
         <!-- Campos-espelho ocultos: strings hw_* derivadas das peças (o resto do app lê daqui) -->
         <div class="hidden">
             <input type="text" id="inl-pc-model"><input type="text" id="inl-pc-cpu"><input type="text" id="inl-pc-mobo">
@@ -1279,13 +1323,17 @@
 <!-- Modal: Entrada de novo item (peça) no almoxarifado -->
 <div id="part-entry-modal" class="modal hidden">
     <div class="modal-content small-modal">
-        <div class="modal-header-row">
-            <h3 id="part-entry-title"><i class="ph ph-cpu"></i> Entrada de Peça</h3>
-            <div style="display:flex;gap:8px;">
-                <button class="btn-icon hidden" id="part-entry-edit-btn" onclick="_editarPecaModal()" title="Editar especificação e status"><i class="ph ph-pencil-simple"></i></button>
-                <button class="btn-icon" onclick="document.getElementById('part-entry-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-cpu" id="part-entry-title-icon"></i></div>
+                <div class="eqd-header-name" id="part-entry-title">Entrada de Peça</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn hidden" id="part-entry-edit-btn" onclick="_editarPecaModal()" title="Editar especificação e status"><i class="ph ph-pencil-simple"></i></button>
+                <button class="eqd-icon-btn" onclick="document.getElementById('part-entry-modal').classList.add('hidden')" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
+        <div class="form-modal-stripe"></div>
         <input type="hidden" id="part-entry-tipo">
         <input type="hidden" id="part-entry-id">
         <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(não pode ser alterado)</span></label><input type="text" id="part-entry-serial" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
@@ -1352,13 +1400,17 @@
 <!-- Modal: Entrada de Licença de Software no estoque -->
 <div id="license-entry-modal" class="modal hidden">
     <div class="modal-content medium-modal">
-        <div class="modal-header-row">
-            <h3 id="lic-entry-title"><i class="ph ph-certificate"></i> Entrada de Licença de Software</h3>
-            <div style="display:flex;gap:8px;">
-                <button class="btn-icon hidden" id="lic-entry-edit-btn" onclick="_editarLicencaModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
-                <button class="btn-icon" onclick="document.getElementById('license-entry-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-certificate"></i></div>
+                <div class="eqd-header-name" id="lic-entry-title">Entrada de Licença de Software</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn hidden" id="lic-entry-edit-btn" onclick="_editarLicencaModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="eqd-icon-btn" onclick="document.getElementById('license-entry-modal').classList.add('hidden')" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
+        <div class="form-modal-stripe"></div>
         <input type="hidden" id="lic-entry-id">
         <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="lic-entry-serial" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
         <div class="grid-2-col">
@@ -1392,13 +1444,17 @@
 <!-- Equip Preset Modal — Impressora/Etiquetadora/Térmica/Webcam/TV -->
 <div id="equip-preset-modal" class="modal hidden">
     <div class="modal-content medium-modal">
-        <div class="modal-header-row">
-            <h3 id="equip-preset-title"><i class="ph ph-printer"></i> Equipamento</h3>
-            <div style="display:flex;gap:8px;">
-                <button class="btn-icon hidden" id="eq-preset-edit-btn" onclick="_editarEquipModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
-                <button class="btn-icon" onclick="document.getElementById('equip-preset-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-printer" id="equip-preset-title-icon"></i></div>
+                <div class="eqd-header-name" id="equip-preset-title">Equipamento</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn hidden" id="eq-preset-edit-btn" onclick="_editarEquipModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="eqd-icon-btn" onclick="document.getElementById('equip-preset-modal').classList.add('hidden')" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
+        <div class="form-modal-stripe"></div>
         <input type="hidden" id="eq-preset-type">
         <input type="hidden" id="eq-preset-id">
         <div class="grid-2-col">
