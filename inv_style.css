@@ -1528,14 +1528,15 @@ select { appearance: none; cursor: pointer; }
 .equip-row-lbl i { font-size: .85rem; color: #94a3b8; }
 .equip-row-val { font-weight: 600; color: var(--navy); text-align: right; }
 
-/* Tags — Setor (categoria) em azul, Tipo/Subtipo em roxo */
+/* Tags — Setor (categoria) em azul, Tipo/Subtipo em cinza. Quadradinhas
+   (raio pequeno), não pílula. */
 .equip-card-tags { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 0 2px; border-top: 1px solid #f1f5f9; }
 .equip-tag {
-    border-radius: 100px;
+    border-radius: 5px;
     font-size: .72rem; font-weight: 700; padding: 4px 12px;
 }
 .equip-tag-categoria { background: #dbeafe; color: #1d4ed8; }
-.equip-tag-tipo      { background: #ede9fe; color: #6d28d9; }
+.equip-tag-tipo      { background: #e2e8f0; color: #475569; }
 
 /* ============================================================
    EQUIPAMENTOS — MODAL DE EDIÇÃO
@@ -1649,7 +1650,7 @@ select { appearance: none; cursor: pointer; }
 }
 .eqd-status-tag {
     background: rgba(16,185,129,.15); color: #34d399;
-    border: 1px solid rgba(16,185,129,.3); border-radius: 100px;
+    border: 1px solid rgba(16,185,129,.3); border-radius: 5px;
     font-size: .72rem; font-weight: 700; padding: 3px 11px;
 }
 .eqd-status-tag.manut { background: rgba(245,158,11,.15); color: #fbbf24; border-color: rgba(245,158,11,.3); }
