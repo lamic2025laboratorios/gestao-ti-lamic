@@ -134,6 +134,11 @@ function iniciarConexaoFirebase() {
     if (typeof repararReferenciasQuebradas === 'function' && modelSettings && Object.keys(modelSettings).length && repararReferenciasQuebradas()) equipConsolidado = true;
     // Guichê com 2+ Modelos vinculados (exigia desvincular 2x) — solta os extras
     if (typeof repararTemplatesDuplicadosGuiche === 'function' && modelSettings && Object.keys(modelSettings).length && repararTemplatesDuplicadosGuiche()) equipConsolidado = true;
+    // Varre os Templates órfãos deixados pelo bug de recuperação (rodar DEPOIS
+    // do reparo acima: é ele que solta a duplicata do guichê, deixando o órfão)
+    if (typeof limparTemplatesOrfaosDaRecuperacao === 'function' && modelSettings && Object.keys(modelSettings).length && limparTemplatesOrfaosDaRecuperacao()) equipConsolidado = true;
+    // Licença sobrando em guichê que ficou vazio (fantasma da mesma corrida)
+    if (typeof limparLicencasFantasmaDeGuicheVazio === 'function' && modelSettings && Object.keys(modelSettings).length && limparLicencasFantasmaDeGuicheVazio()) equipConsolidado = true;
     if (equipConsolidado) {
       saveToStorage();
       if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
@@ -5516,10 +5521,28 @@ function _nextSerial() {
    então rodar de novo não duplica nada. Depois dela o
    migrarPecasDosTemplates() recria as peças a partir dos mesmos campos.
    Ressalva: licença de SO não era espelhada no guichê — Template recuperado
-   volta sem licença, e ela precisa ser reatribuída à mão. */
+   volta sem licença, e ela precisa ser reatribuída à mão.
+
+   RODA UMA VEZ SÓ POR SESSÃO (_recuperacaoTemplatesFeita). Antes rodava a
+   cada snapshot dos 2 listeners, e ERA ISSO que duplicava Template ao
+   anexar: anexar grava em 2 nós separados (itSettings = vínculo do
+   Template, itInventory = hardware espelhado no guichê). Entre uma
+   gravação e outra existe um instante em que o guichê JÁ tem hardware e o
+   Template AINDA não consta vinculado — e nesse instante esta função
+   "recuperava" um Template novo do hardware do guichê. Como Template
+   recuperado nasce sem partIds, ele aparecia Inativo; e como o reparo de
+   duplicatas depois soltava ele do guichê, sobrava um Template órfão
+   Inativo a cada anexação (3 testes = 3 órfãos, exatamente o relatado).
+   Recuperação é rotina de conserto de dado corrompido — só faz sentido na
+   carga inicial, nunca no meio de uma ação do usuário. */
+let _recuperacaoTemplatesFeita = false;
 function recuperarTemplatesDosGuiches() {
+    if (_recuperacaoTemplatesFeita) return false;
     if (!Array.isArray(inventoryData) || !inventoryData.length) return false;
     if (!modelSettings.compPresets) modelSettings.compPresets = [];
+    // Os 2 nós já carregaram — a partir daqui a foto está completa e a
+    // recuperação pode decidir com segurança. Não roda de novo nesta sessão.
+    _recuperacaoTemplatesFeita = true;
     let changed = false;
 
     inventoryData.forEach(unit => {
@@ -6127,26 +6150,70 @@ function abrirLixeira(categoria) {
     const lista = categoria
         ? _trashStore().filter(t => t.categoria === categoria)
         : _trashStore().filter(t => t.categoria !== 'equip-analitico');
+    const barra = document.getElementById('trash-modal-bar');
     if (!lista.length) {
         body.innerHTML = '<div class="estoque-empty">Lixeira vazia.</div>';
+        if (barra) barra.classList.add('hidden');
     } else {
+        if (barra) barra.classList.remove('hidden');
         body.innerHTML = [...lista].reverse().map(t => {
             const dias = TRASH_DIAS - Math.floor((Date.now() - new Date(t.deletedAt).getTime()) / 86400000);
             return `
-            <div class="log-entry">
-                <div class="log-entry-head">
-                    <strong>${t.rotulo || 'Item'}</strong>
-                    <span class="log-entry-when">apaga em ${Math.max(dias, 0)} dia(s)</span>
-                </div>
-                ${t.codigo ? `<div class="log-entry-code">${t.codigo}</div>` : ''}
-                <div class="log-entry-user" style="gap:8px;">
-                    <button class="btn-small" onclick="restaurarDaLixeira('${t.id}')"><i class="ph ph-arrow-counter-clockwise"></i> Restaurar</button>
-                    <button class="btn-small" onclick="excluirDaLixeira('${t.id}')" style="color:var(--red);"><i class="ph ph-trash"></i> Apagar de vez</button>
+            <div class="log-entry trash-entry">
+                <label class="trash-check">
+                    <input type="checkbox" class="trash-item-check" value="${t.id}" onchange="_syncTrashSelecao()">
+                </label>
+                <div class="trash-entry-body">
+                    <div class="log-entry-head">
+                        <strong>${t.rotulo || 'Item'}</strong>
+                        <span class="log-entry-when">apaga em ${Math.max(dias, 0)} dia(s)</span>
+                    </div>
+                    ${t.codigo ? `<div class="log-entry-code">${t.codigo}</div>` : ''}
+                    <div class="log-entry-user" style="gap:8px;">
+                        <button class="btn-small" onclick="restaurarDaLixeira('${t.id}')"><i class="ph ph-arrow-counter-clockwise"></i> Restaurar</button>
+                        <button class="btn-small" onclick="excluirDaLixeira('${t.id}')" style="color:var(--red);"><i class="ph ph-trash"></i> Apagar de vez</button>
+                    </div>
                 </div>
             </div>`;
         }).join('');
     }
+    _syncTrashSelecao();
     document.getElementById('trash-modal').classList.remove('hidden');
+}
+
+// ── Seleção múltipla da lixeira ─────────────────────────────────────────
+function _trashChecks() { return [...document.querySelectorAll('.trash-item-check')]; }
+function _trashSelecionados() { return _trashChecks().filter(c => c.checked).map(c => c.value); }
+
+// Mantém "selecionar todos" e o contador do botão em dia com os checkboxes
+function _syncTrashSelecao() {
+    const total = _trashChecks().length;
+    const n = _trashSelecionados().length;
+    const todos = document.getElementById('trash-check-all');
+    if (todos) {
+        todos.checked = total > 0 && n === total;
+        todos.indeterminate = n > 0 && n < total;
+    }
+    const btn = document.getElementById('trash-del-sel-btn');
+    if (btn) {
+        btn.disabled = n === 0;
+        btn.innerHTML = `<i class="ph ph-trash"></i> Apagar selecionados${n ? ` (${n})` : ''}`;
+    }
+}
+
+function _trashMarcarTodos(marcar) {
+    _trashChecks().forEach(c => { c.checked = marcar; });
+    _syncTrashSelecao();
+}
+
+// Apaga de vez SÓ os marcados (a lixeira já é o "definitivo" — daqui não volta)
+function excluirSelecionadosDaLixeira() {
+    const ids = _trashSelecionados();
+    if (!ids.length) return;
+    if (!confirm(`Apagar definitivamente ${ids.length} item(ns) selecionado(s)?\n\nNão dá pra restaurar depois.`)) return;
+    modelSettings.trash = _trashStore().filter(t => !ids.includes(t.id));
+    saveSettings();
+    abrirLixeira(_trashModalFiltro);
 }
 
 function restaurarDaLixeira(trashId) {
@@ -7523,6 +7590,80 @@ function repararReferenciasQuebradas() {
     });
 
     if (changed) { saveSettings(); saveToStorage(); }
+    return changed;
+}
+
+/* Limpa os Templates órfãos que o bug de recuperação criava a cada anexação
+   (ver comentário em recuperarTemplatesDosGuiches). A assinatura é bem
+   específica pra não pegar Template legítimo:
+     - recuperado: true      → veio da rotina de recuperação, não de cadastro
+     - sem unitId/compId     → não está em guichê nenhum (recuperação SEMPRE
+                               cria vinculado; se está solto, é porque o
+                               reparo de duplicatas soltou ele)
+     - sem peça montada      → nunca foi montado por ninguém
+     - sem licença atrelada  → não tem nada de valor pendurado
+   Um Template recuperado de verdade continua no guichê dele, então não entra
+   aqui. Um Template montado à mão não tem recuperado:true. */
+function limparTemplatesOrfaosDaRecuperacao() {
+    const presets = modelSettings.compPresets || [];
+    if (!presets.length) return false;
+    const temPeca = (p) => Object.keys(PART_TIPOS).some(t => {
+        const v = p.partIds && p.partIds[t];
+        return PART_TIPOS[t].multi ? (v && v.length) : !!v;
+    });
+    const orfaos = presets.filter(p =>
+        p && p.recuperado === true && !p.unitId && !p.compId &&
+        !p.licenseStockId && !temPeca(p)
+    );
+    if (!orfaos.length) return false;
+    orfaos.forEach(p => {
+        if (typeof registrarLog === 'function') {
+            registrarLog(p.serial || p.name, 'pc', 'Template órfão removido (limpeza)',
+                         'Sobra do bug de recuperação — sem guichê, sem peça e sem licença');
+        }
+    });
+    modelSettings.compPresets = presets.filter(p => !orfaos.includes(p));
+    saveSettings();
+    return true;
+}
+
+/* Licença "fantasma": o guichê está VAZIO (sem hardware nenhum) mas continua
+   aparecendo com 1 licença nas Licenças da unidade. Acontecia quando o
+   Template que trouxe a licença foi desvinculado/removido numa das corridas
+   do bug acima e o registro da unidade ficou pra trás.
+   Critério bem apertado, pra não apagar licença legítima:
+     - a licença aponta pra um guichê (campo computer) que existe NESTA unidade
+     - esse guichê está sem hardware nenhum (guichê vazio)
+     - nenhum Template reivindica ela (nem por licenseId nem por licenseStockId)
+     - nenhum guichê da unidade reivindica ela por licStockId
+   Licença digitada à mão na aba Licenças não tem computer apontando pra guichê
+   vazio (ou tem computer em branco), então não entra aqui. */
+function limparLicencasFantasmaDeGuicheVazio() {
+    let changed = false;
+    const presets = modelSettings.compPresets || [];
+    inventoryData.forEach(u => {
+        if (!u.licenses || !u.licenses.length) return;
+        const antes = u.licenses.length;
+        u.licenses = u.licenses.filter(l => {
+            if (!l.computer) return true;                                  // sem guichê apontado: não é este caso
+            const comp = (u.computers || []).find(c => c.name === l.computer);
+            if (!comp) return true;                                        // guichê nem existe mais: outro reparo cuida
+            if (_compHasHw(comp)) return true;                             // guichê tem hardware: licença é legítima
+            const reivindicadaPorTemplate = presets.some(p =>
+                (p.licenseId && p.licenseId === l.id) ||
+                (l.stockId && p.licenseStockId === l.stockId));
+            if (reivindicadaPorTemplate) return true;
+            const reivindicadaPorGuiche = (u.computers || []).some(c => c.licStockId && c.licStockId === l.stockId);
+            if (reivindicadaPorGuiche) return true;
+            if (typeof registrarLog === 'function') {
+                registrarLog('', 'licenca', 'Licença fantasma removida da unidade',
+                             `${l.software || 'Licença'} apontava pro guichê vazio ${l.computer} (${u.name})`, u.id);
+            }
+            return false;
+        });
+        if (u.licenses.length !== antes) changed = true;
+    });
+    if (changed) saveToStorage();
     return changed;
 }
 

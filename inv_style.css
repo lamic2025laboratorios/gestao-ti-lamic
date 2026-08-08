@@ -756,6 +756,22 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg);
   padding: 10px 14px;
 }
+/* Lixeira: barra de seleção + item com checkbox à esquerda */
+.trash-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 12px; margin-top: 10px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+.trash-bar.hidden { display: none; }
+.trash-check-all { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; font-size: .82rem; font-weight: 600; color: var(--text-mid); }
+.trash-check-all input { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--blue); }
+.trash-bar .btn-small:disabled { opacity: .45; cursor: not-allowed; }
+.trash-bar .btn-small:disabled:hover { background: var(--surface); border-color: var(--border); }
+.trash-entry { display: flex; align-items: flex-start; gap: 10px; }
+.trash-check { display: flex; align-items: center; margin: 2px 0 0; cursor: pointer; }
+.trash-check input { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--blue); }
+.trash-entry-body { flex: 1; min-width: 0; }
+
 .log-entry-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .log-entry-head strong { font-size: .84rem; color: var(--navy); }
 .log-entry-when { font-size: .72rem; color: var(--text-muted); white-space: nowrap; }

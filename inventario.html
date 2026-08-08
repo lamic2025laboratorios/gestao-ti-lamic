@@ -1389,6 +1389,15 @@
             <h3 id="trash-modal-title"><i class="ph ph-trash"></i> Lixeira <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(itens ficam 30 dias antes de sumir de vez)</span></h3>
             <button class="btn-icon" onclick="document.getElementById('trash-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
         </div>
+        <div id="trash-modal-bar" class="trash-bar hidden">
+            <label class="trash-check-all">
+                <input type="checkbox" id="trash-check-all" onchange="_trashMarcarTodos(this.checked)">
+                <span>Selecionar todos</span>
+            </label>
+            <button class="btn-small" id="trash-del-sel-btn" onclick="excluirSelecionadosDaLixeira()" style="color:var(--red);" disabled>
+                <i class="ph ph-trash"></i> Apagar selecionados
+            </button>
+        </div>
         <div id="trash-modal-body" class="logs-modal-body"></div>
     </div>
 </div>
