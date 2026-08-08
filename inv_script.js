@@ -5438,7 +5438,7 @@ function renderEstoqueComps() {
                 ${gerado ? `<button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${serial}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>` : ''}
                 ${gerado ? `<button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); deleteCompPreset(${idx})" title="Excluir Modelo"><i class="ph ph-trash"></i></button>` : ''}
                 <div class="estoque-comp-head">
-                    <i class="ph ph-desktop-tower"></i>
+                    <div class="estoque-comp-icon-box"><i class="ph ph-desktop-tower"></i></div>
                     <strong>${gerado ? serial : comp.name}</strong>
                     ${gerado ? '' : '<span class="estoque-badge-pend">Sem modelo</span>'}
                 </div>
@@ -6908,7 +6908,7 @@ function _renderEquipCard(reg, type, unit, soLeitura = false) {
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
         ${!soLeitura ? `<button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); ${delAction}" title="Excluir (vai pra lixeira, 30 dias pra restaurar)"><i class="ph ph-trash"></i></button>` : ''}
         <div class="estoque-comp-head">
-            <i class="ph ${TIPO_ICON[type]}"></i>
+            <div class="estoque-comp-icon-box"><i class="ph ${TIPO_ICON[type]}"></i></div>
             <strong>${serial || titulo || '—'}</strong>
         </div>
         <ul class="estoque-modelo-specs">
@@ -6960,7 +6960,7 @@ function _renderPcPresetCard(p, idx) {
         <button class="btn-icon estoque-modelo-info" onclick="event.stopPropagation(); abrirInfoTemplate(${idx})" title="Informações (peças, licença, danos)"><i class="ph ph-info"></i></button>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${p.serial || p.name}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
         <div class="estoque-comp-head">
-            <i class="ph ph-cube"></i>
+            <div class="estoque-comp-icon-box"><i class="ph ph-cube"></i></div>
             <strong>${p.serial || p.name}</strong>
         </div>
         <ul class="estoque-modelo-specs">
@@ -7191,7 +7191,7 @@ function _renderLicencaCard(l) {
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${l.serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
         <div class="estoque-comp-head">
-            <i class="ph ph-certificate"></i>
+            <div class="estoque-comp-icon-box"><i class="ph ph-certificate"></i></div>
             <strong>${l.serial || '—'}</strong>
         </div>
         <ul class="estoque-modelo-specs">

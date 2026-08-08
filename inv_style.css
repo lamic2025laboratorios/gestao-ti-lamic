@@ -454,8 +454,13 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
   height: 100%; min-height: 160px; color: var(--text-muted); font-size: .85rem; text-align: center;
 }
 .estoque-comps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-.estoque-comp-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding-left: 24px; }
-.estoque-comp-head i { color: var(--blue); font-size: 1.05rem; }
+.estoque-comp-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding-left: 24px; }
+.estoque-comp-icon-box {
+    width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px;
+    background: var(--blue-pale); border: 1px solid #bfdbfe;
+    display: flex; align-items: center; justify-content: center;
+}
+.estoque-comp-icon-box i { color: var(--blue); font-size: 1.05rem; }
 .estoque-comp-head strong { font-size: .88rem; color: var(--navy); flex: 1; }
 .estoque-badge-pend {
   display: inline-flex; align-items: center; gap: 4px;
