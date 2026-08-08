@@ -1265,17 +1265,30 @@ select { appearance: none; cursor: pointer; }
 /* Cabeçalho azul-escuro dos popups de criar/editar do Estoque — mesmo
    visual do popup de detalhe de Equipamentos (fundo escuro, ícone numa
    caixinha — reaproveita .eqd-header-left/-icon-box/-name/-right/.eqd-icon-btn
-   direto), só que sangrando até a borda do .modal-content normal (que tem
-   padding, diferente do .eqd-modal que já nasce com padding:0). */
+   direto). Fica FIXO em cima mesmo rolando os dados: o .modal-content vira
+   coluna flex com padding:0 (.form-modal), cabeçalho/listra não encolhem,
+   e só o .form-modal-scroll (que carrega o padding de sempre) rola —
+   mesmo truque já usado no .eqd-modal do popup de detalhe. */
+.modal-content.form-modal {
+    padding: 0; display: flex; flex-direction: column; max-height: 90vh;
+    overflow: hidden; /* só o .form-modal-scroll rola — evita barra dupla */
+}
 .form-modal-header {
     display: flex; justify-content: space-between; align-items: center;
     background: #0f172a; padding: 14px 18px; gap: 12px;
-    margin: -2rem -2rem 0 -2rem;
     border-radius: var(--r-lg) var(--r-lg) 0 0;
+    flex-shrink: 0;
 }
 .form-modal-stripe {
-    height: 4px; margin: 0 -2rem .75rem;
+    height: 4px; flex-shrink: 0;
     background: linear-gradient(90deg, #38bdf8, var(--blue));
+}
+.form-modal-scroll {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    padding: 2rem;
+}
+.form-modal .modal-actions {
+    flex-shrink: 0; margin: 0; padding: 1rem 2rem;
 }
 
 /* ============================================================

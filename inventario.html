@@ -650,7 +650,7 @@
 
 <!-- Mobile Modal -->
 <div id="mobile-modal" class="modal hidden">
-    <div class="modal-content medium-modal">
+    <div class="modal-content medium-modal form-modal">
         <div class="form-modal-header">
             <div class="eqd-header-left">
                 <div class="eqd-header-icon-box"><i class="ph ph-device-mobile"></i></div>
@@ -662,6 +662,7 @@
             </div>
         </div>
         <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="mob-id">
         <div class="form-group preset-bar" id="mob-preset-bar">
             <label>Modelo Pré-Cadastrado <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerenciados em Configurações)</span></label>
@@ -695,6 +696,7 @@
         <div class="form-group hidden" id="mob-motivo-group"><label>Motivo (dano / manutenção)</label><textarea id="mob-motivo" rows="2" placeholder="Descreva o que aconteceu com o aparelho..." style="width:100%;font-family:inherit;font-size:.85rem;padding:8px;border:1px solid var(--border);border-radius:var(--r);"></textarea></div>
         <button type="button" class="btn-consertado hidden" id="mob-consertado-btn" onclick="_consertarMobile()" style="margin-bottom:10px;"><i class="ph ph-wrench"></i> Consertado — volta pra Em Uso / Disponível</button>
         <p class="tpl-link-box" id="mob-loc-info" style="display:none;"></p>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions"><button class="btn-secondary" onclick="closeModals()">Cancelar</button><button class="btn-primary" id="mob-save-btn" onclick="saveMobile()">Salvar</button></div>
     </div>
 </div>
@@ -769,7 +771,7 @@
 
 <!-- AC Modal -->
 <div id="ac-modal" class="modal hidden">
-    <div class="modal-content medium-modal">
+    <div class="modal-content medium-modal form-modal">
         <div class="form-modal-header">
             <div class="eqd-header-left">
                 <div class="eqd-header-icon-box"><i class="ph ph-snowflake"></i></div>
@@ -781,6 +783,7 @@
             </div>
         </div>
         <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="ac-id">
         <div class="form-group preset-bar" id="ac-preset-bar">
             <label>Modelo Pré-Cadastrado <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerenciados em Configurações)</span></label>
@@ -814,6 +817,7 @@
         <div class="form-group"><label>Observações</label><input type="text" id="ac-notes" placeholder="Ex: Filtro higienizado jun/2024..."></div>
         <input type="hidden" id="ac-install-date"><input type="hidden" id="ac-last-maint">
         <p class="tpl-link-box" id="ac-loc-info" style="display:none;"></p>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions"><button class="btn-secondary" onclick="closeModals()">Cancelar</button><button class="btn-primary" id="ac-save-btn" onclick="saveAc()">Salvar</button></div>
     </div>
 </div>
@@ -1179,7 +1183,7 @@
 
 <!-- Modal: Criar / Editar Template de PC -->
 <div id="pc-preset-modal" class="modal hidden">
-    <div class="modal-content large-modal">
+    <div class="modal-content large-modal form-modal">
         <div class="form-modal-header">
             <div class="eqd-header-left">
                 <div class="eqd-header-icon-box"><i class="ph ph-desktop"></i></div>
@@ -1190,6 +1194,7 @@
             </div>
         </div>
         <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
 
         <input type="hidden" id="inl-pc-index">
         <input type="hidden" id="inl-pc-orig-unitid">
@@ -1301,6 +1306,7 @@
             <input type="text" id="inl-pc-model"><input type="text" id="inl-pc-cpu"><input type="text" id="inl-pc-mobo">
             <input type="text" id="inl-pc-ram"><input type="text" id="inl-pc-disk"><input type="text" id="inl-pc-gpu"><input type="text" id="inl-pc-monitor">
         </div>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions">
             <button class="btn-secondary" onclick="document.getElementById('pc-preset-modal').classList.add('hidden')">Cancelar</button>
             <button class="btn-primary" onclick="savePcPresetModal()"><i class="ph ph-floppy-disk"></i> Salvar Template</button>
@@ -1322,7 +1328,7 @@
 
 <!-- Modal: Entrada de novo item (peça) no almoxarifado -->
 <div id="part-entry-modal" class="modal hidden">
-    <div class="modal-content small-modal">
+    <div class="modal-content small-modal form-modal">
         <div class="form-modal-header">
             <div class="eqd-header-left">
                 <div class="eqd-header-icon-box"><i class="ph ph-cpu" id="part-entry-title-icon"></i></div>
@@ -1334,6 +1340,7 @@
             </div>
         </div>
         <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="part-entry-tipo">
         <input type="hidden" id="part-entry-id">
         <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(não pode ser alterado)</span></label><input type="text" id="part-entry-serial" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
@@ -1364,6 +1371,7 @@
         </div>
         <p class="tpl-link-box" id="part-entry-template-info" style="display:none;"></p>
         <p class="cfg-eq-hint" id="part-entry-nova-hint">O item entra no estoque com status <strong>Disponível</strong>.</p>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions" id="part-entry-actions">
             <button class="btn-secondary" onclick="document.getElementById('part-entry-modal').classList.add('hidden')">Cancelar</button>
             <button class="btn-primary" id="part-entry-save-btn" onclick="_salvarEntradaPeca()"><i class="ph ph-floppy-disk"></i> Registrar Entrada</button>
@@ -1399,7 +1407,7 @@
 
 <!-- Modal: Entrada de Licença de Software no estoque -->
 <div id="license-entry-modal" class="modal hidden">
-    <div class="modal-content medium-modal">
+    <div class="modal-content medium-modal form-modal">
         <div class="form-modal-header">
             <div class="eqd-header-left">
                 <div class="eqd-header-icon-box"><i class="ph ph-certificate"></i></div>
@@ -1411,6 +1419,7 @@
             </div>
         </div>
         <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="lic-entry-id">
         <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="lic-entry-serial" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
         <div class="grid-2-col">
@@ -1434,6 +1443,7 @@
         <div class="form-group"><label>Observações</label><input type="text" id="lic-entry-notes" placeholder="Ex: Renovar em dezembro..."></div>
         <p class="cfg-eq-hint" id="lic-entry-nova-hint">A licença entra no estoque com status <strong>Disponível</strong> — ela é atrelada a um PC na montagem do Template.</p>
         <p class="tpl-link-box" id="lic-entry-template-info" style="display:none;"></p>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions">
             <button class="btn-secondary" onclick="document.getElementById('license-entry-modal').classList.add('hidden')">Cancelar</button>
             <button class="btn-primary" id="lic-entry-save-btn" onclick="_salvarEntradaLicenca()"><i class="ph ph-floppy-disk"></i> Registrar Entrada</button>
@@ -1443,7 +1453,7 @@
 
 <!-- Equip Preset Modal — Impressora/Etiquetadora/Térmica/Webcam/TV -->
 <div id="equip-preset-modal" class="modal hidden">
-    <div class="modal-content medium-modal">
+    <div class="modal-content medium-modal form-modal">
         <div class="form-modal-header">
             <div class="eqd-header-left">
                 <div class="eqd-header-icon-box"><i class="ph ph-printer" id="equip-preset-title-icon"></i></div>
@@ -1455,6 +1465,7 @@
             </div>
         </div>
         <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="eq-preset-type">
         <input type="hidden" id="eq-preset-id">
         <div class="grid-2-col">
@@ -1484,6 +1495,7 @@
             </div>
         </div>
         <div class="form-group"><label>Observações</label><input type="text" id="eq-preset-notes" placeholder="Ex: trocado o toner em..."></div>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions">
             <button class="btn-secondary" onclick="document.getElementById('equip-preset-modal').classList.add('hidden')">Cancelar</button>
             <button class="btn-primary" onclick="_saveEquipModal()"><i class="ph ph-floppy-disk"></i> Salvar</button>
