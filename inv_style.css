@@ -1517,7 +1517,12 @@ select { appearance: none; cursor: pointer; }
     flex-shrink: 0;
 }
 .eqd-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.eqd-header-icon { font-size: 1.4rem; color: #38bdf8; flex-shrink: 0; }
+.eqd-header-icon-box {
+    width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+    background: #1e293b; border: 1px solid #334155;
+    display: flex; align-items: center; justify-content: center;
+}
+.eqd-header-icon-box i { font-size: 1.3rem; color: #38bdf8; }
 .eqd-header-name { font-size: 1rem; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .eqd-header-sub  { font-size: .75rem; color: #64748b; margin-top: 2px; }
 .eqd-header-right { display: flex; gap: 6px; flex-shrink: 0; }
@@ -1556,6 +1561,10 @@ select { appearance: none; cursor: pointer; }
 /* Conteúdo de cada aba — só a ativa aparece */
 .eqd-tab-panel { display: none; flex-direction: column; gap: 12px; }
 .eqd-tab-panel.active { display: flex; }
+/* Documentos e Atividades têm bem menos conteúdo que Informações — sem
+   altura mínima o popup encolhia de leve ao trocar de aba. Fixando as duas
+   no mesmo tamanho, a troca de aba não "pula". */
+#eqd-panel-docs, #eqd-panel-activities { min-height: 320px; }
 
 /* Corpo — flex:1 + min-height:0 obrigatório para overflow-y funcionar em flex child */
 .eqd-body { padding: 16px; overflow: hidden; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
