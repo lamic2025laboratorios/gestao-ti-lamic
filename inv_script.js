@@ -1626,11 +1626,19 @@ function _anexarModeloAoGuiche(idx) {
     _modeloParaGuiche = null;
 }
 
+// Janela curta pós-desvincular/transferência — ver comentário em
+// recuperarTemplatesDosGuiches(). 8s cobre folgado o vai-e-volta dos 2 nós
+// (itSettings/itInventory) numa conexão normal.
+const _guichesLimposEm = {}; // compId -> timestamp
+function _marcarGuicheRecemLimpo(compId) { if (compId) _guichesLimposEm[compId] = Date.now(); }
+function _guicheRecemLimpo(compId) { return !!_guichesLimposEm[compId] && (Date.now() - _guichesLimposEm[compId] < 8000); }
+
 // Zera TUDO que estava atribuído a um guichê que perdeu o equipamento
 // (mesma limpeza do Desvincular): periféricos voltam pro depósito como
 // Disponíveis, e campos de hardware/acessos/autorizações são limpos.
 function _limparGuicheCompleto(unit, comp) {
     if (!unit || !comp) return;
+    _marcarGuicheRecemLimpo(comp.id);
     PERIF_TYPES.forEach(type => {
         const arrKey = PERIF_ARRAY_KEY[type];
         const reg = _acharPerifericoVinculado(arrKey, comp.id);
@@ -5368,6 +5376,11 @@ function _moverPresetParaGuiche(preset, oldUnitId, oldCompId, newUnitId, newComp
     preset.compName = newComp ? newComp.name : '';
     if (newComp) newComp.license = preset.lic_status || 'pirata';
     _criarLicencaDoTemplate(preset, newUnit, newComp);
+    // Espelha o hardware no guichê novo ANTES de salvar — salvar antes disso
+    // gravava o vínculo (itSettings) com o guichê ainda de hardware vazio
+    // (itInventory só pegava o hw_* umas gravações depois), e nessa janela o
+    // guichê novo aparecia "Sem modelo" mesmo já com o Template linkado.
+    if (typeof _syncPresetToComputer === 'function') _syncPresetToComputer(preset);
 
     // PERSISTE o vínculo novo do Template (vive em itSettings) — sem isso,
     // ao recarregar o Template "voltava" pro guichê antigo com os dados dele.
@@ -5375,7 +5388,6 @@ function _moverPresetParaGuiche(preset, oldUnitId, oldCompId, newUnitId, newComp
     saveToStorage();
     renderUnits();
     if (currentUnitId === oldUnitId || currentUnitId === newUnitId) renderComputers();
-    if (typeof _syncPresetToComputer === 'function') _syncPresetToComputer(preset);
 
     // Se a tela de Estoque estava olhando a unidade antiga, acompanha até a nova
     if (typeof _estoqueUnitId !== 'undefined' && _estoqueUnitId === oldUnitId && oldUnitId !== newUnitId) {
@@ -5513,6 +5525,14 @@ function recuperarTemplatesDosGuiches() {
     inventoryData.forEach(unit => {
         (unit.computers || []).forEach(comp => {
             if (!_compHasHw(comp)) return;                          // guichê sem hardware: nada a recuperar
+            // Guichê acabou de ser desvinculado/transferido POR ESTE cliente
+            // (desvincular, transferência): itSettings (Template solto) e
+            // itInventory (hardware do guichê zerado) são 2 nós que sincronizam
+            // em momentos diferentes — se este listener rodar com o Template já
+            // solto mas o hardware do guichê AINDA não confirmado zerado (eco
+            // atrasado), recriava um Template duplicado do hardware "fantasma"
+            // que já ia sumir. Essa janela evita recriar enquanto o eco não chega.
+            if (_guicheRecemLimpo(comp.id)) return;
             if (_presetIndexForComp(unit.id, comp.id) > -1) return; // já tem Template ligado
             // Trava anti-loop: repararTemplatesDuplicadosGuiche() casa só por
             // compId, enquanto _presetIndexForComp casa por unitId+compId. Um
