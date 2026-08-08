@@ -1099,7 +1099,7 @@ function abrirSeletorHardware() {
     if (!itens.length) {
         list.innerHTML = _hwPickerMode === 'uso'
             ? '<div class="estoque-empty">Nenhum Hardware em uso em outros guichês.</div>'
-            : '<div class="estoque-empty">Nenhum Hardware disponível em estoque. Cadastre um em Estoque → Adicionar Equipamento.</div>';
+            : '<div class="estoque-empty">Nenhum Hardware disponível em estoque. Cadastre um em Estoque → Adicionar Novo Template.</div>';
     } else {
         list.innerHTML = itens.map(({ p, idx }) => {
             const specs = [p.hw_model, p.hw_cpu, p.hw_ram].filter(Boolean).join(' · ') || 'Sem dados de hardware';
@@ -1586,7 +1586,7 @@ function abrirSeletorModeloParaGuiche(unitId, compId) {
     document.getElementById('periph-picker-title').innerHTML = `<i class="ph ph-desktop-tower"></i> Adicionar Modelo — disponíveis no estoque`;
     const list = document.getElementById('periph-picker-list');
     if (!disponiveis.length) {
-        list.innerHTML = '<div class="estoque-empty">Nenhum Modelo disponível em estoque. Monte um em Estoque → Gráfico → Adicionar Equipamento.</div>';
+        list.innerHTML = '<div class="estoque-empty">Nenhum Modelo disponível em estoque. Monte um em Estoque → Templates → Adicionar Novo Template.</div>';
     } else {
         list.innerHTML = disponiveis.map(({ p, idx }) => {
             const specs = [p.hw_model, p.hw_cpu, p.hw_ram].filter(Boolean).join(' · ') || 'Sem dados de hardware';
@@ -5188,7 +5188,7 @@ function setEstoqueCatalogView(view) {
     const addBtn = document.getElementById('estoque-add-equip-btn');
     if (addBtn) addBtn.innerHTML = view === 'lista'
         ? '<i class="ph ph-plus"></i> Entrada de Novo Item'
-        : '<i class="ph ph-plus"></i> Adicionar Equipamento';
+        : '<i class="ph ph-plus"></i> Adicionar Novo Template';
     // A busca fica FORA (na subbar) pras duas views; só troca o valor/placeholder
     const buscaInput = document.getElementById('estoque-catalog-search-input');
     if (buscaInput) {
@@ -8367,7 +8367,7 @@ function renderEquipGrid() {
             </div>
             <div class="equip-card-body">
                 <div class="equip-card-top">
-                    <div class="equip-card-icon-box"><i class="ph ph-cash-register"></i></div>
+                    <div class="equip-card-icon-box"><i class="ph ph-monitor"></i></div>
                     <div class="equip-card-name" style="text-transform:uppercase;">${e.nome || '—'}</div>
                 </div>
                 <div class="equip-card-rows">${rows}</div>
@@ -8408,7 +8408,7 @@ function openEquipModal(id) {
     _populateEquipUnidades();
     const e      = id ? equipData.find(x => x.id === id) : null;
     const titleEl = document.getElementById('equip-modal-title');
-    if (titleEl) titleEl.innerHTML = (e ? '<i class="ph ph-pencil-simple"></i> Editar' : '<i class="ph ph-desktop-tower"></i> Novo') + ' Equipamento';
+    if (titleEl) titleEl.textContent = (e ? 'Editar' : 'Novo') + ' Equipamento';
 
     document.getElementById('equip-id').value         = e?.id         || '';
     document.getElementById('equip-nome').value       = (e?.nome || '').toUpperCase();

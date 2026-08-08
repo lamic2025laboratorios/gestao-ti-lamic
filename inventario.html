@@ -1568,11 +1568,18 @@
 
 <!-- Modal: Cadastrar / Editar Equipamento -->
 <div id="equip-modal" class="modal hidden">
-    <div class="modal-content equip-edit-modal">
-        <div class="modal-header-row">
-            <h3 id="equip-modal-title"><i class="ph ph-desktop-tower"></i> Novo Equipamento</h3>
-            <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+    <div class="modal-content equip-edit-modal form-modal">
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-monitor"></i></div>
+                <div class="eqd-header-name" id="equip-modal-title">Novo Equipamento</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="closeModals()" title="Fechar"><i class="ph ph-x"></i></button>
+            </div>
         </div>
+        <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="equip-id">
 
         <!-- ── BLOCO 1 · IDENTIFICAÇÃO ── -->
@@ -1707,6 +1714,7 @@
             </button>
             <input type="file" id="equip-docs-file-input" accept="*/*" style="display:none;" onchange="selecionarDocParaAnexar(this)">
         </div>
+        </div><!-- /form-modal-scroll -->
 
         <div class="modal-actions">
             <button class="btn-secondary" onclick="closeEquipModal()">Cancelar</button>
@@ -1724,7 +1732,7 @@
         <!-- Cabeçalho escuro -->
         <div class="eqd-header">
             <div class="eqd-header-left">
-                <div class="eqd-header-icon-box"><i class="ph ph-desktop-tower"></i></div>
+                <div class="eqd-header-icon-box"><i class="ph ph-monitor"></i></div>
                 <div>
                     <div class="eqd-header-name" id="eqd-nome">—</div>
                     <div class="eqd-header-sub" id="eqd-sub">—</div>
