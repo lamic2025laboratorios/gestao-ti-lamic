@@ -6959,6 +6959,7 @@ function _renderPcPresetCard(p, idx) {
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-info" onclick="event.stopPropagation(); abrirInfoTemplate(${idx})" title="Informações (peças, licença, danos)"><i class="ph ph-info"></i></button>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${p.serial || p.name}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
+        <button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); deleteCompPreset(${idx})" title="Desmontar Template — peças voltam pro Estoque"><i class="ph ph-trash"></i></button>
         <div class="estoque-comp-head">
             <div class="estoque-comp-icon-box"><i class="ph ph-cube"></i></div>
             <strong>${p.serial || p.name}</strong>

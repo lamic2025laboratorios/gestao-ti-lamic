@@ -690,24 +690,26 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
   display: flex; align-items: center; justify-content: center;
 }
 /* Card do Gráfico (card-pc-preset = Template; card-grafico = periférico/
-   celular/AC/licença): sem lixeira aqui — apagar já é feito pela aba
-   Unidades (Template/periférico) ou pela Lista (peça/licença/celular/AC),
-   então no Gráfico só sobra histórico (e informações, no Template) —
-   ambos encostados no canto direito, sem buraco de ícone sumido. */
-.estoque-modelo-card.card-pc-preset .estoque-modelo-log  { right: 8px; }
-.estoque-modelo-card.card-pc-preset .estoque-modelo-info { right: 40px; }
+   celular/AC/licença): Template volta a ter lixeira aqui (desmonta — peças
+   voltam Disponível na Lista); periférico/celular/AC/licença continuam sem
+   (apagar deles já é feito pela aba Unidades ou pela Lista). */
+.estoque-modelo-card.card-pc-preset .estoque-modelo-del  { right: 8px; }
+.estoque-modelo-card.card-pc-preset .estoque-modelo-log  { right: 40px; }
+.estoque-modelo-card.card-pc-preset .estoque-modelo-info { right: 72px; }
 .estoque-modelo-card.card-grafico   .estoque-modelo-log  { right: 8px; }
 
 /* Só no Gráfico (card-pc-preset / card-grafico identificam essas telas — a
    aba Unidades reusa os mesmos cards SEM essas classes, então fica de fora):
-   histórico/informações ocultos por padrão, aparecem só no hover. */
+   histórico/informações/lixeira ocultos por padrão, aparecem só no hover. */
 .estoque-modelo-card.card-pc-preset .estoque-modelo-info,
 .estoque-modelo-card.card-pc-preset .estoque-modelo-log,
+.estoque-modelo-card.card-pc-preset .estoque-modelo-del,
 .estoque-modelo-card.card-grafico .estoque-modelo-log {
   opacity: 0; transition: opacity .15s;
 }
 .estoque-modelo-card.card-pc-preset:hover .estoque-modelo-info,
 .estoque-modelo-card.card-pc-preset:hover .estoque-modelo-log,
+.estoque-modelo-card.card-pc-preset:hover .estoque-modelo-del,
 .estoque-modelo-card.card-grafico:hover .estoque-modelo-log {
   opacity: 1;
 }
