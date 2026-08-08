@@ -1479,7 +1479,7 @@ select { appearance: none; cursor: pointer; }
    ============================================================ */
 .equip-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
     gap: 1.25rem;
     padding-bottom: 2rem;
 }
@@ -1497,15 +1497,15 @@ select { appearance: none; cursor: pointer; }
 .equip-card .card-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; z-index: 2; }
 .equip-card:hover .card-actions { opacity: 1; }
 
-.equip-card-body { padding: 36px 20px 18px; }
-.equip-card-top  { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.equip-card-body { padding: 44px 24px 22px; }
+.equip-card-top  { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
 .equip-card-icon-box {
-    width: 42px; height: 42px; flex-shrink: 0; border-radius: 11px;
+    width: 48px; height: 48px; flex-shrink: 0; border-radius: 12px;
     background: var(--blue-pale); border: 1px solid #bfdbfe;
     display: flex; align-items: center; justify-content: center;
 }
-.equip-card-icon-box i { font-size: 1.25rem; color: var(--blue); }
-.equip-card-name { font-size: 1.15rem; font-weight: 800; color: var(--navy); letter-spacing: -.01em; line-height: 1.2; }
+.equip-card-icon-box i { font-size: 1.4rem; color: var(--blue); }
+.equip-card-name { font-size: 1.25rem; font-weight: 800; color: var(--navy); letter-spacing: -.01em; line-height: 1.2; }
 
 /* Badge de código estilo screenshot */
 .equip-code-badge {
