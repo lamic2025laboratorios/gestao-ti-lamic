@@ -8370,8 +8370,8 @@ function renderEquipGrid() {
                     <div class="equip-card-icon-box"><i class="ph ph-printer"></i></div>
                     <div class="equip-card-name" style="text-transform:uppercase;">${e.nome || '—'}</div>
                 </div>
-                ${tags ? `<div class="equip-card-tags">${tags}</div>` : ''}
                 <div class="equip-card-rows">${rows}</div>
+                ${tags ? `<div class="equip-card-tags">${tags}</div>` : ''}
             </div>`;
         grid.appendChild(card);
     });
