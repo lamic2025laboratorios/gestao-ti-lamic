@@ -134,10 +134,15 @@ function iniciarConexaoFirebase() {
     if (typeof repararReferenciasQuebradas === 'function' && modelSettings && Object.keys(modelSettings).length && repararReferenciasQuebradas()) equipConsolidado = true;
     // Guichê com 2+ Modelos vinculados (exigia desvincular 2x) — solta os extras
     if (typeof repararTemplatesDuplicadosGuiche === 'function' && modelSettings && Object.keys(modelSettings).length && repararTemplatesDuplicadosGuiche()) equipConsolidado = true;
-    // Varre os Templates órfãos deixados pelo bug de recuperação (rodar DEPOIS
-    // do reparo acima: é ele que solta a duplicata do guichê, deixando o órfão)
-    if (typeof limparTemplatesOrfaosDaRecuperacao === 'function' && modelSettings && Object.keys(modelSettings).length && limparTemplatesOrfaosDaRecuperacao()) equipConsolidado = true;
-    // Licença sobrando em guichê que ficou vazio (fantasma da mesma corrida)
+    // DESATIVADO — limparTemplatesOrfaosDaRecuperacao() apagava Template de
+    // verdade. O critério (recuperado:true + solto + sem peça + sem licença)
+    // batia também em Template legítimo que veio de recuperação antiga, tinha
+    // sido desvinculado de propósito e ainda não tinha peça montada — e apagar
+    // dado automaticamente no boot, sem o usuário pedir, é errado de qualquer
+    // forma. A função continua no arquivo mas NÃO roda mais sozinha.
+    // Licença sobrando em guichê que ficou vazio (fantasma) — não apaga
+    // Template nem equipamento, só o registro de licença de um guichê
+    // comprovadamente vazio que ninguém reivindica.
     if (typeof limparLicencasFantasmaDeGuicheVazio === 'function' && modelSettings && Object.keys(modelSettings).length && limparLicencasFantasmaDeGuicheVazio()) equipConsolidado = true;
     if (equipConsolidado) {
       saveToStorage();
@@ -1292,6 +1297,16 @@ function _vincularHardwareDoGuiche(u, d) {
         const old = modelSettings.compPresets[previousHwIdx];
         old.unitId = ''; old.compId = ''; old.unitName = ''; old.compName = '';
         _removerLicencaDaUnidade(old, u); // licença acompanha o Modelo
+        // O Template saiu, mas o guichê ficava com o hardware/acessos que
+        // vieram do formulário (saveComputer grava os campos do form antes de
+        // chegar aqui). Resultado: guichê "Sem modelo" mostrando Modelo/CPU/
+        // RAM preenchidos e botão Adicionar Modelo ao mesmo tempo — exatamente
+        // o card bugado. Se NENHUM Template novo vai entrar no lugar, o guichê
+        // precisa ficar vazio de verdade.
+        if (hwIdx === -1) {
+            const compReal = (u.computers || []).find(c => c.id === d.id) || d;
+            _limparGuicheCompleto(u, compReal);
+        }
     }
     if (hwIdx > -1 && modelSettings.compPresets[hwIdx]) {
         const novo = modelSettings.compPresets[hwIdx];
