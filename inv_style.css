@@ -1529,8 +1529,9 @@ select { appearance: none; cursor: pointer; }
 .equip-row-val { font-weight: 600; color: var(--navy); text-align: right; }
 
 /* Tags — Setor (categoria) em azul, Tipo/Subtipo em cinza. Quadradinhas
-   (raio pequeno), não pílula. */
-.equip-card-tags { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 0 2px; border-top: 1px solid #f1f5f9; }
+   (raio pequeno), não pílula. Ficam logo abaixo do título/ícone, antes
+   das linhas de dado. */
+.equip-card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .equip-tag {
     border-radius: 5px;
     font-size: .72rem; font-weight: 700; padding: 4px 12px;
