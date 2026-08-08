@@ -1492,9 +1492,15 @@ select { appearance: none; cursor: pointer; }
 .equip-card .card-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; z-index: 2; }
 .equip-card:hover .card-actions { opacity: 1; }
 
-.equip-card-body { padding: 34px 18px 14px; }
-.equip-card-top  { margin-bottom: 10px; }
-.equip-card-name { font-size: 1.05rem; font-weight: 800; color: var(--navy); margin-bottom: 5px; letter-spacing: -.01em; }
+.equip-card-body { padding: 36px 20px 18px; }
+.equip-card-top  { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.equip-card-icon-box {
+    width: 42px; height: 42px; flex-shrink: 0; border-radius: 11px;
+    background: var(--blue-pale); border: 1px solid #bfdbfe;
+    display: flex; align-items: center; justify-content: center;
+}
+.equip-card-icon-box i { font-size: 1.25rem; color: var(--blue); }
+.equip-card-name { font-size: 1.15rem; font-weight: 800; color: var(--navy); letter-spacing: -.01em; line-height: 1.2; }
 
 /* Badge de código estilo screenshot */
 .equip-code-badge {
@@ -1506,23 +1512,25 @@ select { appearance: none; cursor: pointer; }
 .equip-code-badge i { font-size: .85rem; }
 
 /* Linhas de informação */
-.equip-card-rows { margin: 10px 0; display: flex; flex-direction: column; gap: 0; }
+.equip-card-rows { margin: 4px 0 10px; display: flex; flex-direction: column; gap: 0; }
 .equip-row {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 7px 0; border-bottom: 1px solid #f1f5f9;
-    font-size: .8rem;
+    padding: 8px 0; border-bottom: 1px solid #f1f5f9;
+    font-size: .82rem;
 }
 .equip-row:last-child { border-bottom: none; }
-.equip-row-lbl { font-size: .68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.equip-row-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: .68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.equip-row-lbl i { font-size: .85rem; color: #94a3b8; }
 .equip-row-val { font-weight: 600; color: var(--navy); text-align: right; }
 
-/* Tags de categoria */
-.equip-card-tags { display: flex; flex-wrap: wrap; gap: 5px; padding: 10px 0 4px; border-top: 1px solid #f1f5f9; }
+/* Tags — Setor (categoria) em azul, Tipo/Subtipo em roxo */
+.equip-card-tags { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 0 2px; border-top: 1px solid #f1f5f9; }
 .equip-tag {
-    background: #f1f5f9; color: #475569;
-    border: 1px solid #e2e8f0; border-radius: 6px;
-    font-size: .7rem; font-weight: 600; padding: 3px 9px;
+    border-radius: 100px;
+    font-size: .72rem; font-weight: 700; padding: 4px 12px;
 }
+.equip-tag-categoria { background: #dbeafe; color: #1d4ed8; }
+.equip-tag-tipo      { background: #ede9fe; color: #6d28d9; }
 
 /* ============================================================
    EQUIPAMENTOS — MODAL DE EDIÇÃO
@@ -1664,7 +1672,14 @@ select { appearance: none; cursor: pointer; }
 }
 .eqd-info-val { font-size: .95rem; font-weight: 700; color: var(--navy); }
 
-/* Observações */
+/* Observações — vermelho bem leve, só pra destacar do resto (info neutra) */
+#eqd-observacoes-card {
+    background: rgba(239,68,68,.06); border-color: rgba(239,68,68,.18);
+}
+#eqd-observacoes-card .eqd-info-lbl { color: #b91c1c; }
+#eqd-observacoes-card .eqd-info-val { color: #7f1d1d; font-weight: 600; }
+
+/* Observações (bloco antigo, sem uso hoje) */
 .eqd-obs-card {
     background: var(--surface-2); border: 1px solid var(--border);
     border-left: 3px solid var(--blue); border-radius: var(--r); padding: 12px 14px;
@@ -1714,8 +1729,27 @@ select { appearance: none; cursor: pointer; }
 }
 .eqd-car-img-el {
     width: 100%; height: 100%; object-fit: contain; object-position: center; display: block;
-    padding: 6px;
+    padding: 6px; cursor: zoom-in;
 }
+/* Dica de zoom no canto — só aparece no hover da imagem */
+.eqd-car-zoom-hint {
+    position: absolute; top: 8px; left: 8px; z-index: 2;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(0,0,0,.45); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .9rem; opacity: 0; transition: opacity .15s; pointer-events: none;
+}
+.eqd-car-wrap:hover .eqd-car-zoom-hint { opacity: 1; }
+
+/* Modal de zoom da imagem — tela cheia escura, imagem grande no centro */
+.img-zoom-modal { background: rgba(0,0,0,.9); z-index: 4000; cursor: zoom-out; }
+.img-zoom-img {
+    max-width: 92vw; max-height: 92vh; object-fit: contain;
+    border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,.5);
+    cursor: default;
+}
+.img-zoom-close { position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; }
+.img-zoom-close i { font-size: 1.3rem; }
 .eqd-car-nav {
     position: absolute; top: 50%; transform: translateY(-50%);
     width: 32px; height: 32px; border-radius: 50%;

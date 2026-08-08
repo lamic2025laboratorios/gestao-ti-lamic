@@ -4975,6 +4975,19 @@ function _initEquipCarousel(imgs) {
     wrap._imgs = imgs;
 }
 
+// Zoom da imagem do equipamento (aba Informações) — clica na imagem do
+// carrossel, abre ela grande em tela cheia. Mesma imagem (base64/bitmap),
+// só maior — não precisa converter nada, o <img src> já é o bitmap inteiro.
+function abrirZoomImagem(src) {
+    if (!src) return;
+    document.getElementById('img-zoom-el').src = src;
+    document.getElementById('img-zoom-modal').classList.remove('hidden');
+}
+function fecharZoomImagem() {
+    document.getElementById('img-zoom-modal').classList.add('hidden');
+    document.getElementById('img-zoom-el').src = '';
+}
+
 function equipCarNav(dir) {
     const wrap = document.getElementById('eqd-car-wrap');
     if (!wrap || !wrap._imgs) return;
@@ -8315,24 +8328,28 @@ function renderEquipGrid() {
 
     grid.innerHTML = '';
     lista.forEach(e => {
-        // Todas as linhas pedidas pelo usuário
+        // Todas as linhas pedidas pelo usuário — mesmos ícones do popup de detalhe
         const fields = [
-            { lbl: 'CÓDIGO / PATRIMÔNIO', val: e.codigo     },
-            { lbl: 'MARCA',               val: e.fabricante },
-            { lbl: 'MODELO',              val: e.modelo     },
-            { lbl: 'Nº SÉRIE',            val: e.serie      },
-            { lbl: 'FORNECEDOR',          val: e.fornecedor },
-            { lbl: 'LOCALIZAÇÃO',         val: e.unidade    }
+            { lbl: 'CÓDIGO / PATRIMÔNIO', val: e.codigo,     icon: 'ph-barcode'   },
+            { lbl: 'MARCA',               val: e.fabricante, icon: 'ph-buildings' },
+            { lbl: 'MODELO',              val: e.modelo,     icon: 'ph-package'   },
+            { lbl: 'Nº SÉRIE',            val: e.serie,      icon: 'ph-hash'      },
+            { lbl: 'FORNECEDOR',          val: e.fornecedor, icon: 'ph-storefront'},
+            { lbl: 'LOCALIZAÇÃO',         val: e.unidade,    icon: 'ph-map-pin'   }
         ];
 
         const rows = fields.map(f => `
             <div class="equip-row">
-                <span class="equip-row-lbl">${f.lbl}</span>
+                <span class="equip-row-lbl"><i class="ph ${f.icon}"></i> ${f.lbl}</span>
                 <span class="equip-row-val">${f.val || '—'}</span>
             </div>`).join('');
 
-        const tags = [e.categoria, e.tipo].filter(Boolean)
-            .map(t => `<span class="equip-tag">${t}</span>`).join('');
+        // Setor (categoria) em azul, Tipo/Subtipo em roxo — cores diferentes
+        // pra distinguir os dois de relance
+        const tags = [
+            e.categoria ? `<span class="equip-tag equip-tag-categoria">${e.categoria}</span>` : '',
+            e.tipo      ? `<span class="equip-tag equip-tag-tipo">${e.tipo}</span>`            : ''
+        ].join('');
 
         const dotClass = e.status === 'Em Manutenção' ? 'dot-manut'
                        : e.status === 'Inativo'       ? 'dot-inativo' : 'dot-uso';
@@ -8350,6 +8367,7 @@ function renderEquipGrid() {
             </div>
             <div class="equip-card-body">
                 <div class="equip-card-top">
+                    <div class="equip-card-icon-box"><i class="ph ph-desktop-tower"></i></div>
                     <div class="equip-card-name" style="text-transform:uppercase;">${e.nome || '—'}</div>
                 </div>
                 <div class="equip-card-rows">${rows}</div>

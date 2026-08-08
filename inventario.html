@@ -1755,7 +1755,8 @@
             <div class="eqd-tab-panel active" id="eqd-panel-info">
                 <!-- Carrossel de imagens — só aparece aqui, nas outras abas some -->
                 <div class="eqd-car-wrap" id="eqd-car-wrap" style="display:none;">
-                    <img id="eqd-car-img" class="eqd-car-img-el" src="" alt="">
+                    <img id="eqd-car-img" class="eqd-car-img-el" src="" alt="" onclick="abrirZoomImagem(this.src)" title="Clique pra dar zoom">
+                    <div class="eqd-car-zoom-hint"><i class="ph ph-magnifying-glass-plus"></i></div>
                     <button class="eqd-car-nav prev" id="eqd-car-prev" onclick="equipCarNav(-1)">&#8249;</button>
                     <button class="eqd-car-nav next" id="eqd-car-next" onclick="equipCarNav(1)">&#8250;</button>
                     <div class="eqd-car-dots" id="eqd-car-dots"></div>
@@ -1822,6 +1823,12 @@
             <button class="eqd-btn-edit" onclick="editEquipFromDetail()"><i class="ph ph-pencil-simple"></i> Editar</button>
         </div>
     </div>
+</div>
+
+<!-- Modal: Zoom da imagem do equipamento -->
+<div id="img-zoom-modal" class="modal img-zoom-modal hidden" onclick="fecharZoomImagem()">
+    <button class="eqd-icon-btn img-zoom-close" onclick="event.stopPropagation();fecharZoomImagem()" title="Fechar"><i class="ph ph-x"></i></button>
+    <img id="img-zoom-el" class="img-zoom-img" src="" alt="" onclick="event.stopPropagation();">
 </div>
 
 <!-- Modal: Preview de Arquivo -->
