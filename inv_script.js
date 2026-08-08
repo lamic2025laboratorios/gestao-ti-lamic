@@ -8367,7 +8367,7 @@ function renderEquipGrid() {
             </div>
             <div class="equip-card-body">
                 <div class="equip-card-top">
-                    <div class="equip-card-icon-box"><i class="ph ph-printer"></i></div>
+                    <div class="equip-card-icon-box"><i class="ph ph-cash-register"></i></div>
                     <div class="equip-card-name" style="text-transform:uppercase;">${e.nome || '—'}</div>
                 </div>
                 <div class="equip-card-rows">${rows}</div>
