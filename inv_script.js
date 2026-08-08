@@ -8013,6 +8013,17 @@ function _novoEquipamentoVoltar() {
 // "Modelo da Máquina" é especial: escolhe DESKTOP/ALL IN ONE/NOTEBOOK e
 // digita a marca — fica salvo como "MODELO - MARCA" (a contagem por tipo do
 // dashboard sai daqui).
+// Bolinha de cor ao lado do Status, no popup de Entrada de Peça — Disponível
+// azul, Em Uso verde, Manutenção amarela, Danificada vermelha, Descartada
+// preta (dot-descartado é só dessa tela; os outros 4 já existiam em
+// .equip-status-dot pro resto do app).
+const PART_STATUS_DOT = { disponivel: 'dot-disp', em_uso: 'dot-uso', manutencao: 'dot-manut', danificado: 'dot-inativo', descartado: 'dot-descartado' };
+function _syncPartEntryStatusDot() {
+    const val = document.getElementById('part-entry-status')?.value || 'disponivel';
+    const dot = document.getElementById('part-entry-status-dot');
+    if (dot) dot.className = 'equip-status-dot equip-status-dot-inline ' + (PART_STATUS_DOT[val] || 'dot-disp');
+}
+
 // Popup de peça: peça existente abre em modo VISUALIZAÇÃO (código, spec,
 // status e em qual Template está) com o lápis liberando a edição; entrada
 // nova abre direto editável.
@@ -8046,6 +8057,7 @@ function abrirEntradaPeca(tipo, pecaId = null, editavel = null) {
         ? ((peca.status === 'danificado' || peca.status === 'manutencao' || peca.status === 'descartado') ? peca.status : (peca.usedBy ? 'em_uso' : 'disponivel'))
         : 'disponivel';
     document.getElementById('part-entry-status').value = statusVal;
+    _syncPartEntryStatusDot();
     document.getElementById('part-entry-motivo-group').classList.toggle('hidden', !['danificado', 'manutencao', 'descartado'].includes(statusVal));
     document.getElementById('part-entry-motivo').value = peca ? (peca.motivoDano || '') : '';
 

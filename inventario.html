@@ -1356,13 +1356,16 @@
         </div>
         <div class="form-group" id="part-entry-spec-group"><label>Especificação</label><input type="text" id="part-entry-spec" placeholder="Ex: 8GB DDR4 2666MHz"></div>
         <div class="form-group hidden" id="part-entry-status-group"><label>Status</label>
-            <select id="part-entry-status" onchange="document.getElementById('part-entry-motivo-group').classList.toggle('hidden', !['danificado','manutencao','descartado'].includes(this.value))">
-                <option value="disponivel">Disponível</option>
-                <option value="em_uso">Em Uso</option>
-                <option value="manutencao">Manutenção</option>
-                <option value="danificado">Danificada</option>
-                <option value="descartado">⚫ Descartada</option>
-            </select>
+            <div class="status-select-wrap">
+                <span class="equip-status-dot equip-status-dot-inline" id="part-entry-status-dot"></span>
+                <select id="part-entry-status" onchange="_syncPartEntryStatusDot(); document.getElementById('part-entry-motivo-group').classList.toggle('hidden', !['danificado','manutencao','descartado'].includes(this.value))">
+                    <option value="disponivel">Disponível</option>
+                    <option value="em_uso">Em Uso</option>
+                    <option value="manutencao">Manutenção</option>
+                    <option value="danificado">Danificada</option>
+                    <option value="descartado">Descartada</option>
+                </select>
+            </div>
         </div>
         <div class="form-group hidden" id="part-entry-motivo-group"><label>Motivo (dano / manutenção)</label><textarea id="part-entry-motivo" rows="2" placeholder="Descreva o que aconteceu com a peça..." style="width:100%;font-family:inherit;font-size:.85rem;padding:8px;border:1px solid var(--border);border-radius:var(--r);"></textarea></div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">

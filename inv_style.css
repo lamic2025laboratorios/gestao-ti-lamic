@@ -2240,6 +2240,12 @@ select { appearance: none; cursor: pointer; }
 .equip-status-dot.dot-uso     { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
 .equip-status-dot.dot-manut   { background: #f59e0b; box-shadow: 0 0 6px #f59e0b88; }
 .equip-status-dot.dot-inativo { background: #ef4444; box-shadow: 0 0 6px #ef444488; }
+.equip-status-dot.dot-descartado { background: #111827; box-shadow: 0 0 6px #11182788; }
+
+/* Select de Status com a bolinha da cor do status escolhido do lado —
+   usado no popup de Entrada de Peça (Lista do Estoque). */
+.status-select-wrap { display: flex; align-items: center; gap: 8px; }
+.status-select-wrap select { flex: 1; }
 
 .eqd-docs-list { display: flex; flex-direction: column; gap: 6px; }
 .eqd-doc-view-item {
