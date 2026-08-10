@@ -169,7 +169,7 @@ const App = {
     const btn = document.getElementById('btn-units-ok');
     if (sel.value) {
       info.classList.remove('hidden');
-      nameEl.textContent = State.units[sel.value] || sel.value;
+      nameEl.textContent = State.units[sel.value] || '—';
       btn.disabled = false;
     } else {
       info.classList.add('hidden');
@@ -182,7 +182,7 @@ const App = {
     if (!sel.value) return;
     State.currentUnit = sel.value;
     LS.save('currentUnit', sel.value);
-    document.getElementById('topbar-unit-name').textContent = State.units[sel.value] || sel.value;
+    document.getElementById('topbar-unit-name').textContent = State.units[sel.value] || '—';
     App._popularSelectSetor('req-setor', sel.value, '');
     App.buildRequestPanel();
     App.goTo('screen-request');
@@ -7674,7 +7674,16 @@ const App = {
       }
     };
 
-    safeListener('units',     v => { State.units    =v||{}; App.renderUnitsDropdown(); });
+    safeListener('units',     v => {
+      State.units = v||{};
+      App.renderUnitsDropdown();
+      // Unidade: no boot o topbar mostra o nome antes dos dados chegarem do Firebase
+      // (mesma razão do comentário de 'groups' logo abaixo) — corrige assim que chegam.
+      if (!State.adminUser && State.currentUnit) {
+        const nome = document.getElementById('topbar-unit-name');
+        if (nome) nome.textContent = State.units[State.currentUnit] || '—';
+      }
+    });
     safeListener('unitSetores', v => {
       State.unitSetores = v || {};
       // Mesma razão do listener de 'groups': no boot (unidade recarregando a página) o
@@ -8016,7 +8025,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       // Unidade escolhida na casca: monta e abre o formulário direto
       const nome = document.getElementById('topbar-unit-name');
-      if (nome) nome.textContent = State.units?.[State.currentUnit] || State.currentUnit || '—';
+      if (nome) nome.textContent = State.units?.[State.currentUnit] || '—';
       App._popularSelectSetor?.('req-setor', State.currentUnit, '');
       App.buildRequestPanel?.();
       App.goTo('screen-request');
