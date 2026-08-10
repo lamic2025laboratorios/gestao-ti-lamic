@@ -48,9 +48,10 @@ function toast(msg, tipo) {
   const el = document.getElementById('toast');
   if (!el) return;
   el.textContent = msg;
-  el.className = 'toast show' + (tipo === 'error' ? ' error' : '');
+  el.className = 'toast' + (tipo === 'error' ? ' error' : '');
+  el.classList.remove('hidden');
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => { el.className = 'toast'; }, 3000);
+  toast._t = setTimeout(() => el.classList.add('hidden'), 3000);
 }
 
 const App = {

@@ -1445,3 +1445,13 @@
 .atv-trash-item-meta { font-size: .72rem; color: var(--ink-400); margin-top: 2px; }
 .atv-trash-item-acts { display: flex; gap: 6px; flex-shrink: 0; }
 .atv-trash-empty { text-align: center; padding: 40px 20px; color: var(--ink-300); font-size: .85rem; }
+
+/* ── Home > Configurações: Grupos+Subgrupos / Unidades+Setores num card só ── */
+.hc-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 6px; }
+.hc-2col-item { min-width: 0; }
+.hc-2col-item:first-child { padding-right: 28px; border-right: 1px solid var(--surf-border-soft); }
+.hc-2col-title { font-size: .8rem; font-weight: 700; color: var(--ink-500); text-transform: uppercase; letter-spacing: .03em; margin: 0 0 8px; }
+@media (max-width: 900px) {
+  .hc-2col { grid-template-columns: 1fr; gap: 20px; }
+  .hc-2col-item:first-child { padding-right: 0; border-right: none; border-bottom: 1px solid var(--surf-border-soft); padding-bottom: 20px; }
+}
