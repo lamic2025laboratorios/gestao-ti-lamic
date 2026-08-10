@@ -198,6 +198,16 @@
       <div class="sidebar-brand" style="display:none"></div>
       <nav class="sidebar-nav">
         <div class="nav-section-label sb-txt">Home</div>
+        <button class="nav-item" data-tab="tab-home-dashboard" onclick="App.abrirSecao(this)" data-tip="Dashboard">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="9" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="5" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="12" width="7" height="9" rx="1" stroke="currentColor" stroke-width="2"/><rect x="3" y="16" width="7" height="5" rx="1" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="ni-txt">Dashboard</span>
+          <span class="ni-tip">Dashboard</span>
+        </button>
+        <button class="nav-item" data-tab="tab-atividades" onclick="App.abrirSecao(this)" data-tip="Atividades">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="ni-txt">Atividades</span>
+          <span class="ni-tip">Atividades</span>
+        </button>
         <button class="nav-item active" data-tab="tab-unilamic" onclick="App.abrirSecao(this)" data-tip="UniLAMIC TI">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           <span class="ni-txt">UniLAMIC TI</span>
@@ -252,6 +262,250 @@
     </aside>
 
     <main class="admin-main">
+      <!-- ===== #tab-home-dashboard ===== -->
+      <div id="tab-home-dashboard" class="tab-panel">
+        <div class="tab-header dash-topbar">
+          <div><h2>Dashboard</h2></div>
+        </div>
+        <div style="padding:60px 20px;text-align:center;color:var(--ink-400);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="42" height="42" style="opacity:.5;margin-bottom:10px;"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          <div style="font-weight:700;color:var(--ink-900);margin-bottom:4px;">Dashboard em construção</div>
+          <div style="font-size:.85rem;">Estrutura criada — o conteúdo entra nas próximas rodadas.</div>
+        </div>
+      </div>
+
+      <!-- ===== #tab-atividades ===== -->
+      <div id="tab-atividades" class="tab-panel atv-panel">
+        <div class="tab-header dash-topbar">
+          <div>
+            <h2>Gestão de Atividades</h2>
+            <p class="tab-subtitle">Controle de tarefas, reuniões e projetos</p>
+          </div>
+          <div class="atv-view-toggle">
+            <button class="atv-view-btn active" data-view="kanban" onclick="App.atvSetView('kanban')">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><rect x="3" y="3" width="7" height="18" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="10" rx="1.5" stroke="currentColor" stroke-width="2"/></svg>
+              Kanban
+            </button>
+            <button class="atv-view-btn" data-view="lista" onclick="App.atvSetView('lista')">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Lista
+            </button>
+            <button class="atv-view-btn" data-view="calendario" onclick="App.atvSetView('calendario')">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><rect x="3" y="4" width="18" height="17" rx="2" stroke="currentColor" stroke-width="2"/><line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="2"/><line x1="7" y1="2" x2="7" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="17" y1="2" x2="17" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Calendário
+            </button>
+          </div>
+        </div>
+
+        <!-- Barra de ferramentas -->
+        <div class="atv-toolbar">
+          <div class="atv-toolbar-left">
+            <div class="atv-search">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <input type="text" id="atv-search-input" placeholder="Buscar tarefa..." oninput="App.atvBusca(this.value)">
+            </div>
+            <div class="atv-select-wrap">
+              <select id="atv-filtro-revisor" onchange="App.atvFiltroRevisor(this.value)">
+                <option value="">Filtrar por Revisor</option>
+              </select>
+            </div>
+            <button class="atv-icon-btn" id="atv-filtro-btn" onclick="App.atvToggleFiltro()" title="Filtros">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="18" x2="13" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="atv-toolbar-right">
+            <div class="atv-select-wrap">
+              <select id="atv-modo-visao" onchange="App.atvSetModoVisao(this.value)">
+                <option value="minhas">Minhas Tarefas</option>
+                <option value="todas">Todas as Tarefas</option>
+              </select>
+            </div>
+            <button class="atv-icon-btn" onclick="App.atvRender()" title="Atualizar">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="atv-icon-btn atv-trash-btn" onclick="App.atvAbrirLixeira()" title="Lixeira">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="atv-trash-badge" id="atv-trash-badge" style="display:none;">0</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Painel de filtros avançados -->
+        <div class="atv-filtro-panel hidden" id="atv-filtro-panel">
+          <div class="atv-filtro-group">
+            <span class="atv-filtro-lbl">Setor</span>
+            <div class="atv-chip-group" id="atv-filtro-setores"></div>
+          </div>
+          <div class="atv-filtro-group">
+            <span class="atv-filtro-lbl">Categoria</span>
+            <div class="atv-chip-group" id="atv-filtro-categorias"></div>
+          </div>
+          <div class="atv-filtro-group">
+            <span class="atv-filtro-lbl">Prioridade</span>
+            <div class="atv-chip-group" id="atv-filtro-prioridades"></div>
+          </div>
+          <button class="atv-filtro-clear" onclick="App.atvLimparFiltros()">Limpar filtros</button>
+        </div>
+
+        <!-- ===== Vista Kanban ===== -->
+        <div class="atv-view atv-view-kanban active" id="atv-view-kanban">
+          <div class="atv-board" id="atv-board"></div>
+          <button class="atv-add-col-btn" onclick="App.atvAbrirColuna()">
+            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Adicionar coluna
+          </button>
+        </div>
+
+        <!-- ===== Vista Lista ===== -->
+        <div class="atv-view atv-view-lista" id="atv-view-lista">
+          <div class="atv-lista-sub">
+            <button class="atv-sub-btn active" data-sub="cards" onclick="App.atvSetListaSub('cards')">Cards</button>
+            <button class="atv-sub-btn" data-sub="tabela" onclick="App.atvSetListaSub('tabela')">Tabela</button>
+            <button class="atv-sub-btn" data-sub="grupos" onclick="App.atvSetListaSub('grupos')">Grupos</button>
+            <button class="atv-sub-btn" data-sub="setores" onclick="App.atvSetListaSub('setores')">Setores</button>
+          </div>
+          <div id="atv-lista-corpo"></div>
+        </div>
+
+        <!-- ===== Vista Calendário ===== -->
+        <div class="atv-view atv-view-calendario" id="atv-view-calendario">
+          <div class="atv-cal-toolbar">
+            <div class="atv-cal-nav">
+              <button class="atv-icon-btn" onclick="App.atvCalNav(-1)">
+                <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><polyline points="15 18 9 12 15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <button class="atv-cal-hoje" onclick="App.atvCalHoje()">Hoje</button>
+              <button class="atv-icon-btn" onclick="App.atvCalNav(1)">
+                <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><polyline points="9 18 15 12 9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <strong class="atv-cal-titulo" id="atv-cal-titulo">—</strong>
+            </div>
+            <div class="atv-cal-modo">
+              <button class="atv-sub-btn active" data-modo="mes" onclick="App.atvCalSetModo('mes')">Mensal</button>
+              <button class="atv-sub-btn" data-modo="semana" onclick="App.atvCalSetModo('semana')">Semanal</button>
+            </div>
+          </div>
+          <div class="atv-cal-grid" id="atv-cal-grid"></div>
+        </div>
+      </div>
+
+      <!-- ===== Modal: Nova/Editar Tarefa ===== -->
+      <div id="atv-task-modal" class="modal-overlay hidden">
+        <div class="modal-card atv-modal-card" style="max-width:720px">
+          <div class="modal-header">
+            <h3 id="atv-task-title">Nova Tarefa</h3>
+            <button class="modal-close" onclick="App.atvFecharTask()">
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="atv-task-id">
+            <div class="form-group"><label class="form-label">Título *</label><input type="text" id="atv-task-titulo" class="input-field" placeholder="Ex: Migração do servidor central"></div>
+            <div class="form-group"><label class="form-label">Descrição</label><textarea id="atv-task-desc" class="input-field" rows="3" placeholder="Detalhes da tarefa..."></textarea></div>
+            <div class="atv-grid-3">
+              <div class="form-group"><label class="form-label">Coluna / Status</label><select id="atv-task-coluna" class="input-field select-styled"></select></div>
+              <div class="form-group"><label class="form-label">Setor</label><select id="atv-task-setor" class="input-field select-styled"><option value="">—</option></select></div>
+              <div class="form-group">
+                <label class="form-label">Categoria</label>
+                <div class="atv-cat-wrap">
+                  <select id="atv-task-categoria" class="input-field select-styled"><option value="">—</option></select>
+                  <button type="button" class="atv-cat-add" onclick="App.atvNovaCategoria()" title="Nova categoria">+</button>
+                </div>
+              </div>
+            </div>
+            <div class="atv-grid-3">
+              <div class="form-group"><label class="form-label">Responsável</label><select id="atv-task-responsavel" class="input-field select-styled"><option value="">—</option></select></div>
+              <div class="form-group"><label class="form-label">Revisor</label><select id="atv-task-revisor" class="input-field select-styled"><option value="">—</option></select></div>
+              <div class="form-group"><label class="form-label">Prioridade</label>
+                <select id="atv-task-prioridade" class="input-field select-styled">
+                  <option value="P1">P1 — Urgente</option>
+                  <option value="P2">P2 — Alta</option>
+                  <option value="P3" selected>P3 — Normal</option>
+                  <option value="P4">P4 — Baixa</option>
+                </select>
+              </div>
+            </div>
+            <div class="atv-grid-3">
+              <div class="form-group"><label class="form-label">Início</label><input type="date" id="atv-task-inicio" class="input-field"></div>
+              <div class="form-group"><label class="form-label">Conclusão</label><input type="date" id="atv-task-fim" class="input-field"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Checklist / Subtarefas <span class="atv-progresso-txt" id="atv-progresso-txt"></span></label>
+              <div id="atv-subtarefas-list" class="atv-subtarefas-list"></div>
+              <div class="atv-subtarefa-add">
+                <input type="text" id="atv-nova-subtarefa" class="input-field" placeholder="Adicionar item ao checklist..." onkeydown="if(event.key==='Enter'){event.preventDefault();App.atvAddSubtarefa();}">
+                <button type="button" class="btn-ghost" onclick="App.atvAddSubtarefa()">Adicionar</button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-delete" id="atv-task-del-btn" onclick="App.atvExcluirTask()" style="display:none">Excluir</button>
+            <button class="btn-ghost" onclick="App.atvFecharTask()">Cancelar</button>
+            <button class="btn-primary" onclick="App.atvSalvarTask()">Salvar Tarefa</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Modal: Nova/Editar Coluna ===== -->
+      <div id="atv-col-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:420px">
+          <div class="modal-header">
+            <h3 id="atv-col-title">Nova Coluna</h3>
+            <button class="modal-close" onclick="App.atvFecharColuna()">
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="atv-col-id">
+            <div class="form-group"><label class="form-label">Nome da coluna</label><input type="text" id="atv-col-nome" class="input-field" placeholder="Ex: Aguardando aprovação"></div>
+            <div class="form-group">
+              <label class="form-label">Cor</label>
+              <div class="atv-cor-swatches" id="atv-col-cores"></div>
+              <input type="hidden" id="atv-col-cor" value="#64748b">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-delete" id="atv-col-del-btn" onclick="App.atvExcluirColuna()" style="display:none">Excluir coluna</button>
+            <button class="btn-ghost" onclick="App.atvFecharColuna()">Cancelar</button>
+            <button class="btn-primary" onclick="App.atvSalvarColuna()">Salvar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Modal: Lixeira de Atividades ===== -->
+      <div id="atv-trash-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:640px">
+          <div class="modal-header">
+            <h3>Lixeira de Atividades</h3>
+            <button class="modal-close" onclick="document.getElementById('atv-trash-modal').classList.add('hidden')">
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div id="atv-trash-body" class="atv-trash-body"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Modal: Nova Categoria (rápido) ===== -->
+      <div id="atv-cat-modal" class="modal-overlay hidden" style="z-index:3100;">
+        <div class="modal-card" style="max-width:380px">
+          <div class="modal-header">
+            <h3>Nova Categoria</h3>
+            <button class="modal-close" onclick="document.getElementById('atv-cat-modal').classList.add('hidden')">
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group"><label class="form-label">Nome</label><input type="text" id="atv-cat-nome" class="input-field" placeholder="Ex: Servidor"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="document.getElementById('atv-cat-modal').classList.add('hidden')">Cancelar</button>
+            <button class="btn-primary" onclick="App.atvSalvarCategoria()">Adicionar</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ===== #tab-unilamic ===== -->
       <div id="tab-unilamic" class="tab-panel">
         <div class="tab-header dash-topbar">
