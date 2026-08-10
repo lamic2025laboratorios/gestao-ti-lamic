@@ -7,7 +7,7 @@ const State = {
   currentUnit: null, currentType: null,
   adminUser: null,
   editingRequestId: null, modalStatus: null,
-  requests: {}, units: {}, groups: {}, groupMeta: {}, subOpts: {}, subgroups: {}, admins: {}, suppliers: {},
+  requests: {}, units: {}, unitSetores: {}, groups: {}, groupMeta: {}, subOpts: {}, subgroups: {}, admins: {}, suppliers: {},
   estoque: {}, estoqueMov: {}, compras: {}, activityLog: {}, metas: {}, config: {},
   charts: {},
   calYear: new Date().getFullYear(), calMonth: new Date().getMonth(),
@@ -128,6 +128,40 @@ const App = {
     });
   },
 
+  /* ── SETORES (por unidade) ───────────────────
+     Cadastro fica em Home → Configurações; aqui só lemos State.unitSetores
+     (nó próprio, não mexe em `units`) pra montar os seletores de Solicitante. */
+  _setoresSeedEmAndamento: new Set(),
+  _setoresDaUnidade(unitId) {
+    const raw = (State.unitSetores || {})[unitId] || {};
+    const lista = Object.entries(raw).map(([id, nome]) => ({ id, nome })).sort((a,b)=>a.nome.localeCompare(b.nome));
+    // Unidade sem nenhum setor ainda (cadastro antigo) → cria "Própria Unidade" com chave
+    // fixa ('padrao'), não com push (chave aleatória): um set() na mesma chave nunca duplica,
+    // mesmo que este módulo (iframe à parte) e a Home semeiem quase ao mesmo tempo.
+    if (!lista.length && unitId && State.units?.[unitId] && !App._setoresSeedEmAndamento.has(unitId)) {
+      App._setoresSeedEmAndamento.add(unitId);
+      Promise.resolve(DB.set(`unitSetores/${unitId}/padrao`, 'Própria Unidade'))
+        .then(() => App._setoresSeedEmAndamento.delete(unitId), () => App._setoresSeedEmAndamento.delete(unitId));
+    }
+    return lista;
+  },
+
+  // Popula um <select> de Setor pro selId, com base na unidade. Preserva valor antigo
+  // (texto livre já salvo antes desta função existir) como opção extra, se não bater com nenhum setor cadastrado.
+  _popularSelectSetor(selId, unitId, valorAtual) {
+    const sel = document.getElementById(selId); if (!sel) return;
+    const setores = unitId ? App._setoresDaUnidade(unitId) : [];
+    let html = '<option value="">— Selecione —</option>' + setores.map(s => `<option value="${s.nome}">${s.nome}</option>`).join('');
+    if (valorAtual && !setores.some(s => s.nome === valorAtual)) {
+      html += `<option value="${valorAtual}">${valorAtual}</option>`;
+    }
+    sel.innerHTML = html;
+    // Sem valor salvo ainda (solicitação nova) → cai no padrão "Própria Unidade" (ou o
+    // primeiro setor cadastrado, se o padrão tiver sido renomeado/apagado pelo admin).
+    if (valorAtual) { sel.value = valorAtual; }
+    else { const padrao = setores.find(s => s.nome === 'Própria Unidade'); sel.value = padrao ? padrao.nome : (setores[0]?.nome || ''); }
+  },
+
   onUnitSelectChange() {
     const sel = document.getElementById('unit-select');
     const info = document.getElementById('unit-selected-info');
@@ -149,6 +183,7 @@ const App = {
     State.currentUnit = sel.value;
     LS.save('currentUnit', sel.value);
     document.getElementById('topbar-unit-name').textContent = State.units[sel.value] || sel.value;
+    App._popularSelectSetor('req-setor', sel.value, '');
     App.buildRequestPanel();
     App.goTo('screen-request');
     App.restoreRequestForm();
@@ -475,6 +510,7 @@ const App = {
     const norm = State.currentType.name.toLowerCase();
     const base = {
       unitId: State.currentUnit, unitName: State.units[State.currentUnit]||'?',
+      setor: document.getElementById('req-setor')?.value || '',
       groupId: State.currentType.id, groupName: State.currentType.name,
       urgent: document.getElementById('chk-urgency').checked,
       obs: document.getElementById('req-obs').value,
@@ -546,6 +582,7 @@ const App = {
     Object.entries(State.units || {}).forEach(([id, nome]) => {
       const o = document.createElement('option'); o.value = id; o.textContent = nome; usel.appendChild(o);
     });
+    App._popularSelectSetor('nsol-setor', '', '');
     App._nsolType = null;
     App._nsolBuildGroups();
     ['nsol-sub-ink', 'nsol-sub-battery', 'nsol-sub-other'].forEach(s => document.getElementById(s).classList.add('hidden'));
@@ -559,6 +596,10 @@ const App = {
     document.getElementById('modal-nova-solic').classList.remove('hidden');
   },
   closeNovaSolic() { document.getElementById('modal-nova-solic').classList.add('hidden'); },
+
+  _nsolUnitChange() {
+    App._popularSelectSetor('nsol-setor', document.getElementById('nsol-unit')?.value || '', '');
+  },
 
   _nsolBuildGroups() {
     const wrap = document.getElementById('nsol-groups'); wrap.innerHTML = '';
@@ -643,6 +684,7 @@ const App = {
     const norm = App._nsolType.name.toLowerCase();
     const base = {
       unitId, unitName: State.units[unitId] || '?',
+      setor: document.getElementById('nsol-setor')?.value || '',
       groupId: App._nsolType.id, groupName: App._nsolType.name,
       urgent: document.getElementById('nsol-urgency').checked,
       obs: document.getElementById('nsol-obs').value,
@@ -4850,7 +4892,7 @@ const App = {
     // ── Campos da compra ───────────────────────────────────────────
     // Data da compra: só preenche se já existe valor salvo
     document.getElementById('modal-buy-date').value = r.boughtAt ? r.boughtAt.substring(0,10) : '';
-    document.getElementById('modal-requester').value  = r.solicitante || '';
+    App._popularSelectSetor('modal-requester', r.unitId, r.solicitante || '');
     document.getElementById('modal-qty').value        = r.quantidade  || '';
     const qEnvEl = document.getElementById('modal-qty-enviada');
     if (qEnvEl) qEnvEl.value = r.qtdEnviada != null ? r.qtdEnviada : '';
@@ -5597,7 +5639,6 @@ const App = {
 
   /* ── SETTINGS ─────────────────────────────── */
   renderSettings() {
-    App.renderUnitsAdmin();
     App.renderGroupsAdmin();
     App.renderSubgroupsAdmin();
     App.renderSuppliersAdmin();
@@ -6100,29 +6141,9 @@ const App = {
     DB.push('suppliers', name).then(()=>{ inp.value=''; toast('Fornecedor adicionado!'); App._logActivity('Configurações', 'Fornecedor adicionado', name); });
   },
 
-  // UNITS
-  renderUnitsAdmin() {
-    const wrap = document.getElementById('list-units-admin'); wrap.innerHTML='';
-    Object.entries(State.units||{}).forEach(([id,name]) => {
-      const el=document.createElement('div'); el.className='settings-item';
-      el.innerHTML=`<span class="settings-item-name">${name}</span>
-        <div class="settings-item-actions">
-          <button class="btn-icon-sm edit" title="Renomear" onclick="App.openEditModal('Renomear Unidade','${name}',v=>DB.set('units/${id}',v))">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2"/></svg>
-          </button>
-          <button class="btn-icon-sm" title="Remover" onclick="App.removeItem('units','${id}')">
-            <svg viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke="currentColor" stroke-width="2"/></svg>
-          </button>
-        </div>`;
-      wrap.appendChild(el);
-    });
-    App.renderUnitsDropdown();
-  },
-
-  addUnit() {
-    const inp=document.getElementById('inp-unit'); const name=inp.value.trim(); if(!name) return;
-    DB.push('units',name).then(()=>{inp.value=''; toast('Unidade adicionada!'); App._logActivity('Configurações', 'Unidade adicionada', name); });
-  },
+  // UNITS — gerenciar (renomear/adicionar/remover) migrou pra Home → Configurações.
+  // Financeiro continua só CONSUMINDO State.units (dropdown, selects, relatórios etc.),
+  // por isso renderUnitsDropdown() acima permanece intocado.
 
   // GROUPS
   _cfgSelGroup: null,
@@ -6881,6 +6902,7 @@ const App = {
     App._populateEstoqueFornecedor();
     App._populateEstoqueUnidade();
     App._populateEstoqueBrindeGrupoSel();
+    App._popularSelectSetor('estoque-solicitante', null, '');
 
     const item = id ? (State.estoque[id] || {}) : {};
     const reqLig = item.reqId ? (State.requests || {})[item.reqId] : null;
@@ -6924,7 +6946,7 @@ const App = {
         const uSel = document.getElementById('estoque-unidade-destino');
         if (uSel) uSel.value = reqLig.unitName === 'Estoque Central' ? '__central__' : (reqLig.unitId || '');
         const vEl = document.getElementById('estoque-valor'); if (vEl) vEl.value = reqLig.valor || '';
-        const solEl = document.getElementById('estoque-solicitante'); if (solEl) solEl.value = reqLig.solicitante || '';
+        App._popularSelectSetor('estoque-solicitante', reqLig.unitId || null, reqLig.solicitante || '');
         const temParc = !!(reqLig.parcelas && reqLig.parcelas.length);
         document.getElementById('chk-estoque-parcelas').checked = temParc;
         document.getElementById('estoque-parcelas-wrap').style.display = temParc ? '' : 'none';
@@ -7652,7 +7674,16 @@ const App = {
       }
     };
 
-    safeListener('units',     v => { State.units    =v||{}; App.renderUnitsDropdown(); if(State.adminUser) App.renderUnitsAdmin?.(); });
+    safeListener('units',     v => { State.units    =v||{}; App.renderUnitsDropdown(); });
+    safeListener('unitSetores', v => {
+      State.unitSetores = v || {};
+      // Mesma razão do listener de 'groups': no boot (unidade recarregando a página) o
+      // formulário monta antes dos setores chegarem do Firebase — repopula quando chegam.
+      if (!State.adminUser && State.currentUnit && document.getElementById('screen-request')?.classList.contains('active')) {
+        const cur = document.getElementById('req-setor')?.value || '';
+        App._popularSelectSetor('req-setor', State.currentUnit, cur);
+      }
+    });
     safeListener('groups',    v => {
       State.groups = v||{};
       App._migrarGrupoConserto?.();
@@ -7986,6 +8017,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Unidade escolhida na casca: monta e abre o formulário direto
       const nome = document.getElementById('topbar-unit-name');
       if (nome) nome.textContent = State.units?.[State.currentUnit] || State.currentUnit || '—';
+      App._popularSelectSetor?.('req-setor', State.currentUnit, '');
       App.buildRequestPanel?.();
       App.goTo('screen-request');
       App.restoreRequestForm?.();

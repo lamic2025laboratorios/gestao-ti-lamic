@@ -29,6 +29,7 @@ const State = {
   adminUser: null,
   currentUnit: null,
   units: {},
+  unitSetores: {},
   admins: {},
   // UniLAMIC TI: wikis, grupos/subgrupos cadastrados e avisos de novidade
   kb: {},
@@ -337,6 +338,10 @@ const App = {
       catch (e) { console.error('[listener] ' + caminho, e); }
     };
     liga('units',  v => { State.units  = v || {}; App.renderUnitsDropdown(); });
+    liga('unitSetores', v => {
+      State.unitSetores = v || {};
+      if (document.querySelector('.tab-panel.active')?.id === 'tab-home-config') App.renderHomeConfig?.();
+    });
     liga('admins', v => { State.admins = v || {}; App.renderAdminsCards?.(); });
     liga('activityLog', v => { State.activityLog = v || {}; });
 
@@ -439,6 +444,8 @@ const App = {
      comentários) e as Configurações desta seção.
      ══════════════════════════════════════════════════════════ */
   _hcGrupoSel: null,   // grupo aberto na coluna de subgrupos
+  _hcUnidadeSel: null,  // unidade aberta na coluna de setores
+  _hcSetorSeedEmAndamento: new Set(),  // trava anti-corrida do seed de "Própria Unidade"
 
   _hcGrupos() {
     return Object.entries(State.kbCategorias || {})
@@ -467,6 +474,50 @@ const App = {
           </span>
         </div>`).join('')
         : '<div style="color:var(--gray-500);font-size:.85rem;padding:8px">Nenhum grupo cadastrado. Adicione abaixo.</div>';
+    }
+
+    // ── Unidades
+    const unidades = App._hcUnidades();
+    const boxU = document.getElementById('hc-list-unidades');
+    if (boxU) {
+      boxU.innerHTML = unidades.length ? unidades.map(u => `
+        <div class="settings-list-item ${u.id === App._hcUnidadeSel ? 'hc-sel' : ''}" style="cursor:pointer"
+             onclick="App.hcAbrirUnidade('${u.id}')">
+          <span><strong>${u.nome}</strong>
+            <span style="color:var(--ink-400);font-size:.76rem">${App._hcSetores(u.id).length} setor(es)</span>
+          </span>
+          <span style="display:flex;gap:4px">
+            <button class="btn-ico" title="Renomear" onclick="event.stopPropagation();App.hcRenUnidade('${u.id}')">${App._svg('pencil')}</button>
+            <button class="btn-ico btn-ico-del" title="Apagar" onclick="event.stopPropagation();App.hcDelUnidade('${u.id}')">${App._svg('trash')}</button>
+          </span>
+        </div>`).join('')
+        : '<div style="color:var(--gray-500);font-size:.85rem;padding:8px">Nenhuma unidade cadastrada. Adicione abaixo.</div>';
+    }
+
+    // ── Setores da unidade selecionada
+    const boxSet   = document.getElementById('hc-list-setores');
+    const descSet  = document.getElementById('hc-setor-desc');
+    const addRowSet = document.getElementById('hc-add-setor-row');
+    const uSel = unidades.find(x => x.id === App._hcUnidadeSel);
+    if (!uSel) {
+      if (boxSet)  boxSet.innerHTML = '<div style="color:var(--gray-500);font-size:.85rem;padding:8px">Selecione uma unidade ao lado.</div>';
+      if (descSet) descSet.textContent = 'Selecione uma unidade ao lado para gerenciar os setores dela.';
+      if (addRowSet) addRowSet.style.display = 'none';
+    } else {
+      if (descSet) descSet.innerHTML = `Setores de <strong>${uSel.nome}</strong>`;
+      if (addRowSet) addRowSet.style.display = 'flex';
+      const setores = App._hcSetores(uSel.id);
+      if (boxSet) {
+        boxSet.innerHTML = setores.length ? setores.map(s => `
+          <div class="settings-list-item">
+            <span><strong>${s.nome}</strong></span>
+            <span style="display:flex;gap:4px">
+              <button class="btn-ico" title="Renomear" onclick="App.hcRenSetor('${uSel.id}','${s.id}')">${App._svg('pencil')}</button>
+              <button class="btn-ico btn-ico-del" title="Apagar" onclick="App.hcDelSetor('${uSel.id}','${s.id}')">${App._svg('trash')}</button>
+            </span>
+          </div>`).join('')
+          : '<div style="color:var(--gray-500);font-size:.85rem;padding:8px">Nenhum setor nesta unidade.</div>';
+      }
     }
 
     // ── Subgrupos do grupo selecionado
@@ -580,6 +631,118 @@ const App = {
     DB.set(`kbCategorias/${g.id}/subs`, g.subs.filter((_, k) => k !== i)).then(() => {
       toast('Subgrupo apagado.');
       App._logActivity?.('Home', 'Subgrupo apagado', `${g.nome} › ${atual}`);
+    }).catch(() => toast('Erro ao apagar.', 'error'));
+  },
+
+  /* ── UNIDADES + SETORES ──────────────────────────────────────
+     Migrado de Financeiro → Configurações (Home). O nó `units` no
+     Firebase continua exatamente igual (id → nome), só a tela de
+     gerenciar mudou de lugar — Financeiro segue lendo `units` normal.
+     Setores vivem num nó novo e independente (`unitSetores/{unitId}/{setorId}`),
+     então nada que já existia foi alterado, só adicionado. Toda unidade
+     ganha um setor padrão "Própria Unidade" (criado na hora do cadastro,
+     ou de forma preguiçosa/travada por _hcSetorSeedEmAndamento pra unidades
+     antigas que ainda não têm nenhum). ── */
+  _hcUnidades() {
+    return Object.entries(State.units || {})
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  },
+
+  _hcSetores(unitId) {
+    const raw = (State.unitSetores || {})[unitId] || {};
+    const lista = Object.entries(raw)
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+    // Unidade sem nenhum setor ainda: cria "Própria Unidade" com chave fixa ('padrao'),
+    // não com push (chave aleatória) — um set() na mesma chave nunca duplica, mesmo que
+    // Home (casca) e Financeiro (iframe à parte, com seu próprio guard em memória) tentem
+    // semear o mesmo instante quase junto: os dois só escrevem a mesma chave, sem duplicar.
+    if (!lista.length && unitId && State.units?.[unitId] && !App._hcSetorSeedEmAndamento.has(unitId)) {
+      App._hcSetorSeedEmAndamento.add(unitId);
+      Promise.resolve(DB.set(`unitSetores/${unitId}/padrao`, 'Própria Unidade'))
+        .then(() => App._hcSetorSeedEmAndamento.delete(unitId), () => App._hcSetorSeedEmAndamento.delete(unitId));
+    }
+    return lista;
+  },
+
+  hcAbrirUnidade(id) { App._hcUnidadeSel = id; App.renderHomeConfig(); },
+
+  hcAddUnidade() {
+    const inp = document.getElementById('hc-nova-unidade');
+    const nome = (inp?.value || '').trim();
+    if (!nome) { toast('Informe o nome da unidade.', 'error'); return; }
+    if (App._hcUnidades().some(u => u.nome.toLowerCase() === nome.toLowerCase())) { toast('Já existe uma unidade com esse nome.', 'error'); return; }
+    // Só cria a unidade aqui — o setor "Própria Unidade" nasce sozinho pelo
+    // seed preguiçoso de _hcSetores() no próximo render (evita duas escritas
+    // paralelas de setor criando "Própria Unidade" em duplicidade).
+    DB.push('units', nome).then(() => {
+      if (inp) inp.value = '';
+      toast('✓ Unidade cadastrada.');
+      App._logActivity?.('Home', 'Unidade cadastrada', nome);
+      App.renderHomeConfig();
+    }).catch(() => toast('Erro ao salvar.', 'error'));
+  },
+
+  hcRenUnidade(id) {
+    const u = App._hcUnidades().find(x => x.id === id); if (!u) return;
+    const novo = prompt('Renomear unidade para:', u.nome);
+    if (novo === null) return;
+    const nome = novo.trim();
+    if (!nome || nome === u.nome) return;
+    DB.set(`units/${id}`, nome).then(() => {
+      toast('✓ Unidade renomeada.');
+      App._logActivity?.('Home', 'Unidade renomeada', `${u.nome} → ${nome}`);
+      App.renderHomeConfig();
+    }).catch(() => toast('Erro ao renomear.', 'error'));
+  },
+
+  hcDelUnidade(id) {
+    const u = App._hcUnidades().find(x => x.id === id); if (!u) return;
+    if (!confirm(`Apagar a unidade "${u.nome}"?\nOs setores cadastrados dela também serão removidos.`)) return;
+    Promise.all([DB.remove(`units/${id}`), DB.remove(`unitSetores/${id}`)]).then(() => {
+      if (App._hcUnidadeSel === id) App._hcUnidadeSel = null;
+      toast('Unidade apagada.');
+      App._logActivity?.('Home', 'Unidade apagada', u.nome);
+      App.renderHomeConfig();
+    }).catch(() => toast('Erro ao apagar.', 'error'));
+  },
+
+  hcAddSetor() {
+    const u = App._hcUnidades().find(x => x.id === App._hcUnidadeSel); if (!u) return;
+    const inp = document.getElementById('hc-novo-setor');
+    const nome = (inp?.value || '').trim();
+    if (!nome) { toast('Informe o nome do setor.', 'error'); return; }
+    if (App._hcSetores(u.id).some(s => s.nome.toLowerCase() === nome.toLowerCase())) { toast('Esse setor já existe nessa unidade.', 'error'); return; }
+    DB.push(`unitSetores/${u.id}`, nome).then(() => {
+      if (inp) inp.value = '';
+      toast('✓ Setor cadastrado.');
+      App._logActivity?.('Home', 'Setor cadastrado', `${u.nome} › ${nome}`);
+    }).catch(() => toast('Erro ao salvar.', 'error'));
+  },
+
+  hcRenSetor(unitId, setorId) {
+    const u = App._hcUnidades().find(x => x.id === unitId); if (!u) return;
+    const s = App._hcSetores(unitId).find(x => x.id === setorId); if (!s) return;
+    const novo = prompt('Renomear setor para:', s.nome);
+    if (novo === null) return;
+    const nome = novo.trim();
+    if (!nome || nome === s.nome) return;
+    DB.set(`unitSetores/${unitId}/${setorId}`, nome).then(() => {
+      toast('✓ Setor renomeado.');
+      App._logActivity?.('Home', 'Setor renomeado', `${u.nome}: ${s.nome} → ${nome}`);
+    }).catch(() => toast('Erro ao renomear.', 'error'));
+  },
+
+  hcDelSetor(unitId, setorId) {
+    const u = App._hcUnidades().find(x => x.id === unitId); if (!u) return;
+    const setores = App._hcSetores(unitId);
+    const s = setores.find(x => x.id === setorId); if (!s) return;
+    if (setores.length <= 1) { toast('A unidade precisa ter ao menos um setor.', 'error'); return; }
+    if (!confirm(`Apagar o setor "${s.nome}"?\nSolicitações antigas que usaram esse setor mantêm o nome salvo, só some da lista de opções.`)) return;
+    DB.remove(`unitSetores/${unitId}/${setorId}`).then(() => {
+      toast('Setor apagado.');
+      App._logActivity?.('Home', 'Setor apagado', `${u.nome} › ${s.nome}`);
     }).catch(() => toast('Erro ao apagar.', 'error'));
   },
 
