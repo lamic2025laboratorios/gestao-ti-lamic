@@ -2219,11 +2219,8 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   display: flex; align-items: center; gap: 10px;
 }
 @keyframes toastIn { from { opacity:0; transform: translateY(12px) scale(.96); } to { opacity:1; transform: none; } }
-.toast::before { content: '●'; font-size: .6rem; }
 .toast.success { border-color: rgba(29,184,122,.4); }
-.toast.success::before { color: var(--green); }
 .toast.error { border-color: rgba(217,64,64,.4); }
-.toast.error::before { color: var(--red); }
 
 /* ══ RESPONSIVE ══ */
 @media (max-width: 900px) {
