@@ -756,7 +756,7 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 }
 
 /* ── Gastos por Grupo de Produto (fluxo de caixa horizontal) ── */
-.groupspend-card { width: 100%; height: 300px; box-sizing: border-box; display: flex; flex-direction: column; }
+.groupspend-card { width: 100%; height: 220px; box-sizing: border-box; display: flex; flex-direction: column; }
 .groupspend-card canvas { flex: 1; min-height: 0; }
 
 /* ── DASHBOARD GRID ── */
@@ -3272,11 +3272,14 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   grid-template-columns: repeat(3, 1fr) !important;
   gap: 14px !important;
   min-width: 0 !important;
-  align-items: start !important; /* cada card no tamanho do próprio conteúdo */
+  align-items: stretch !important; /* os 3 cards esticam pro tamanho do mais alto
+                                       (Sub-opções, que tem o botão "Ver todas" a mais) */
 }
 .charts-trio .chart-card { min-width: 0 !important; overflow: hidden !important; }
-/* Por Unidade, Grupo e Sub-opções: os 3 do mesmo tamanho (.charts-trio canvas,
-   acima, já define 220px pros três — nada de override por id aqui). */
+/* Por Unidade, Grupo e Sub-opções: os 3 do mesmo tamanho — canvas nos 3 em
+   220px (.charts-trio canvas acima) + align-items:stretch fazendo o card
+   inteiro (não só o gráfico) bater igual mesmo com o botão extra do
+   Sub-opções. */
 
 /* Gráfico de gastos: coluna esquerda linha 2 — estica p/ preencher o vão */
 .spending-card {
@@ -3362,7 +3365,7 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
    vez de rolar por dentro — o card ficava enorme, bem diferente do
    vizinho (Compras Parceladas, que é um gráfico pequeno e fixo). */
 .mgmt-card-log {
-  width: 100%; height: 300px;
+  width: 100%; height: 400px; /* +100px a pedido */
   box-sizing: border-box; overflow: hidden;
 }
 .mgmt-card-log #activity-log-feed {
