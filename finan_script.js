@@ -2994,6 +2994,21 @@ const App = {
     return fallback[i % fallback.length];
   },
 
+  // Nome padrão (Title Case) de uma cor de tinta — solicitações feitas em
+  // épocas diferentes (ou com a sub-opção reconfigurada) podem ter salvo
+  // "azul" numa e "Azul" noutra; sem isso viram 2 baldes diferentes no
+  // gráfico "Por cor". Nome fora do padrão conhecido (Preta/Azul/Amarela/
+  // Vermelha) mantém como veio, sem inventar nada.
+  _inkCanonColor(name) {
+    const n = (name || '').trim();
+    const low = n.toLowerCase();
+    if (low.startsWith('preta'))    return 'Preta';
+    if (low.startsWith('azul'))     return 'Azul';
+    if (low.startsWith('amarela'))  return 'Amarela';
+    if (low.startsWith('vermelha')) return 'Vermelha';
+    return n;
+  },
+
   // Calcula tudo que os cards de consumo mostram (extraído do render pra poder
   // ser reusado também no popup de auditoria — mesmos números nos dois lugares,
   // sem duplicar a lógica). Não muda nenhuma conta, só separa cálculo de DOM.
@@ -3046,8 +3061,12 @@ const App = {
           return;
         }
       }
-      const key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || r.equipamento || r.subgrupo || '').toString();
+      let key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || r.equipamento || r.subgrupo || '').toString();
       if (!key) return;
+      // Normaliza maiúscula/minúscula da cor da tinta — solicitações antigas
+      // (ou sub-opção reconfigurada em outro momento) podem ter guardado
+      // "azul" em vez de "Azul", virando um balde duplicado no gráfico.
+      if (kind === 'ink') key = App._inkCanonColor(key);
       topMap[key] = (topMap[key] || 0) + App._qtyComprada(r);
     });
     let topSorted = Object.entries(topMap).sort((a, b) => b[1] - a[1]);
