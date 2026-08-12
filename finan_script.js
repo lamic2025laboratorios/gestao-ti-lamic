@@ -2341,30 +2341,10 @@ const App = {
     const tag = document.getElementById('audit-trend-tag');
     if (tag) tag.className = `audit-side-tag trend-${s.trend.cls}`;
 
-    // Ranking bonito (reusa o mesmo visual em barras do card, só que maior)
-    const bd = document.getElementById('audit-breakdown');
-    if (bd) {
-      if (!s.topSorted.length) {
-        bd.innerHTML = `<div class="consumo-bd-empty">Nenhuma compra no período</div>`;
-      } else {
-        const shown = s.topSorted.slice(0, 8);
-        const total = s.topSorted.reduce((sum, [, n]) => sum + n, 0) || 1;
-        const palette = ['#d9a520', '#2a68d4', '#1db87a', '#e8830a', '#7c52d4', '#d94040'];
-        bd.innerHTML = `<div class="consumo-bd-title">${cfg.breakdownTitle}</div>` +
-          shown.map(([name, n], i) => {
-            const pct = Math.round(n / total * 100);
-            const w = Math.max(pct, 14);
-            const color = kind === 'ink' ? App._inkColor(name, i) : palette[i % palette.length];
-            return `
-            <div class="consumo-bd2-row">
-              <div class="consumo-bd2-label" title="${name}">${name}</div>
-              <div class="consumo-bd2-bar">
-                <div class="consumo-bd2-fill" style="width:${w}%;background:${color}"><span>${n} · ${pct}%</span></div>
-              </div>
-            </div>`;
-          }).join('');
-      }
-    }
+    // Ranking em gráfico de barra horizontal com eixo (igual ao modelo enviado —
+    // linhas de grade e escala embaixo, em vez das barrinhas de CSS do card pequeno).
+    setTxt('audit-bd-title', cfg.breakdownTitle);
+    App._renderAuditBreakdownChart(kind, s.topSorted);
 
     // Caixa azul: % da meta anual configurada que esse material já consumiu
     const metaInfo = App._auditMetaPct(def);
@@ -2430,6 +2410,41 @@ const App = {
   _calcAvgLine(vals) {
     const avg = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
     return vals.map(() => avg);
+  },
+
+  // Ranking (Por cor/modelo/subgrupo) em barra horizontal com eixo — igual ao
+  // modelo enviado (linhas de grade + escala embaixo do gráfico).
+  _renderAuditBreakdownChart(kind, topSorted) {
+    const canvas = document.getElementById('audit-breakdown-chart');
+    const emptyEl = document.getElementById('audit-breakdown-empty');
+    App._destroyChart('audit-breakdown-chart');
+    if (!canvas) return;
+    if (!topSorted.length) {
+      canvas.style.display = 'none';
+      emptyEl?.classList.remove('hidden');
+      return;
+    }
+    canvas.style.display = '';
+    emptyEl?.classList.add('hidden');
+
+    const shown  = topSorted.slice(0, 8);
+    const labels = shown.map(([name]) => name);
+    const vals   = shown.map(([, n]) => n);
+    const palette = ['#d9a520', '#2a68d4', '#1db87a', '#e8830a', '#7c52d4', '#d94040'];
+    const colors = labels.map((name, i) => kind === 'ink' ? App._inkColor(name, i) : palette[i % palette.length]);
+
+    State.charts['audit-breakdown-chart'] = new Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 6, maxBarThickness: 26 }] },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw} un.` } } },
+        scales: {
+          x: { beginAtZero: true, ticks: { color: '#8898b8', font: { size: 10 } }, grid: { color: '#eef2f8' } },
+          y: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } }
+        }
+      }
+    });
   },
 
   _renderAuditChart() {

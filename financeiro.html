@@ -229,6 +229,30 @@
              centralizados e com uma cor só (sem o arco-íris de antes) -->
         <div class="kpi-ring-section">
           <div class="kpi-ring-col">
+            <div class="kpi-card kpi-clickable" onclick="App.showTotalKpi()" title="Clique para ver por unidade">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado ↗</div></div>
+            </div>
+            <div class="kpi-card kpi-clickable" onclick="App.showKpiList('Comprado')" title="Clique para ver pedidos comprados">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><polyline points="20 12 20 22 4 22 4 12" stroke="currentColor" stroke-width="2"/><rect x="2" y="7" width="20" height="5" stroke="currentColor" stroke-width="2"/><path d="M12 22V7" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados ↗</div></div>
+            </div>
+            <div class="kpi-card kpi-clickable" onclick="App.showKpiList('Negado')" title="Clique para ver pedidos negados">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados ↗</div></div>
+            </div>
+          </div>
+
+          <!-- Só a rosca — sem título, sem índice/legenda embaixo -->
+          <div class="kpi-ring-center status-big-card">
+            <canvas id="chart-status" height="220" style="max-height:220px"></canvas>
+            <!-- title do status-card fica escondido; a lógica que escreve nele (filtro
+                 ativo) continua rodando, só não aparece mais na tela -->
+            <span id="status-card-title" class="hidden"></span>
+            <div id="status-legend" class="status-legend-list hidden"></div>
+          </div>
+
+          <div class="kpi-ring-col">
             <!-- Só informativo: atendidos com item já em estoque, sem compra nova -->
             <div class="kpi-card" title="Pedidos atendidos com item já em estoque — não geram compra nem entram no Gasto do Período">
               <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg></div>
@@ -245,30 +269,6 @@
                 <div class="kpi-val" id="kpi-month-spent">R$ 0</div>
                 <div class="kpi-lbl">Gasto do Período <span id="kpi-period-sub" class="kpi-period-sub-hidden"></span></div>
               </div>
-            </div>
-          </div>
-
-          <!-- Só a rosca — sem título, sem índice/legenda embaixo -->
-          <div class="kpi-ring-center status-big-card">
-            <canvas id="chart-status" height="220" style="max-height:220px"></canvas>
-            <!-- title do status-card fica escondido; a lógica que escreve nele (filtro
-                 ativo) continua rodando, só não aparece mais na tela -->
-            <span id="status-card-title" class="hidden"></span>
-            <div id="status-legend" class="status-legend-list hidden"></div>
-          </div>
-
-          <div class="kpi-ring-col">
-            <div class="kpi-card kpi-clickable" onclick="App.showTotalKpi()" title="Clique para ver por unidade">
-              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg></div>
-              <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado ↗</div></div>
-            </div>
-            <div class="kpi-card kpi-clickable" onclick="App.showKpiList('Comprado')" title="Clique para ver pedidos comprados">
-              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><polyline points="20 12 20 22 4 22 4 12" stroke="currentColor" stroke-width="2"/><rect x="2" y="7" width="20" height="5" stroke="currentColor" stroke-width="2"/><path d="M12 22V7" stroke="currentColor" stroke-width="2"/></svg></div>
-              <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados ↗</div></div>
-            </div>
-            <div class="kpi-card kpi-clickable" onclick="App.showKpiList('Negado')" title="Clique para ver pedidos negados">
-              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2"/></svg></div>
-              <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados ↗</div></div>
             </div>
           </div>
         </div>
@@ -890,7 +890,11 @@
                     <div class="audit-stat"><span id="audit-unit-lbl">Unidade que mais comprou</span><strong id="audit-top-unit">—</strong></div>
                     <div class="audit-stat"><span id="audit-sol-lbl">Maior solicitante</span><strong id="audit-top-sol">—</strong></div>
                   </div>
-                  <div class="audit-bd" id="audit-breakdown"></div>
+                  <div class="audit-bd">
+                    <div class="consumo-bd-title" id="audit-bd-title">Por item</div>
+                    <canvas id="audit-breakdown-chart"></canvas>
+                    <div class="consumo-bd-empty hidden" id="audit-breakdown-empty">Nenhuma compra no período</div>
+                  </div>
                 </div>
               </div>
 

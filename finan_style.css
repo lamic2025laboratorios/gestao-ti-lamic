@@ -1332,7 +1332,10 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 
 /* ── Popup de Auditoria (cards de consumo) ── */
 .audit-modal-header {
-  background: linear-gradient(90deg, #1a3050 0%, #254870 100%);
+  /* Azul vivo (igual ao modelo enviado) — diferente do navy escuro usado
+     nos outros cabeçalhos de card (.cfg-card-head): esse popup é uma tela
+     à parte, "estilo auditoria", pedida com essa cor específica. */
+  background: linear-gradient(90deg, #2f6fed 0%, #1d4ed8 100%);
   border-radius: var(--r-xl) var(--r-xl) 0 0;
   border-bottom: none;
 }
@@ -1385,7 +1388,8 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 }
 .audit-stat span { font-size: .7rem; font-weight: 700; color: #8898b8; text-transform: uppercase; letter-spacing: .03em; }
 .audit-stat strong { font-size: .92rem; font-weight: 700; color: #1a3050; }
-.audit-bd { background: var(--surf-1, #f7f9fd); border: 1px solid var(--surf-border-soft); border-radius: var(--r-md); padding: 14px 16px; }
+.audit-bd { background: var(--surf-1, #f7f9fd); border: 1px solid var(--surf-border-soft); border-radius: var(--r-md); padding: 14px 16px; flex: 1; display: flex; flex-direction: column; min-height: 260px; }
+.audit-bd canvas { flex: 1; min-height: 220px; }
 
 .audit-chart-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--surf-border-soft); }
 .audit-chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
