@@ -1406,12 +1406,24 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 }
 .audit-stat span { font-size: .7rem; font-weight: 700; color: #8898b8; text-transform: uppercase; letter-spacing: .03em; }
 .audit-stat strong { font-size: .92rem; font-weight: 700; color: #1a3050; }
-.audit-bd { background: var(--surf-1, #f7f9fd); border: 1px solid var(--surf-border-soft); border-radius: var(--r-md); padding: 14px 16px; flex: 1; display: flex; flex-direction: column; min-height: 260px; }
-.audit-bd canvas { flex: 1; min-height: 220px; }
+/* Altura FIXA (não flex:1/min-height) de propósito: Chart.js com
+   maintainAspectRatio:false mede o tamanho do pai do canvas pra se ajustar —
+   se esse pai também estica por flex (sem nenhum ponto fixo na cadeia), vira
+   um loop: canvas cresce → pai cresce → canvas mede o pai maior → cresce nele
+   de novo, sem parar ("gráfico infinito"). Por isso .audit-bd tem altura em
+   px certa, e o canvas fica dentro de um wrap com position:relative (o jeito
+   recomendado pelo Chart.js) que HERDA uma altura já resolvida, não circular. */
+.audit-bd { background: var(--surf-1, #f7f9fd); border: 1px solid var(--surf-border-soft); border-radius: var(--r-md); padding: 14px 16px; display: flex; flex-direction: column; height: 300px; box-sizing: border-box; }
+.audit-bd-chart-wrap { position: relative; flex: 1; min-height: 0; }
+.audit-bd-chart-wrap canvas { position: absolute; inset: 0; }
 
 .audit-chart-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--surf-border-soft); }
 .audit-chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
 .audit-chart-head > span { font-size: .92rem; font-weight: 800; color: #1a3050; }
+/* Mesmo cuidado aqui: wrap com altura fixa + position:relative, não o canvas
+   direto solto num bloco cujo tamanho também depende do próprio conteúdo. */
+.audit-chart-canvas-wrap { position: relative; height: 230px; }
+.audit-chart-canvas-wrap canvas { position: absolute; inset: 0; }
 
 /* ══ ESTOQUE ══════════════════════════════════ */
 .estoque-form-box {
