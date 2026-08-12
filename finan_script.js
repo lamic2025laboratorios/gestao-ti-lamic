@@ -4104,6 +4104,11 @@ const App = {
       data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 6, maxBarThickness: 40 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
+        // mode:'index'+intersect:false: passa o mouse em qualquer ponto da
+        // coluna daquele grupo já mostra o tooltip — sem isso, grupo com
+        // barra bem baixa (Pilhas/Conserto, gasto pequeno perto de Tinta/
+        // Outros) exige acertar o mouse bem em cima da pontinha da barra.
+        interaction: { mode: 'index', intersect: false },
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmt(c.raw) } } },
         scales: {
           x: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } },
