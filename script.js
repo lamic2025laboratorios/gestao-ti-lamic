@@ -79,7 +79,15 @@ const App = {
     // assim o boot dele já encontra login/unidade certos no localStorage,
     // em vez de rodar cedo demais com dado de sessão anterior.
     const iframe = painel?.querySelector('iframe[data-src]');
-    if (iframe) { iframe.src = iframe.dataset.src; iframe.removeAttribute('data-src'); }
+    if (iframe) {
+      iframe.src = iframe.dataset.src; iframe.removeAttribute('data-src');
+    } else {
+      // Já tinha carregado antes: a sidebar só troca visibilidade, o iframe
+      // continua vivo com o que a pessoa deixou aberto lá dentro. Força o
+      // módulo a reabrir sempre no Dashboard dele, mesmo saindo há pouco.
+      const iframeVivo = painel?.querySelector('iframe');
+      if (iframeVivo) App._forcarDashboardModulo(alvo, iframeVivo);
+    }
 
     // Cada seção monta o próprio conteúdo. Isolado: erro numa não
     // pode deixar as outras em branco.
@@ -99,8 +107,23 @@ const App = {
   voltarAoMenu() {
     const layout = document.querySelector('.admin-layout');
     layout?.classList.remove('hide-master-sidebar');
-    const btn = document.querySelector('.nav-item[data-tab="tab-unilamic"]');
+    const btn = document.querySelector('.nav-item[data-tab="tab-home-dashboard"]');
     if (btn) App.abrirSecao(btn);
+  },
+
+  // Financeiro/Inventário rodam em iframe que só carrega uma vez (a sidebar
+  // só troca visibilidade depois disso). Sem isso, reabrir o módulo mostra
+  // a última aba interna que a pessoa deixou aberta, em vez do Dashboard.
+  _forcarDashboardModulo(alvo, iframeEl) {
+    try {
+      const w = iframeEl.contentWindow; if (!w || !w.document) return;
+      if (alvo === 'tab-financeiro' && w.App && typeof w.App.adminTab === 'function') {
+        const btnDash = w.document.querySelector('.nav-item[data-tab="tab-dashboard"]');
+        if (btnDash) w.App.adminTab(btnDash);
+      } else if (alvo === 'tab-inventario' && typeof w.showUnitsView === 'function') {
+        w.showUnitsView();
+      }
+    } catch (e) { console.error('[_forcarDashboardModulo] ' + alvo, e); }
   },
 
   toggleSidebar() {
@@ -271,8 +294,8 @@ const App = {
     LS.save('adminUser', user);
     App._pintarConta(user);
     App.goTo('screen-admin');
-    // Entra sempre pelo UniLAMIC TI
-    const btn = document.querySelector('.nav-item[data-tab="tab-unilamic"]');
+    // Entra sempre pelo Dashboard
+    const btn = document.querySelector('.nav-item[data-tab="tab-home-dashboard"]');
     if (btn) App.abrirSecao(btn);
     App.resetIdle();
   },
@@ -371,13 +394,13 @@ const App = {
   /* ══ ARRANQUE ══ */
   init() {
     // Sessão salva: entra direto no painel — o menu principal é sempre
-    // o UniLAMIC TI (nunca a última seção aberta antes de sair)
+    // o Dashboard (nunca a última seção aberta antes de sair)
     const user = LS.load('adminUser');
     if (user) {
       State.adminUser = user;
       App._pintarConta(user);
       App.goTo('screen-admin');
-      const btn = document.querySelector('.nav-item[data-tab="tab-unilamic"]');
+      const btn = document.querySelector('.nav-item[data-tab="tab-home-dashboard"]');
       if (btn) App.abrirSecao(btn);
       App.startIdleWatch();
       App.resetIdle();
@@ -390,8 +413,8 @@ const App = {
       if (!e.target.closest('.sidebar-account')) App.closeUserMenu();
     });
 
-    // ESC em cascata: passo 1 fecha o pop-up aberto; passo 2 sai da guia atual (volta pra UniLAMIC TI);
-    // passo 3, sem pop-up nem guia aberta, garante que está na UniLAMIC TI (menu principal)
+    // ESC em cascata: passo 1 fecha o pop-up aberto; passo 2 sai da guia atual (volta pro Dashboard);
+    // passo 3, sem pop-up nem guia aberta, garante que está no Dashboard (menu principal)
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;
 
@@ -410,8 +433,8 @@ const App = {
       if (antes !== depois) return;              // a seção tratou o ESC
       if (document.querySelector('.modal-overlay:not(.hidden)')) return;
 
-      // Sem pop-up nem guia aberta: volta para a UniLAMIC TI
-      if (antes && antes !== 'tab-unilamic') App.voltarAoMenu();
+      // Sem pop-up nem guia aberta: volta para o Dashboard
+      if (antes && antes !== 'tab-home-dashboard') App.voltarAoMenu();
     });
   },
 

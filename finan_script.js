@@ -216,7 +216,6 @@ const App = {
       App.goTo('screen-admin');
       App.renderAdminPanels();
       // Este módulo é o portal financeiro: entra direto no Dashboard
-      LS.save('adminTab', 'tab-dashboard');
       const dashBtn = document.querySelector('.nav-item[data-tab="tab-dashboard"]');
       if (dashBtn) App.adminTab(dashBtn);
       App.resetIdle();
@@ -269,13 +268,10 @@ const App = {
       document.addEventListener(ev, App.resetIdle, { passive: true }));
   },
 
-  /* ── Restaura a última seção aberta (F5 não volta ao Dashboard) ── */
+  /* ── Sempre entra pelo Dashboard — inclusive no F5, mesmo saindo de outra aba
+     há pouco. (Antes restaurava a última aba salva; a pedido, não restaura mais.) ── */
   _restoreAdminTab() {
-    const saved = LS.load('adminTab');
-    // Só as abas deste módulo valem aqui; qualquer outra cai no Dashboard
-    let btn = (saved && App.ABAS_FINANCEIRO.includes(saved))
-      ? document.querySelector(`.nav-item[data-tab="${saved}"]`) : null;
-    if (!btn) btn = document.querySelector('.nav-item[data-tab="tab-dashboard"]');
+    const btn = document.querySelector('.nav-item[data-tab="tab-dashboard"]');
     if (btn) App.adminTab(btn);
   },
 
@@ -1546,7 +1542,6 @@ const App = {
 
     const targetTab = btn.dataset.tab;
     document.getElementById(targetTab).classList.add('active');
-    LS.save('adminTab', targetTab);   // lembra a seção p/ sobreviver ao F5
 
     if (btn.dataset.tab === 'tab-dashboard') App.renderDashboard();
     if (btn.dataset.tab === 'tab-requests')  App.renderRequests();
