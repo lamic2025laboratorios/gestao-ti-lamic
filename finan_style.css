@@ -765,8 +765,12 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 }
 
 /* ── Gastos por Grupo de Produto (fluxo de caixa horizontal) ── */
-.groupspend-card { width: 100%; height: 220px; box-sizing: border-box; display: flex; flex-direction: column; }
+.groupspend-card { width: 100%; height: 300px; box-sizing: border-box; display: flex; flex-direction: column; }
 .groupspend-card canvas { flex: 1; min-height: 0; }
+/* Compras Parceladas (vizinho na mesma linha do .dash-mgmt-grid) sincronizado
+   na mesma altura — sem isso ele ficava do tamanho do próprio conteúdo,
+   desproporcional ao Gastos por Grupo, que tem altura fixa. */
+.dash-mgmt-grid .parcelas-card { height: 300px; box-sizing: border-box; }
 
 /* ── Faixa de cor lateral pra identificar cada card de relance (a pedido) ── */
 .spending-card     { border-left: 4px solid #0d7a4a; }  /* Gastos por Mês — verde escuro */
