@@ -366,20 +366,30 @@
             =================================================== -->
             <section id="config" class="section">
                 <div class="config-wrap">
-                    <div class="chart-card">
-                        <div class="chart-title"><span>Backup dos Dados</span></div>
-                        <p class="config-desc">Baixe um arquivo de backup com todos os dados (CC, IA e as planilhas base salvas). Guarde-o em local seguro — se algo for perdido, é só restaurar.</p>
-                        <div class="config-actions">
-                            <button class="btn-primary" onclick="baixarBackup()">⬇ Baixar backup (.json)</button>
-                            <button class="btn-secondary" onclick="document.getElementById('restore-backup-file').click()">⬆ Restaurar backup</button>
-                            <input type="file" id="restore-backup-file" accept=".json" style="display:none;" onchange="restaurarBackup(event)">
+                    <div class="rel-cfg-card">
+                        <div class="rel-cfg-card-head">
+                            <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="5" rx="9" ry="3" stroke="currentColor" stroke-width="2"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" stroke="currentColor" stroke-width="2"/></svg>
+                            <h3>Backup dos Dados</h3>
                         </div>
-                        <p class="config-warn">⚠ Restaurar SUBSTITUI os dados atuais (CC e IA) pelos do arquivo.</p>
+                        <div class="rel-cfg-card-body">
+                            <p class="config-desc">Baixe um arquivo de backup com todos os dados (CC, IA e as planilhas base salvas). Guarde-o em local seguro — se algo for perdido, é só restaurar.</p>
+                            <div class="config-actions">
+                                <button class="btn-primary" onclick="baixarBackup()">⬇ Baixar backup (.json)</button>
+                                <button class="btn-secondary" onclick="document.getElementById('restore-backup-file').click()">⬆ Restaurar backup</button>
+                                <input type="file" id="restore-backup-file" accept=".json" style="display:none;" onchange="restaurarBackup(event)">
+                            </div>
+                            <p class="config-warn">⚠ Restaurar SUBSTITUI os dados atuais (CC e IA) pelos do arquivo.</p>
+                        </div>
                     </div>
 
-                    <div class="chart-card">
-                        <div class="chart-title"><span>Planilha Base (CC)</span></div>
-                        <p class="config-desc">A planilha importada fica guardada no Firebase. Quando o painel ganhar métricas novas, use "Reprocessar base" na aba <strong>Inserir Dados</strong> — recalcula tudo sem re-anexar o arquivo.</p>
+                    <div class="rel-cfg-card">
+                        <div class="rel-cfg-card-head">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18" stroke="currentColor" stroke-width="2"/></svg>
+                            <h3>Planilha Base (CC)</h3>
+                        </div>
+                        <div class="rel-cfg-card-body">
+                            <p class="config-desc">A planilha importada fica guardada no Firebase. Quando o painel ganhar métricas novas, use "Reprocessar base" na aba <strong>Inserir Dados</strong> — recalcula tudo sem re-anexar o arquivo.</p>
+                        </div>
                     </div>
                 </div>
             </section>

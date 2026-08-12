@@ -2599,7 +2599,10 @@ main.main-expanded {
   justify-content: space-between;
   gap: 10px;
   padding: .875rem 1.25rem;
-  background: linear-gradient(90deg, var(--navy) 0%, var(--navy-mid) 100%);
+  /* Mesma cor do cabeçalho das Configurações do Financeiro/Home (.cfg-card-head) —
+     hex fixo em vez de var(--navy)/var(--navy-mid) pra não puxar o resto do tema
+     do Inventário, que usa um navy um pouco mais escuro nesses tokens. */
+  background: linear-gradient(90deg, #1a3050 0%, #254870 100%);
 }
 .config-section-header h4 { flex: 1; }
 .config-section-header i { font-size: 1.1rem; color: rgba(255,255,255,.8); }

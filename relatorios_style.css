@@ -474,6 +474,29 @@ body {
 .config-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .config-warn { font-size: 0.78rem; color: var(--amber, #b45309); margin-top: 12px; font-weight: 600; }
 
+/* Cartão de Configuração com cabeçalho em degradê — mesma cor do cabeçalho
+   das Configurações do Financeiro/Home/Inventário (hex fixo pra bater igual
+   em todos os módulos, cada um com sua própria paleta de base). */
+.rel-cfg-card {
+    background: var(--white);
+    border-radius: var(--r);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.2s;
+}
+.rel-cfg-card:hover { box-shadow: var(--shadow-m); }
+.rel-cfg-card-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: .875rem 1.25rem;
+    background: linear-gradient(90deg, #1a3050 0%, #254870 100%);
+}
+.rel-cfg-card-head svg { width: 18px; height: 18px; color: rgba(255,255,255,.85); flex-shrink: 0; }
+.rel-cfg-card-head h3 { margin: 0; font-size: 1rem; font-weight: 700; color: #fff; flex: 1; }
+.rel-cfg-card-body { padding: 1.25rem; }
+.rel-cfg-card-body .config-desc { margin-top: 0; }
+
 .chart-title {
     font-size: 0.73rem;
     font-weight: 700;
