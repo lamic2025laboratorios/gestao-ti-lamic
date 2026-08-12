@@ -3697,9 +3697,18 @@ const App = {
   },
 
   // Cor "termômetro": ratio 1 (mais pedido) → quente (vermelho/laranja); ratio 0 → frio (azul)
+  // (usada no ranking/popup "Ver todas as sub-opções" — não no gráfico de pizza)
   _heatColor(ratio) {
     const hue = Math.round(212 - Math.max(0, Math.min(1, ratio)) * 212); // 212=azul … 0=vermelho
     return `hsl(${hue}, 82%, 52%)`;
+  },
+
+  // N cores discretas e mais sóbrias (mesmo espaçamento por ângulo áureo de
+  // _distinctColors, só que com menos saturação/brilho) — usada no gráfico de
+  // pizza de Sub-opções, que pedia um visual menos vibrante/mais "padrão".
+  _mutedColors(n) {
+    return Array.from({ length: Math.max(1, n) }, (_, i) =>
+      `hsl(${Math.round((i * 137.508) % 360)}, 28%, 56%)`);
   },
 
   // Gastos por Grupo de Produto — barra horizontal (estilo fluxo de caixa).
@@ -3755,13 +3764,13 @@ const App = {
 
     State.charts['chart-groupspend'] = new Chart(canvas, {
       type: 'bar',
-      data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 6, maxBarThickness: 26 }] },
+      data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 6, maxBarThickness: 40 }] },
       options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmt(c.raw) } } },
         scales: {
-          x: { beginAtZero: true, ticks: { color: '#6680a0', font: { size: 10 }, callback: v => 'R$ ' + Number(v).toLocaleString('pt-BR') }, grid: { color: '#eef2f8' } },
-          y: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } }
+          x: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: '#6680a0', font: { size: 10 }, callback: v => 'R$ ' + Number(v).toLocaleString('pt-BR') }, grid: { color: '#eef2f8' } }
         }
       }
     });
@@ -3789,7 +3798,6 @@ const App = {
     }
     canvas.style.display = '';
 
-    const max = entries[0][1] || 1;
     const TOP = 8;
     const visiveis = entries.slice(0, TOP);
     const resto = entries.slice(TOP);
@@ -3797,13 +3805,13 @@ const App = {
 
     const labels = visiveis.map(([name]) => name);
     const vals   = visiveis.map(([, v]) => v);
-    const cores  = vals.map(v => App._heatColor(v / max));
+    const cores  = App._mutedColors(labels.length);
     // "Outros" agrupa o que passou do TOP 8, pra fatia da pizza não mentir
     // proporção (sem isso os 8 primeiros pareceriam 100% do total).
     const temResto = restoTotal > 0;
     const pieLabels = temResto ? [...labels, 'Outros'] : labels;
     const pieVals   = temResto ? [...vals, restoTotal]  : vals;
-    const pieCores  = temResto ? [...cores, '#c7d2e0']  : cores;
+    const pieCores  = temResto ? [...cores, '#b8c2d1']  : cores;
 
     State.charts['chart-subopts'] = new Chart(canvas, {
       type: 'pie',
@@ -4034,11 +4042,24 @@ const App = {
 
     const fmtR = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+    // Modelo em linha mesmo (voltou do formato em colunas) — gradiente suave
+    // no preenchimento, igual era antes das Tendência/Média entrarem.
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.clientHeight || 260);
+    gradient.addColorStop(0, color + '3d');
+    gradient.addColorStop(1, color + '00');
+
     State.charts[id] = new Chart(canvas, {
       data: {
         labels: sorted,
         datasets: [
-          { type: 'bar', label: 'Gastos', data: vals, backgroundColor: color + 'cc', borderColor: color, borderWidth: 1.5, borderRadius: 6, order: 3 },
+          {
+            type: 'line', label: 'Gastos', data: vals,
+            borderColor: color, backgroundColor: gradient,
+            borderWidth: 2.5, tension: 0.45, fill: true, cubicInterpolationMode: 'monotone',
+            pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 2,
+            pointRadius: 3.5, pointHoverRadius: 6, order: 3
+          },
           { type: 'line', label: 'Tendência', data: trendLine, borderColor: '#e8830a', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0, order: 1 },
           { type: 'line', label: 'Média', data: mediaLine, borderColor: '#7c52d4', borderWidth: 2, borderDash: [2, 3], pointRadius: 0, fill: false, tension: 0, order: 2 }
         ]

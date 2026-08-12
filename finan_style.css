@@ -737,8 +737,18 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 }
 .kpi-ring-col { display: flex; flex-direction: column; gap: 16px; justify-content: center; }
 .kpi-ring-col .kpi-card { flex: 1 1 auto; }
-.kpi-ring-center { display: flex; flex-direction: column; }
-.kpi-ring-center canvas { max-height: 190px !important; }
+/* Cor única (sem arco-íris) pra ficar mais sóbrio/profissional — navy suave,
+   mesmo tom do resto do sistema, em vez de um k-* diferente por card. */
+.kpi-ring-col .kpi-card {
+  background: linear-gradient(135deg, #eef3fb, #f7f9fd);
+  border-color: var(--surf-border, #dde5f2);
+}
+.kpi-ring-col .kpi-icon svg { color: var(--blue-500, #1a5bbf); }
+.kpi-ring-center {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.kpi-ring-center canvas { max-height: 210px !important; }
 @media (max-width: 1100px) {
   .kpi-ring-section { grid-template-columns: 1fr; }
   .kpi-ring-col { flex-direction: row; flex-wrap: wrap; }
@@ -776,7 +786,7 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   gap: 14px;
 }
 .charts-trio .chart-card { padding: 16px; }
-.charts-trio canvas { max-height: 150px !important; }
+.charts-trio canvas { max-height: 220px !important; }
 
 /* Card Sub-opções — estilo temperatura (barras de calor ranqueadas) */
 .subopts-heat {
@@ -3262,14 +3272,11 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   grid-template-columns: repeat(3, 1fr) !important;
   gap: 14px !important;
   min-width: 0 !important;
-  align-items: start !important; /* cada card no tamanho do próprio conteúdo — Por Unidade
-                                     pode crescer sem esticar Grupo/Sub-opções junto */
+  align-items: start !important; /* cada card no tamanho do próprio conteúdo */
 }
 .charts-trio .chart-card { min-width: 0 !important; overflow: hidden !important; }
-/* Por Unidade: card um pouco maior pra caber todas as unidades sem espremer.
-   Grupo continua exatamente como estava; Sub-opções muda de formato (pizza),
-   não de tamanho. */
-#chart-units { max-height: 220px !important; }
+/* Por Unidade, Grupo e Sub-opções: os 3 do mesmo tamanho (.charts-trio canvas,
+   acima, já define 220px pros três — nada de override por id aqui). */
 
 /* Gráfico de gastos: coluna esquerda linha 2 — estica p/ preencher o vão */
 .spending-card {
