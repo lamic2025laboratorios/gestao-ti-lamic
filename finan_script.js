@@ -3453,6 +3453,13 @@ const App = {
     const filterDesc = [fUnit||'Todas as unidades', fGroup||'Todos os grupos'].join(' · ') + rangeStr;
     title.textContent = `Total Solicitado — ${filterDesc}`;
 
+    // Este modal é compartilhado com showKpiList('Comprado') — a barra de
+    // filtro interna (calendário + grupo/subgrupo) é só de lá, então some aqui.
+    const toolbarTK = document.getElementById('kpi-list-toolbar');
+    const totalBoxTK = document.getElementById('kpi-list-total-box');
+    if (toolbarTK) toolbarTK.style.display = 'none';
+    if (totalBoxTK) totalBoxTK.style.display = 'none';
+
     if (thead) thead.innerHTML = `<tr><th>Unidade</th><th>Total de Solicitações</th><th>% do Total</th></tr>`;
     tbody.innerHTML = '';
     const grandTotal = reqs.length || 1;
@@ -3682,11 +3689,128 @@ const App = {
     }).join('');
   },
 
+  // Filtro interno do pop-up (calendário + grupo/subgrupo) — só existe pra 'Comprado'.
+  _kpiListStatus: null,
+  _kpiListInternal: { periodo: 'todos', grupo: '', subgrupo: '' },
+
   showKpiList(status) {
+    App._kpiListStatus = status;
+    App._kpiListInternal = { periodo: 'todos', grupo: '', subgrupo: '' };
+    const toolbar = document.getElementById('kpi-list-toolbar');
+    const totalBox = document.getElementById('kpi-list-total-box');
+    const isComprado = status === 'Comprado';
+    if (toolbar)  toolbar.style.display  = isComprado ? '' : 'none';
+    if (totalBox) totalBox.style.display = 'none';
+    if (isComprado) {
+      document.querySelectorAll('.kpi-list-per-btn').forEach(b => b.classList.toggle('active', b.dataset.per === 'todos'));
+      App._showKpiListPicker('todos');
+      App._populateKpiListGrupos();
+      App._populateKpiListSubgrupos('');
+    }
+    App._renderKpiList();
+    document.getElementById('kpi-list-modal').classList.remove('hidden');
+  },
+
+  // Ano/Mês/Dia do filtro interno — mesmo padrão do Extrato, sem a opção Semana (não pedida aqui).
+  _showKpiListPicker(per) {
+    const hoje = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const hojeStr = `${hoje.getFullYear()}-${pad(hoje.getMonth()+1)}-${pad(hoje.getDate())}`;
+    const selAno = document.getElementById('kpi-list-ano-select');
+    const inpMes = document.getElementById('kpi-list-mes-input');
+    const inpDia = document.getElementById('kpi-list-dia-input');
+    [selAno, inpMes, inpDia].forEach(el => { if (el) el.style.display = 'none'; });
+    if (per === 'ano') {
+      App._populateKpiListAnos();
+      if (selAno) { selAno.style.display = ''; if (!selAno.value) selAno.value = String(hoje.getFullYear()); }
+    } else if (per === 'mes') {
+      if (inpMes) { inpMes.style.display = ''; if (!inpMes.value) inpMes.value = hojeStr.substring(0, 7); }
+    } else if (per === 'dia') {
+      if (inpDia) { inpDia.style.display = ''; if (!inpDia.value) inpDia.value = hojeStr; }
+    }
+  },
+
+  _populateKpiListAnos() {
+    const sel = document.getElementById('kpi-list-ano-select'); if (!sel) return;
+    const prevVal = sel.value;
+    const anos = new Set([new Date().getFullYear()]);
+    Object.values(State.requests||{}).forEach(r => { const y=(r.createdAt||'').substring(0,4); if (/^\d{4}$/.test(y)) anos.add(parseInt(y)); });
+    sel.innerHTML = '';
+    [...anos].sort((a,b)=>b-a).forEach(y => { const o=document.createElement('option'); o.value=o.textContent=y; sel.appendChild(o); });
+    if (prevVal && [...anos].map(String).includes(prevVal)) sel.value = prevVal;
+  },
+
+  setKpiListPeriodo(per, btn) {
+    App._kpiListInternal.periodo = per;
+    document.querySelectorAll('.kpi-list-per-btn').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+    App._showKpiListPicker(per);
+    App._renderKpiList();
+  },
+
+  _populateKpiListGrupos() {
+    const sel = document.getElementById('kpi-list-grupo-select'); if (!sel) return;
+    const prevVal = sel.value;
+    sel.innerHTML = '<option value="">Grupo: Todos</option>';
+    Object.values(State.groups||{}).forEach(n => { const o=document.createElement('option'); o.value=o.textContent=n; sel.appendChild(o); });
+    if (prevVal) sel.value = prevVal;
+  },
+
+  _onKpiListGrupoChange() {
+    const gname = document.getElementById('kpi-list-grupo-select')?.value || '';
+    App._kpiListInternal.grupo = gname;
+    App._kpiListInternal.subgrupo = '';
+    App._populateKpiListSubgrupos(gname);
+    App._renderKpiList();
+  },
+
+  // Subgrupo depende do Grupo escolhido (lista cadastrada em State.subgroups[gid],
+  // ex.: Tinta → Originais/Genéricas, Conserto → Impressora...).
+  _populateKpiListSubgrupos(gname) {
+    const sel = document.getElementById('kpi-list-subgrupo-select'); if (!sel) return;
+    sel.innerHTML = '<option value="">Subgrupo: Todos</option>';
+    const gid = Object.entries(State.groups||{}).find(([,n]) => n === gname)?.[0];
+    const list = gid ? (State.subgroups?.[gid] || []) : [];
+    list.forEach(sg => { const o=document.createElement('option'); o.value=o.textContent=sg; sel.appendChild(o); });
+  },
+
+  onKpiListSubgrupoChange() {
+    App._kpiListInternal.subgrupo = document.getElementById('kpi-list-subgrupo-select')?.value || '';
+    App._renderKpiList();
+  },
+
+  // Aplica o filtro interno do pop-up (calendário + grupo/subgrupo) em cima do
+  // que já passou pelo filtro do dashboard (_applyKpiFilters).
+  _applyKpiListInternalFilters(reqs) {
+    const st = App._kpiListInternal || {};
+    return reqs.filter(r => {
+      if (st.grupo && r.groupName !== st.grupo) return false;
+      if (st.subgrupo && r.subgrupo !== st.subgrupo) return false;
+      if (st.periodo && st.periodo !== 'todos') {
+        const ds = (r.createdAt||'').substring(0,10);
+        if (!ds) return false;
+        if (st.periodo === 'ano') {
+          const v = document.getElementById('kpi-list-ano-select')?.value;
+          if (v && ds.substring(0,4) !== v) return false;
+        } else if (st.periodo === 'mes') {
+          const v = document.getElementById('kpi-list-mes-input')?.value;
+          if (v && ds.substring(0,7) !== v) return false;
+        } else if (st.periodo === 'dia') {
+          const v = document.getElementById('kpi-list-dia-input')?.value;
+          if (v && ds !== v) return false;
+        }
+      }
+      return true;
+    });
+  },
+
+  _renderKpiList() {
+    const status = App._kpiListStatus;
     const modal = document.getElementById('kpi-list-modal');
     const title = document.getElementById('kpi-list-title');
     const tbody = document.getElementById('kpi-list-tbody');
     const thead = document.getElementById('kpi-list-thead');
+    const totalBox = document.getElementById('kpi-list-total-box');
     const filters = App._getKpiFilters();
     const { fUnit, fGroup, fFrom, fTo } = filters;
     const fmt = v => v ? 'R$ '+parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
@@ -3695,10 +3819,24 @@ const App = {
       Object.values(State.requests||{}).filter(r=>r.status===status),
       filters
     );
+
+    const isComprado = status === 'Comprado';
+    if (isComprado) reqs = App._applyKpiListInternalFilters(reqs);
+
     reqs.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
 
     const rangeStr = (fFrom||fTo) ? ` · ${App._fmtDate(fFrom)} → ${App._fmtDate(fTo)}` : '';
-    const filterDesc = [fUnit||'Todas as unidades', fGroup||'Todos os grupos'].join(' · ') + rangeStr;
+    let filterDesc = [fUnit||'Todas as unidades', fGroup||'Todos os grupos'].join(' · ') + rangeStr;
+    if (isComprado) {
+      const st = App._kpiListInternal;
+      const extra = [];
+      if (st.grupo) extra.push(st.grupo);
+      if (st.subgrupo) extra.push(st.subgrupo);
+      if (st.periodo === 'ano') { const v = document.getElementById('kpi-list-ano-select')?.value; if (v) extra.push(v); }
+      if (st.periodo === 'mes') { const v = document.getElementById('kpi-list-mes-input')?.value; if (v) { const [y,m]=v.split('-'); extra.push(`${m}/${y}`); } }
+      if (st.periodo === 'dia') { const v = document.getElementById('kpi-list-dia-input')?.value; if (v) extra.push(App._fmtDate(v)); }
+      if (extra.length) filterDesc += ' · ' + extra.join(' · ');
+    }
     title.textContent = `${status} — ${filterDesc} (${reqs.length})`;
 
     tbody.innerHTML = '';
@@ -3749,6 +3887,24 @@ const App = {
         });
       }
     }
+
+    // Caixa azul com o total (qtd + R$) referente ao filtro aplicado — só
+    // aparece quando algum filtro interno (calendário/grupo/subgrupo) está ativo.
+    if (isComprado && totalBox) {
+      const st = App._kpiListInternal;
+      const hasFilter = (st.periodo && st.periodo !== 'todos') || st.grupo || st.subgrupo;
+      if (hasFilter) {
+        const totalQtd = reqs.reduce((s,r) => s + App._qtyComprada(r), 0);
+        const totalVal = reqs.reduce((s,r) => s + (parseFloat(r.valorTotal)||0), 0);
+        totalBox.style.display = '';
+        totalBox.innerHTML = `
+          <div><span class="klt-label">Referente à pesquisa</span><div class="klt-qty">${totalQtd} ite${totalQtd===1?'m':'ns'} comprado${totalQtd===1?'':'s'}</div></div>
+          <div class="klt-val">${fmt(totalVal)}</div>`;
+      } else {
+        totalBox.style.display = 'none';
+      }
+    }
+
     modal.classList.remove('hidden');
   },
 
@@ -3848,7 +4004,7 @@ const App = {
     const topUnit = Object.entries(unitC)[0];
     const topBadge = document.getElementById('chart-units-top');
     if (topBadge && topUnit) topBadge.textContent = `🏆 ${topUnit[0]}`;
-    App._drawBar('chart-units', unitC, App._distinctColors(Object.keys(unitC).length));
+    App._renderUnitsChart(unitC);
 
     // Groups bar — ordenado por mais pedidos, com cor distinta por grupo (não fica limitado a 4 cores)
     // Unifica grafias antigas de Conserto/Concerto num único grupo (App._displayGroupName)
@@ -4084,6 +4240,37 @@ const App = {
       data: { labels, datasets: [{ data: vals, backgroundColor: labels.map((_,i) => colors[i%colors.length]), borderColor: labels.map((_,i) => colors[i%colors.length]), borderWidth: 1.5, borderRadius: 6 }] },
       options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#6680a0', font: { size: 11 } }, grid: { color: '#e2e8f0' } }, y: { ticks: { color: '#6680a0', font: { size: 11 } }, grid: { color: '#e2e8f0' }, beginAtZero: true } } }
     });
+  },
+
+  // "Por Unidade" pagina 3 em 3 (em vez de empilhar todas as unidades de uma
+  // vez) — deixa o gráfico mais enxuto/legível quando tem muita unidade
+  // cadastrada. Cores calculadas em cima da lista INTEIRA (não só da página),
+  // pra cada unidade manter sempre a mesma cor ao navegar entre páginas.
+  _unitsChartPage: 0,
+  _unitsChartData: {},
+
+  _renderUnitsChart(unitC) {
+    App._unitsChartData = unitC;
+    const entries = Object.entries(unitC);
+    const totalPages = Math.max(1, Math.ceil(entries.length / 3));
+    if (App._unitsChartPage >= totalPages) App._unitsChartPage = 0;
+    const start = App._unitsChartPage * 3;
+    const pageEntries = entries.slice(start, start + 3);
+    const colors = App._distinctColors(entries.length);
+    const pageColors = colors.slice(start, start + 3);
+    App._drawBar('chart-units', Object.fromEntries(pageEntries), pageColors);
+
+    const nav = document.getElementById('chart-units-nav');
+    const pageLbl = document.getElementById('chart-units-page');
+    if (pageLbl) pageLbl.textContent = entries.length ? `${start + 1}–${Math.min(start + 3, entries.length)} de ${entries.length}` : '';
+    if (nav) nav.style.display = entries.length > 3 ? '' : 'none';
+  },
+
+  unitsChartNav(delta) {
+    const entries = Object.entries(App._unitsChartData || {});
+    const totalPages = Math.max(1, Math.ceil(entries.length / 3));
+    App._unitsChartPage = (App._unitsChartPage + delta + totalPages) % totalPages;
+    App._renderUnitsChart(App._unitsChartData);
   },
 
   // N cores visualmente distintas (ângulo áureo espalha os matizes, sem repetir tom)

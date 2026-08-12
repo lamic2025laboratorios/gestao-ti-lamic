@@ -402,10 +402,30 @@
             <div class="form-modal-stripe"></div>
             <div class="form-modal-scroll">
             <div class="modal-body">
+              <div class="kpi-list-toolbar" id="kpi-list-toolbar" style="display:none">
+                <div class="extrato-periodo">
+                  <button class="extrato-per-btn kpi-list-per-btn active" data-per="todos" onclick="App.setKpiListPeriodo('todos',this)">Todos</button>
+                  <button class="extrato-per-btn kpi-list-per-btn"        data-per="ano"   onclick="App.setKpiListPeriodo('ano',this)">Ano</button>
+                  <button class="extrato-per-btn kpi-list-per-btn"        data-per="mes"   onclick="App.setKpiListPeriodo('mes',this)">Mês</button>
+                  <button class="extrato-per-btn kpi-list-per-btn"        data-per="dia"   onclick="App.setKpiListPeriodo('dia',this)">Dia</button>
+                </div>
+                <div class="extrato-periodo-picker" id="kpi-list-periodo-picker">
+                  <select id="kpi-list-ano-select" class="input-field extrato-picker-input" style="display:none" onchange="App._renderKpiList()"></select>
+                  <input type="month" id="kpi-list-mes-input" class="input-field extrato-picker-input" style="display:none" onchange="App._renderKpiList()" />
+                  <input type="date" id="kpi-list-dia-input" class="input-field extrato-picker-input" style="display:none" onchange="App._renderKpiList()" />
+                </div>
+                <select id="kpi-list-grupo-select" class="filter-select extrato-picker-input" onchange="App._onKpiListGrupoChange()">
+                  <option value="">Grupo: Todos</option>
+                </select>
+                <select id="kpi-list-subgrupo-select" class="filter-select extrato-picker-input" onchange="App.onKpiListSubgrupoChange()">
+                  <option value="">Subgrupo: Todos</option>
+                </select>
+              </div>
               <div class="table-wrap"><table class="data-table">
                 <thead id="kpi-list-thead"><tr><th>Data</th><th>Unidade</th><th>Grupo</th><th>Subgrupo</th><th>Resumo</th><th>Fornecedor</th><th>Status</th><th>Valor</th></tr></thead>
                 <tbody id="kpi-list-tbody"></tbody>
               </table></div>
+              <div class="kpi-list-total-box" id="kpi-list-total-box" style="display:none"></div>
             </div>
             </div>
           </div>
@@ -421,6 +441,11 @@
                 <span class="chart-badge" id="chart-units-top"></span>
               </div>
               <canvas id="chart-units"></canvas>
+              <div class="chart-units-nav" id="chart-units-nav" style="display:none">
+                <button type="button" class="chart-nav-btn" onclick="App.unitsChartNav(-1)" title="Unidades anteriores">‹</button>
+                <span class="chart-nav-page" id="chart-units-page"></span>
+                <button type="button" class="chart-nav-btn" onclick="App.unitsChartNav(1)" title="Próximas unidades">›</button>
+              </div>
             </div>
             <div class="chart-card">
               <div class="chart-card-header"><span>Grupo</span></div>

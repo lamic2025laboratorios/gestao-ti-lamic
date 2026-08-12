@@ -824,6 +824,18 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 }
 .charts-trio .chart-card { padding: 16px; }
 .charts-trio canvas { max-height: 220px !important; }
+/* Por Unidade agora pagina 3 em 3 — canvas um pouco mais baixo que os
+   irmãos (Grupo/Sub-opções) pra sobrar espaço pra barra de navegação;
+   align-items:stretch do .charts-trio continua igualando a altura do card. */
+#chart-units { max-height: 168px !important; }
+.chart-units-nav { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 8px; }
+.chart-nav-btn {
+  width: 26px; height: 26px; border-radius: var(--r-md); border: 1.5px solid var(--surf-border);
+  background: var(--surf-0); color: #5a6a84; font-size: 1.05rem; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: all .15s var(--ease);
+}
+.chart-nav-btn:hover { border-color: #3a7ee8; color: #3a7ee8; background: #eef4ff; }
+.chart-nav-page { font-size: .74rem; font-weight: 600; color: #6680a0; white-space: nowrap; }
 
 /* Card Sub-opções — estilo temperatura (barras de calor ranqueadas) */
 .subopts-heat {
@@ -2460,9 +2472,9 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .modal-footer-right { display: flex; gap: 8px; }
 
 /* Spending card canvas constrained */
-#chart-monthly { 
-  height: 160px !important;
-  max-height: 160px !important;
+#chart-monthly {
+  height: 240px !important;
+  max-height: 240px !important;
   flex-shrink: 0;
 }
 /* Status card canvas constrained */  
@@ -2556,6 +2568,23 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .extrato-cod.cod-cmp { background: #f5f1fe; color: #7c52d4; }
 .extrato-cod.cod-sl  { background: #eef4ff; color: #3a7ee8; }
 .extrato-itens { font-size: .72rem; color: #8898b8; margin-left: 4px; }
+
+/* Filtro dentro do pop-up de Comprados (calendário + grupo/subgrupo) —
+   reaproveita o visual do Extrato (.extrato-periodo/.extrato-per-btn/
+   .extrato-picker-input), só acrescenta os dois selects de grupo/subgrupo. */
+.kpi-list-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.kpi-list-toolbar .filter-select.extrato-picker-input { height: 34px; min-width: 150px; }
+
+/* Caixa azul com o total (qtd + R$) do que foi filtrado */
+.kpi-list-total-box {
+  margin-top: 14px; padding: 12px 18px; border-radius: var(--r-md);
+  background: linear-gradient(135deg, #1a5bbf, #2a68d4);
+  box-shadow: 0 4px 14px rgba(26,91,191,.35);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+}
+.kpi-list-total-box .klt-label { font-size: .72rem; font-weight: 600; color: rgba(255,255,255,.8); text-transform: uppercase; letter-spacing: .03em; }
+.kpi-list-total-box .klt-qty { font-family: 'Rajdhani', sans-serif; font-size: 1.5rem; font-weight: 800; color: #fff; margin-top: 2px; }
+.kpi-list-total-box .klt-val { font-size: .92rem; font-weight: 700; color: #fff; }
 .kpi-card.k-red { background: linear-gradient(135deg,#fdecea,#fff5f5); border-color: rgba(217,64,64,.25); }
 .k-red .kpi-icon svg { color: var(--red); }
 .k-red .kpi-icon { background: rgba(217,64,64,.1); }
