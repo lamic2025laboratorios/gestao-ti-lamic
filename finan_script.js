@@ -1942,6 +1942,7 @@ const App = {
     const reqs = App.getFilteredReqs();
     App.updateKPIs(reqs);
     App.updateCharts(reqs);
+    App._renderGroupSpendChart();
     App.updateCompareCard();
     App.renderConsumoCards();
     App.renderNovasSolicitacoes();
@@ -3425,6 +3426,9 @@ const App = {
     // Só informativo: atendidos com item do estoque, sem compra nova
     const elEst = document.getElementById('kpi-estoque');
     if (elEst) elEst.textContent = reqs.filter(r=>r.status==='Estoque').length;
+    // Só informativo: ainda em aprovação/decisão
+    const elAg = document.getElementById('kpi-aguardando');
+    if (elAg) elAg.textContent = reqs.filter(r=>r.status==='Aguardando').length;
   },
 
   // Helper: convert a date string to a grouping key for a given periodView
@@ -3581,10 +3585,10 @@ const App = {
       if (!sorted.length) {
         spendEl.innerHTML = '<div style="color:#8898b8;font-size:.82rem;padding:8px">Nenhum gasto registrado.</div>';
       } else {
-        spendEl.innerHTML = '<div style="font-size:.72rem;color:#8898b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;font-weight:600">Gastos por Unidade</div>';
+        spendEl.innerHTML = '<div style="font-size:.7rem;color:#8898b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">Gastos por Unidade</div>';
         // Preenche a altura do card e ROLA quando passar (min-height:0 deixa o flex encolher p/ scroll)
         const scrollWrap = document.createElement('div');
-        scrollWrap.style.cssText = 'flex:1 1 0;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:2px';
+        scrollWrap.style.cssText = 'flex:1 1 0;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;padding-right:2px';
         sorted.forEach(([name, val], i) => {
           const pct     = Math.round(val / maxVal * 100);
           const parcVal = unitParcelado[name] || 0;
@@ -3602,16 +3606,16 @@ const App = {
           const parcInfo = parcInfoHtml;
           const item = document.createElement('div');
           item.className = 'unit-spend-item';
-          item.style.cssText = 'flex-direction:column;align-items:stretch;gap:4px;padding:10px 14px';
+          item.style.cssText = 'flex-direction:column;align-items:stretch;gap:2px;padding:5px 10px';
           item.innerHTML = `
-            <div style="display:flex;align-items:center;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px">
               <div class="unit-spend-rank ${i===0?'top':''}">${i+1}</div>
               <div class="unit-spend-name" style="flex:1">${name}</div>
               <div class="unit-spend-val">${fmt(val)}</div>
             </div>
 
-            <div style="padding-left:32px">
-              <div class="unit-spend-bar-wrap" style="width:100%;margin-bottom:4px">
+            <div style="padding-left:28px">
+              <div class="unit-spend-bar-wrap" style="width:100%;margin-bottom:2px">
                 <div class="unit-spend-bar" style="width:${pct}%"></div>
               </div>
               ${parcInfo}
@@ -3698,10 +3702,76 @@ const App = {
     return `hsl(${hue}, 82%, 52%)`;
   },
 
+  // Gastos por Grupo de Produto — barra horizontal (estilo fluxo de caixa).
+  // Mesma fonte de dinheiro que o card "Gastos por Período" (status Comprado,
+  // à vista por boughtAt / parcelada por p.date, somando dentro do intervalo de
+  // datas escolhido), só que agrupado por grupo de produto em vez de por data.
+  // Não respeita o filtro de Grupo do popover — o gráfico existe justamente pra
+  // comparar os grupos entre si — mas respeita Unidade e o intervalo de datas,
+  // igual ao "Gastos por Período".
+  _renderGroupSpendChart() {
+    const canvas = document.getElementById('chart-groupspend'); if (!canvas) return;
+    const fFrom = document.getElementById('filter-date-from')?.value || '';
+    const fTo   = document.getElementById('filter-date-to')?.value   || '';
+    const fUnit = document.getElementById('dash-filter-unit')?.value || '';
+    const inRange = (d) => {
+      if (!fFrom && !fTo) return true;
+      const s = (d || '').substring(0, 10);
+      if (fFrom && s < fFrom) return false;
+      if (fTo   && s > fTo)   return false;
+      return true;
+    };
+
+    const byGroup = {};
+    Object.values(State.requests || {})
+      .filter(r => r.status === 'Comprado' && r.boughtAt)
+      .forEach(r => {
+        if (fUnit && r.unitName !== fUnit) return;
+        const g = App._displayGroupName(r.groupName);
+        const isParceled = r.parcelas && r.parcelas.length > 0;
+        if (!isParceled) {
+          if (!inRange(r.boughtAt)) return;
+          byGroup[g] = (byGroup[g] || 0) + (parseFloat(r.valorTotal) || 0);
+        } else {
+          r.parcelas.forEach(p => {
+            const pDate = p.date || (p.month + '-01');
+            if (!inRange(pDate)) return;
+            byGroup[g] = (byGroup[g] || 0) + (parseFloat(p.valor) || 0);
+          });
+        }
+      });
+
+    const entries = Object.entries(byGroup).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const fmt = v => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const badge = document.getElementById('groupspend-total');
+    if (badge) badge.textContent = entries.length ? fmt(entries.reduce((s, [, v]) => s + v, 0)) : '';
+
+    App._destroyChart('chart-groupspend');
+    if (!entries.length) return;
+
+    const labels = entries.map(([g]) => g);
+    const vals   = entries.map(([, v]) => v);
+    const colors = App._distinctColors(entries.length);
+
+    State.charts['chart-groupspend'] = new Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 6, maxBarThickness: 26 }] },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmt(c.raw) } } },
+        scales: {
+          x: { beginAtZero: true, ticks: { color: '#6680a0', font: { size: 10 }, callback: v => 'R$ ' + Number(v).toLocaleString('pt-BR') }, grid: { color: '#eef2f8' } },
+          y: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } }
+        }
+      }
+    });
+  },
+
   _suboptsData: [],   // cache do ranking completo (p/ popup "todas")
 
-  // Card "Sub-opções": barra horizontal ranqueada por quantidade, cor de calor
-  // (quente = mais pedido, fria = menos) — mesma lógica do ranking anterior, agora em gráfico.
+  // Card "Sub-opções": pizza por quantidade, cor de calor nas fatias visíveis
+  // (quente = mais pedido, fria = menos) — mesma lógica de ranking de antes,
+  // só o formato do gráfico mudou de barra horizontal pra pizza.
   _renderSuboptsHeat(data) {
     const canvas = document.getElementById('chart-subopts');
     const moreLine = document.getElementById('subopts-more-line');
@@ -3728,16 +3798,21 @@ const App = {
     const labels = visiveis.map(([name]) => name);
     const vals   = visiveis.map(([, v]) => v);
     const cores  = vals.map(v => App._heatColor(v / max));
+    // "Outros" agrupa o que passou do TOP 8, pra fatia da pizza não mentir
+    // proporção (sem isso os 8 primeiros pareceriam 100% do total).
+    const temResto = restoTotal > 0;
+    const pieLabels = temResto ? [...labels, 'Outros'] : labels;
+    const pieVals   = temResto ? [...vals, restoTotal]  : vals;
+    const pieCores  = temResto ? [...cores, '#c7d2e0']  : cores;
 
     State.charts['chart-subopts'] = new Chart(canvas, {
-      type: 'bar',
-      data: { labels, datasets: [{ data: vals, backgroundColor: cores, borderRadius: 6, maxBarThickness: 18 }] },
+      type: 'pie',
+      data: { labels: pieLabels, datasets: [{ data: pieVals, backgroundColor: pieCores, borderColor: '#fff', borderWidth: 2 }] },
       options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw} un.` } } },
-        scales: {
-          x: { beginAtZero: true, ticks: { color: '#6680a0', font: { size: 10 } }, grid: { color: '#eef2f8' } },
-          y: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } }
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw} un.` } }
         }
       }
     });
@@ -3927,29 +4002,55 @@ const App = {
     }
   },
 
+  // Gastos por Período — colunas, com linha de Tendência e linha de Média
+  // sobrepostas (clica no nome delas na legenda pra mostrar/esconder, igual
+  // o Chart.js já faz nativamente com qualquer dataset). Os valores em si
+  // (o "data" recebido) continuam vindo de _buildSpendMap, sem mudar nada
+  // no cálculo — só troca o tipo de gráfico e soma 2 séries derivadas dele.
   _drawLine(id, data, color) {
     const canvas = document.getElementById(id); if (!canvas) return;
     App._destroyChart(id);
     const sorted = Object.keys(data).sort();
-    const ctx = canvas.getContext('2d');
-    // Gradiente suave: cor no topo, transparente embaixo (mesmo visual da referência)
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.clientHeight || 260);
-    gradient.addColorStop(0, color + '3d');
-    gradient.addColorStop(1, color + '00');
+    const vals = sorted.map(k => data[k]);
+
+    // Linha de Média: valor constante = média simples dos períodos exibidos
+    const media = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+    const mediaLine = vals.map(() => media);
+
+    // Linha de Tendência: regressão linear simples (mínimos quadrados) sobre os pontos
+    let trendLine = vals.slice();
+    const n = vals.length;
+    if (n >= 2) {
+      const xs = vals.map((_, i) => i);
+      const sumX  = xs.reduce((a, b) => a + b, 0);
+      const sumY  = vals.reduce((a, b) => a + b, 0);
+      const sumXY = xs.reduce((s, x, i) => s + x * vals[i], 0);
+      const sumXX = xs.reduce((s, x) => s + x * x, 0);
+      const denom = (n * sumXX - sumX * sumX) || 1;
+      const slope = (n * sumXY - sumX * sumY) / denom;
+      const intercept = (sumY - slope * sumX) / n;
+      trendLine = xs.map(x => slope * x + intercept);
+    }
+
+    const fmtR = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
     State.charts[id] = new Chart(canvas, {
-      type: 'line',
-      data: { labels: sorted, datasets: [{
-        data: sorted.map(k=>data[k]),
-        borderColor: color, backgroundColor: gradient,
-        borderWidth: 2.5, tension: 0.45, fill: true, cubicInterpolationMode: 'monotone',
-        pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 2,
-        pointRadius: 3.5, pointHoverRadius: 6
-      }] },
+      data: {
+        labels: sorted,
+        datasets: [
+          { type: 'bar', label: 'Gastos', data: vals, backgroundColor: color + 'cc', borderColor: color, borderWidth: 1.5, borderRadius: 6, order: 3 },
+          { type: 'line', label: 'Tendência', data: trendLine, borderColor: '#e8830a', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0, order: 1 },
+          { type: 'line', label: 'Média', data: mediaLine, borderColor: '#7c52d4', borderWidth: 2, borderDash: [2, 3], pointRadius: 0, fill: false, tension: 0, order: 2 }
+        ]
+      },
       plugins: [App._verticalGuidePlugin],
       options: {
-        responsive: true, interaction: { mode: 'index', intersect: false },
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { display: false },
+          legend: {
+            display: true, position: 'top', align: 'end',
+            labels: { boxWidth: 14, boxHeight: 2, font: { size: 11, weight: '600' }, color: '#5a6a84', usePointStyle: false }
+          },
           tooltip: {
             enabled: true, backgroundColor: '#0f1e35', cornerRadius: 10, padding: 10,
             displayColors: true, usePointStyle: true, boxWidth: 8, boxHeight: 8, boxPadding: 4,
@@ -3957,7 +4058,7 @@ const App = {
             bodyFont: { size: 11, weight: '600' }, bodyColor: 'rgba(255,255,255,.85)',
             callbacks: {
               title: items => App._fmtLineKey(items[0].label),
-              label: item => 'R$ ' + (item.raw||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              label: item => `${item.dataset.label}: ${fmtR(item.raw)}`
             }
           }
         },

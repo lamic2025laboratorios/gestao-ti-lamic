@@ -225,31 +225,49 @@
           </div>
         </div>
 
-        <!-- KPI Row -->
-        <div class="kpi-row">
-          <div class="kpi-card k-blue kpi-clickable" onclick="App.showTotalKpi()" title="Clique para ver por unidade">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado ↗</div></div>
+        <!-- KPI Ring: Status (rosca) no centro, KPIs ao redor -->
+        <div class="kpi-ring-section">
+          <div class="kpi-ring-col">
+            <div class="kpi-card k-blue kpi-clickable" onclick="App.showTotalKpi()" title="Clique para ver por unidade">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado ↗</div></div>
+            </div>
+            <!-- Só informativo: não é clicável nem soma no Comprados/Gasto —
+                 mostra quantos dos solicitados saíram do estoque (sem compra nova) -->
+            <div class="kpi-card k-orange" title="Pedidos atendidos com item já em estoque — não geram compra nem entram no Gasto do Período">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-estoque">0</div><div class="kpi-lbl">Do Estoque<small style="display:block;font-weight:600;opacity:.75">não foram comprados</small></div></div>
+            </div>
+            <!-- Só informativo: pedidos ainda em aprovação/decisão -->
+            <div class="kpi-card k-green" title="Pedidos aguardando aprovação/decisão">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-aguardando">0</div><div class="kpi-lbl">Aguardando</div></div>
+            </div>
           </div>
-          <!-- Só informativo: não é clicável nem soma no Comprados/Gasto —
-               mostra quantos dos solicitados saíram do estoque (sem compra nova) -->
-          <div class="kpi-card k-orange" title="Pedidos atendidos com item já em estoque — não geram compra nem entram no Gasto do Período">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-estoque">0</div><div class="kpi-lbl">Do Estoque<small style="display:block;font-weight:600;opacity:.75">não foram comprados</small></div></div>
+
+          <div class="kpi-ring-center chart-card status-big-card">
+            <div class="chart-card-header">
+              <span id="status-card-title">Status das Solicitações</span>
+            </div>
+            <canvas id="chart-status" height="220" style="max-height:220px"></canvas>
+            <div id="status-legend" class="status-legend-list"></div>
           </div>
-          <div class="kpi-card k-teal kpi-clickable" onclick="App.showKpiList('Comprado')" title="Clique para ver pedidos comprados">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><polyline points="20 12 20 22 4 22 4 12" stroke="currentColor" stroke-width="2"/><rect x="2" y="7" width="20" height="5" stroke="currentColor" stroke-width="2"/><path d="M12 22V7" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados ↗</div></div>
-          </div>
-          <div class="kpi-card k-red kpi-clickable" onclick="App.showKpiList('Negado')" title="Clique para ver pedidos negados">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados ↗</div></div>
-          </div>
-          <div class="kpi-card k-purple kpi-clickable" onclick="App.showExtrato()" title="Clique para ver o extrato de compras">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body">
-              <div class="kpi-val" id="kpi-month-spent">R$ 0</div>
-              <div class="kpi-lbl">Gasto do Período <span id="kpi-period-sub" class="kpi-period-sub-hidden"></span></div>
+
+          <div class="kpi-ring-col">
+            <div class="kpi-card k-teal kpi-clickable" onclick="App.showKpiList('Comprado')" title="Clique para ver pedidos comprados">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><polyline points="20 12 20 22 4 22 4 12" stroke="currentColor" stroke-width="2"/><rect x="2" y="7" width="20" height="5" stroke="currentColor" stroke-width="2"/><path d="M12 22V7" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados ↗</div></div>
+            </div>
+            <div class="kpi-card k-red kpi-clickable" onclick="App.showKpiList('Negado')" title="Clique para ver pedidos negados">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados ↗</div></div>
+            </div>
+            <div class="kpi-card k-purple kpi-clickable" onclick="App.showExtrato()" title="Clique para ver o extrato de compras">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body">
+                <div class="kpi-val" id="kpi-month-spent">R$ 0</div>
+                <div class="kpi-lbl">Gasto do Período <span id="kpi-period-sub" class="kpi-period-sub-hidden"></span></div>
+              </div>
             </div>
           </div>
         </div>
@@ -404,14 +422,6 @@
               <div id="novas-sol-feed" class="mgmt-feed"></div>
             </div>
 
-            <div class="chart-card status-big-card">
-              <div class="chart-card-header">
-                <span id="status-card-title">Status das Solicitações</span>
-              </div>
-              <canvas id="chart-status" height="220" style="max-height:220px"></canvas>
-              <div id="status-legend" class="status-legend-list"></div>
-            </div>
-
             <!-- Card Comparativo Anual -->
             <div class="chart-card compare-year-card">
               <div class="chart-card-header">
@@ -465,13 +475,56 @@
               </div>
             </div>
 
+            <!-- Log de Atividades Recentes (auditoria multiusuário) — antes ficava
+                 embaixo, ao lado de Compras Parceladas; agora fica aqui, no lugar
+                 que era do Comparativo Anual. -->
+            <div class="chart-card mgmt-card mgmt-card-log">
+              <div class="chart-card-header">
+                <span>Log de Atividades Recentes</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="chart-badge" id="activity-log-count"></span>
+                  <div class="filter-popover-wrap">
+                    <button class="btn-filter-toggle" id="btn-activity-filter" onclick="App.toggleActivityFilterPopover(event)" title="Filtrar log de atividades">
+                      <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
+                      <span class="filter-toggle-badge" id="activity-filter-badge" style="display:none">0</span>
+                    </button>
+                    <div class="filter-popover" id="activity-filter-popover" style="left:auto;right:0">
+                      <div class="filter-popover-row">
+                        <div class="req-search-wrap" style="width:100%;max-width:none">
+                          <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
+                          <input type="text" id="activity-search" class="req-search-input" placeholder="Buscar por quem, ação, detalhe..." oninput="App.renderActivityLog()">
+                        </div>
+                      </div>
+                      <div class="filter-popover-row">
+                        <label>TIPO</label>
+                        <select id="activity-filter-modulo" class="filter-select" onchange="App.renderActivityLog()">
+                          <option value="">Todos</option>
+                          <option value="Solicitações">Solicitações</option>
+                          <option value="Estoque">Estoque</option>
+                          <option value="Configurações">Configurações</option>
+                          <option value="Calendário">Calendário</option>
+                        </select>
+                      </div>
+                      <div class="filter-popover-row">
+                        <label>ANO</label>
+                        <select id="activity-filter-year" class="filter-select" onchange="App.renderActivityLog()">
+                          <option value="">Todos</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div id="activity-log-feed" class="mgmt-feed"></div>
+            </div>
+
           </div>
           <!-- Row 2 Col 1: Gastos por mês -->
           <div class="chart-card spending-card">
             <div class="chart-card-header">
               <span>Gastos por Período</span>
             </div>
-            <canvas id="chart-monthly" height="160" style="max-height:160px"></canvas>
+            <canvas id="chart-monthly" height="260" style="max-height:260px"></canvas>
             <div id="unit-spending-list" class="unit-spending-list"></div>
           </div>
 
@@ -492,45 +545,14 @@
             </div>
           </div>
 
-          <!-- Card 2: Log de Atividades Recentes (auditoria multiusuário) -->
-          <div class="chart-card mgmt-card mgmt-card-log">
+          <!-- Card 2: Gastos por Grupo de Produto (fluxo de caixa, barra horizontal) —
+               antes era o Log de Atividades, que mudou pra coluna da direita. -->
+          <div class="chart-card mgmt-card groupspend-card">
             <div class="chart-card-header">
-              <span>Log de Atividades Recentes</span>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span class="chart-badge" id="activity-log-count"></span>
-                <div class="filter-popover-wrap">
-                  <button class="btn-filter-toggle" id="btn-activity-filter" onclick="App.toggleActivityFilterPopover(event)" title="Filtrar log de atividades">
-                    <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
-                    <span class="filter-toggle-badge" id="activity-filter-badge" style="display:none">0</span>
-                  </button>
-                  <div class="filter-popover" id="activity-filter-popover" style="left:auto;right:0">
-                    <div class="filter-popover-row">
-                      <div class="req-search-wrap" style="width:100%;max-width:none">
-                        <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
-                        <input type="text" id="activity-search" class="req-search-input" placeholder="Buscar por quem, ação, detalhe..." oninput="App.renderActivityLog()">
-                      </div>
-                    </div>
-                    <div class="filter-popover-row">
-                      <label>TIPO</label>
-                      <select id="activity-filter-modulo" class="filter-select" onchange="App.renderActivityLog()">
-                        <option value="">Todos</option>
-                        <option value="Solicitações">Solicitações</option>
-                        <option value="Estoque">Estoque</option>
-                        <option value="Configurações">Configurações</option>
-                        <option value="Calendário">Calendário</option>
-                      </select>
-                    </div>
-                    <div class="filter-popover-row">
-                      <label>ANO</label>
-                      <select id="activity-filter-year" class="filter-select" onchange="App.renderActivityLog()">
-                        <option value="">Todos</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <span>Gastos por Grupo de Produto</span>
+              <span class="chart-badge" id="groupspend-total"></span>
             </div>
-            <div id="activity-log-feed" class="mgmt-feed"></div>
+            <canvas id="chart-groupspend"></canvas>
           </div>
 
           </div>
