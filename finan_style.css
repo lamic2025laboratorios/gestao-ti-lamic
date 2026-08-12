@@ -743,9 +743,11 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   background: linear-gradient(135deg, #eef3fb, #f7f9fd);
   border-color: var(--surf-border, #dde5f2);
 }
-/* Mais quadrados e maiores, ícone do lado DIREITO (maior também) — o texto
-   (número + rótulo) fica à esquerda. row-reverse mantém a ordem do HTML
-   (ícone primeiro, corpo depois) mas desenha visualmente invertido. */
+/* Mais quadrados e maiores, ícones voltados pra fora (colunas espelhadas):
+   coluna da direita (junto da rosca) — ícone à direita, texto à esquerda,
+   row-reverse mantém a ordem do HTML (ícone primeiro no markup) mas
+   desenha invertido. Coluna da esquerda é sobrescrita logo abaixo pro
+   espelho — ícone primeiro (à esquerda), texto depois (à direita). */
 .kpi-ring-col .kpi-card {
   flex-direction: row-reverse; align-items: center; text-align: right;
   justify-content: space-between; gap: 12px;
@@ -753,6 +755,12 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 }
 .kpi-ring-col .kpi-icon { width: 76px; height: 76px; flex-shrink: 0; }
 .kpi-ring-col .kpi-icon svg { width: 34px; color: var(--blue-500, #1a5bbf); }
+/* Coluna da esquerda (Total Solicitado/Comprados/Negados): espelhada — ícone
+   primeiro (esquerda), texto depois (direita), lendo em direção à rosca. */
+.kpi-ring-section > .kpi-ring-col:first-child .kpi-card {
+  flex-direction: row;
+  text-align: left;
+}
 .kpi-ring-center {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
