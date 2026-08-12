@@ -760,8 +760,12 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .kpi-ring-col .kpi-icon { width: 76px; height: 76px; flex-shrink: 0; }
 .kpi-ring-col .kpi-icon svg { width: 34px; color: var(--blue-500, #1a5bbf); }
 /* Coluna da esquerda (Total Solicitado/Comprados/Negados): espelhada — ícone
-   primeiro (esquerda), texto depois (direita), lendo em direção à rosca. */
-.kpi-ring-section > .kpi-ring-col:first-child .kpi-card {
+   primeiro (esquerda), texto depois (direita), lendo em direção à rosca.
+   :first-of-type (não :first-child): o <svg> dos conectores é o 1º filho
+   real da seção agora, então :first-child nunca bateria com nenhum
+   .kpi-ring-col — :first-of-type ignora o svg (tag diferente) e pega o
+   primeiro <div> mesmo. */
+.kpi-ring-section > .kpi-ring-col:first-of-type .kpi-card {
   flex-direction: row;
   text-align: left;
 }
