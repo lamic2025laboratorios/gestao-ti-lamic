@@ -3061,12 +3061,15 @@ const App = {
           return;
         }
       }
+      // r.produto: entradas feitas direto pela aba Estoque (Nova Compra/Entrada
+      // em vez de Solicitação) salvam o item escolhido nesse campo, não em
+      // "modelo" — mas quando o grupo tem Sub-opções cadastradas (Tinta/Pilha),
+      // o <select> de produto da tela de Estoque É o mesmo cadastro (mesma
+      // fonte, State.subOpts), então é um modelo cadastrado de verdade, só
+      // guardado com outro nome de campo por ter vindo de outra tela.
       // Fallback pro equipamento/subgrupo é só do Conserto (às vezes só tem o
       // equipamento marcado, sem "modelo" — cai pro subgrupo, ex. "Impressora").
-      // Pilhas/Baterias NÃO usa esse fallback: modelo tem que ser um dos
-      // cadastrados em Sub-opções por Grupo — sem isso, um pedido avulso sem
-      // modelo virava um balde falso "Avulso"/subgrupo genérico no gráfico.
-      let key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || '').toString();
+      let key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || r.produto || '').toString();
       if (!key && kind === 'concerto') key = (r.equipamento || r.subgrupo || '').toString();
       if (!key) return;
       // Normaliza maiúscula/minúscula da cor da tinta — solicitações antigas
