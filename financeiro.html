@@ -214,9 +214,9 @@
             <p class="tab-subtitle">Visão geral das solicitações e gastos</p>
           </div>
           <div class="dash-controls">
-            <div class="idle-chip" id="idle-chip" title="Tempo restante até o logout automático por inatividade">
+            <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
               <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-              <span id="idle-timer">60:00</span>
+              <span class="idle-timer">60:00</span>
             </div>
             <button class="btn-dash-print" onclick="App.printDashboard()" title="Baixar relatório em PDF">
               <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -997,11 +997,25 @@
             <h2>Gestão de Estoque</h2>
             <p class="tab-subtitle">Controle itens disponíveis para retirada nas solicitações</p>
           </div>
-          <div style="display:flex;gap:8px">
-            <button class="btn-primary" onclick="App.escolherTipoEstoque()">
-              <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:4px"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-              Novo Item
-            </button>
+          <div class="dash-controls">
+            <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="idle-timer">60:00</span>
+            </div>
+            <div class="filter-popover-wrap">
+              <button class="btn-dash-print" id="btn-estoque-relatorio" onclick="App.toggleEstoqueRelatorioPopover(event)" title="Baixar relatório de estoque em PDF">
+                <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Relatório
+              </button>
+              <div class="filter-popover" id="estoque-relatorio-popover" style="left:auto;right:0">
+                <div class="filter-popover-row">
+                  <button class="btn-secondary" onclick="App.gerarRelatorioEstoque('itens')" title="Saldo atual de cada item cadastrado">Somente itens em estoque</button>
+                </div>
+                <div class="filter-popover-row">
+                  <button class="btn-secondary" onclick="App.gerarRelatorioEstoque('movs')" title="Histórico completo de entradas e saídas">Todas entradas e saídas</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1044,6 +1058,9 @@
               </div>
             </div>
           </div>
+          <button class="btn-nova-solic" onclick="App.escolherTipoEstoque()" title="Novo Item">
+            <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </button>
         </div>
 
         <!-- Estado vazio geral -->
@@ -1537,6 +1554,18 @@
             <h2>Calendário de Compras</h2>
             <p class="tab-subtitle">Visualize gastos por dia, parcelas e compras diretas</p>
           </div>
+          <div class="dash-controls">
+            <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="idle-timer">60:00</span>
+            </div>
+            <button class="btn-dash-print" onclick="App.printCalendarReport()" title="Baixar relatório em PDF com os itens do mês, dia a dia">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Relatório
+            </button>
+          </div>
+        </div>
+        <div class="cal-toolbar-row">
           <div class="cal-nav">
             <button class="btn-cal-nav" onclick="App.calPrev()">
               <svg viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2"/></svg>
@@ -1546,10 +1575,10 @@
               <svg viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2"/></svg>
             </button>
           </div>
-        </div>
-        <div class="cal-legend-row">
-          <span class="cal-leg parcela"><span></span>Parcela</span>
-          <span class="cal-leg direta"><span></span>Compra Direta</span>
+          <div class="cal-legend-row">
+            <span class="cal-leg parcela"><span></span>Parcela</span>
+            <span class="cal-leg direta"><span></span>Compra Direta</span>
+          </div>
         </div>
         <div class="calendar-wrap">
           <div class="cal-header-row">
@@ -1584,7 +1613,16 @@
             <select id="filter-group-req" style="display:none" onchange="App.renderRequests()"></select>
             <select id="filter-subgroup-req" style="display:none" onchange="App.renderRequests()"></select>
           </div>
-
+          <div class="dash-controls">
+            <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="idle-timer">60:00</span>
+            </div>
+            <button class="btn-dash-print" onclick="App.printRequestsList()" title="Baixar relatório em PDF com a lista de solicitações (respeita os filtros ativos)">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Relatório
+            </button>
+          </div>
         </div>
 
         <!-- ── Mini-KPIs (5 cards) ── -->
@@ -1833,6 +1871,12 @@
           <div>
             <h2>Configurações do Sistema</h2>
             <p class="tab-subtitle">Gerencie unidades, grupos, subgrupos e usuários</p>
+          </div>
+          <div class="dash-controls">
+            <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="idle-timer">60:00</span>
+            </div>
           </div>
         </div>
         <div class="settings-grid">

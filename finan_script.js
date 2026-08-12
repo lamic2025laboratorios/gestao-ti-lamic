@@ -250,13 +250,15 @@ const App = {
     if (!App._idleTick) App._idleTick = setInterval(App._updateIdleChip, 1000);
     App._updateIdleChip();
   },
+  // Chip do timer replicado em várias abas (Dashboard/Calendário/Solicitações/
+  // Estoque/Configurações) — por isso classList/querySelectorAll em vez de um
+  // único id (só a 1ª aba aberta ficaria contando se fosse por id).
   _updateIdleChip() {
-    const el = document.getElementById('idle-timer'); if (!el) return;
     let ms = App._idleDeadline - Date.now(); if (ms < 0) ms = 0;
     const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
-    el.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    const chip = document.getElementById('idle-chip');
-    if (chip) chip.classList.toggle('idle-timer-warn', ms <= 60000);
+    const txt = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    document.querySelectorAll('.idle-timer').forEach(el => { el.textContent = txt; });
+    document.querySelectorAll('.idle-chip').forEach(chip => chip.classList.toggle('idle-timer-warn', ms <= 60000));
   },
   idleLogout() {
     if (!State.adminUser) return;
@@ -1657,6 +1659,7 @@ const App = {
     { pop: 'req-filter-panel', btn: 'btn-req-filter-toggle', label: 'btn-filter-label', labelOn: 'Ocultar Filtros', labelOff: 'Mostrar Filtros', reserveTab: 'tab-requests' },
     { pop: 'estoque-conf-popover', btn: 'btn-estoque-conf-toggle' },
     { pop: 'estoque-filter-popover', btn: 'btn-estoque-filter-toggle' },
+    { pop: 'estoque-relatorio-popover', btn: 'btn-estoque-relatorio' },
     { pop: 'activity-filter-popover', btn: 'btn-activity-filter' },
   ],
 
@@ -1783,6 +1786,11 @@ const App = {
   toggleEstoqueFilterPopover(ev) {
     ev?.stopPropagation();
     App._togglePopover('estoque-filter-popover', 'btn-estoque-filter-toggle');
+  },
+
+  toggleEstoqueRelatorioPopover(ev) {
+    ev?.stopPropagation();
+    App._togglePopover('estoque-relatorio-popover', 'btn-estoque-relatorio');
   },
 
   toggleReqConfPopover(ev) {
@@ -2058,10 +2066,72 @@ const App = {
       ['Total de solicitações', g('kpi-total')],
       ['Compradas',             g('kpi-bought')],
       ['Negadas',               g('kpi-negado')],
+      ['Do estoque (sem compra)', g('kpi-estoque')],
+      ['Aguardando decisão',    g('kpi-aguardando')],
       ['Gasto do período',      g('kpi-month-spent')],
     ];
     const data  = new Date().toLocaleDateString('pt-BR');
     const admin = State.adminUser || 'LAMIC';
+
+    // Sub-opções mais pedidas — mesmo ranking já cacheado pelo card (_renderSuboptsHeat)
+    const suboptsRows = (App._suboptsData || []).slice(0, 20).map(([k, v]) => [App._pdfClean(k), String(v)]);
+
+    // Gastos por Grupo de Produto — mesma fonte/regra do gráfico (Comprado, respeita
+    // Unidade + intervalo de datas, mas NÃO o filtro de Grupo — ele existe pra comparar os grupos)
+    const byGroupSpend = {};
+    Object.values(State.requests || {})
+      .filter(r => r.status === 'Comprado' && r.boughtAt)
+      .forEach(r => {
+        if (fUnit && r.unitName !== fUnit) return;
+        const gName = App._displayGroupName(r.groupName);
+        const isParceled = r.parcelas && r.parcelas.length > 0;
+        if (!isParceled) {
+          const bd = (r.boughtAt || '').substring(0, 10);
+          if ((!fFrom || bd >= fFrom) && (!fTo || bd <= fTo)) byGroupSpend[gName] = (byGroupSpend[gName] || 0) + (parseFloat(r.valorTotal) || 0);
+        } else {
+          r.parcelas.forEach(p => {
+            const pd = (p.date || (p.month + '-01')).substring(0, 10);
+            if ((!fFrom || pd >= fFrom) && (!fTo || pd <= fTo)) byGroupSpend[gName] = (byGroupSpend[gName] || 0) + (parseFloat(p.valor) || 0);
+          });
+        }
+      });
+
+    // Gastos por Mês — mesma fonte do gráfico "Gastos por Período" (respeita Unidade
+    // + Grupo, NÃO o createdAt usado em getFilteredReqs — a janela de data aqui é
+    // sobre a data da COMPRA/parcela, por isso usa um recorte próprio, sem status)
+    const spendReqs = Object.values(State.requests || {}).filter(r => {
+      if (fUnit  && r.unitName  !== fUnit)  return false;
+      if (fGroup && r.groupName !== fGroup) return false;
+      return true;
+    });
+    const monthly = App._buildSpendMap(spendReqs, 'month', null, fFrom, fTo);
+    const monthlyRows = Object.keys(monthly).sort().map(k => {
+      const [y, mo] = k.split('-');
+      const lbl = new Date(+y, +mo - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return [lbl.charAt(0).toUpperCase() + lbl.slice(1), fmt(monthly[k])];
+    });
+
+    // Compras Parceladas — mesma coleta do card/modal
+    const parceladas = App._collectParceladas();
+    const parcPagas = parceladas.filter(x => App._parcelaPaga(x.parcelas)).length;
+    const parcelasRows = parceladas.map(x => {
+      const total = x.parcelas.length;
+      const pagas = x.parcelas.filter(p => App._parcelaPaga([p])).length;
+      return [App._pdfClean(x.titulo), App._pdfClean(x.sub || '—'), `${pagas}/${total}`, App._parcelaPaga(x.parcelas) ? 'Quitada' : 'Em aberto'];
+    });
+
+    // Consumo por categoria (Tintas/Pilhas/Outros/Conserto) — mesmos números dos
+    // cards, no período que estiver selecionado em cada um deles
+    const consumoRows = Object.entries(App._CONSUMO_CFG || {}).map(([kind, def]) => {
+      const s = App._consumoStats(kind, def.keywords, def.cfg);
+      return [def.cfg.titulo, String(s.curCount || 0), fmt(s.curSpent || 0), App._pdfClean(s.top ? s.top[0] : '—')];
+    });
+
+    // Log de Atividades Recentes — últimos 15 registros
+    const logsRows = Object.values(State.activityLog || {})
+      .sort((a, b) => (b.ts || '').localeCompare(a.ts || ''))
+      .slice(0, 15)
+      .map(l => [App._fmtDate(l.ts), App._pdfClean(l.ator || '—'), App._pdfClean(l.modulo || '—'), App._pdfClean(`${l.acao || ''} ${l.detalhe || ''}`.trim())]);
 
     const sections = [
       { heading: 'Indicadores Gerais', headers: ['Indicador', 'Valor'],
@@ -2077,6 +2147,15 @@ const App = {
       { heading: 'Por Grupo', headers: ['Grupo', 'Solicitações'],
         cols: [{ w: .7 }, { w: .3, align: 'right' }],
         rows: Object.entries(byGroup).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, String(v)]) },
+      { heading: 'Sub-opções Mais Pedidas', headers: ['Sub-opção', 'Pedidos'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: suboptsRows },
+      { heading: 'Gastos por Grupo de Produto', headers: ['Grupo', 'Gasto'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: Object.entries(byGroupSpend).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, fmt(v)]) },
+      { heading: 'Gastos por Mês', headers: ['Mês', 'Gasto'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: monthlyRows },
       { heading: 'Comparativo Anual', headers: ['Referência', 'Valor'],
         cols: [{ w: .5 }, { w: .5, align: 'right' }],
         rows: [
@@ -2084,6 +2163,15 @@ const App = {
           [cmp.prevY || 'Ano anterior', cmp.prevV || '—'],
           ['Projeção / referência', `${cmp.pct || '—'} ${cmp.lbl || ''} ${cmp.trend ? '· ' + cmp.trend : ''}`.trim()],
         ] },
+      { heading: `Compras Parceladas (${parceladas.length} no total · ${parcPagas} quitada(s))`, headers: ['Item', 'Detalhe', 'Parcelas', 'Status'],
+        cols: [{ w: .32 }, { w: .28 }, { w: .16, align: 'center' }, { w: .24 } ],
+        rows: parcelasRows.length ? parcelasRows : [] },
+      { heading: 'Consumo por Categoria', headers: ['Categoria', 'Qtd no período', 'Gasto', 'Item mais comprado'],
+        cols: [{ w: .3 }, { w: .18, align: 'right' }, { w: .22, align: 'right' }, { w: .3 }],
+        rows: consumoRows },
+      { heading: 'Log de Atividades Recentes', headers: ['Data', 'Quem', 'Módulo', 'Ação'],
+        cols: [{ w: .13 }, { w: .2 }, { w: .17 }, { w: .5 }],
+        rows: logsRows },
     ];
 
     App._pdfReport({
@@ -2151,6 +2239,206 @@ const App = {
     });
 
     pdf.save(filename);
+  },
+
+  // Limpa texto pro PDF: as fontes padrão do jsPDF (helvetica etc.) só cobrem
+  // Latin-1/WinAnsi — acento português passa numa boa, mas emoji/símbolo Unicode
+  // (✓ ✕ ↗ 📦 🏆 📅) vira caixinha em branco ou some. Troca pelos equivalentes
+  // em texto antes de jogar em qualquer célula/linha do relatório.
+  _pdfClean(s) {
+    return String(s ?? '')
+      .replace(/✓/g, 'OK')
+      .replace(/✕/g, 'X')
+      .replace(/[↗↑↓]/g, '')
+      .replace(/📦|🏆|📅/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  },
+
+  /* ── Relatório em PDF — lista de Solicitações (respeita os filtros/busca
+     ativos na tela: lê direto da tabela já renderizada, garante que o PDF
+     bate exatamente com o que está sendo visto, sem duplicar a lógica de
+     filtro/ordenação que já existe em renderRequests()) ── */
+  printRequestsList() {
+    App.renderRequests();
+    const tbody = document.getElementById('requests-tbody');
+    const rows = [];
+    tbody?.querySelectorAll('tr').forEach(tr => {
+      const tds = tr.children;
+      if (tds.length < 8) return; // linha de "nenhuma solicitação encontrada"
+      const seq  = tds[0].querySelector('.req-seq-badge')?.textContent || '';
+      const dt   = tds[0].querySelector('span:last-child')?.textContent || '';
+      const resumoEl = tds[4].querySelector('[title]');
+      const resumo = resumoEl ? resumoEl.getAttribute('title') : tds[4].textContent;
+      const urgente = tds[5].querySelector('.badge-urgent-ico') ? 'Urgente' : '—';
+      rows.push([
+        App._pdfClean(`${seq} ${dt}`),
+        App._pdfClean(tds[1].textContent),
+        App._pdfClean(tds[2].textContent),
+        App._pdfClean(tds[3].textContent),
+        App._pdfClean(resumo),
+        urgente,
+        App._pdfClean(tds[6].textContent),
+        App._pdfClean(tds[7].textContent),
+      ]);
+    });
+
+    const fStatus   = document.getElementById('filter-status')?.value || '';
+    const fUnit     = document.getElementById('filter-unit-req')?.value || '';
+    const fGroup    = document.getElementById('filter-group-req')?.value || '';
+    const fSubgroup = document.getElementById('filter-subgroup-req')?.value || '';
+    const qLive     = document.getElementById('req-live-search')?.value || '';
+    const fReqFrom  = document.getElementById('req-date-from')?.value || '';
+    const fReqTo    = document.getElementById('req-date-to')?.value || '';
+    const filtros = [];
+    if (fStatus)   filtros.push(`Status: ${fStatus}`);
+    if (fUnit)     filtros.push(`Unidade: ${fUnit}`);
+    if (fGroup)    filtros.push(`Grupo: ${fGroup}`);
+    if (fSubgroup) filtros.push(`Subgrupo: ${fSubgroup}`);
+    if (fReqFrom || fReqTo) filtros.push(`Período: ${fReqFrom ? App._fmtDate(fReqFrom) : '…'} → ${fReqTo ? App._fmtDate(fReqTo) : '…'}`);
+    if (qLive)     filtros.push(`Busca: "${qLive}"`);
+    const filtrosTxt = filtros.length ? filtros.join(' · ') : 'Todas as solicitações (sem filtro)';
+
+    App._pdfReport({
+      filename: `Relatorio-Solicitacoes-${new Date().toISOString().slice(0, 10)}.pdf`,
+      title: 'Relatório de Solicitações — Gestão TI',
+      subtitle: `Gerado em ${new Date().toLocaleDateString('pt-BR')} | ${State.adminUser || 'LAMIC'}  ·  ${filtrosTxt}  ·  ${rows.length} solicitação(ões)`,
+      sections: [
+        { heading: 'Solicitações', headers: ['Data', 'Unidade', 'Grupo', 'Subgrupo', 'Resumo', 'Urg.', 'Envio', 'Status'],
+          cols: [{ w: .11 }, { w: .14 }, { w: .12 }, { w: .12 }, { w: .24 }, { w: .06, align: 'center' }, { w: .10 }, { w: .11 }],
+          rows }
+      ]
+    });
+  },
+
+  /* ── Relatório em PDF — Estoque (2 modos: saldo atual OU entradas/saídas) ── */
+  gerarRelatorioEstoque(tipo) {
+    App._closeAllPopovers();
+    const fmt   = v => 'R$ ' + (parseFloat(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const data  = new Date().toLocaleDateString('pt-BR');
+    const admin = State.adminUser || 'LAMIC';
+
+    if (tipo === 'movs') {
+      const movs = Object.values(State.estoqueMov || {}).slice().sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+      const nEnt = movs.filter(m => m.tipo === 'entrada').length;
+      const nSai = movs.filter(m => m.tipo === 'saida').length;
+      const rows = movs.map(m => [
+        App._fmtDate(m.data),
+        m.tipo === 'entrada' ? 'Entrada' : 'Saída',
+        App._pdfClean(m.produto || '—'),
+        App._pdfClean(m.grupo || '—'),
+        `${m.tipo === 'entrada' ? '+' : '-'}${m.qtd ?? 0} ${m.unidade || ''}`.trim(),
+        m.saldo != null ? String(m.saldo) : '—',
+        App._pdfClean(m.tipo === 'entrada' ? (m.origem || '—') : (m.destino || '—')),
+      ]);
+      App._pdfReport({
+        filename: `Relatorio-Estoque-Movimentacoes-${new Date().toISOString().slice(0, 10)}.pdf`,
+        title: 'Relatório de Estoque — Entradas e Saídas',
+        subtitle: `Gerado em ${data} | ${admin}  ·  ${nEnt} entrada(s) · ${nSai} saída(s) · ${movs.length} movimentação(ões)`,
+        sections: [
+          { heading: 'Resumo', headers: ['Indicador', 'Valor'],
+            cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            rows: [['Entradas registradas', String(nEnt)], ['Saídas registradas', String(nSai)], ['Total de movimentações', String(movs.length)]] },
+          { heading: 'Movimentações', headers: ['Data', 'Tipo', 'Produto', 'Grupo', 'Qtd', 'Saldo', 'Origem/Destino'],
+            cols: [{ w: .11 }, { w: .10 }, { w: .24 }, { w: .15 }, { w: .12, align: 'right' }, { w: .10, align: 'right' }, { w: .18 }],
+            rows }
+        ]
+      });
+      return;
+    }
+
+    // tipo === 'itens' — saldo atual de cada item cadastrado (todo o estoque, sem
+    // depender do filtro de busca/grupo/zerados que estiver ativo na tela nesse momento)
+    const items = Object.entries(State.estoque || {}).map(([id, i]) => ({ id, ...i }))
+      .sort((a, b) => (a.grupo || '').localeCompare(b.grupo || '') || (a.produto || '').localeCompare(b.produto || ''));
+    const zerados    = items.filter(i => (parseFloat(i.quantidade) || 0) <= 0).length;
+    const saldoTotal = items.reduce((s, i) => s + (parseFloat(i.quantidade) || 0), 0);
+    const porGrupo = {};
+    items.forEach(i => { const g = i.grupo || '—'; porGrupo[g] = (porGrupo[g] || 0) + (parseFloat(i.quantidade) || 0); });
+
+    const rows = items.map(i => {
+      const qtd = parseFloat(i.quantidade) || 0;
+      return [
+        App._pdfClean(App._loteDisplay(i)),
+        App._pdfClean(i.produto || '—'),
+        App._pdfClean(i.grupo || '—'),
+        App._pdfClean(i.subgrupo || '—'),
+        String(qtd) + (qtd <= 0 ? ' (ZERADO)' : ''),
+      ];
+    });
+
+    App._pdfReport({
+      filename: `Relatorio-Estoque-Itens-${new Date().toISOString().slice(0, 10)}.pdf`,
+      title: 'Relatório de Estoque — Itens em Estoque',
+      subtitle: `Gerado em ${data} | ${admin}  ·  ${items.length} item(ns) cadastrado(s) · ${zerados} zerado(s) · Saldo total: ${saldoTotal}`,
+      sections: [
+        { heading: 'Resumo por Grupo', headers: ['Grupo', 'Saldo'],
+          cols: [{ w: .7 }, { w: .3, align: 'right' }],
+          rows: Object.entries(porGrupo).sort((a, b) => b[1] - a[1]).map(([g, v]) => [g, String(v)]) },
+        { heading: 'Itens em Estoque', headers: ['Lote/Código', 'Produto', 'Grupo', 'Subgrupo', 'Quantidade'],
+          cols: [{ w: .14 }, { w: .30 }, { w: .20 }, { w: .20 }, { w: .16, align: 'right' }],
+          rows }
+      ]
+    });
+  },
+
+  /* ── Relatório em PDF — Calendário (mês visível, dia a dia) ── */
+  printCalendarReport() {
+    const y = State.calYear, m = State.calMonth;
+    const label = new Date(y, m, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const fmt = v => 'R$ ' + parseFloat(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Mesma lógica de montagem do dia→eventos de renderCalendar() (só leitura,
+    // duplicada aqui de propósito pra não mexer numa função que já funciona).
+    const dayMap = {};
+    Object.values(State.requests || {}).forEach(r => {
+      if (r.status === 'Comprado' && r.boughtAt) {
+        const isParceled = r.parcelas && r.parcelas.length > 0;
+        if (!isParceled && r.boughtAt.startsWith(`${y}-${String(m + 1).padStart(2, '0')}`)) {
+          const day = parseInt(r.boughtAt.substring(8, 10));
+          if (!dayMap[day]) dayMap[day] = [];
+          dayMap[day].push({ type: 'direta', val: r.valorTotal, unit: r.unitName || '?', desc: (r.compraCodigo ? `[${r.compraCodigo}] ` : '') + (r.descricao || r.product || r.groupName || 'Compra') });
+        }
+      }
+      if (r.parcelas) {
+        r.parcelas.forEach(p => {
+          const pMonthStr = `${y}-${String(m + 1).padStart(2, '0')}`;
+          const pDate = p.date || (p.month + '-01');
+          if (!pDate.startsWith(pMonthStr)) return;
+          const day = parseInt(pDate.substring(8, 10)) || 1;
+          if (!dayMap[day]) dayMap[day] = [];
+          const lbl = p.num ? `Parcela ${p.num}/${p.total}` : 'Parcela';
+          dayMap[day].push({ type: 'parcela', val: p.valor, unit: r.unitName || '?', desc: `${r.compraCodigo ? `[${r.compraCodigo}] ` : ''}${lbl} — ${r.descricao || r.groupName || 'Compra'}` });
+        });
+      }
+    });
+
+    const rows = [];
+    let totalMes = 0;
+    Object.keys(dayMap).map(Number).sort((a, b) => a - b).forEach(day => {
+      dayMap[day].forEach(ev => {
+        totalMes += parseFloat(ev.val || 0);
+        rows.push([
+          String(day).padStart(2, '0') + '/' + String(m + 1).padStart(2, '0'),
+          ev.type === 'parcela' ? 'Parcela' : 'Compra Direta',
+          App._pdfClean(ev.unit),
+          App._pdfClean(ev.desc),
+          fmt(ev.val),
+        ]);
+      });
+    });
+
+    const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+    App._pdfReport({
+      filename: `Relatorio-Calendario-${y}-${String(m + 1).padStart(2, '0')}.pdf`,
+      title: `Relatório do Calendário de Compras — ${labelCap}`,
+      subtitle: `Gerado em ${new Date().toLocaleDateString('pt-BR')} | ${State.adminUser || 'LAMIC'}  ·  ${rows.length} lançamento(s) · Total do mês: ${fmt(totalMes)}`,
+      sections: [
+        { heading: `Itens de ${labelCap}`, headers: ['Dia', 'Tipo', 'Unidade', 'Descrição', 'Valor'],
+          cols: [{ w: .08 }, { w: .16 }, { w: .20 }, { w: .40 }, { w: .16, align: 'right' }],
+          rows }
+      ]
+    });
   },
 
   /* ── Cards de consumo: Tintas e Pilhas/Baterias ─── */

@@ -1710,6 +1710,10 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .unit-spend-val { font-size: .82rem; font-weight: 600; color: var(--green); min-width: 70px; text-align: right; }
 
 /* ── CALENDAR ── */
+/* Navegação de mês saiu do cabeçalho da aba (virou botão Relatório) — agora
+   fica numa linha própria, junto com a legenda, logo acima do grid. */
+.cal-toolbar-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.cal-toolbar-row .cal-legend-row { margin-bottom: 0; }
 .cal-nav { display: flex; align-items: center; gap: 12px; }
 .btn-cal-nav {
   background: #fff; border: 1px solid #c8d4e8;
