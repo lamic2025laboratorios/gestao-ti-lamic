@@ -2732,7 +2732,27 @@ const App = {
   // Quantidade efetivamente comprada de uma solicitação: usa a quantidade confirmada
   // na compra (quantidade); r.qty (só existe em pilha/bateria, definido na solicitação
   // original) é usado como fallback só se a compra não tiver quantidade registrada.
-  _qtyComprada(r) { return parseFloat(r.quantidade) || parseInt(r.qty) || 1; },
+  // Tinta "Kit 4 cores": cada kit comprado = 4 unidades (1 de cada cor), não 1.
+  _qtyComprada(r) {
+    const q = parseFloat(r.quantidade) || parseInt(r.qty) || 1;
+    const cor = (r.cor || r.cores || '').toLowerCase();
+    if (cor.includes('kit') && cor.includes('4')) return q * 4;
+    return q;
+  },
+
+  // Cor fixa da barra no card de Tintas: segue a cor real da tinta (não o
+  // rank/índice) — azul→azul, amarela→amarela, vermelha→vermelha, preta→preta,
+  // Kit 4 cores→roxo. Nome fora dessa lista cai no palette padrão por índice.
+  _inkColor(name, i) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('kit') && n.includes('4')) return '#7c52d4';
+    if (n.includes('azul'))     return '#2a68d4';
+    if (n.includes('amarel'))   return '#d9a520';
+    if (n.includes('vermelh'))  return '#d94040';
+    if (n.includes('pret'))     return '#1f2937';
+    const fallback = ['#d9a520', '#2a68d4', '#1db87a', '#e8830a', '#7c52d4', '#d94040'];
+    return fallback[i % fallback.length];
+  },
 
   _renderConsumo(kind, keywords, cfg) {
     const fmt = v => 'R$ ' + (v||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2765,10 +2785,12 @@ const App = {
     const curSpent  = App._spentInWindow(inCur,  win.from,  win.to);
     const prevSpent = App._spentInWindow(inPrev, prev.from, prev.to);
 
-    // Top item (cor/modelo) no período atual
+    // Top item (cor/modelo) no período atual. Conserto às vezes só tem o
+    // equipamento marcado (sem "modelo" propriamente) ou nem isso — nesse caso
+    // cai pro subgrupo (ex: "Impressora"), pra não sumir da métrica.
     const topMap = {};
     inCur.forEach(r => {
-      const key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || '').toString();
+      const key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || r.equipamento || r.subgrupo || '').toString();
       if (!key) return;
       topMap[key] = (topMap[key] || 0) + App._qtyComprada(r);
     });
@@ -2784,10 +2806,20 @@ const App = {
     });
     const topUnit = Object.entries(unitMap).sort((a, b) => b[1] - a[1])[0];
 
-    // Maior Solicitante — UNIDADE que mais solicitou (igual às solicitações),
-    // contada por nº de pedidos no período. Não usa o campo livre "solicitante".
+    // Maior Solicitante — UNIDADE que mais SOLICITOU, não a que mais comprou:
+    // conta QUALQUER status (Negado/Aguardando/Comprado/Estoque/Solicitado), já
+    // que "solicitou" independe de ter virado compra ou ter sido negado depois.
+    // Por isso usa uma lista à parte (matchesAll), sem o filtro status==='Comprado'
+    // que "matches"/inCur têm — as outras métricas do card continuam só com Comprado.
+    const matchesAll = Object.values(State.requests || {}).filter(r => {
+      const g = (r.groupName || '').toLowerCase();
+      if (fUnit && r.unitName !== fUnit) return false;
+      const hit = keywords.some(k => g.includes(k));
+      return cfg.exclude ? !hit : hit;
+    });
+    const inCurAllStatus = matchesAll.filter(r => { const d = App._purchaseDate(r); return d && d >= win.from && d <= win.to; });
     const solicitanteMap = {};
-    inCur.forEach(r => {
+    inCurAllStatus.forEach(r => {
       const u = (r.unitName || '').trim();
       if (!u) return;
       solicitanteMap[u] = (solicitanteMap[u] || 0) + 1;
@@ -2837,7 +2869,9 @@ const App = {
           shown.map(([name, n], i) => {
             const pct = Math.round(n / total * 100);
             const w = Math.max(pct, 14); // largura mínima p/ o texto caber
-            const color = palette[i % palette.length];
+            // Tinta: cor da barra segue a cor real (azul/amarelo/vermelho/preto),
+            // e "Kit 4 cores" fica roxo — em vez do índice de rank genérico.
+            const color = kind === 'ink' ? App._inkColor(name, i) : palette[i % palette.length];
             return `
             <div class="consumo-bd2-row">
               <div class="consumo-bd2-label" title="${name}">${name}</div>
@@ -4787,6 +4821,20 @@ const App = {
         DB.set(`groups/${id}`, novo);
       }
     });
+  },
+
+  // O grupo cadastrado (groups/{id}) já virou "Conserto" há tempos — mas
+  // solicitações antigas guardam uma CÓPIA do nome (groupName) tirada na hora
+  // em que foram criadas, e essa cópia não se atualiza sozinha quando o grupo
+  // é renomeado. Corrige as que ainda têm a grafia velha exata "Concerto".
+  // Idempotente (trava por sessão, só escreve o que ainda estiver errado).
+  _consertoNomeFixFeito: false,
+  _migrarNomeConsertoRequests() {
+    if (App._consertoNomeFixFeito) return;
+    App._consertoNomeFixFeito = true;
+    Object.entries(State.requests || {})
+      .filter(([, r]) => r && r.groupName === 'Concerto')
+      .forEach(([id]) => DB.set(`requests/${id}/groupName`, 'Conserto'));
   },
 
   // Puxa o gestor legado (número único antigo em config.gestorWhats) pra dentro
@@ -7836,6 +7884,7 @@ const App = {
     safeListener('config',    v => { State.config   =v||{}; App._migrarGestorLegacy?.(); App._syncGestorField?.(); });
     safeListener('requests',  v => {
       State.requests=v||{};
+      App._migrarNomeConsertoRequests?.();
       App.updatePendingBadge();
       App.populateDashFilters();
       if (State.adminUser) {
