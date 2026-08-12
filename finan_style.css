@@ -729,14 +729,18 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 
 /* ── KPI Ring: Status (rosca) no centro, KPIs ao redor (topo do dashboard) ── */
 .kpi-ring-section {
+  position: relative; /* âncora do SVG de conectores, que é position:absolute */
   display: grid;
   grid-template-columns: 1fr minmax(280px, 360px) 1fr;
   gap: 20px;
   align-items: stretch;
   margin-bottom: 26px;
 }
-.kpi-ring-col { display: flex; flex-direction: column; gap: 16px; justify-content: center; }
+.kpi-ring-col { display: flex; flex-direction: column; gap: 16px; justify-content: center; position: relative; z-index: 1; }
 .kpi-ring-col .kpi-card { flex: 1 1 auto; }
+/* SVG das linhas ligando cada card à rosca — cobre a seção inteira, fica
+   ATRÁS dos cards/rosca (z-index 1 acima), só as linhas aparecem no vão. */
+.kpi-ring-connectors { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
 /* Cor única (sem arco-íris) pra ficar mais sóbrio/profissional — navy suave,
    mesmo tom do resto do sistema, em vez de um k-* diferente por card. */
 .kpi-ring-col .kpi-card {
@@ -764,6 +768,7 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .kpi-ring-center {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
+  position: relative; z-index: 1;
 }
 .kpi-ring-center canvas { max-height: 260px !important; }
 @media (max-width: 1100px) {

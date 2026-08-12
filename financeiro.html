@@ -228,6 +228,9 @@
         <!-- KPI Ring: Status (só a rosca, sem título/índice) no centro, KPIs ao redor,
              centralizados e com uma cor só (sem o arco-íris de antes) -->
         <div class="kpi-ring-section">
+          <!-- Linhas conectando cada card à rosca (calculadas em JS —
+               App._renderKpiConnectors — pra acompanhar o layout real) -->
+          <svg id="kpi-ring-connectors" class="kpi-ring-connectors"></svg>
           <div class="kpi-ring-col">
             <div class="kpi-card kpi-clickable" onclick="App.showTotalKpi()" title="Clique para ver por unidade">
               <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg></div>

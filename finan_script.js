@@ -1948,6 +1948,65 @@ const App = {
     App.renderNovasSolicitacoes();
     App.renderActivityLog();
     App.renderParcelasCard();
+    // Depois de tudo renderizado (canvas da rosca incluso) — só aí dá pra medir
+    // a posição real dos cards/rosca na tela e desenhar as linhas certas.
+    requestAnimationFrame(() => App._renderKpiConnectors());
+  },
+
+  // Linhas ligando cada card do KPI ring à rosca central — desenhadas em
+  // SVG, calculadas pela posição REAL na tela (não dá pra fazer isso só
+  // com CSS: os cards ficam em coluna própria, a rosca noutra, cada card
+  // numa altura diferente). Pra cada card, acha o ponto na borda do círculo
+  // na MESMA altura do card (interseção de y=cardY com a equação do
+  // círculo) e traça uma linha até lá — efeito de "raio" apontando pro
+  // centro, parecido com leader line de gráfico de pizza rotulado.
+  _renderKpiConnectors() {
+    const svg = document.getElementById('kpi-ring-connectors');
+    const section = document.querySelector('.kpi-ring-section');
+    const ringEl = document.querySelector('.kpi-ring-center canvas');
+    if (!svg || !section || !ringEl) return;
+    const secRect  = section.getBoundingClientRect();
+    const ringRect = ringEl.getBoundingClientRect();
+    if (!secRect.width || !ringRect.width) return; // seção ainda não visível (aba fechada)
+
+    const ringCx = ringRect.left + ringRect.width / 2 - secRect.left;
+    const ringCy = ringRect.top + ringRect.height / 2 - secRect.top;
+    const ringR  = Math.min(ringRect.width, ringRect.height) / 2;
+
+    svg.setAttribute('viewBox', `0 0 ${secRect.width} ${secRect.height}`);
+    svg.innerHTML = '';
+    const NS = 'http://www.w3.org/2000/svg';
+
+    document.querySelectorAll('.kpi-ring-col .kpi-card').forEach(card => {
+      const r = card.getBoundingClientRect();
+      if (!r.width) return;
+      const cardCy    = r.top + r.height / 2 - secRect.top;
+      const isLeftCol = (r.left + r.width / 2) < ringRect.left;
+      const cardEdgeX = isLeftCol ? (r.right - secRect.left) : (r.left - secRect.left);
+
+      // Ponto na borda do círculo na mesma altura do card (x = cx ± √(r²−dy²));
+      // se o card estiver mais alto/baixo que o raio alcança, gruda no topo/base.
+      const dy = Math.max(-ringR, Math.min(ringR, cardCy - ringCy));
+      const dx = Math.sqrt(Math.max(ringR * ringR - dy * dy, 0)) * (isLeftCol ? -1 : 1);
+      const ringEdgeX = ringCx + dx;
+      const ringEdgeY = ringCy + dy;
+
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', cardEdgeX);
+      line.setAttribute('y1', cardCy);
+      line.setAttribute('x2', ringEdgeX);
+      line.setAttribute('y2', ringEdgeY);
+      line.setAttribute('stroke', '#c7d2e0');
+      line.setAttribute('stroke-width', '2');
+      svg.appendChild(line);
+
+      const dot = document.createElementNS(NS, 'circle');
+      dot.setAttribute('cx', ringEdgeX);
+      dot.setAttribute('cy', ringEdgeY);
+      dot.setAttribute('r', '3.5');
+      dot.setAttribute('fill', '#8898b8');
+      svg.appendChild(dot);
+    });
   },
 
   /* ── Impressão / PDF do dashboard ─────────── */
@@ -8131,6 +8190,13 @@ const App = {
 
   initListeners() {
     App._initEscClose();
+    // Redesenha as linhas do KPI ring quando a janela muda de tamanho —
+    // as posições dos cards/rosca mudam, as linhas ficariam desalinhadas.
+    let _kpiConnResizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(_kpiConnResizeTimer);
+      _kpiConnResizeTimer = setTimeout(() => App._renderKpiConnectors?.(), 150);
+    });
     const safeListener = (path, cb) => {
       try {
         const r = window._ref(window._db, path);
