@@ -1086,13 +1086,22 @@
 
       <!-- Modal: Histórico completo de movimentações -->
       <div id="mov-hist-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:880px">
-          <div class="modal-header">
-            <h3 id="mov-hist-title">Histórico</h3>
-            <button class="modal-close" onclick="App.closeMovHist()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
+        <div class="modal-card form-modal" style="max-width:880px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M12 8v4l2.5 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="mov-hist-title">Histórico</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeMovHist()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
           </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
           <div class="modal-body">
             <input type="text" id="mov-hist-search" class="req-search-input" placeholder="Buscar..." oninput="App.setMovHistSearch(this.value)" style="max-width:100%;margin-bottom:10px">
             <div class="table-wrap">
@@ -1107,19 +1116,30 @@
               <button id="mov-hist-next" class="estoque-pager-btn" onclick="App.movHistPage('next')">Próximo ›</button>
             </div>
           </div>
+          </div>
         </div>
       </div>
 
       <!-- Modal: Detalhe de uma movimentação -->
       <div id="mov-detail-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:520px">
-          <div class="modal-header">
-            <h3 id="mov-detail-title">Detalhe da Movimentação</h3>
-            <button class="modal-close" onclick="App.closeMovDetail()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
+        <div class="modal-card form-modal" style="max-width:520px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="mov-detail-title">Detalhe da Movimentação</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeMovDetail()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
           </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
           <div class="modal-body" id="mov-detail-body"></div>
+          </div>
           <div class="modal-footer">
             <button class="btn-ghost" onclick="App.closeMovDetail()">Fechar</button>
             <button class="btn-delete" id="mov-detail-del-btn" onclick="App.deleteMovimento()">Apagar movimento</button>
@@ -1130,19 +1150,29 @@
 
       <!-- Modal: Editar data da movimentação -->
       <div id="mov-date-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:400px">
-          <div class="modal-header">
-            <h3>Alterar Data da Movimentação</h3>
-            <button class="modal-close" onclick="App.closeMovDate()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
+        <div class="modal-card form-modal" style="max-width:400px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name">Alterar Data da Movimentação</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeMovDate()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
           </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
           <div class="modal-body">
             <input type="hidden" id="mov-date-id">
             <div class="form-group">
               <label class="form-label">Data</label>
               <input type="date" id="mov-date-input" class="input-field">
             </div>
+          </div>
           </div>
           <div class="modal-footer">
             <button class="btn-ghost" onclick="App.closeMovDate()">Cancelar</button>
@@ -1154,13 +1184,22 @@
       <!-- Modal: Novo/Editar Item de Estoque -->
       <!-- ── MODAL: escolher tipo (Nova compra x Nova entrada) ── -->
       <div id="estoque-tipo-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:460px">
-          <div class="modal-header">
-            <h3>Adicionar ao Estoque</h3>
-            <button class="modal-close" onclick="document.getElementById('estoque-tipo-modal').classList.add('hidden')">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
+        <div class="modal-card form-modal" style="max-width:460px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name">Adicionar ao Estoque</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="document.getElementById('estoque-tipo-modal').classList.add('hidden')" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
           </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
           <div class="modal-body">
             <p style="color:var(--ink-500);margin-bottom:14px">O que você está adicionando?</p>
             <div style="display:flex;flex-direction:column;gap:12px">
@@ -1174,17 +1213,27 @@
               </button>
             </div>
           </div>
+          </div>
         </div>
       </div>
 
       <div id="estoque-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:620px">
-          <div class="modal-header">
-            <h3 id="estoque-form-title">Novo Item em Estoque</h3>
-            <button class="modal-close" onclick="App.closeEstoqueForm()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
+        <div class="modal-card form-modal" style="max-width:620px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="estoque-form-title">Novo Item em Estoque</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeEstoqueForm()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
           </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
           <div class="modal-body">
             <input type="hidden" id="estoque-edit-id">
             <div class="form-row-2">
@@ -1306,6 +1355,7 @@
               <input type="date" id="estoque-data" class="input-field">
             </div>
           </div>
+          </div>
           <div class="modal-footer">
             <button class="btn-ghost" onclick="App.closeEstoqueForm()">Cancelar</button>
             <button class="btn-primary" onclick="App.saveEstoqueItem()">
@@ -1319,12 +1369,20 @@
       <!-- ── MODAL: COMPRA COMBINADA ── -->
       <div id="compra-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width:720px">
-          <div class="modal-header">
-            <h3 id="compra-modal-title">Compra Combinada — Seleção</h3>
-            <button class="modal-close" onclick="App.closeCompraModal()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="compra-modal-title">Compra Combinada — Seleção</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeCompraModal()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
           </div>
+          <div class="form-modal-stripe"></div>
 
           <!-- PASSO 1: Seleção -->
           <div id="compra-step-1">
@@ -1916,14 +1974,24 @@
 
         <!-- Modal: Logs completos por dia -->
         <div id="logs-full-modal" class="modal-overlay hidden">
-          <div class="modal-card" style="max-width:760px">
-            <div class="modal-header">
-              <h3>Logs de Atividade — Histórico Completo</h3>
-              <button class="modal-close" onclick="document.getElementById('logs-full-modal').classList.add('hidden')">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-              </button>
+          <div class="modal-card form-modal" style="max-width:760px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <div class="eqd-header-name">Logs de Atividade — Histórico Completo</div>
+              </div>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('logs-full-modal').classList.add('hidden')" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
             </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
             <div class="modal-body" id="logs-full-body"></div>
+            </div>
             <div class="modal-footer" id="logs-full-footer" style="display:none">
               <button class="btn-delete" onclick="App.apagarLogs()">
                 <svg viewBox="0 0 24 24" fill="none" style="width:14px;vertical-align:middle;margin-right:5px"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -1937,13 +2005,22 @@
 
       <!-- ── MODAL: EDITAR GRUPO (sub-opções + subgrupos) ── -->
       <div id="modal-grupo-edit" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:560px">
-          <div class="modal-header">
-            <h3 id="cfg-detail-title">Grupo</h3>
-            <button class="modal-close" onclick="App.closeGroupEdit()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
+        <div class="modal-card form-modal" style="max-width:560px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="cfg-detail-title">Grupo</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeGroupEdit()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
           </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
           <div class="modal-body">
             <div class="cfg-block">
               <div class="cfg-block-head">
@@ -1980,18 +2057,28 @@
               </div>
             </div>
           </div>
+          </div>
         </div>
       </div>
 
       <!-- ── MODAL: NOVA SOLICITAÇÃO (ADMIN) ── -->
       <div id="modal-nova-solic" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:560px">
-          <div class="modal-header">
-            <h3>Nova Solicitação</h3>
-            <button class="modal-close" onclick="App.closeNovaSolic()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
+        <div class="modal-card form-modal" style="max-width:560px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name">Nova Solicitação</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeNovaSolic()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
           </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
           <div class="modal-body">
             <div class="form-row-2">
               <div class="form-group">
@@ -2054,6 +2141,7 @@
               <label class="form-label">Observação <span class="opt-tag">opcional</span></label>
               <textarea id="nsol-obs" rows="2" placeholder="Alguma observação adicional?" class="input-field"></textarea>
             </div>
+          </div>
           </div>
           <div class="modal-footer">
             <button class="btn-secondary" onclick="App.closeNovaSolic()">Cancelar</button>
@@ -2230,11 +2318,22 @@
 
 <!-- ══ MODAL: enviar para autorização (escolher gestor + valor) ══ -->
 <div id="autz-send-modal" class="modal-overlay hidden">
-  <div class="modal-card" style="max-width:480px">
-    <div class="modal-header">
-      <h3>Enviar para autorização</h3>
-      <button class="modal-close" onclick="document.getElementById('autz-send-modal').classList.add('hidden')">✕</button>
+  <div class="modal-card form-modal" style="max-width:480px">
+    <div class="form-modal-header">
+      <div class="eqd-header-left">
+        <div class="eqd-header-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <div class="eqd-header-name">Enviar para autorização</div>
+      </div>
+      <div class="eqd-header-right">
+        <button class="eqd-icon-btn" onclick="document.getElementById('autz-send-modal').classList.add('hidden')" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
     </div>
+    <div class="form-modal-stripe"></div>
+    <div class="form-modal-scroll">
     <div class="modal-body">
       <p id="autz-send-resumo" style="font-weight:600;color:var(--ink-900);background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:14px"></p>
       <div class="form-row-2" style="margin-bottom:14px">
@@ -2256,16 +2355,27 @@
       <div id="autz-send-gestores" class="autz-gestores-box"></div>
       <a id="autz-enviar-btn" class="btn-primary autz-enviar-btn is-disabled" href="#">Escolha um gestor</a>
     </div>
+    </div>
   </div>
 </div>
 
 <!-- ══ MODAL: autorizar compra em LOTE (várias solicitações) ══ -->
 <div id="autz-lote-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width:560px">
-    <div class="modal-header">
-      <h3 id="autz-lote-title">Autorizar compra — Solicitações</h3>
-      <button class="modal-close" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')">✕</button>
+    <div class="form-modal-header">
+      <div class="eqd-header-left">
+        <div class="eqd-header-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <div class="eqd-header-name" id="autz-lote-title">Autorizar compra — Solicitações</div>
+      </div>
+      <div class="eqd-header-right">
+        <button class="eqd-icon-btn" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
     </div>
+    <div class="form-modal-stripe"></div>
 
     <!-- PASSO 1: escolher solicitações -->
     <div id="autz-lote-step1">
@@ -2314,11 +2424,22 @@
 
 <!-- ══ MODAL: decisão de autorização (gestor respondeu) ══ -->
 <div id="autorizacao-modal" class="modal-overlay hidden">
-  <div class="modal-card" style="max-width:460px">
-    <div class="modal-header">
-      <h3>Decisão de Autorização</h3>
-      <button class="modal-close" onclick="document.getElementById('autorizacao-modal').classList.add('hidden')">✕</button>
+  <div class="modal-card form-modal" style="max-width:460px">
+    <div class="form-modal-header">
+      <div class="eqd-header-left">
+        <div class="eqd-header-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <div class="eqd-header-name">Decisão de Autorização</div>
+      </div>
+      <div class="eqd-header-right">
+        <button class="eqd-icon-btn" onclick="document.getElementById('autorizacao-modal').classList.add('hidden')" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
     </div>
+    <div class="form-modal-stripe"></div>
+    <div class="form-modal-scroll">
     <div class="modal-body">
       <p style="color:var(--ink-500);margin-bottom:6px">O que o gestor decidiu?</p>
       <p id="autz-resumo" style="font-weight:600;color:var(--ink-900);background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:16px"></p>
@@ -2328,21 +2449,31 @@
       </div>
       <p style="font-size:.78rem;color:var(--ink-500);margin-top:10px">Autorizado abre a compra (Comprado ou Estoque). Negado marca a solicitação como negada.</p>
     </div>
+    </div>
   </div>
 </div>
 
 <!-- ══ MODAL SOLICITAÇÃO ══ -->
 <div id="modal-request" class="modal-overlay hidden">
-  <div class="modal-card">
-    <div class="modal-header">
-      <div class="modal-header-info">
-        <h3 id="modal-title">Solicitação</h3>
-        <span id="modal-header-badge"></span>
+  <div class="modal-card form-modal">
+    <div class="form-modal-header">
+      <div class="eqd-header-left">
+        <div class="eqd-header-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          <div class="eqd-header-name" id="modal-title">Solicitação</div>
+          <span id="modal-header-badge"></span>
+        </div>
       </div>
-      <button class="modal-close" onclick="App.closeModal()">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-      </button>
+      <div class="eqd-header-right">
+        <button class="eqd-icon-btn" onclick="App.closeModal()" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
     </div>
+    <div class="form-modal-stripe"></div>
+    <div class="form-modal-scroll">
     <div class="modal-body">
       <div id="modal-info" class="modal-info-block"></div>
       <div class="form-group" style="margin-bottom:16px">
@@ -2545,6 +2676,7 @@
         </div>
       </div>
     </div>
+    </div>
     <div class="modal-footer">
       <div class="modal-footer-left">
         <button class="btn-delete" id="modal-btn-delete" onclick="App.deleteRequest()">
@@ -2565,18 +2697,28 @@
 
 <!-- MODAL EDITAR SUBGRUPO / SUBOPT -->
 <div id="modal-edit-item" class="modal-overlay hidden">
-  <div class="modal-card small-modal">
-    <div class="modal-header">
-      <h3 id="edit-modal-title">Editar</h3>
-      <button class="modal-close" onclick="App.closeEditModal()">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-      </button>
+  <div class="modal-card form-modal small-modal">
+    <div class="form-modal-header">
+      <div class="eqd-header-left">
+        <div class="eqd-header-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <div class="eqd-header-name" id="edit-modal-title">Editar</div>
+      </div>
+      <div class="eqd-header-right">
+        <button class="eqd-icon-btn" onclick="App.closeEditModal()" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
     </div>
+    <div class="form-modal-stripe"></div>
+    <div class="form-modal-scroll">
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">Novo nome</label>
         <input type="text" id="edit-item-value" class="input-field" />
       </div>
+    </div>
     </div>
     <div class="modal-footer">
       <button class="btn-ghost" onclick="App.closeEditModal()">Cancelar</button>
