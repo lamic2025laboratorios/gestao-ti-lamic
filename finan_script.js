@@ -3061,7 +3061,13 @@ const App = {
           return;
         }
       }
-      let key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || r.equipamento || r.subgrupo || '').toString();
+      // Fallback pro equipamento/subgrupo é só do Conserto (às vezes só tem o
+      // equipamento marcado, sem "modelo" — cai pro subgrupo, ex. "Impressora").
+      // Pilhas/Baterias NÃO usa esse fallback: modelo tem que ser um dos
+      // cadastrados em Sub-opções por Grupo — sem isso, um pedido avulso sem
+      // modelo virava um balde falso "Avulso"/subgrupo genérico no gráfico.
+      let key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || '').toString();
+      if (!key && kind === 'concerto') key = (r.equipamento || r.subgrupo || '').toString();
       if (!key) return;
       // Normaliza maiúscula/minúscula da cor da tinta — solicitações antigas
       // (ou sub-opção reconfigurada em outro momento) podem ter guardado
