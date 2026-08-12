@@ -743,12 +743,19 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   background: linear-gradient(135deg, #eef3fb, #f7f9fd);
   border-color: var(--surf-border, #dde5f2);
 }
+/* Mais quadrados e maiores: ícone em cima, número/rótulo embaixo, tudo
+   centralizado — em vez da linha estreita ícone-à-esquerda/texto-à-direita. */
+.kpi-ring-col .kpi-card {
+  flex-direction: column; align-items: center; text-align: center;
+  justify-content: center; gap: 10px;
+  padding: 24px 18px; min-height: 118px;
+}
 .kpi-ring-col .kpi-icon svg { color: var(--blue-500, #1a5bbf); }
 .kpi-ring-center {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
 }
-.kpi-ring-center canvas { max-height: 210px !important; }
+.kpi-ring-center canvas { max-height: 240px !important; }
 @media (max-width: 1100px) {
   .kpi-ring-section { grid-template-columns: 1fr; }
   .kpi-ring-col { flex-direction: row; flex-wrap: wrap; }
@@ -1240,16 +1247,19 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   flex-basis: 100%; justify-content: flex-end;
 }
-.cons-year-sel, .cons-month-sel {
+.cons-year-sel, .cons-month-sel, .cons-week-sel {
   padding: 5px 8px; border-radius: 8px; border: 1.5px solid #d0d9ea;
   background: #fff; color: #1a3a6b; font-size: .78rem; font-weight: 600; cursor: pointer;
+  min-width: 118px; box-sizing: border-box; /* os 3 do mesmo tamanho — proporcional
+                                                não importa se é select, month ou date */
 }
-.cons-year-sel:hover, .cons-month-sel:hover { border-color: #3a7ee8; }
+.cons-year-sel:hover, .cons-month-sel:hover, .cons-week-sel:hover { border-color: #3a7ee8; }
 .consumo-period-toggle { display: flex; gap: 0; border: 1.5px solid #d0d9ea; border-radius: 8px; overflow: hidden; }
 .cons-per-btn {
+  flex: 1 1 0; /* Semana/Mês/Ano do mesmo tamanho, em vez de cada um no tamanho do texto */
   padding: 5px 12px; border: none; background: #fff; color: #6680a0;
   font-size: .76rem; font-weight: 600; cursor: pointer; transition: all .15s;
-  border-right: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0; white-space: nowrap;
 }
 .cons-per-btn:last-child { border-right: none; }
 .cons-per-btn:hover { background: #eef4ff; color: #3a7ee8; }

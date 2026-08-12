@@ -2098,6 +2098,8 @@ const App = {
   consPeriod: { ink: 'year', bat: 'year', outros: 'year', concerto: 'year' },
   consYear:   { ink: new Date().getFullYear().toString(), bat: new Date().getFullYear().toString(), outros: new Date().getFullYear().toString(), concerto: new Date().getFullYear().toString() },
   consMonth:  { ink: (new Date().getMonth() + 1).toString().padStart(2,'0'), bat: (new Date().getMonth() + 1).toString().padStart(2,'0'), outros: (new Date().getMonth() + 1).toString().padStart(2,'0'), concerto: (new Date().getMonth() + 1).toString().padStart(2,'0') },
+  // Dia escolhido pro filtro "Semana" (a semana é os 7 dias terminando nele) — YYYY-MM-DD
+  consWeek: (() => { const t = new Date().toISOString().substring(0,10); return { ink: t, bat: t, outros: t, concerto: t }; })(),
 
   setConsPeriod(kind, period, btn) {
     App.consPeriod[kind] = period;
@@ -2105,11 +2107,13 @@ const App = {
       document.querySelectorAll(`.cons-per-btn[data-kind="${kind}"]`).forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     }
-    // Ano: só visível em "year" · Mês: só visível em "month" · Semana: nenhum
-    const yearSel  = document.getElementById(`${kind}-year`);
+    // Só o controle do período escolhido fica visível — os outros dois somem
+    const weekSel  = document.getElementById(`${kind}-week`);
     const monthSel = document.getElementById(`${kind}-month`);
-    if (yearSel)  yearSel.classList.toggle('hidden',  period !== 'year');
+    const yearSel  = document.getElementById(`${kind}-year`);
+    if (weekSel)  weekSel.classList.toggle('hidden',  period !== 'week');
     if (monthSel) monthSel.classList.toggle('hidden', period !== 'month');
+    if (yearSel)  yearSel.classList.toggle('hidden',  period !== 'year');
     App.renderConsumoCards();
   },
 
@@ -2118,22 +2122,23 @@ const App = {
     App.renderConsumoCards();
   },
 
-  setConsMonth(kind, month) {
-    App.consMonth[kind] = month;
+  setConsMonth(kind, ym) {
+    // <input type="month"> devolve "YYYY-MM" — separa em ano+mês (consYear/consMonth
+    // continuam existindo separados, é só o INPUT que virou um calendário só)
+    const [y, m] = (ym || '').split('-');
+    if (y) App.consYear[kind]  = y;
+    if (m) App.consMonth[kind] = m;
     App.renderConsumoCards();
   },
 
-  // Preenche selects de ano e mês e sincroniza visibilidade
-  _populateConsYears() {
-    const mesesNome = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    // "outros" usa exclude:true → conta grupos que NÃO batem com tinta/pilha/bateria
-    const keywordCfg = {
-      ink:      { kws: ['tinta'],                                     exclude: false },
-      bat:      { kws: ['pilha', 'bateria'],                          exclude: false },
-      concerto: { kws: ['conserto', 'concerto'],                      exclude: false },
-      outros:   { kws: ['tinta', 'pilha', 'bateria', 'conserto', 'concerto'], exclude: true }
-    };
+  setConsWeek(kind, dateStr) {
+    if (!dateStr) return;
+    App.consWeek[kind] = dateStr;
+    App.renderConsumoCards();
+  },
 
+  // Preenche o valor inicial dos 3 controles (semana/mês/ano) e sincroniza visibilidade
+  _populateConsYears() {
     // Anos com pedidos (qualquer status, qualquer tipo)
     const allYears = new Set([new Date().getFullYear().toString()]);
     Object.values(State.requests || {}).forEach(r => {
@@ -2144,8 +2149,9 @@ const App = {
 
     ['ink', 'bat', 'concerto', 'outros'].forEach(kind => {
       const period   = App.consPeriod[kind] || 'year';
-      const yearSel  = document.getElementById(`${kind}-year`);
+      const weekSel  = document.getElementById(`${kind}-week`);
       const monthSel = document.getElementById(`${kind}-month`);
+      const yearSel  = document.getElementById(`${kind}-year`);
 
       // ── Ano ──
       if (yearSel) {
@@ -2156,37 +2162,25 @@ const App = {
         yearSel.classList.toggle('hidden', period !== 'year');
       }
 
-      // ── Mês — só os que têm pedidos do tipo ──
+      // ── Mês — calendário nativo (ano+mês juntos, "YYYY-MM") ──
       if (monthSel) {
-        const { kws, exclude } = keywordCfg[kind];
-        const monthsWithData = new Set();
-        Object.values(State.requests || {}).forEach(r => {
-          if (r.status !== 'Comprado') return;
-          const g = (r.groupName || '').toLowerCase();
-          const hit = kws.some(k => g.includes(k));
-          if (exclude ? hit : !hit) return;
-          const ym = (r.boughtAt || r.createdAt || '').substring(0, 7); // YYYY-MM
-          if (/^\d{4}-\d{2}$/.test(ym)) monthsWithData.add(ym.substring(5, 7)); // MM
-        });
-
-        // Se não há dados, mostra todos os meses
-        const mList = monthsWithData.size > 0
-          ? [...monthsWithData].sort()
-          : Array.from({length:12}, (_,i) => String(i+1).padStart(2,'0'));
-
-        const curM = App.consMonth[kind] || (new Date().getMonth() + 1).toString().padStart(2,'0');
-        monthSel.innerHTML = mList.map(m =>
-          `<option value="${m}">${mesesNome[+m - 1]}</option>`
-        ).join('');
-        monthSel.value = mList.includes(curM) ? curM : mList[mList.length - 1];
-        App.consMonth[kind] = monthSel.value;
+        const y = App.consYear[kind]  || new Date().getFullYear().toString();
+        const m = App.consMonth[kind] || (new Date().getMonth() + 1).toString().padStart(2, '0');
+        monthSel.value = `${y}-${m}`;
         monthSel.classList.toggle('hidden', period !== 'month');
+      }
+
+      // ── Semana — um dia qualquer; a semana é calculada a partir dele ──
+      if (weekSel) {
+        weekSel.value = App.consWeek[kind] || new Date().toISOString().substring(0, 10);
+        weekSel.classList.toggle('hidden', period !== 'week');
       }
     });
   },
 
-  // Retorna {from, to} ISO para o período (offset 0=atual, 1=anterior), ancorado em baseYear/baseMonth
-  _periodWindow(period, offset = 0, baseYear = null, baseMonth = null) {
+  // Retorna {from, to} ISO para o período (offset 0=atual, 1=anterior), ancorado em
+  // baseYear/baseMonth (mês/ano) ou baseWeekDate (semana, "YYYY-MM-DD" escolhido no card)
+  _periodWindow(period, offset = 0, baseYear = null, baseMonth = null, baseWeekDate = null) {
     const now = new Date();
     const anchorYear  = baseYear  ? +baseYear  : now.getFullYear();
     const anchorMonth = baseMonth ? +baseMonth - 1 : now.getMonth(); // 0-indexed
@@ -2202,8 +2196,8 @@ const App = {
       while (m > 11) { m -= 12; y++; }
       from = new Date(y, m, 1);
       to   = new Date(y, m + 1, 0);
-    } else { // week
-      const anchor = new Date(anchorYear, anchorMonth, now.getDate());
+    } else { // week — ancorado no dia escolhido no filtro (ou hoje, se nada foi escolhido)
+      const anchor = baseWeekDate ? new Date(baseWeekDate + 'T00:00:00') : now;
       to   = new Date(anchor); to.setDate(to.getDate() - offset * 7);
       from = new Date(to);     from.setDate(from.getDate() - 6);
     }
@@ -2759,6 +2753,7 @@ const App = {
     const period    = App.consPeriod[kind] || 'year';
     const baseYear  = App.consYear[kind]  || null;
     const baseMonth = App.consMonth[kind] || null;
+    const baseWeek  = App.consWeek[kind]  || null;
 
     // Respeita filtro de unidade do dashboard (não o de data, pois usamos janela própria)
     const fUnit = document.getElementById('dash-filter-unit')?.value || '';
@@ -2772,8 +2767,8 @@ const App = {
       return cfg.exclude ? !hit : hit;
     });
 
-    const win  = App._periodWindow(period, 0, baseYear, baseMonth);
-    const prev = App._periodWindow(period, 1, baseYear, baseMonth);
+    const win  = App._periodWindow(period, 0, baseYear, baseMonth, baseWeek);
+    const prev = App._periodWindow(period, 1, baseYear, baseMonth, baseWeek);
 
     const inCur  = matches.filter(r => { const d = App._purchaseDate(r); return d && d >= win.from  && d <= win.to;  });
     const inPrev = matches.filter(r => { const d = App._purchaseDate(r); return d && d >= prev.from && d <= prev.to; });
@@ -2790,6 +2785,19 @@ const App = {
     // cai pro subgrupo (ex: "Impressora"), pra não sumir da métrica.
     const topMap = {};
     inCur.forEach(r => {
+      // Tinta "Kit 4 cores": conta 1 kit no balde "Kit 4 cores" (nº de kits
+      // comprados, sem o ×4) E soma +1×kits em CADA cor (Preta/Azul/Amarela/
+      // Vermelha), já que cada kit físico traz 1 de cada — assim dá pra ver
+      // tanto "quantos kits" quanto "quanto de cada cor entrou, direto ou via kit".
+      if (kind === 'ink') {
+        const cor = (r.cor || r.cores || '').toLowerCase();
+        if (cor.includes('kit') && cor.includes('4')) {
+          const nKits = parseFloat(r.quantidade) || parseInt(r.qty) || 1;
+          topMap['Kit 4 cores'] = (topMap['Kit 4 cores'] || 0) + nKits;
+          ['Preta', 'Azul', 'Amarela', 'Vermelha'].forEach(c => { topMap[c] = (topMap[c] || 0) + nKits; });
+          return;
+        }
+      }
       const key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || r.equipamento || r.subgrupo || '').toString();
       if (!key) return;
       topMap[key] = (topMap[key] || 0) + App._qtyComprada(r);
