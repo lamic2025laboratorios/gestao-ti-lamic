@@ -649,13 +649,13 @@
         <div class="consumo-grid">
 
           <!-- Card Tintas -->
-          <div class="chart-card consumo-card">
+          <div class="chart-card consumo-card" onclick="App.openConsumoAudit('ink')" title="Clique para ver a auditoria completa">
             <div class="consumo-card-head">
               <div class="consumo-card-title">
                 <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 <span>Tintas Compradas</span>
               </div>
-              <div class="consumo-head-controls">
+              <div class="consumo-head-controls" onclick="event.stopPropagation()">
                 <input type="date"  id="ink-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('ink',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
                 <input type="month" id="ink-month" class="cons-month-sel hidden" onchange="App.setConsMonth('ink',this.value)">
                 <select id="ink-year"  class="cons-year-sel"  onchange="App.setConsYear('ink',this.value)"></select>
@@ -699,13 +699,13 @@
           </div>
 
           <!-- Card Pilhas/Baterias -->
-          <div class="chart-card consumo-card">
+          <div class="chart-card consumo-card" onclick="App.openConsumoAudit('bat')" title="Clique para ver a auditoria completa">
             <div class="consumo-card-head">
               <div class="consumo-card-title">
                 <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><rect x="2" y="7" width="18" height="10" rx="2" stroke="currentColor" stroke-width="2"/><line x1="22" y1="10" x2="22" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="10" x2="6" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
                 <span>Pilhas &amp; Baterias</span>
               </div>
-              <div class="consumo-head-controls">
+              <div class="consumo-head-controls" onclick="event.stopPropagation()">
                 <input type="date"  id="bat-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('bat',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
                 <input type="month" id="bat-month" class="cons-month-sel hidden" onchange="App.setConsMonth('bat',this.value)">
                 <select id="bat-year"  class="cons-year-sel"  onchange="App.setConsYear('bat',this.value)"></select>
@@ -749,13 +749,13 @@
           </div>
 
           <!-- Card Outros -->
-          <div class="chart-card consumo-card">
+          <div class="chart-card consumo-card" onclick="App.openConsumoAudit('outros')" title="Clique para ver a auditoria completa">
             <div class="consumo-card-head">
               <div class="consumo-card-title">
                 <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/><polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="currentColor" stroke-width="2"/><line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2"/></svg></span>
                 <span>Outros</span>
               </div>
-              <div class="consumo-head-controls">
+              <div class="consumo-head-controls" onclick="event.stopPropagation()">
                 <input type="date"  id="outros-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('outros',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
                 <input type="month" id="outros-month" class="cons-month-sel hidden" onchange="App.setConsMonth('outros',this.value)">
                 <select id="outros-year"  class="cons-year-sel"  onchange="App.setConsYear('outros',this.value)"></select>
@@ -799,13 +799,13 @@
           </div>
 
           <!-- Card Conserto -->
-          <div class="chart-card consumo-card">
+          <div class="chart-card consumo-card" onclick="App.openConsumoAudit('concerto')" title="Clique para ver a auditoria completa">
             <div class="consumo-card-head">
               <div class="consumo-card-title">
                 <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke="currentColor" stroke-width="2"/></svg></span>
                 <span>Conserto</span>
               </div>
-              <div class="consumo-head-controls">
+              <div class="consumo-head-controls" onclick="event.stopPropagation()">
                 <input type="date"  id="concerto-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('concerto',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
                 <input type="month" id="concerto-month" class="cons-month-sel hidden" onchange="App.setConsMonth('concerto',this.value)">
                 <select id="concerto-year"  class="cons-year-sel"  onchange="App.setConsYear('concerto',this.value)"></select>
@@ -848,6 +848,66 @@
             <div class="consumo-breakdown" id="concerto-breakdown"></div>
           </div>
 
+        </div>
+
+        <!-- Modal: Auditoria de um card de consumo (Tintas/Pilhas/Outros/Conserto) -->
+        <div id="consumo-audit-modal" class="modal-overlay hidden">
+          <div class="modal-card audit-modal-card" style="max-width:1000px">
+            <div class="modal-header audit-modal-header">
+              <div class="audit-modal-title-wrap">
+                <span class="audit-modal-ico" id="audit-ico">
+                  <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 15l4-5 3 3 5-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <div>
+                  <h3 id="audit-title">Auditoria</h3>
+                  <p class="audit-modal-sub" id="audit-sub">Período: —</p>
+                </div>
+              </div>
+              <button class="modal-close" onclick="App.closeConsumoAudit()">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+            <div class="modal-body audit-modal-body">
+              <div class="audit-grid">
+                <!-- Painel esquerdo escuro, estilo auditoria -->
+                <div class="audit-side">
+                  <div class="audit-side-lbl">Gasto Total</div>
+                  <div class="audit-side-big" id="audit-spent">R$ 0,00</div>
+                  <div class="audit-side-tag" id="audit-trend-tag">—</div>
+                  <div class="audit-side-divider"></div>
+                  <div class="audit-side-row"><span id="audit-count-lbl">Comprados no período</span><strong id="audit-count">0</strong></div>
+                  <div class="audit-side-row"><span>Período anterior</span><strong id="audit-prev">0 · R$ 0,00</strong></div>
+                  <!-- Box azul: % da meta anual já consumida por esse material -->
+                  <div class="audit-meta-box hidden" id="audit-meta-box">
+                    <div class="audit-meta-lbl">% da meta anual já gasta com esse material</div>
+                    <div class="audit-meta-pct" id="audit-meta-pct">—</div>
+                  </div>
+                </div>
+                <!-- Painel direito: estatísticas + ranking -->
+                <div class="audit-main">
+                  <div class="audit-stats-grid">
+                    <div class="audit-stat"><span id="audit-top-lbl">Mais comprado</span><strong id="audit-top">—</strong></div>
+                    <div class="audit-stat"><span id="audit-unit-lbl">Unidade que mais comprou</span><strong id="audit-top-unit">—</strong></div>
+                    <div class="audit-stat"><span id="audit-sol-lbl">Maior solicitante</span><strong id="audit-top-sol">—</strong></div>
+                  </div>
+                  <div class="audit-bd" id="audit-breakdown"></div>
+                </div>
+              </div>
+
+              <!-- Comparativo de gastos: semanal / mensal / anual, com Tendência e Média -->
+              <div class="audit-chart-section">
+                <div class="audit-chart-head">
+                  <span>Comparativo de Gastos</span>
+                  <div class="consumo-period-toggle" id="audit-gran-toggle">
+                    <button class="cons-per-btn" data-g="week" onclick="App.setAuditGranularity('week',this)">Semanal</button>
+                    <button class="cons-per-btn active" data-g="month" onclick="App.setAuditGranularity('month',this)">Mensal</button>
+                    <button class="cons-per-btn" data-g="year" onclick="App.setAuditGranularity('year',this)">Anual</button>
+                  </div>
+                </div>
+                <canvas id="audit-chart" height="230" style="max-height:230px"></canvas>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

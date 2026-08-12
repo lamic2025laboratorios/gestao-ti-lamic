@@ -1225,7 +1225,11 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 /* Altura fixa — sem isso cada card fica do tamanho do próprio conteúdo (nº de
    linhas em "Por Cor/Modelo/Subgrupo" varia muito entre os 4), ficando
    desproporcional. O que não cabe rola dentro do bloco de detalhamento. */
-.consumo-card { display: flex; flex-direction: column; height: 620px; }
+.consumo-card {
+  display: flex; flex-direction: column; height: 620px;
+  cursor: pointer; transition: box-shadow .18s var(--ease), transform .18s var(--ease);
+}
+.consumo-card:hover { box-shadow: var(--shadow-card-hover); transform: translateY(-2px); }
 .consumo-card-head {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
@@ -1325,6 +1329,67 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   .consumo-body { flex-direction: column; gap: 14px; }
   .consumo-main { border-right: none; border-bottom: 1px solid #eef2f8; padding-right: 0; padding-bottom: 14px; }
 }
+
+/* ── Popup de Auditoria (cards de consumo) ── */
+.audit-modal-header {
+  background: linear-gradient(90deg, #1a3050 0%, #254870 100%);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  border-bottom: none;
+}
+.audit-modal-header h3 { color: #fff; font-size: 1.1rem; }
+.audit-modal-title-wrap { display: flex; align-items: center; gap: 12px; }
+.audit-modal-ico {
+  width: 38px; height: 38px; border-radius: var(--r-md); flex-shrink: 0;
+  background: rgba(255,255,255,.14); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.audit-modal-sub { font-size: .78rem; color: rgba(255,255,255,.7); margin-top: 2px; }
+.audit-modal-header .modal-close { background: rgba(255,255,255,.14); border-color: transparent; color: #fff; }
+.audit-modal-header .modal-close:hover { background: rgba(255,255,255,.28); color: #fff; transform: rotate(90deg); }
+
+.audit-grid { display: grid; grid-template-columns: 260px 1fr; gap: 20px; }
+@media (max-width: 720px) { .audit-grid { grid-template-columns: 1fr; } }
+
+.audit-side {
+  background: linear-gradient(160deg, #132542, #0b1628);
+  border-radius: var(--r-lg); padding: 22px 20px; color: #fff;
+  display: flex; flex-direction: column;
+}
+.audit-side-lbl { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.55); }
+.audit-side-big { font-family: 'Rajdhani', sans-serif; font-size: 2.1rem; font-weight: 800; margin: 4px 0 8px; }
+.audit-side-tag {
+  align-self: flex-start; font-size: .76rem; font-weight: 700; padding: 4px 10px;
+  border-radius: 100px; background: rgba(255,255,255,.12);
+}
+.audit-side-tag.trend-up   { background: rgba(217,64,64,.25);  color: #ffb3b3; }
+.audit-side-tag.trend-down { background: rgba(29,184,122,.25); color: #9ff0cf; }
+.audit-side-tag.trend-flat { background: rgba(255,255,255,.14); color: rgba(255,255,255,.8); }
+.audit-side-divider { height: 1px; background: rgba(255,255,255,.14); margin: 18px 0; }
+.audit-side-row { display: flex; justify-content: space-between; align-items: center; font-size: .82rem; padding: 6px 0; color: rgba(255,255,255,.85); }
+.audit-side-row strong { color: #fff; font-weight: 700; }
+.audit-meta-box {
+  margin-top: 18px; padding: 14px 16px; border-radius: var(--r-md);
+  background: linear-gradient(135deg, #1a5bbf, #2a68d4);
+  box-shadow: 0 4px 14px rgba(26,91,191,.4);
+}
+.audit-meta-lbl { font-size: .72rem; font-weight: 600; color: rgba(255,255,255,.85); line-height: 1.4; }
+.audit-meta-pct { font-family: 'Rajdhani', sans-serif; font-size: 1.7rem; font-weight: 800; color: #fff; margin-top: 4px; }
+
+.audit-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.audit-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 560px) { .audit-stats-grid { grid-template-columns: 1fr; } }
+.audit-stat {
+  background: var(--surf-1, #f7f9fd); border: 1px solid var(--surf-border-soft);
+  border-radius: var(--r-md); padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.audit-stat span { font-size: .7rem; font-weight: 700; color: #8898b8; text-transform: uppercase; letter-spacing: .03em; }
+.audit-stat strong { font-size: .92rem; font-weight: 700; color: #1a3050; }
+.audit-bd { background: var(--surf-1, #f7f9fd); border: 1px solid var(--surf-border-soft); border-radius: var(--r-md); padding: 14px 16px; }
+
+.audit-chart-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--surf-border-soft); }
+.audit-chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
+.audit-chart-head > span { font-size: .92rem; font-weight: 800; color: #1a3050; }
 
 /* ══ ESTOQUE ══════════════════════════════════ */
 .estoque-form-box {

@@ -2244,12 +2244,39 @@ const App = {
     return (r.createdAt || '').substring(0, 10);
   },
 
+  // Config central dos 4 cards de consumo — usada tanto pro render dos cards
+  // quanto pelo popup de auditoria (mesma fonte, sem repetir os keywords/campos
+  // em 2 lugares). titulo/countLbl/unitStatLbl/solStatLbl só são usados pelo popup.
+  _CONSUMO_CFG: {
+    ink: {
+      keywords: ['tinta'],
+      cfg: { topField: 'cor', topLabel: 'ink-top-color', breakdownTitle: 'Por cor',
+             titulo: 'Tintas Compradas', countLbl: 'tintas no período',
+             topStatLbl: 'Cor mais comprada', unitStatLbl: 'Unidade que mais comprou', solStatLbl: 'Maior solicitante' }
+    },
+    bat: {
+      keywords: ['pilha', 'bateria'],
+      cfg: { topField: 'modelo', topLabel: 'bat-top-model', breakdownTitle: 'Por modelo',
+             titulo: 'Pilhas & Baterias', countLbl: 'unidades no período',
+             topStatLbl: 'Modelo mais comprado', unitStatLbl: 'Unidade que mais comprou', solStatLbl: 'Maior solicitante' }
+    },
+    concerto: {
+      keywords: ['conserto', 'concerto'],
+      cfg: { topField: 'modelo', topLabel: 'concerto-top-model', breakdownTitle: 'Por modelo',
+             titulo: 'Conserto', countLbl: 'consertos no período',
+             topStatLbl: 'Modelo que mais deu problema', unitStatLbl: 'Unidade que mais deu problema', solStatLbl: 'Maior solicitante' }
+    },
+    outros: {
+      keywords: ['tinta', 'pilha', 'bateria', 'conserto', 'concerto'],
+      cfg: { topField: 'subgrupo', topLabel: 'outros-top-subgrupo', breakdownTitle: 'Por subgrupo', exclude: true,
+             titulo: 'Outros', countLbl: 'itens no período',
+             topStatLbl: 'Subgrupo mais comprado', unitStatLbl: 'Unidade que mais comprou', solStatLbl: 'Maior solicitante' }
+    }
+  },
+
   renderConsumoCards() {
     App._populateConsYears();
-    App._renderConsumo('ink',      ['tinta'],                                             { topField: 'cor',      topLabel: 'ink-top-color',      breakdownTitle: 'Por cor' });
-    App._renderConsumo('bat',      ['pilha', 'bateria'],                                  { topField: 'modelo',   topLabel: 'bat-top-model',      breakdownTitle: 'Por modelo' });
-    App._renderConsumo('concerto', ['conserto', 'concerto'],                              { topField: 'modelo',   topLabel: 'concerto-top-model', breakdownTitle: 'Por modelo' });
-    App._renderConsumo('outros',   ['tinta', 'pilha', 'bateria', 'conserto', 'concerto'], { topField: 'subgrupo', topLabel: 'outros-top-subgrupo', breakdownTitle: 'Por subgrupo', exclude: true });
+    Object.entries(App._CONSUMO_CFG).forEach(([kind, def]) => App._renderConsumo(kind, def.keywords, def.cfg));
   },
 
   // Atalho: abre a config do grupo Conserto (sub-opções/modelos) a partir do card do dashboard
@@ -2259,6 +2286,210 @@ const App = {
     const btn = document.querySelector('.nav-item[data-tab="tab-settings"]');
     if (btn) App.adminTab(btn);
     setTimeout(() => App.openGroupEdit(entry[0]), 120);
+  },
+
+  /* ── Popup de Auditoria dos cards de consumo ────────────────────────
+     Reusa App._consumoStats (mesmos números que já aparecem no card),
+     só que "de forma mais bonita" com gráfico de comparativo semanal/
+     mensal/anual (Tendência + Média, como no Gastos por Período) e uma
+     caixa mostrando quanto da meta anual esse tipo de material já consumiu. ── */
+  _auditKind: null,
+  _auditGran: 'month',
+
+  openConsumoAudit(kind) {
+    if (!App._CONSUMO_CFG[kind]) return;
+    App._auditKind = kind;
+    App._auditGran = 'month';
+    document.querySelectorAll('#audit-gran-toggle .cons-per-btn').forEach(b => b.classList.toggle('active', b.dataset.g === 'month'));
+    document.getElementById('consumo-audit-modal')?.classList.remove('hidden');
+    App._renderConsumoAudit();
+  },
+
+  closeConsumoAudit() {
+    document.getElementById('consumo-audit-modal')?.classList.add('hidden');
+    App._auditKind = null;
+  },
+
+  setAuditGranularity(g, btn) {
+    App._auditGran = g;
+    document.querySelectorAll('#audit-gran-toggle .cons-per-btn').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+    App._renderAuditChart();
+  },
+
+  _renderConsumoAudit() {
+    const kind = App._auditKind; const def = App._CONSUMO_CFG[kind]; if (!def) return;
+    const { keywords, cfg } = def;
+    const s = App._consumoStats(kind, keywords, cfg);
+    const fmt = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const setTxt = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+    setTxt('audit-title', cfg.titulo || kind);
+    setTxt('audit-sub', `Período: ${App._fmtPeriodLabel(s.period, s.win)}`);
+    setTxt('audit-spent', fmt(s.curSpent));
+    setTxt('audit-trend-tag', s.trend.txt);
+    setTxt('audit-count-lbl', (cfg.countLbl || 'no período').replace(/^./, c => c.toUpperCase()));
+    setTxt('audit-count', s.curCount);
+    setTxt('audit-prev', `${s.prevCount} · ${fmt(s.prevSpent)}`);
+    setTxt('audit-top-lbl', cfg.topStatLbl || 'Mais comprado');
+    setTxt('audit-top', s.top ? `${s.top[0]} (${s.top[1]})` : '—');
+    setTxt('audit-unit-lbl', cfg.unitStatLbl || 'Unidade que mais comprou');
+    setTxt('audit-top-unit', s.topUnit ? `${s.topUnit[0]} (${s.topUnit[1]})` : '—');
+    setTxt('audit-sol-lbl', cfg.solStatLbl || 'Maior solicitante');
+    setTxt('audit-top-sol', s.topSolicitante ? `${s.topSolicitante[0]} (${s.topSolicitante[1]})` : '—');
+
+    const tag = document.getElementById('audit-trend-tag');
+    if (tag) tag.className = `audit-side-tag trend-${s.trend.cls}`;
+
+    // Ranking bonito (reusa o mesmo visual em barras do card, só que maior)
+    const bd = document.getElementById('audit-breakdown');
+    if (bd) {
+      if (!s.topSorted.length) {
+        bd.innerHTML = `<div class="consumo-bd-empty">Nenhuma compra no período</div>`;
+      } else {
+        const shown = s.topSorted.slice(0, 8);
+        const total = s.topSorted.reduce((sum, [, n]) => sum + n, 0) || 1;
+        const palette = ['#d9a520', '#2a68d4', '#1db87a', '#e8830a', '#7c52d4', '#d94040'];
+        bd.innerHTML = `<div class="consumo-bd-title">${cfg.breakdownTitle}</div>` +
+          shown.map(([name, n], i) => {
+            const pct = Math.round(n / total * 100);
+            const w = Math.max(pct, 14);
+            const color = kind === 'ink' ? App._inkColor(name, i) : palette[i % palette.length];
+            return `
+            <div class="consumo-bd2-row">
+              <div class="consumo-bd2-label" title="${name}">${name}</div>
+              <div class="consumo-bd2-bar">
+                <div class="consumo-bd2-fill" style="width:${w}%;background:${color}"><span>${n} · ${pct}%</span></div>
+              </div>
+            </div>`;
+          }).join('');
+      }
+    }
+
+    // Caixa azul: % da meta anual configurada que esse material já consumiu
+    const metaInfo = App._auditMetaPct(def);
+    const metaBox = document.getElementById('audit-meta-box');
+    if (metaInfo) {
+      setTxt('audit-meta-pct', metaInfo.pct.toFixed(1).replace('.', ',') + '%');
+      metaBox?.classList.remove('hidden');
+    } else {
+      metaBox?.classList.add('hidden');
+    }
+
+    App._renderAuditChart();
+  },
+
+  // Série dos últimos N períodos (semana/mês/ano) de gasto — reusa
+  // _spentInWindow (mesma conta de sempre: à vista por boughtAt, parcelado por
+  // p.date) em janelas construídas em ordem cronológica (sem depender de
+  // ordenar string de rótulo, que pra semana não ordena certo).
+  _consumoSeries(keywords, exclude, gran) {
+    const reqs = Object.values(State.requests || {}).filter(r => {
+      if (r.status !== 'Comprado') return false;
+      const g = (r.groupName || '').toLowerCase();
+      const hit = keywords.some(k => g.includes(k));
+      return exclude ? !hit : hit;
+    });
+    const N = gran === 'year' ? 6 : 12;
+    const now = new Date();
+    const iso = d => d.toISOString().substring(0, 10);
+    const buckets = [];
+    for (let i = N - 1; i >= 0; i--) {
+      let from, to, label;
+      if (gran === 'year') {
+        const y = now.getFullYear() - i;
+        from = new Date(y, 0, 1); to = new Date(y, 11, 31); label = String(y);
+      } else if (gran === 'week') {
+        const end = new Date(now); end.setDate(end.getDate() - i * 7);
+        to = new Date(end); from = new Date(end); from.setDate(from.getDate() - 6);
+        label = `${String(from.getDate()).padStart(2, '0')}/${String(from.getMonth() + 1).padStart(2, '0')}`;
+      } else { // month
+        let m = now.getMonth() - i, y = now.getFullYear();
+        while (m < 0) { m += 12; y--; }
+        from = new Date(y, m, 1); to = new Date(y, m + 1, 0);
+        label = `${String(m + 1).padStart(2, '0')}/${String(y).substring(2)}`;
+      }
+      buckets.push({ label, from: iso(from), to: iso(to) });
+    }
+    return { labels: buckets.map(b => b.label), vals: buckets.map(b => App._spentInWindow(reqs, b.from, b.to)) };
+  },
+
+  // Regressão linear simples (mínimos quadrados) e média — mesma matemática já
+  // usada no Gastos por Período (_drawLine), copiada aqui pra não arriscar
+  // mexer numa função que já está funcionando por causa de um gráfico novo.
+  _calcTrendLine(vals) {
+    const n = vals.length;
+    if (n < 2) return vals.slice();
+    const xs = vals.map((_, i) => i);
+    const sumX = xs.reduce((a, b) => a + b, 0), sumY = vals.reduce((a, b) => a + b, 0);
+    const sumXY = xs.reduce((s, x, i) => s + x * vals[i], 0), sumXX = xs.reduce((s, x) => s + x * x, 0);
+    const denom = (n * sumXX - sumX * sumX) || 1;
+    const slope = (n * sumXY - sumX * sumY) / denom, intercept = (sumY - slope * sumX) / n;
+    return xs.map(x => slope * x + intercept);
+  },
+  _calcAvgLine(vals) {
+    const avg = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+    return vals.map(() => avg);
+  },
+
+  _renderAuditChart() {
+    const canvas = document.getElementById('audit-chart'); if (!canvas) return;
+    const kind = App._auditKind; const def = App._CONSUMO_CFG[kind]; if (!def) return;
+    const gran = App._auditGran || 'month';
+    const { labels, vals } = App._consumoSeries(def.keywords, def.cfg.exclude, gran);
+    const trendLine = App._calcTrendLine(vals);
+    const avgLine   = App._calcAvgLine(vals);
+    const fmtR = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    App._destroyChart('audit-chart');
+    State.charts['audit-chart'] = new Chart(canvas, {
+      data: {
+        labels,
+        datasets: [
+          { type: 'bar', label: 'Gastos', data: vals, backgroundColor: '#2a68d4cc', borderColor: '#2a68d4', borderWidth: 1.5, borderRadius: 6, order: 3 },
+          { type: 'line', label: 'Tendência', data: trendLine, borderColor: '#e8830a', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0, order: 1 },
+          { type: 'line', label: 'Média', data: avgLine, borderColor: '#7c52d4', borderWidth: 2, borderDash: [2, 3], pointRadius: 0, fill: false, tension: 0, order: 2 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 14, boxHeight: 2, font: { size: 11, weight: '600' }, color: '#5a6a84' } },
+          tooltip: {
+            enabled: true, backgroundColor: '#0f1e35', cornerRadius: 10, padding: 10,
+            titleFont: { size: 12, weight: '700' }, titleColor: '#fff',
+            bodyFont: { size: 11, weight: '600' }, bodyColor: 'rgba(255,255,255,.85)',
+            callbacks: { label: item => `${item.dataset.label}: ${fmtR(item.raw)}` }
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#8898b8', font: { size: 11 } }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: '#8898b8', font: { size: 11 } }, grid: { color: '#eef2f8' } }
+        }
+      }
+    });
+  },
+
+  // % da meta anual (mesma meta configurada em "Comparativo Anual de Gastos",
+  // Configurações → Meta) que esse tipo de material já consumiu sozinho —
+  // sempre sobre o ANO CORRENTE inteiro (a meta é anual), independente do
+  // filtro semana/mês/ano do card. Sem meta configurada, retorna null (a
+  // caixa azul fica escondida em vez de mostrar um número sem sentido).
+  _auditMetaPct(def) {
+    const curYear = new Date().getFullYear();
+    const meta = State.metas?.[curYear] || null;
+    if (!meta) return null;
+    const prevEff = App._prevYearEffective(curYear, meta);
+    const metaTarget = prevEff.value * (1 - (meta.reductionPct || 0) / 100);
+    if (!(metaTarget > 0)) return null;
+    const reqs = Object.values(State.requests || {}).filter(r => {
+      if (r.status !== 'Comprado') return false;
+      const g = (r.groupName || '').toLowerCase();
+      const hit = def.keywords.some(k => g.includes(k));
+      return def.cfg.exclude ? !hit : hit;
+    });
+    const spend = App._spentInWindow(reqs, curYear + '-01-01', curYear + '-12-31');
+    return { pct: spend / metaTarget * 100, spend, metaTarget };
   },
 
   // Formata data/hora ISO curto: "05/07 · 14:32"
@@ -2748,8 +2979,10 @@ const App = {
     return fallback[i % fallback.length];
   },
 
-  _renderConsumo(kind, keywords, cfg) {
-    const fmt = v => 'R$ ' + (v||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Calcula tudo que os cards de consumo mostram (extraído do render pra poder
+  // ser reusado também no popup de auditoria — mesmos números nos dois lugares,
+  // sem duplicar a lógica). Não muda nenhuma conta, só separa cálculo de DOM.
+  _consumoStats(kind, keywords, cfg) {
     const period    = App.consPeriod[kind] || 'year';
     const baseYear  = App.consYear[kind]  || null;
     const baseMonth = App.consMonth[kind] || null;
@@ -2834,19 +3067,9 @@ const App = {
     });
     const topSolicitante = Object.entries(solicitanteMap).sort((a, b) => b[1] - a[1])[0];
 
-    // Preenche DOM
-    const setTxt = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-    setTxt(`${kind}-count`, curCount);
-    setTxt(`${kind}-spent`, fmt(curSpent));
-    setTxt(`${kind}-prev`,  `${prevCount} · ${fmt(prevSpent)}`);
-    setTxt(`${kind}-prev-lbl`, `Anterior (${App._fmtPeriodLabel(period, prev)})`);
-    setTxt(cfg.topLabel, top ? `${top[0]} (${top[1]})` : '—');
-    setTxt(`${kind}-top-unit`, topUnit ? `${topUnit[0]} (${topUnit[1]})` : '—');
-    setTxt(`${kind}-top-solicitante`, topSolicitante ? `${topSolicitante[0]} (${topSolicitante[1]})` : '—');
-
     // Tendência (variação de quantidade vs período anterior)
-    const trendEl = document.getElementById(`${kind}-trend`);
-    if (trendEl) {
+    let trend = null;
+    {
       let diffPct, cls, arrow, word;
       if (prevCount === 0) {
         diffPct = curCount > 0 ? 100 : 0;
@@ -2859,19 +3082,41 @@ const App = {
         arrow = diffPct > 0 ? '▲' : diffPct < 0 ? '▼' : '–';
         word = diffPct > 0 ? 'aumento' : diffPct < 0 ? 'queda' : 'estável';
       }
-      trendEl.className = `consumo-trend trend-${cls}`;
       const lbl = { week: 'vs semana ant.', month: 'vs mês ant.', year: 'vs ano ant.' }[period];
-      trendEl.textContent = `${arrow} ${Math.abs(diffPct)}% ${word} ${lbl}`;
+      trend = { diffPct, cls, arrow, word, txt: `${arrow} ${Math.abs(diffPct)}% ${word} ${lbl}` };
+    }
+
+    return { period, win, prev, curCount, prevCount, curSpent, prevSpent, topSorted, top, topUnit, topSolicitante, trend };
+  },
+
+  _renderConsumo(kind, keywords, cfg) {
+    const fmt = v => 'R$ ' + (v||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const s = App._consumoStats(kind, keywords, cfg);
+
+    // Preenche DOM
+    const setTxt = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    setTxt(`${kind}-count`, s.curCount);
+    setTxt(`${kind}-spent`, fmt(s.curSpent));
+    setTxt(`${kind}-prev`,  `${s.prevCount} · ${fmt(s.prevSpent)}`);
+    setTxt(`${kind}-prev-lbl`, `Anterior (${App._fmtPeriodLabel(s.period, s.prev)})`);
+    setTxt(cfg.topLabel, s.top ? `${s.top[0]} (${s.top[1]})` : '—');
+    setTxt(`${kind}-top-unit`, s.topUnit ? `${s.topUnit[0]} (${s.topUnit[1]})` : '—');
+    setTxt(`${kind}-top-solicitante`, s.topSolicitante ? `${s.topSolicitante[0]} (${s.topSolicitante[1]})` : '—');
+
+    const trendEl = document.getElementById(`${kind}-trend`);
+    if (trendEl) {
+      trendEl.className = `consumo-trend trend-${s.trend.cls}`;
+      trendEl.textContent = s.trend.txt;
     }
 
     // Breakdown (lista de cores/modelos)
     const bd = document.getElementById(`${kind}-breakdown`);
     if (bd) {
-      if (!topSorted.length) {
+      if (!s.topSorted.length) {
         bd.innerHTML = `<div class="consumo-bd-empty">Nenhuma compra no período</div>`;
       } else {
-        const shown = topSorted.slice(0, 6);
-        const total = topSorted.reduce((s, [, n]) => s + n, 0) || 1;
+        const shown = s.topSorted.slice(0, 6);
+        const total = s.topSorted.reduce((sum, [, n]) => sum + n, 0) || 1;
         const palette = ['#d9a520', '#2a68d4', '#1db87a', '#e8830a', '#7c52d4', '#d94040'];
         bd.innerHTML = `<div class="consumo-bd-title">${cfg.breakdownTitle}</div>` +
           shown.map(([name, n], i) => {
