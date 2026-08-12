@@ -759,6 +759,13 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .groupspend-card { width: 100%; height: 220px; box-sizing: border-box; display: flex; flex-direction: column; }
 .groupspend-card canvas { flex: 1; min-height: 0; }
 
+/* ── Faixa de cor lateral pra identificar cada card de relance (a pedido) ── */
+.spending-card     { border-left: 4px solid #0d7a4a; }  /* Gastos por Mês — verde escuro */
+.compare-year-card { border-left: 4px solid var(--red, #d94040); }      /* Comparativo Anual — vermelho */
+.mgmt-card-log      { border-left: 4px solid #e0b400; }  /* Log de Atividades Recentes — amarelo */
+.groupspend-card   { border-left: 4px solid var(--blue-500, #1a5bbf); } /* Gastos por Grupo de Produto — azul */
+.parcelas-card      { border-left: 4px solid var(--orange, #e8830a); }  /* Compras Parceladas — laranja */
+
 /* ── DASHBOARD GRID ── */
 .dash-grid {
   display: grid;

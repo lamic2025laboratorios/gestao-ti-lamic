@@ -656,8 +656,9 @@
                 <span>Tintas Compradas</span>
               </div>
               <div class="consumo-head-controls">
+                <input type="date"  id="ink-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('ink',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
+                <input type="month" id="ink-month" class="cons-month-sel hidden" onchange="App.setConsMonth('ink',this.value)">
                 <select id="ink-year"  class="cons-year-sel"  onchange="App.setConsYear('ink',this.value)"></select>
-                <select id="ink-month" class="cons-month-sel hidden" onchange="App.setConsMonth('ink',this.value)"></select>
                 <div class="consumo-period-toggle">
                   <button class="cons-per-btn"        data-kind="ink" data-period="week"  onclick="App.setConsPeriod('ink','week',this)">Semana</button>
                   <button class="cons-per-btn"        data-kind="ink" data-period="month" onclick="App.setConsPeriod('ink','month',this)">Mês</button>
@@ -705,8 +706,9 @@
                 <span>Pilhas &amp; Baterias</span>
               </div>
               <div class="consumo-head-controls">
+                <input type="date"  id="bat-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('bat',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
+                <input type="month" id="bat-month" class="cons-month-sel hidden" onchange="App.setConsMonth('bat',this.value)">
                 <select id="bat-year"  class="cons-year-sel"  onchange="App.setConsYear('bat',this.value)"></select>
-                <select id="bat-month" class="cons-month-sel hidden" onchange="App.setConsMonth('bat',this.value)"></select>
                 <div class="consumo-period-toggle">
                   <button class="cons-per-btn"        data-kind="bat" data-period="week"  onclick="App.setConsPeriod('bat','week',this)">Semana</button>
                   <button class="cons-per-btn"        data-kind="bat" data-period="month" onclick="App.setConsPeriod('bat','month',this)">Mês</button>
@@ -754,8 +756,9 @@
                 <span>Outros</span>
               </div>
               <div class="consumo-head-controls">
+                <input type="date"  id="outros-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('outros',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
+                <input type="month" id="outros-month" class="cons-month-sel hidden" onchange="App.setConsMonth('outros',this.value)">
                 <select id="outros-year"  class="cons-year-sel"  onchange="App.setConsYear('outros',this.value)"></select>
-                <select id="outros-month" class="cons-month-sel hidden" onchange="App.setConsMonth('outros',this.value)"></select>
                 <div class="consumo-period-toggle">
                   <button class="cons-per-btn"        data-kind="outros" data-period="week"  onclick="App.setConsPeriod('outros','week',this)">Semana</button>
                   <button class="cons-per-btn"        data-kind="outros" data-period="month" onclick="App.setConsPeriod('outros','month',this)">Mês</button>
@@ -803,8 +806,9 @@
                 <span>Conserto</span>
               </div>
               <div class="consumo-head-controls">
+                <input type="date"  id="concerto-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('concerto',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
+                <input type="month" id="concerto-month" class="cons-month-sel hidden" onchange="App.setConsMonth('concerto',this.value)">
                 <select id="concerto-year"  class="cons-year-sel"  onchange="App.setConsYear('concerto',this.value)"></select>
-                <select id="concerto-month" class="cons-month-sel hidden" onchange="App.setConsMonth('concerto',this.value)"></select>
                 <div class="consumo-period-toggle">
                   <button class="cons-per-btn"        data-kind="concerto" data-period="week"  onclick="App.setConsPeriod('concerto','week',this)">Semana</button>
                   <button class="cons-per-btn"        data-kind="concerto" data-period="month" onclick="App.setConsPeriod('concerto','month',this)">Mês</button>
