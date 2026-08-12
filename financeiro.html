@@ -850,23 +850,29 @@
 
         </div>
 
-        <!-- Modal: Auditoria de um card de consumo (Tintas/Pilhas/Outros/Conserto) -->
+        <!-- Modal: Auditoria de um card de consumo (Tintas/Pilhas/Outros/Conserto).
+             Cabeçalho segue o padrão do Inventário (.form-modal/.form-modal-header/
+             .form-modal-stripe) — padrão de TODO popup novo daqui pra frente. -->
         <div id="consumo-audit-modal" class="modal-overlay hidden">
-          <div class="modal-card audit-modal-card" style="max-width:1000px">
-            <div class="modal-header audit-modal-header">
-              <div class="audit-modal-title-wrap">
-                <span class="audit-modal-ico" id="audit-ico">
-                  <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 15l4-5 3 3 5-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </span>
+          <div class="modal-card form-modal audit-modal-card" style="max-width:1000px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 15l4-5 3 3 5-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
                 <div>
-                  <h3 id="audit-title">Auditoria</h3>
-                  <p class="audit-modal-sub" id="audit-sub">Período: —</p>
+                  <div class="eqd-header-name" id="audit-title">Auditoria</div>
+                  <div class="eqd-header-sub audit-modal-sub" id="audit-sub">Período: —</div>
                 </div>
               </div>
-              <button class="modal-close" onclick="App.closeConsumoAudit()">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-              </button>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="App.closeConsumoAudit()" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
             </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
             <div class="modal-body audit-modal-body">
               <div class="audit-grid">
                 <!-- Painel esquerdo escuro, estilo auditoria -->
@@ -910,6 +916,7 @@
                 </div>
                 <canvas id="audit-chart" height="230" style="max-height:230px"></canvas>
               </div>
+            </div>
             </div>
           </div>
         </div>

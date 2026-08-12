@@ -743,19 +743,21 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   background: linear-gradient(135deg, #eef3fb, #f7f9fd);
   border-color: var(--surf-border, #dde5f2);
 }
-/* Mais quadrados e maiores: ícone em cima, número/rótulo embaixo, tudo
-   centralizado — em vez da linha estreita ícone-à-esquerda/texto-à-direita. */
+/* Mais quadrados e maiores, ícone do lado DIREITO (maior também) — o texto
+   (número + rótulo) fica à esquerda. row-reverse mantém a ordem do HTML
+   (ícone primeiro, corpo depois) mas desenha visualmente invertido. */
 .kpi-ring-col .kpi-card {
-  flex-direction: column; align-items: center; text-align: center;
-  justify-content: center; gap: 10px;
-  padding: 24px 18px; min-height: 118px;
+  flex-direction: row-reverse; align-items: center; text-align: right;
+  justify-content: space-between; gap: 12px;
+  padding: 22px 20px; min-height: 118px;
 }
-.kpi-ring-col .kpi-icon svg { color: var(--blue-500, #1a5bbf); }
+.kpi-ring-col .kpi-icon { width: 54px; height: 54px; }
+.kpi-ring-col .kpi-icon svg { width: 26px; color: var(--blue-500, #1a5bbf); }
 .kpi-ring-center {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
 }
-.kpi-ring-center canvas { max-height: 240px !important; }
+.kpi-ring-center canvas { max-height: 260px !important; }
 @media (max-width: 1100px) {
   .kpi-ring-section { grid-template-columns: 1fr; }
   .kpi-ring-col { flex-direction: row; flex-wrap: wrap; }
@@ -1330,25 +1332,41 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   .consumo-main { border-right: none; border-bottom: 1px solid #eef2f8; padding-right: 0; padding-bottom: 14px; }
 }
 
-/* ── Popup de Auditoria (cards de consumo) ── */
-.audit-modal-header {
-  /* Azul vivo (igual ao modelo enviado) — diferente do navy escuro usado
-     nos outros cabeçalhos de card (.cfg-card-head): esse popup é uma tela
-     à parte, "estilo auditoria", pedida com essa cor específica. */
-  background: linear-gradient(90deg, #2f6fed 0%, #1d4ed8 100%);
+/* ── Cabeçalho padrão de popup (mesmo do Inventário: fundo escuro, ícone azul
+   numa caixinha, listra azul embaixo) — vira o padrão de TODO popup novo do
+   sistema a partir de agora (pedido explícito, ver memória do projeto). Nomes
+   de classe iguais aos de inv_style.css de propósito, pra ficar óbvio que é
+   o mesmo componente replicado (cada módulo carrega seu próprio CSS). ── */
+.modal-card.form-modal { padding: 0; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; }
+.form-modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  background: #0f172a; padding: 14px 18px; gap: 12px;
   border-radius: var(--r-xl) var(--r-xl) 0 0;
-  border-bottom: none;
+  flex-shrink: 0;
 }
-.audit-modal-header h3 { color: #fff; font-size: 1.1rem; }
-.audit-modal-title-wrap { display: flex; align-items: center; gap: 12px; }
-.audit-modal-ico {
-  width: 38px; height: 38px; border-radius: var(--r-md); flex-shrink: 0;
-  background: rgba(255,255,255,.14); color: #fff;
+.form-modal-stripe { height: 4px; flex-shrink: 0; background: linear-gradient(90deg, #38bdf8, #0d6efd); }
+.form-modal-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.eqd-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.eqd-header-icon-box {
+  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+  background: #1e293b; border: 1px solid #334155;
   display: flex; align-items: center; justify-content: center;
 }
-.audit-modal-sub { font-size: .78rem; color: rgba(255,255,255,.7); margin-top: 2px; }
-.audit-modal-header .modal-close { background: rgba(255,255,255,.14); border-color: transparent; color: #fff; }
-.audit-modal-header .modal-close:hover { background: rgba(255,255,255,.28); color: #fff; transform: rotate(90deg); }
+.eqd-header-icon-box svg { width: 20px; height: 20px; color: #38bdf8; }
+.eqd-header-name { font-size: 1rem; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.eqd-header-sub { font-size: .75rem; color: #64748b; margin-top: 2px; }
+.eqd-header-right { display: flex; gap: 6px; flex-shrink: 0; }
+.eqd-icon-btn {
+  width: 30px; height: 30px; border-radius: 7px;
+  border: 1px solid #1e293b; background: #1e293b; color: #94a3b8;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: .95rem; transition: all .15s;
+}
+.eqd-icon-btn:hover { background: #334155; color: #fff; }
+.eqd-icon-btn svg { width: 15px; height: 15px; }
+
+/* ── Popup de Auditoria (cards de consumo) ── */
+.audit-modal-sub { font-size: .78rem; color: #64748b; margin-top: 2px; }
 
 .audit-grid { display: grid; grid-template-columns: 260px 1fr; gap: 20px; }
 @media (max-width: 720px) { .audit-grid { grid-template-columns: 1fr; } }
