@@ -751,8 +751,8 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   justify-content: space-between; gap: 12px;
   padding: 22px 20px; min-height: 118px;
 }
-.kpi-ring-col .kpi-icon { width: 54px; height: 54px; }
-.kpi-ring-col .kpi-icon svg { width: 26px; color: var(--blue-500, #1a5bbf); }
+.kpi-ring-col .kpi-icon { width: 76px; height: 76px; flex-shrink: 0; }
+.kpi-ring-col .kpi-icon svg { width: 34px; color: var(--blue-500, #1a5bbf); }
 .kpi-ring-center {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
