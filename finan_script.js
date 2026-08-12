@@ -3050,8 +3050,15 @@ const App = {
       if (!key) return;
       topMap[key] = (topMap[key] || 0) + App._qtyComprada(r);
     });
-    const topSorted = Object.entries(topMap).sort((a, b) => b[1] - a[1]);
+    let topSorted = Object.entries(topMap).sort((a, b) => b[1] - a[1]);
     const top = topSorted[0];
+    // "Kit 4 cores" sempre por último no gráfico/lista, separado das cores —
+    // é informativo (mostra quantos kits foram comprados), não compete no
+    // ranking de cor mais pedida (as 4 cores já foram somadas com o valor dele).
+    if (kind === 'ink') {
+      const kitIdx = topSorted.findIndex(([name]) => name === 'Kit 4 cores');
+      if (kitIdx > -1) topSorted.push(topSorted.splice(kitIdx, 1)[0]);
+    }
 
     // Unidade que mais comprou — mesma base das demais métricas (compradas na janela),
     // contando pela QUANTIDADE comprada (não por nº de solicitações).
