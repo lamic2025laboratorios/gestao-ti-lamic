@@ -67,7 +67,11 @@ const App = {
   },
 
   toggleAllStatus(btn) {
-    const chips = document.querySelectorAll('.req-status-chip');
+    // Escopado a #req-filter-panel: o pop-up de Relatório de Solicitações
+    // reaproveita a MESMA classe .req-status-chip pro visual, mas com estado
+    // próprio (rptSolToggleStatus/rptSolToggleAllStatus) — sem o escopo, um
+    // clique aqui mexeria nos chips dos dois lugares ao mesmo tempo.
+    const chips = document.querySelectorAll('#req-filter-panel .req-status-chip');
     const allActive = [...chips].every(c => c.classList.contains('active'));
     if (allActive) {
       // Desmarcar todos
@@ -96,7 +100,7 @@ const App = {
     // Sincroniza botão "Todos"
     const allBtn = document.getElementById('btn-toggle-all-status');
     if (allBtn) {
-      const chips = document.querySelectorAll('.req-status-chip');
+      const chips = document.querySelectorAll('#req-filter-panel .req-status-chip');
       const allActive = [...chips].every(c => c.classList.contains('active'));
       allBtn.textContent = allActive ? 'Todos ✓' : 'Todos ✕';
       allActive ? allBtn.classList.remove('all-off') : allBtn.classList.add('all-off');
@@ -1833,9 +1837,10 @@ const App = {
     ['req-filter-unit-vis','req-filter-group-vis','req-filter-subgroup-vis'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
-    // Reativa todos os chips rosca
+    // Reativa todos os chips rosca (escopado — .req-status-chip é reaproveitada
+    // no pop-up de Relatório de Solicitações, com estado próprio)
     App.reqHiddenStatuses.clear();
-    document.querySelectorAll('.req-status-chip').forEach(c => c.classList.add('active'));
+    document.querySelectorAll('#req-filter-panel .req-status-chip').forEach(c => c.classList.add('active'));
     const allBtn = document.getElementById('btn-toggle-all-status');
     if (allBtn) { allBtn.textContent = 'Todos ✓'; allBtn.classList.remove('all-off'); }
     App.reqSortDir = 'desc';
@@ -3197,34 +3202,66 @@ const App = {
     const list = App._collectParceladas();
     if (!list.length) {
       body.innerHTML = '<div class="mgmt-empty" style="padding:30px">Nenhuma compra parcelada registrada.</div>';
-    } else {
-      list.sort((a, b) => (App._parcelaPaga(a.parcelas) ? 1 : 0) - (App._parcelaPaga(b.parcelas) ? 1 : 0));
-      body.innerHTML = list.map(x => {
-        const paga = App._parcelaPaga(x.parcelas);
-        const parc = x.parcelas.slice().sort((a, b) => (a.num || 0) - (b.num || 0));
-        const ultima = parc[parc.length - 1];
-        const quitaData = ultima ? (ultima.date || (ultima.month ? ultima.month + '-01' : '')) : '';
-        const pagasN = parc.filter(p => App._parcelaPaga([p])).length;
-        const rows = parc.map(p => {
-          const pg = App._parcelaPaga([p]);
-          return `<div class="parc-modal-parcela">
-            <span>Parcela ${p.num}/${p.total} · vence ${fmtD(p.date || (p.month ? p.month + '-01' : ''))}</span>
-            <span class="${pg ? 'parc-pg' : 'parc-pd'}">${pg ? '✓ paga' : 'pendente'} · ${fmtR(p.valor)}</span>
-          </div>`;
-        }).join('');
-        return `<div class="parc-modal-card ${paga ? 'is-paga' : 'is-aberto'}">
-          <div class="parc-modal-head" onclick="${x.onclick}" title="Abrir detalhe completo">
-            <div style="min-width:0">
-              <div class="parc-modal-title">${x.titulo}</div>
-              <div class="parc-modal-sub">${x.sub || ''}</div>
-            </div>
-            <span class="parc-modal-tag ${paga ? 'tag-pg' : 'tag-pd'}">${paga ? 'Quitada' : `${pagasN}/${parc.length} pagas`}</span>
-          </div>
-          <div class="parc-modal-parcelas">${rows}</div>
-          <div class="parc-modal-foot">${paga ? '✓ Quitada em ' + fmtD(quitaData) : 'Termina de pagar em ' + fmtD(quitaData)}</div>
+      modal.classList.remove('hidden');
+      return;
+    }
+
+    // Métricas gerais no topo — visão rápida antes de entrar item por item
+    const quitadas = list.filter(x => App._parcelaPaga(x.parcelas)).length;
+    const emAberto = list.length - quitadas;
+    const valorAberto = list.reduce((s, x) => s + x.parcelas
+      .filter(p => !App._parcelaPaga([p]))
+      .reduce((s2, p) => s2 + (parseFloat(p.valor) || 0), 0), 0);
+    const metricsHtml = `
+      <div class="parc-metrics">
+        <div class="parc-metric">
+          <div class="parc-metric-ico"><svg viewBox="0 0 24 24" fill="none" width="17" height="17"><rect x="1" y="4" width="22" height="16" rx="2" stroke="currentColor" stroke-width="2"/><line x1="1" y1="10" x2="23" y2="10" stroke="currentColor" stroke-width="2"/></svg></div>
+          <div><div class="parc-metric-val">${list.length}</div><div class="parc-metric-lbl">Compras parceladas</div></div>
+        </div>
+        <div class="parc-metric parc-metric-green">
+          <div class="parc-metric-ico"><svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div><div class="parc-metric-val">${quitadas}</div><div class="parc-metric-lbl">Quitadas</div></div>
+        </div>
+        <div class="parc-metric parc-metric-orange">
+          <div class="parc-metric-ico"><svg viewBox="0 0 24 24" fill="none" width="17" height="17"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div><div class="parc-metric-val">${emAberto}</div><div class="parc-metric-lbl">Em aberto</div></div>
+        </div>
+        <div class="parc-metric parc-metric-blue">
+          <div class="parc-metric-ico"><svg viewBox="0 0 24 24" fill="none" width="17" height="17"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg></div>
+          <div><div class="parc-metric-val">${fmtR(valorAberto)}</div><div class="parc-metric-lbl">Valor pendente</div></div>
+        </div>
+      </div>`;
+
+    list.sort((a, b) => (App._parcelaPaga(a.parcelas) ? 1 : 0) - (App._parcelaPaga(b.parcelas) ? 1 : 0));
+    const cardsHtml = list.map(x => {
+      const paga = App._parcelaPaga(x.parcelas);
+      const parc = x.parcelas.slice().sort((a, b) => (a.num || 0) - (b.num || 0));
+      const ultima = parc[parc.length - 1];
+      const quitaData = ultima ? (ultima.date || (ultima.month ? ultima.month + '-01' : '')) : '';
+      const pagasN = parc.filter(p => App._parcelaPaga([p])).length;
+      const pct = parc.length ? Math.round(pagasN / parc.length * 100) : 0;
+      const rows = parc.map(p => {
+        const pg = App._parcelaPaga([p]);
+        return `<div class="parc-modal-parcela">
+          <span>Parcela ${p.num}/${p.total} · vence ${fmtD(p.date || (p.month ? p.month + '-01' : ''))}</span>
+          <span class="${pg ? 'parc-pg' : 'parc-pd'}">${pg ? 'paga' : 'pendente'} · ${fmtR(p.valor)}</span>
         </div>`;
       }).join('');
-    }
+      return `<div class="parc-modal-card ${paga ? 'is-paga' : 'is-aberto'}">
+        <div class="parc-modal-head" onclick="${x.onclick}" title="Abrir detalhe completo">
+          <div style="min-width:0">
+            <div class="parc-modal-title">${x.titulo}</div>
+            <div class="parc-modal-sub">${x.sub || ''}</div>
+          </div>
+          <span class="parc-modal-tag ${paga ? 'tag-pg' : 'tag-pd'}">${paga ? 'Quitada' : `${pagasN}/${parc.length} pagas`}</span>
+        </div>
+        <div class="parc-modal-progress"><div class="parc-modal-progress-bar" style="width:${pct}%"></div></div>
+        <div class="parc-modal-parcelas">${rows}</div>
+        <div class="parc-modal-foot">${paga ? 'Quitada em ' + fmtD(quitaData) : 'Termina de pagar em ' + fmtD(quitaData)}</div>
+      </div>`;
+    }).join('');
+
+    body.innerHTML = metricsHtml + cardsHtml;
     modal.classList.remove('hidden');
   },
 
@@ -4409,7 +4446,7 @@ const App = {
     const topUnit = Object.entries(unitC)[0];
     const topBadge = document.getElementById('chart-units-top');
     if (topBadge && topUnit) topBadge.textContent = `🏆 ${topUnit[0]}`;
-    App._renderUnitsChart(unitC);
+    App._drawBar('chart-units', unitC, App._distinctColors(Object.keys(unitC).length));
 
     // Groups bar — ordenado por mais pedidos, com cor distinta por grupo (não fica limitado a 4 cores)
     // Unifica grafias antigas de Conserto/Concerto num único grupo (App._displayGroupName)
@@ -4645,37 +4682,6 @@ const App = {
       data: { labels, datasets: [{ data: vals, backgroundColor: labels.map((_,i) => colors[i%colors.length]), borderColor: labels.map((_,i) => colors[i%colors.length]), borderWidth: 1.5, borderRadius: 6 }] },
       options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#6680a0', font: { size: 11 } }, grid: { color: '#e2e8f0' } }, y: { ticks: { color: '#6680a0', font: { size: 11 } }, grid: { color: '#e2e8f0' }, beginAtZero: true } } }
     });
-  },
-
-  // "Por Unidade" pagina 3 em 3 (em vez de empilhar todas as unidades de uma
-  // vez) — deixa o gráfico mais enxuto/legível quando tem muita unidade
-  // cadastrada. Cores calculadas em cima da lista INTEIRA (não só da página),
-  // pra cada unidade manter sempre a mesma cor ao navegar entre páginas.
-  _unitsChartPage: 0,
-  _unitsChartData: {},
-
-  _renderUnitsChart(unitC) {
-    App._unitsChartData = unitC;
-    const entries = Object.entries(unitC);
-    const totalPages = Math.max(1, Math.ceil(entries.length / 3));
-    if (App._unitsChartPage >= totalPages) App._unitsChartPage = 0;
-    const start = App._unitsChartPage * 3;
-    const pageEntries = entries.slice(start, start + 3);
-    const colors = App._distinctColors(entries.length);
-    const pageColors = colors.slice(start, start + 3);
-    App._drawBar('chart-units', Object.fromEntries(pageEntries), pageColors);
-
-    const nav = document.getElementById('chart-units-nav');
-    const pageLbl = document.getElementById('chart-units-page');
-    if (pageLbl) pageLbl.textContent = entries.length ? `${start + 1}–${Math.min(start + 3, entries.length)} de ${entries.length}` : '';
-    if (nav) nav.style.display = entries.length > 3 ? '' : 'none';
-  },
-
-  unitsChartNav(delta) {
-    const entries = Object.entries(App._unitsChartData || {});
-    const totalPages = Math.max(1, Math.ceil(entries.length / 3));
-    App._unitsChartPage = (App._unitsChartPage + delta + totalPages) % totalPages;
-    App._renderUnitsChart(App._unitsChartData);
   },
 
   // N cores visualmente distintas (ângulo áureo espalha os matizes, sem repetir tom)
@@ -7550,7 +7556,8 @@ const App = {
 
   renderEstoque() {
     const tbody = document.getElementById('estoque-tbody'); if (!tbody) return;
-    const fGrupo  = document.getElementById('estoque-filter-grupo')?.value || '';
+    const fGrupo    = document.getElementById('estoque-filter-grupo')?.value || '';
+    const fSubgrupo = document.getElementById('estoque-filter-subgrupo')?.value || '';
     const fSearch = (document.getElementById('estoque-search')?.value || '').toLowerCase();
     tbody.innerHTML = '';
 
@@ -7563,9 +7570,28 @@ const App = {
       grupoSel.value = cur;
     }
 
+    // Popula filtro subgrupo — depende do grupo escolhido (State.subgroups[gid]);
+    // sem grupo escolhido, junta os subgrupos de todos os grupos (deduplicado).
+    const subSel = document.getElementById('estoque-filter-subgrupo');
+    if (subSel) {
+      const cur = subSel.value;
+      let listaSub;
+      if (fGrupo) {
+        const gid = Object.entries(State.groups || {}).find(([, n]) => n === fGrupo)?.[0];
+        listaSub = gid ? (State.subgroups?.[gid] || []) : [];
+      } else {
+        const set = new Set();
+        Object.values(State.subgroups || {}).forEach(arr => (arr || []).forEach(sg => set.add(sg)));
+        listaSub = [...set].sort();
+      }
+      subSel.innerHTML = '<option value="">Todos</option>' + listaSub.map(sg => `<option value="${sg}">${sg}</option>`).join('');
+      subSel.value = listaSub.includes(cur) ? cur : '';
+    }
+
     const items = Object.entries(State.estoque || {});
     const filtered = items.filter(([,i]) => {
-      if (fGrupo  && i.grupo !== fGrupo) return false;
+      if (fGrupo    && i.grupo !== fGrupo) return false;
+      if (fSubgrupo && i.subgrupo !== fSubgrupo) return false;
       if (fSearch && !( (i.produto||'').toLowerCase().includes(fSearch) ||
                         (i.subgrupo||'').toLowerCase().includes(fSearch) ||
                         (i.grupo||'').toLowerCase().includes(fSearch) ||
@@ -7826,23 +7852,20 @@ const App = {
 
   closeMovHist() { document.getElementById('mov-hist-modal').classList.add('hidden'); },
 
-  // Detalhe de uma movimentação — mostra solicitação se houver
+  // Detalhe de uma movimentação — mostra solicitação se houver. Visual no
+  // padrão do pop-up de auditoria dos cards de consumo (.audit-grid/.audit-side/
+  // .audit-main): painel escuro à esquerda com o essencial (tipo/qtd/produto),
+  // solicitação vinculada (ou origem no estoque) ao LADO — não embaixo — e as
+  // 2 datas de referência numa faixa full-width no final (entrada esquerda,
+  // saída direita).
   _movDetailCur: null,
   openMovDetail(tipo, idx) {
     const x = (App._movCache[tipo] || [])[idx]; if (!x) return;
     App._movDetailCur = x;
     const isEnt = tipo === 'entrada';
-    const linhas = [
-      ['Tipo', isEnt ? 'Entrada' : 'Saída'],
-      ['Produto', x.produto || '—'],
-      ['Grupo', x.grupo || '—'],
-      ['Subgrupo', x.subgrupo || '—'],
-      ['Quantidade', `${x.qtd} ${x.unidade || ''}`],
-      ['Saldo após', x.saldo != null ? x.saldo : '—'],
-      ['Data', App._fmtDate(x.data)],
-      [isEnt ? 'Lote' : 'Destino', isEnt ? ((x.estoqueId && (State.estoque||{})[x.estoqueId]) ? App._loteDisplay((State.estoque||{})[x.estoqueId]) : (x.lote || '—')) : (x.destino || '—')],
-      ['Origem', x.origem || '—']
-    ];
+    const loteOuDestino = isEnt
+      ? ((x.estoqueId && (State.estoque||{})[x.estoqueId]) ? App._loteDisplay((State.estoque||{})[x.estoqueId]) : (x.lote || '—'))
+      : (x.destino || '—');
 
     // Liga à solicitação (saída via pedido)
     let solHtml = '';
@@ -7852,7 +7875,7 @@ const App = {
       if (r) {
         solHtml = `
           <div class="mov-detail-sol">
-            <div class="mov-detail-sol-title">📋 Solicitação vinculada</div>
+            <div class="mov-detail-sol-title">Solicitação vinculada</div>
             <div class="mov-detail-grid">
               <div><span>Unidade</span><strong>${r.unitName || '—'}</strong></div>
               <div><span>Status</span><strong>${r.status || '—'}</strong></div>
@@ -7863,14 +7886,6 @@ const App = {
           </div>`;
       }
     }
-
-    // Datas de referência: entrada (verde) e saída (laranja)
-    const { dEnt, dSai } = App._movDatasRef(x);
-    const datasHtml = `
-      <div class="mov-detail-datas">
-        <div class="mov-data-ref entrada"><span>Data de entrada</span><strong>${dEnt ? App._fmtDate(dEnt) : '—'}</strong></div>
-        <div class="mov-data-ref saida"><span>Data de saída</span><strong>${dSai ? App._fmtDate(dSai) : '—'}</strong></div>
-      </div>`;
 
     // Fonte do estoque (só saída) — de qual lote/compra o item saiu, p/ mapeamento
     let fonteHtml = '';
@@ -7888,10 +7903,36 @@ const App = {
           </div>`;
       }
     }
+    const mainHtml = (solHtml || fonteHtml)
+      ? `${solHtml}${fonteHtml}`
+      : `<div class="mov-detail-empty">Movimento manual — sem solicitação vinculada.</div>`;
 
-    document.getElementById('mov-detail-body').innerHTML =
-      `<div class="mov-detail-list">${linhas.map(([k,v]) =>
-        `<div class="mov-detail-row"><span>${k}</span><strong>${v}</strong></div>`).join('')}</div>${datasHtml}${fonteHtml}${solHtml}`;
+    // Datas de referência: entrada (verde) e saída (laranja) — sempre no final, full-width
+    const { dEnt, dSai } = App._movDatasRef(x);
+    const datasHtml = `
+      <div class="mov-detail-datas">
+        <div class="mov-data-ref entrada"><span>Data de entrada</span><strong>${dEnt ? App._fmtDate(dEnt) : '—'}</strong></div>
+        <div class="mov-data-ref saida"><span>Data de saída</span><strong>${dSai ? App._fmtDate(dSai) : '—'}</strong></div>
+      </div>`;
+
+    document.getElementById('mov-detail-body').innerHTML = `
+      <div class="audit-grid">
+        <div class="audit-side">
+          <span class="audit-side-tag ${isEnt ? 'mov-ent' : 'mov-sai'}">${isEnt ? 'ENTRADA' : 'SAÍDA'}</span>
+          <div class="audit-side-big">${isEnt ? '+' : '−'}${x.qtd} <small>${x.unidade || ''}</small></div>
+          <div class="audit-side-lbl">Produto</div>
+          <div class="audit-side-produto">${x.produto || '—'}</div>
+          <div class="audit-side-divider"></div>
+          <div class="audit-side-row"><span>Grupo</span><strong>${x.grupo || '—'}</strong></div>
+          <div class="audit-side-row"><span>Subgrupo</span><strong>${x.subgrupo || '—'}</strong></div>
+          <div class="audit-side-row"><span>Saldo após</span><strong>${x.saldo != null ? x.saldo : '—'}</strong></div>
+          <div class="audit-side-row"><span>Data</span><strong>${App._fmtDate(x.data)}</strong></div>
+          <div class="audit-side-row"><span>${isEnt ? 'Lote' : 'Destino'}</span><strong>${loteOuDestino}</strong></div>
+          <div class="audit-side-row"><span>Origem</span><strong>${x.origem || '—'}</strong></div>
+        </div>
+        <div class="audit-main">${mainHtml}</div>
+      </div>
+      ${datasHtml}`;
     document.getElementById('mov-detail-date-btn').style.display = x.movId ? '' : 'none';
     const delBtn = document.getElementById('mov-detail-del-btn');
     if (delBtn) delBtn.style.display = x.movId ? '' : 'none';

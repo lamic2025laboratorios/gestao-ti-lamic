@@ -441,11 +441,6 @@
                 <span class="chart-badge" id="chart-units-top"></span>
               </div>
               <canvas id="chart-units"></canvas>
-              <div class="chart-units-nav" id="chart-units-nav" style="display:none">
-                <button type="button" class="chart-nav-btn" onclick="App.unitsChartNav(-1)" title="Unidades anteriores">‹</button>
-                <span class="chart-nav-page" id="chart-units-page"></span>
-                <button type="button" class="chart-nav-btn" onclick="App.unitsChartNav(1)" title="Próximas unidades">›</button>
-              </div>
             </div>
             <div class="chart-card">
               <div class="chart-card-header"><span>Grupo</span></div>
@@ -1091,12 +1086,20 @@
             <button class="btn-filter-toggle" id="btn-estoque-filter-toggle" onclick="App.toggleEstoqueFilterPopover(event)" title="Filtros">
               <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
             </button>
-            <div class="filter-popover" id="estoque-filter-popover">
-              <div class="filter-popover-row">
-                <label>GRUPO</label>
-                <select id="estoque-filter-grupo" class="filter-select" onchange="App.estoquePagina=1;App.renderEstoque()">
-                  <option value="">Todos os grupos</option>
-                </select>
+            <div class="filter-popover filt-panel" id="estoque-filter-popover">
+              <div class="filt-grid">
+                <div class="filt-field">
+                  <label>Grupo</label>
+                  <select id="estoque-filter-grupo" class="filter-select" onchange="App.estoquePagina=1;App.renderEstoque()">
+                    <option value="">Todos os grupos</option>
+                  </select>
+                </div>
+                <div class="filt-field">
+                  <label>Subgrupo</label>
+                  <select id="estoque-filter-subgrupo" class="filter-select" onchange="App.estoquePagina=1;App.renderEstoque()">
+                    <option value="">Todos</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -1249,7 +1252,7 @@
 
       <!-- Modal: Detalhe de uma movimentação -->
       <div id="mov-detail-modal" class="modal-overlay hidden">
-        <div class="modal-card form-modal" style="max-width:520px">
+        <div class="modal-card form-modal" style="max-width:720px">
           <div class="form-modal-header">
             <div class="eqd-header-left">
               <div class="eqd-header-icon-box">
@@ -1877,84 +1880,104 @@
             <button class="btn-filter-toggle" id="btn-req-filter-toggle" onclick="App.toggleReqFilterPanel(event)" title="Filtros">
               <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
             </button>
-            <!-- ── Filtro completo ── -->
+            <!-- ── Filtro completo — grade padronizada (label em cima, controle
+                 embaixo), mesma estética do filtro de Estoque ── -->
             <div id="req-filter-panel" class="req-filter-panel">
-              <div class="req-filter-panel-inner">
-            <!-- Status chips -->
-            <div class="req-filter-group">
-              <span class="req-filter-label">Status</span>
-              <button class="btn-toggle-all-status" id="btn-toggle-all-status" onclick="App.toggleAllStatus(this)">Todos ✓</button>
-              <button class="req-status-chip chip-sol active" data-status="Solicitado" onclick="App.toggleStatusFilter(this)">Solicitado</button>
-              <button class="req-status-chip chip-agu active" data-status="Aguardando" onclick="App.toggleStatusFilter(this)">Aguardando</button>
-              <button class="req-status-chip chip-com active" data-status="Comprado"   onclick="App.toggleStatusFilter(this)">Comprado</button>
-              <button class="req-status-chip chip-est active" data-status="Estoque"    onclick="App.toggleStatusFilter(this)">Estoque</button>
-              <button class="req-status-chip chip-neg active" data-status="Negado"     onclick="App.toggleStatusFilter(this)">Negado</button>
-              <select id="filter-parcelado" class="req-filter-select" onchange="App.renderRequests()" title="Filtrar por parcelamento/forma de pagamento" style="margin-left:8px">
-                <option value="">Pagamento: todos</option>
-                <option value="parcelado">Parcelada</option>
-                <option value="combinada">Combinada</option>
-                <option value="boleto">Boleto</option>
-                <option value="dinheiro">Dinheiro</option>
-                <option value="cartao">Cartão</option>
-              </select>
-            </div>
-            <!-- Unidade + Grupo -->
-            <div class="req-filter-group">
-              <span class="req-filter-label">Unidade</span>
-              <select id="req-filter-unit-vis" class="req-filter-select" onchange="document.getElementById('filter-unit-req').value=this.value; App.renderRequests()">
-                <option value="">Todas</option>
-              </select>
-              <span class="req-filter-label" style="margin-left:12px">Grupo</span>
-              <select id="req-filter-group-vis" class="req-filter-select" onchange="document.getElementById('filter-group-req').value=this.value; App.renderRequests()">
-                <option value="">Todos</option>
-              </select>
-              <span class="req-filter-label" style="margin-left:12px">Subgrupo</span>
-              <select id="req-filter-subgroup-vis" class="req-filter-select" onchange="document.getElementById('filter-subgroup-req').value=this.value; App.renderRequests()">
-                <option value="">Todos</option>
-              </select>
-            </div>
-            <!-- Ordenação por data de solicitação -->
-            <div class="req-filter-group">
-              <span class="req-filter-label">Ord. Solicitação</span>
-              <button class="req-sort-btn" id="sort-req-desc" onclick="App.setReqSort('createdAt','desc',this)">
-                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Mais recente
-              </button>
-              <button class="req-sort-btn" id="sort-req-asc" onclick="App.setReqSort('createdAt','asc',this)">
-                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Mais antiga
-              </button>
-              <span class="req-filter-label" style="margin-left:12px">Ord. Envio</span>
-              <button class="req-sort-btn" id="sort-sent-desc" onclick="App.setReqSort('shippedAt','desc',this)">
-                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Mais recente
-              </button>
-              <button class="req-sort-btn" id="sort-sent-asc" onclick="App.setReqSort('shippedAt','asc',this)">
-                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Mais antiga
-              </button>
-            </div>
-            <!-- Data solicitação -->
-            <div class="req-filter-group">
-              <span class="req-filter-label">Data solicitação</span>
-              <input type="date" id="req-date-from" class="req-filter-date" onchange="App.renderRequests()">
-              <span style="color:#8898b8">→</span>
-              <input type="date" id="req-date-to" class="req-filter-date" onchange="App.renderRequests()">
-            </div>
-            <!-- Data envio -->
-            <div class="req-filter-group">
-              <span class="req-filter-label">Data envio</span>
-              <input type="date" id="req-sent-from" class="req-filter-date" onchange="App.renderRequests()">
-              <span style="color:#8898b8">→</span>
-              <input type="date" id="req-sent-to" class="req-filter-date" onchange="App.renderRequests()">
-            </div>
-            <!-- Limpar -->
-            <div class="req-filter-group" style="justify-content:flex-end">
-              <button class="btn-req-clear-all" onclick="App.clearAllReqFilters()">
-                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Limpar
-              </button>
-            </div>
+              <div class="filt-panel" style="width:640px">
+                <div class="filt-grid">
+                  <div class="filt-field filt-field-full">
+                    <label>Status</label>
+                    <div class="req-filter-group" style="gap:6px">
+                      <button class="btn-toggle-all-status" id="btn-toggle-all-status" onclick="App.toggleAllStatus(this)">Todos ✓</button>
+                      <button class="req-status-chip chip-sol active" data-status="Solicitado" onclick="App.toggleStatusFilter(this)">Solicitado</button>
+                      <button class="req-status-chip chip-agu active" data-status="Aguardando" onclick="App.toggleStatusFilter(this)">Aguardando</button>
+                      <button class="req-status-chip chip-com active" data-status="Comprado"   onclick="App.toggleStatusFilter(this)">Comprado</button>
+                      <button class="req-status-chip chip-est active" data-status="Estoque"    onclick="App.toggleStatusFilter(this)">Estoque</button>
+                      <button class="req-status-chip chip-neg active" data-status="Negado"     onclick="App.toggleStatusFilter(this)">Negado</button>
+                    </div>
+                  </div>
+
+                  <div class="filt-field">
+                    <label>Pagamento</label>
+                    <select id="filter-parcelado" class="req-filter-select" onchange="App.renderRequests()" title="Filtrar por parcelamento/forma de pagamento">
+                      <option value="">Todos</option>
+                      <option value="parcelado">Parcelada</option>
+                      <option value="combinada">Combinada</option>
+                      <option value="boleto">Boleto</option>
+                      <option value="dinheiro">Dinheiro</option>
+                      <option value="cartao">Cartão</option>
+                    </select>
+                  </div>
+                  <div class="filt-field">
+                    <label>Unidade</label>
+                    <select id="req-filter-unit-vis" class="req-filter-select" onchange="document.getElementById('filter-unit-req').value=this.value; App.renderRequests()">
+                      <option value="">Todas</option>
+                    </select>
+                  </div>
+                  <div class="filt-field">
+                    <label>Grupo</label>
+                    <select id="req-filter-group-vis" class="req-filter-select" onchange="document.getElementById('filter-group-req').value=this.value; App.renderRequests()">
+                      <option value="">Todos</option>
+                    </select>
+                  </div>
+                  <div class="filt-field">
+                    <label>Subgrupo</label>
+                    <select id="req-filter-subgroup-vis" class="req-filter-select" onchange="document.getElementById('filter-subgroup-req').value=this.value; App.renderRequests()">
+                      <option value="">Todos</option>
+                    </select>
+                  </div>
+
+                  <div class="filt-divider"></div>
+
+                  <div class="filt-field">
+                    <label>Ord. Solicitação</label>
+                    <div class="filt-toggle-row">
+                      <button class="req-sort-btn" id="sort-req-desc" onclick="App.setReqSort('createdAt','desc',this)" title="Mais recente primeiro">
+                        <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        Recente
+                      </button>
+                      <button class="req-sort-btn" id="sort-req-asc" onclick="App.setReqSort('createdAt','asc',this)" title="Mais antiga primeiro">
+                        <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        Antiga
+                      </button>
+                    </div>
+                  </div>
+                  <div class="filt-field">
+                    <label>Ord. Envio</label>
+                    <div class="filt-toggle-row">
+                      <button class="req-sort-btn" id="sort-sent-desc" onclick="App.setReqSort('shippedAt','desc',this)" title="Mais recente primeiro">
+                        <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        Recente
+                      </button>
+                      <button class="req-sort-btn" id="sort-sent-asc" onclick="App.setReqSort('shippedAt','asc',this)" title="Mais antiga primeiro">
+                        <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        Antiga
+                      </button>
+                    </div>
+                  </div>
+                  <div class="filt-field">
+                    <label>Data solicitação</label>
+                    <div class="filt-field-daterange">
+                      <input type="date" id="req-date-from" class="req-filter-date" onchange="App.renderRequests()">
+                      <span>→</span>
+                      <input type="date" id="req-date-to" class="req-filter-date" onchange="App.renderRequests()">
+                    </div>
+                  </div>
+                  <div class="filt-field">
+                    <label>Data envio</label>
+                    <div class="filt-field-daterange">
+                      <input type="date" id="req-sent-from" class="req-filter-date" onchange="App.renderRequests()">
+                      <span>→</span>
+                      <input type="date" id="req-sent-to" class="req-filter-date" onchange="App.renderRequests()">
+                    </div>
+                  </div>
+                </div>
+                <div class="filt-footer">
+                  <button class="btn-req-clear-all" onclick="App.clearAllReqFilters()">
+                    <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    Limpar filtros
+                  </button>
+                </div>
               </div>
             </div>
           </div>
