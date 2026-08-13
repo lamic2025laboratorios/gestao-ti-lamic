@@ -698,11 +698,18 @@ body {
 .proj-fin-status.st-falta  { background: var(--red-l);   color: #b91c1c; }
 .proj-fin-status.st-semdado{ background: var(--gray-1);  color: var(--muted); }
 
+/* Linha do pop-up de Custo API: toggle Antiga/Nova + alternador de mês juntos */
+.api-modo-row {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 10px; margin: 8px 0 4px;
+}
+
 /* Toggle Cobrança Antiga / Nova — segmented control */
 .api-modo-switch {
     display: inline-flex; border: 1px solid var(--gray-2); border-radius: 8px;
     overflow: hidden; margin: 8px 0 4px;
 }
+.api-modo-row .api-modo-switch { margin: 0; }
 .api-modo-btn {
     padding: 6px 12px; font-size: 0.74rem; font-weight: 600;
     background: var(--white); color: var(--muted); border: none; cursor: pointer;
@@ -731,12 +738,6 @@ body {
 .audit-modal-title { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.02em; }
 .audit-modal-sub { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 2px; }
 .audit-modal-stripe { height: 4px; flex-shrink: 0; background: linear-gradient(90deg, #38bdf8, var(--blue-v)); }
-
-/* Alternador de mês dentro do cabeçalho escuro dos pop-ups de auditoria */
-.audit-modal-header .canal-switch { flex-shrink: 0; }
-.audit-modal-header .canal-arrow { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.18); color: #fff; }
-.audit-modal-header .canal-arrow:hover { background: #7dd3fc; color: #06283d; border-color: #7dd3fc; }
-.audit-modal-header .canal-switch-lbl { color: #fff; }
 
 /* align-items:stretch (grid já faz por padrão, deixado explícito) garante que
    o painel escuro sempre acompanha a altura NATURAL da coluna principal —
