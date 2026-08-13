@@ -699,12 +699,19 @@ body {
 .audit-modal-sub { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 2px; }
 .audit-modal-stripe { height: 4px; flex-shrink: 0; background: linear-gradient(90deg, #38bdf8, var(--blue-v)); }
 
-.audit-grid { display: grid; grid-template-columns: 270px 1fr; gap: 20px; }
-@media (max-width: 640px) { .audit-grid { grid-template-columns: 1fr; } }
+/* Altura mínima FIXA e igual pros 3 pop-ups de auditoria (Faturamento/API/
+   Atendente) — sem isso cada um ficava de um tamanho, dependendo de quanto
+   conteúdo tinha (ex.: o bloco de meta de mensagens só aparece no de API).
+   align-items:stretch (grid já faz isso por padrão, mas deixado explícito)
+   garante que o painel escuro sempre acompanha a altura da coluna principal —
+   "sincronizado" com o gráfico do lado, não sobra nem falta pedaço. */
+.audit-grid { display: grid; grid-template-columns: 270px 1fr; gap: 20px; align-items: stretch; min-height: 520px; }
+@media (max-width: 640px) { .audit-grid { grid-template-columns: 1fr; min-height: 0; } }
 .audit-side {
     background: linear-gradient(160deg, var(--dark2), var(--primary));
     border-radius: 10px; padding: 24px 20px; color: #fff;
     display: flex; flex-direction: column;
+    height: 100%; box-sizing: border-box;
 }
 .audit-side-lbl { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.55); }
 .audit-side-big { font-size: 2.15rem; font-weight: 800; margin: 5px 0 9px; line-height: 1.1; }
@@ -719,7 +726,7 @@ body {
 .audit-side-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.81rem; padding: 6px 0; color: rgba(255,255,255,0.85); }
 .audit-side-row strong { color: #fff; font-weight: 700; }
 
-.audit-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.audit-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; height: 100%; box-sizing: border-box; }
 .audit-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 @media (max-width: 520px) { .audit-stats-grid { grid-template-columns: 1fr 1fr; } }
 .audit-stat {
