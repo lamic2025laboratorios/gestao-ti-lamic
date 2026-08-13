@@ -157,9 +157,18 @@ function _valorNoMes(tipo, ano, mes) {
 }
 
 function _fbSetValor(tipo, ano, mes, valor) {
+    financeiroData.valores[tipo] = financeiroData.valores[tipo] || {};
+    financeiroData.valores[tipo][_anoMesKey(ano, mes)] = valor;
     if (!window._db || !window._ref || !window._set) return;
     window._set(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/valores/${tipo}/${_anoMesKey(ano, mes)}`), valor)
         .catch(e => console.warn('[Firebase] Erro ao salvar valor:', e));
+}
+
+function _fbRemoveValor(tipo, ano, mes) {
+    if (financeiroData.valores[tipo]) delete financeiroData.valores[tipo][_anoMesKey(ano, mes)];
+    if (!window._db || !window._ref || !window._remove) return;
+    window._remove(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/valores/${tipo}/${_anoMesKey(ano, mes)}`))
+        .catch(e => console.warn('[Firebase] Erro ao remover valor:', e));
 }
 
 function _fbSetMeta(meta) {
@@ -737,28 +746,96 @@ function salvarMetaFin() {
     cancelarMetaForm();
 }
 
-// ── Modal: Lançar Valor (faturamento/exames/tipo personalizado) ─
+// ── Modal: Valores lançados (faturamento/exames/tipo personalizado) ─
+// Lista tudo que já foi lançado do tipo escolhido, com Editar/Excluir por
+// linha, mais um botão pra lançar um novo mês. Aberto a partir do "＋
+// Faturamento" do card Faturamento x Meta (tipoPreSel = 'faturamento').
 function abrirValorModal(tipoPreSel) {
     const sel = document.getElementById('vf-tipo');
     const tipos = _tiposDeMetaConhecidos();
     sel.innerHTML = tipos.map(t => `<option value="${escAttr(t)}">${escHtml(_labelTipoMeta(t))}</option>`).join('');
     sel.value = tipoPreSel && tipos.includes(tipoPreSel) ? tipoPreSel : tipos[0];
+    sel.onchange = _renderListaValoresFin;
 
-    const anoEl = document.getElementById('vf-ano'), mesEl = document.getElementById('vf-mes');
-    anoEl.value = filtro.ano || new Date().getFullYear();
-    mesEl.value = filtro.mes || (new Date().getMonth() + 1);
-
-    const refresh = () => {
-        const t = sel.value, a = parseInt(anoEl.value) || 0, m = parseInt(mesEl.value) || 0;
-        const v = _valorNoMes(t, a, m);
-        document.getElementById('vf-valor').value = (v != null) ? v : '';
-        document.getElementById('vf-valor-label').textContent = (t === 'exames') ? 'Valor (quantidade)' : 'Valor (R$)';
-    };
-    sel.onchange = refresh; anoEl.oninput = refresh; mesEl.onchange = refresh;
-    refresh();
-
-    document.getElementById('valor-modal-title').textContent = 'Lançar Valor';
+    _renderListaValoresFin();
+    document.getElementById('vf-lista-card').style.display = '';
+    document.getElementById('vf-form-card').style.display  = 'none';
+    document.getElementById('valor-modal-title').textContent = _labelTipoMeta(sel.value);
     document.getElementById('valor-modal-fin').style.display = 'flex';
+}
+
+// Todos os valores já lançados de um tipo, mais recente primeiro.
+function _listaValoresDoTipo(tipo) {
+    const obj = financeiroData.valores[tipo] || {};
+    return Object.keys(obj).map(k => {
+        const [ano, mes] = k.split('-').map(Number);
+        return { ano, mes, valor: parseFloat(obj[k]) };
+    }).sort((a, b) => (b.ano - a.ano) || (b.mes - a.mes));
+}
+
+function _renderListaValoresFin() {
+    const tipo = document.getElementById('vf-tipo').value;
+    const el = document.getElementById('vf-lista');
+    const lista = _listaValoresDoTipo(tipo);
+    const isQtd = (tipo === 'exames');
+    document.getElementById('vf-lista-titulo').textContent = `Valores lançados — ${_labelTipoMeta(tipo)}`;
+    document.getElementById('valor-modal-title').textContent = _labelTipoMeta(tipo);
+    if (!lista.length) {
+        el.innerHTML = '<div class="empty-state" style="padding:14px;"><div class="empty-state-text">Nenhum valor lançado ainda</div></div>';
+        return;
+    }
+    el.innerHTML = lista.map(item => `<div class="meta-list-item">
+        <div class="meta-list-info">
+            <strong>${MESES_PT[item.mes - 1]}/${item.ano}</strong>
+            <span>${isQtd ? fNum(item.valor) : fBRL(item.valor)}</span>
+        </div>
+        <div class="meta-list-actions">
+            <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;" onclick="editarValorFin('${escAttr(tipo)}',${item.ano},${item.mes})">Editar</button>
+            <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;color:#dc2626;" onclick="excluirValorFin('${escAttr(tipo)}',${item.ano},${item.mes})">Excluir</button>
+        </div>
+    </div>`).join('');
+}
+
+function novoValorForm() {
+    const tipo = document.getElementById('vf-tipo').value;
+    document.getElementById('vf-form-titulo').textContent = `Novo valor — ${_labelTipoMeta(tipo)}`;
+    document.getElementById('vf-edit-key').value = '';
+    const anoEl = document.getElementById('vf-ano'), mesEl = document.getElementById('vf-mes');
+    anoEl.value = filtro.ano || new Date().getFullYear(); anoEl.disabled = false;
+    mesEl.value = filtro.mes || (new Date().getMonth() + 1); mesEl.disabled = false;
+    document.getElementById('vf-valor').value = '';
+    document.getElementById('vf-valor-label').textContent = (tipo === 'exames') ? 'Valor (quantidade)' : 'Valor (R$)';
+    document.getElementById('vf-lista-card').style.display = 'none';
+    document.getElementById('vf-form-card').style.display  = '';
+}
+
+// Ano/mês ficam travados na edição — trocar o mês de um valor já lançado é,
+// na prática, lançar em outro lugar; edição aqui é só o valor mesmo.
+function editarValorFin(tipo, ano, mes) {
+    document.getElementById('vf-tipo').value = tipo;
+    document.getElementById('vf-form-titulo').textContent = `Editar valor — ${_labelTipoMeta(tipo)}`;
+    document.getElementById('vf-edit-key').value = _anoMesKey(ano, mes);
+    const anoEl = document.getElementById('vf-ano'), mesEl = document.getElementById('vf-mes');
+    anoEl.value = ano; anoEl.disabled = true;
+    mesEl.value = mes; mesEl.disabled = true;
+    document.getElementById('vf-valor').value = _valorNoMes(tipo, ano, mes);
+    document.getElementById('vf-valor-label').textContent = (tipo === 'exames') ? 'Valor (quantidade)' : 'Valor (R$)';
+    document.getElementById('vf-lista-card').style.display = 'none';
+    document.getElementById('vf-form-card').style.display  = '';
+}
+
+function cancelarValorForm() {
+    document.getElementById('vf-form-card').style.display  = 'none';
+    document.getElementById('vf-lista-card').style.display = '';
+    _renderListaValoresFin();
+}
+
+function excluirValorFin(tipo, ano, mes) {
+    if (!confirm(`Excluir o valor de ${MESES_PT[mes - 1]}/${ano}? Essa ação não pode ser desfeita.`)) return;
+    _fbRemoveValor(tipo, ano, mes);
+    _renderListaValoresFin();
+    const dashSec = document.getElementById('dashboard');
+    if (dashSec && dashSec.classList.contains('active')) renderProjecaoFinanceira();
 }
 
 function salvarValorFin() {
@@ -768,7 +845,9 @@ function salvarValorFin() {
     const valor = parseFloat(document.getElementById('vf-valor').value);
     if (!ano || !mes || isNaN(valor)) { alert('Preencha ano, mês e valor.'); return; }
     _fbSetValor(tipo, ano, mes, valor);
-    fecharModalGenerico('valor-modal-fin');
+    cancelarValorForm();
+    const dashSec = document.getElementById('dashboard');
+    if (dashSec && dashSec.classList.contains('active')) renderProjecaoFinanceira();
 }
 
 // ── Modal: Lançar Gasto com API — modelo antigo (US$) ───────────

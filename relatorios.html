@@ -849,18 +849,27 @@
          MODAL — Lançar Valor (Faturamento / Exames / outros tipos)
     ======================================================= -->
     <div class="modal-overlay" id="valor-modal-fin" style="display:none;" onclick="modalOverlayClickGenerico(event,'valor-modal-fin')">
-        <div class="modal-panel" style="max-width:420px" onclick="event.stopPropagation()">
+        <div class="modal-panel" style="max-width:460px" onclick="event.stopPropagation()">
+            <input type="hidden" id="vf-edit-key">
             <div class="modal-header">
-                <span class="modal-header-title" id="valor-modal-title">Lançar Valor</span>
+                <span class="modal-header-title" id="valor-modal-title">Faturamento</span>
                 <button class="modal-close-btn" onclick="fecharModalGenerico('valor-modal-fin')">✕</button>
             </div>
             <div class="modal-body">
-                <div class="card">
+
+                <div class="card" id="vf-lista-card">
+                    <div class="form-group" id="vf-tipo-group" style="margin-bottom:12px;">
+                        <label for="vf-tipo">Tipo</label>
+                        <select id="vf-tipo"></select>
+                    </div>
+                    <div class="card-title" id="vf-lista-titulo">Valores lançados</div>
+                    <div id="vf-lista"></div>
+                    <button class="btn-add" onclick="novoValorForm()">＋ Novo Valor</button>
+                </div>
+
+                <div class="card" id="vf-form-card" style="display:none;">
+                    <div class="card-title" id="vf-form-titulo">Novo Valor</div>
                     <div class="form-grid">
-                        <div class="form-group" id="vf-tipo-group">
-                            <label for="vf-tipo">Tipo</label>
-                            <select id="vf-tipo"></select>
-                        </div>
                         <div class="form-group">
                             <label for="vf-ano">Ano</label>
                             <input type="number" id="vf-ano" min="2020" max="2099">
@@ -881,11 +890,12 @@
                             <input type="number" id="vf-valor" min="0" step="0.01" placeholder="0">
                         </div>
                     </div>
+                    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
+                        <button class="btn-secondary" onclick="cancelarValorForm()">Cancelar</button>
+                        <button class="btn-primary" onclick="salvarValorFin()">Salvar</button>
+                    </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="fecharModalGenerico('valor-modal-fin')">Cancelar</button>
-                <button class="btn-primary" onclick="salvarValorFin()">Salvar</button>
+
             </div>
         </div>
     </div>
