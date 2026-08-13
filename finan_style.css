@@ -1059,14 +1059,14 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   min-height: 0;
 }
 
-/* ── Botão Imprimir / PDF ── */
+/* ── Botão Imprimir / PDF (azul cheio, igual ao Relatório em Relatórios) ── */
 .btn-dash-print {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 14px; border-radius: 8px; border: 1.5px solid #d0d9ea;
-  background: #fff; color: #4a6080; font-size: .82rem; font-weight: 600;
-  cursor: pointer; transition: all .15s; white-space: nowrap;
+  height: 36px; padding: 0 16px; border-radius: 8px; border: none;
+  background: #2563eb; color: #fff; font-size: .84rem; font-weight: 600;
+  cursor: pointer; transition: background .15s, box-shadow .15s; white-space: nowrap;
 }
-.btn-dash-print:hover { border-color: #3a7ee8; color: #3a7ee8; background: #eef4ff; }
+.btn-dash-print:hover { background: #1d4ed8; box-shadow: 0 2px 8px rgba(37,99,235,.3); }
 
 /* ── Central de Tratamento + Log de Atividades ── */
 .dash-mgmt-grid {
