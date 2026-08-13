@@ -2187,52 +2187,81 @@ function chartComparacao(ano) {
     const trendData = _calcTrendLine(efData);
     const avgData   = _calcAvgLine(efData);
 
+    // Meta (cadastrada em Inserir Dados, tipo "mensagens" — reduzir o volume
+    // trocado). O alvo é em nº de mensagens; aqui é convertido pro mesmo eixo
+    // do gráfico (msgs/atendimento) dividindo pelos atendimentos reais do mês,
+    // pra já mostrar em que nível de eficiência aquela meta colocaria o mês.
+    const metaMsg  = _metaAtivaDoTipo('mensagens');
+    const metaData = metaMsg ? lista.map(item => {
+        const alvoMsgs = _metaAlvoParaMes(metaMsg, ano, item.mes);
+        if (alvoMsgs == null || !item.p || !item.p.total) return null;
+        return +(alvoMsgs / item.p.total).toFixed(2);
+    }) : null;
+    const metaCor = metaMsg ? (metaMsg.cor || _corPadraoTipoMeta('mensagens')) : null;
+
+    const datasets = [
+        {
+            label: 'Eficiência (msgs/atendimento)',
+            data: efData,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37,99,235,0.08)',
+            pointBackgroundColor: pointColors,
+            pointBorderColor: pointColors,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            tension: 0.35,
+            fill: true,
+            spanGaps: true,
+            order: 1
+        },
+        {
+            label: 'Tendência',
+            data: trendData,
+            borderColor: '#d97706',
+            borderDash: [7, 4],
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHitRadius: 0,
+            fill: false,
+            tension: 0,
+            spanGaps: true,
+            order: 2
+        },
+        {
+            label: 'Média',
+            data: avgData,
+            borderColor: '#8b5cf6',
+            borderDash: [2, 3],
+            borderWidth: 1.5,
+            pointRadius: 0,
+            pointHitRadius: 0,
+            fill: false,
+            tension: 0,
+            spanGaps: true,
+            order: 3
+        }
+    ];
+    if (metaData) {
+        datasets.push({
+            label: `Meta — ${metaMsg.nome}`,
+            data: metaData,
+            borderColor: metaCor,
+            borderDash: [3, 3],
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHitRadius: 0,
+            fill: false,
+            tension: 0,
+            spanGaps: true,
+            order: 0
+        });
+    }
+
     charts['comp'] = new Chart(ctx, {
         type: 'line',
         data: {
             labels: lista.map(item => MESES_ABR[item.mes - 1]),
-            datasets: [
-                {
-                    label: 'Eficiência (msgs/atendimento)',
-                    data: efData,
-                    borderColor: '#2563eb',
-                    backgroundColor: 'rgba(37,99,235,0.08)',
-                    pointBackgroundColor: pointColors,
-                    pointBorderColor: pointColors,
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                    tension: 0.35,
-                    fill: true,
-                    spanGaps: true,
-                    order: 1
-                },
-                {
-                    label: 'Tendência',
-                    data: trendData,
-                    borderColor: '#d97706',
-                    borderDash: [7, 4],
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    pointHitRadius: 0,
-                    fill: false,
-                    tension: 0,
-                    spanGaps: true,
-                    order: 2
-                },
-                {
-                    label: 'Média',
-                    data: avgData,
-                    borderColor: '#8b5cf6',
-                    borderDash: [2, 3],
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    pointHitRadius: 0,
-                    fill: false,
-                    tension: 0,
-                    spanGaps: true,
-                    order: 3
-                }
-            ]
+            datasets
         },
         options: {
             responsive: true,
