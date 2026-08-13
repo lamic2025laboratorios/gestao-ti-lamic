@@ -636,13 +636,9 @@ body {
    Faturamento x Meta + Projeção de custo da API oficial (Meta). */
 .proj-fin-card {
     cursor: pointer;
-    border-top: 3px solid var(--gray-2);
-    padding-top: 15px;
-    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    transition: transform 0.15s, box-shadow 0.15s;
 }
 .proj-fin-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-m); }
-.proj-fin-card-fat { border-top-color: var(--green); }
-.proj-fin-card-api { border-top-color: var(--blue-v); }
 .proj-fin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .proj-fin-btn {
     display: inline-flex; align-items: center;
