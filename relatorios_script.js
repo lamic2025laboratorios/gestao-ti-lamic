@@ -197,6 +197,15 @@ function _labelTipoMeta(tipo) {
     return m ? (m.tipoLabel || m.nome || tipo) : tipo;
 }
 
+// Cor padrão da linha de meta no gráfico, por tipo — usada quando a meta
+// ainda não tem cor própria salva (metas antigas) ou como sugestão ao criar.
+function _corPadraoTipoMeta(tipo) {
+    if (tipo === 'faturamento') return '#059669';
+    if (tipo === 'mensagens')   return '#dc2626';
+    if (tipo === 'exames')      return '#7c3aed';
+    return '#2563eb';
+}
+
 // Meta ATIVA de um tipo (assume 1 meta ativa por tipo — a mais recente cadastrada)
 function _metaAtivaDoTipo(tipo) {
     const lista = Object.values(financeiroData.metas || {})
@@ -424,6 +433,13 @@ function setApiModo(modo) {
     const btnA = document.getElementById('api-modo-antigo'), btnN = document.getElementById('api-modo-novo');
     if (btnA) btnA.classList.toggle('active', modo !== 'novo');
     if (btnN) btnN.classList.toggle('active', modo === 'novo');
+    // se o pop-up de auditoria da API estiver aberto, atualiza ele na hora
+    // (sem esperar o round-trip do Firebase) — inclusive os botões de lá.
+    const modal = document.getElementById('audit-apicost-modal');
+    if (modal && modal.style.display !== 'none') {
+        financeiroData.apiCost.modoAtivo = modo;
+        _atualizarAuditApiCabecalho();
+    }
 }
 
 // ── Modal: Metas (lista + formulário de nova/editar) ────────────
@@ -506,9 +522,10 @@ function _renderMetasListInto(containerId, tipo, somenteLeitura) {
                 <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;" onclick="editarMeta('${m.id}','${tipo}')">Editar</button>
                 <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;color:#dc2626;" onclick="excluirMeta('${m.id}','${tipo}')">Excluir</button>
             </div>`;
+        const cor = m.cor || _corPadraoTipoMeta(m.tipo);
         return `<div class="meta-list-item">
             <div class="meta-list-info">
-                <strong>${escHtml(m.nome)}</strong>
+                <strong><span class="meta-cor-dot" style="background:${escAttr(cor)}"></span>${escHtml(m.nome)}</strong>
                 <span>${escHtml(_labelTipoMeta(m.tipo))} · ${m.periodicidade === 'anual' ? 'Anual' : 'Mensal'} · alvo ${alvoTxt}${m.autoIncrementoPct ? ' · auto +' + m.autoIncrementoPct + '%' : ''}</span>
             </div>
             <span class="proj-fin-status st-${st.status === 'sem-dado' ? 'semdado' : st.status}" style="margin:0;">${pctTxt}</span>
@@ -533,6 +550,7 @@ function novaMetaForm() {
     document.getElementById('mf-tipo-custom-group').style.display = 'none';
     document.getElementById('mf-tipo-custom').value = '';
     document.getElementById('mf-nome').value = 'Meta de Faturamento';
+    document.getElementById('mf-cor').value = _corPadraoTipoMeta('faturamento');
     document.getElementById('mf-periodicidade').value = 'mensal';
     document.getElementById('mf-direcao').value = 'aumentar';
     document.getElementById('mf-modo').value = 'valor';
@@ -565,6 +583,7 @@ function editarMeta(id, tipo) {
     document.getElementById('mf-tipo-custom-group').style.display = tipoConhecido ? 'none' : '';
     document.getElementById('mf-tipo-custom').value = tipoConhecido ? '' : m.tipo;
     document.getElementById('mf-nome').value = m.nome || '';
+    document.getElementById('mf-cor').value = m.cor || _corPadraoTipoMeta(m.tipo);
     document.getElementById('mf-periodicidade').value = m.periodicidade || 'mensal';
     document.getElementById('mf-direcao').value = m.direcao === 'diminuir' ? 'diminuir' : 'aumentar';
     document.getElementById('mf-modo').value = m.modoAlvo || 'valor';
@@ -595,6 +614,7 @@ function onMetaTipoChange() {
         if (!nomeEl.value) nomeEl.value = 'Meta de Redução de Mensagens';
         document.getElementById('mf-direcao').value = 'diminuir';   // mensagens é sempre pra reduzir
     }
+    document.getElementById('mf-cor').value = _corPadraoTipoMeta(v === '__novo__' ? 'personalizado' : v);
     onMetaModoChange();
 }
 
@@ -643,6 +663,7 @@ function salvarMetaFin() {
 
     const meta = {
         id, tipo, nome,
+        cor: document.getElementById('mf-cor').value || _corPadraoTipoMeta(tipo),
         periodicidade: document.getElementById('mf-periodicidade').value,
         direcao: document.getElementById('mf-direcao').value === 'diminuir' ? 'diminuir' : 'aumentar',
         modoAlvo: document.getElementById('mf-modo').value,
@@ -778,6 +799,7 @@ function _renderAuditFatChart(ano, meses, fatSerie, meta) {
     if (!ctx) return;
     const labels    = meses.map(item => MESES_ABR[item.mes - 1]);
     const metaSerie = meses.map(item => meta ? _metaAlvoParaMes(meta, ano, item.mes) : null);
+    const metaCor   = meta ? (meta.cor || _corPadraoTipoMeta(meta.tipo)) : '#059669';
     const trend = _calcTrendLine(fatSerie);
     const avg   = _calcAvgLine(fatSerie);
     charts['auditFat'] = new Chart(ctx, {
@@ -786,7 +808,7 @@ function _renderAuditFatChart(ano, meses, fatSerie, meta) {
             labels,
             datasets: [
                 { label: 'Faturamento', data: fatSerie,  borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.08)', fill: true,  tension: .3, spanGaps: true, pointRadius: 4 },
-                { label: 'Meta',        data: metaSerie, borderColor: '#059669', borderDash: [6, 4], borderWidth: 2,   pointRadius: 0, fill: false, spanGaps: true },
+                { label: meta ? `Meta — ${meta.nome}` : 'Meta', data: metaSerie, borderColor: metaCor, borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false, spanGaps: true },
                 { label: 'Tendência',   data: trend,     borderColor: '#d97706', borderDash: [7, 4], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true },
                 { label: 'Média',       data: avg,       borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true }
             ]
@@ -811,12 +833,8 @@ function abrirAuditApiCost() {
     const p = getPeriodoAtual();
     const antigo = _custoApiAntigo(ano, mes);
     const novo   = _custoApiNovoEstimado(p);
-    const modo   = financeiroData.apiCost.modoAtivo;
-    const ativo  = modo === 'novo' ? novo : antigo;
 
-    document.getElementById('audit-api-sub').textContent = `${MESES_PT[mes - 1]}/${ano} · modelo ${modo === 'novo' ? 'novo (estimado)' : 'antigo'} selecionado`;
-    document.getElementById('audit-api-tag').textContent = modo === 'novo' ? 'MODELO NOVO (ESTIMADO)' : 'MODELO ANTIGO (REAL)';
-    document.getElementById('audit-api-big').textContent = ativo != null ? fBRL(ativo) : '—';
+    _atualizarAuditApiCabecalho();
     document.getElementById('audit-api-antigo').textContent = antigo != null ? fBRL(antigo) : '—';
     document.getElementById('audit-api-novo').textContent = novo != null ? fBRL(novo) : '—';
     const dif = (antigo != null && novo != null) ? (novo - antigo) : null;
@@ -826,18 +844,36 @@ function abrirAuditApiCost() {
     document.getElementById('audit-api-cotacao').textContent = financeiroData.apiCost.dolarCotacao ? 'R$ ' + Number(financeiroData.apiCost.dolarCotacao).toFixed(2) : '—';
 
     const meses = getPeriodsForMesComparacao(ano);
-    const novoSerie = meses.map(item => _custoApiNovoEstimado(item.p));
-    const validos = novoSerie.filter(v => v != null);
-    const media = validos.length ? validos.reduce((a, b) => a + b, 0) / validos.length : null;
-    document.getElementById('audit-api-media').textContent = media != null ? fBRL(media) : '—';
-    const trend = _calcTrendLine(novoSerie);
-    const trendValidos = trend.filter(v => v != null);
-    document.getElementById('audit-api-tend').textContent = (trendValidos.length >= 2)
-        ? (trendValidos[trendValidos.length - 1] >= trendValidos[0] ? '▲ Em alta' : '▼ Em queda') : '—';
+    const antigoSerie = meses.map(item => _custoApiAntigo(ano, item.mes));
+    const novoSerie   = meses.map(item => _custoApiNovoEstimado(item.p));
+    const mediaDe = serie => { const v = serie.filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+    const mediaNovo = mediaDe(novoSerie), mediaAntigo = mediaDe(antigoSerie);
+    document.getElementById('audit-api-media').textContent = mediaNovo != null ? fBRL(mediaNovo) : '—';
+    document.getElementById('audit-api-media-antigo').textContent = mediaAntigo != null ? fBRL(mediaAntigo) : '—';
 
     _renderAuditApiGoalBox(ano, mes);
     _renderAuditApiChart(ano, meses);
     document.getElementById('audit-apicost-modal').style.display = 'flex';
+}
+
+// Só a etiqueta/valor "ativo" (e o estado dos botões novo/antigo de dentro do
+// próprio pop-up) — separado pra poder ser chamado de novo ao trocar de
+// modelo pelo toggle sem re-renderizar o gráfico inteiro.
+function _atualizarAuditApiCabecalho() {
+    const ano = filtro.ano, mes = filtro.mes;
+    const p = getPeriodoAtual();
+    const antigo = _custoApiAntigo(ano, mes);
+    const novo   = _custoApiNovoEstimado(p);
+    const modo   = financeiroData.apiCost.modoAtivo;
+    const ativo  = modo === 'novo' ? novo : antigo;
+
+    document.getElementById('audit-api-sub').textContent = `${MESES_PT[mes - 1]}/${ano} · modelo ${modo === 'novo' ? 'novo (estimado)' : 'antigo'} selecionado`;
+    document.getElementById('audit-api-tag').textContent = modo === 'novo' ? 'MODELO NOVO (ESTIMADO)' : 'MODELO ANTIGO (REAL)';
+    document.getElementById('audit-api-big').textContent = ativo != null ? fBRL(ativo) : '—';
+
+    const abtnA = document.getElementById('audit-api-modo-antigo'), abtnN = document.getElementById('audit-api-modo-novo');
+    if (abtnA) abtnA.classList.toggle('active', modo !== 'novo');
+    if (abtnN) abtnN.classList.toggle('active', modo === 'novo');
 }
 
 // Bloco separado dentro do pop-up de custo da API: meta de reduzir o volume de
@@ -869,28 +905,46 @@ function _renderAuditApiChart(ano, meses) {
     const labels      = meses.map(item => MESES_ABR[item.mes - 1]);
     const antigoSerie = meses.map(item => _custoApiAntigo(ano, item.mes));
     const novoSerie   = meses.map(item => _custoApiNovoEstimado(item.p));
-    const trend = _calcTrendLine(novoSerie);
-    const avg   = _calcAvgLine(novoSerie);
+    const avgAntigo = _calcAvgLine(antigoSerie);
+    const avgNovo   = _calcAvgLine(novoSerie);
+
+    // Linha de meta (tipo "mensagens" — reduzir volume trocado), num eixo à
+    // parte porque é contada em mensagens, não em R$. Cor vem do cadastro
+    // da própria meta (Inserir Dados → Metas).
+    const metaMsg   = _metaAtivaDoTipo('mensagens');
+    const metaSerie = metaMsg ? meses.map(item => _metaAlvoParaMes(metaMsg, ano, item.mes)) : null;
+    const metaCor   = metaMsg ? (metaMsg.cor || _corPadraoTipoMeta('mensagens')) : null;
+
+    const datasets = [
+        { type: 'bar',  label: 'Modelo Antigo (real)',   data: antigoSerie, backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 5, order: 4, yAxisID: 'y' },
+        { type: 'bar',  label: 'Modelo Novo (estimado)', data: novoSerie,   backgroundColor: 'rgba(217,119,6,0.7)', borderRadius: 5, order: 4, yAxisID: 'y' },
+        { type: 'line', label: 'Média (antigo)', data: avgAntigo, borderColor: '#1e40af', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 2, yAxisID: 'y' },
+        { type: 'line', label: 'Média (novo)',   data: avgNovo,   borderColor: '#b45309', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 2, yAxisID: 'y' }
+    ];
+    if (metaSerie) {
+        datasets.push({ type: 'line', label: `Meta — ${metaMsg.nome}`, data: metaSerie, borderColor: metaCor, borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false, spanGaps: true, order: 1, yAxisID: 'y1' });
+    }
+
     charts['auditApi'] = new Chart(ctx, {
-        data: {
-            labels,
-            datasets: [
-                { type: 'bar',  label: 'Modelo Antigo (real)',     data: antigoSerie, backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 5, order: 3 },
-                { type: 'bar',  label: 'Modelo Novo (estimado)',   data: novoSerie,   backgroundColor: 'rgba(217,119,6,0.7)', borderRadius: 5, order: 3 },
-                { type: 'line', label: 'Tendência (novo)', data: trend, borderColor: '#dc2626', borderDash: [7, 4], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 1 },
-                { type: 'line', label: 'Média (novo)',     data: avg,   borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 2 }
-            ]
-        },
+        data: { labels, datasets },
         options: {
             responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { labels: { color: '#475569', font: { size: 10 }, boxWidth: 12 } },
-                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            if (ctx.raw == null) return ` ${ctx.dataset.label}: sem dado`;
+                            return ctx.dataset.yAxisID === 'y1' ? ` ${ctx.dataset.label}: ${fNum(ctx.raw)} msgs` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}`;
+                        }
+                    }
+                }
             },
             scales: {
-                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => fBRL(v) }, beginAtZero: true },
-                x: { grid: { display: false }, ticks: { color: '#475569' } }
+                y:  { position: 'left',  grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => fBRL(v) }, beginAtZero: true },
+                y1: { position: 'right', display: !!metaSerie, grid: { display: false }, ticks: { color: '#64748b' }, beginAtZero: true, title: { display: !!metaSerie, text: 'Mensagens (meta)', color: '#94a3b8', font: { size: 9 } } },
+                x:  { grid: { display: false }, ticks: { color: '#475569' } }
             }
         }
     });

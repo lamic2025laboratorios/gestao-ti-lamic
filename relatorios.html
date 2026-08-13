@@ -776,6 +776,12 @@
                         </div>
 
                         <div class="form-group">
+                            <label for="mf-cor">Cor da linha no gráfico</label>
+                            <input type="color" id="mf-cor" value="#059669" style="height:38px;padding:2px;cursor:pointer;">
+                            <span class="field-hint">Usada na linha de meta em Faturamento x Meta e Projeção de Custo API.</span>
+                        </div>
+
+                        <div class="form-group">
                             <label for="mf-periodicidade">Periodicidade</label>
                             <select id="mf-periodicidade">
                                 <option value="mensal">Mensal</option>
@@ -1030,8 +1036,13 @@
                     <div class="audit-main">
                         <div class="audit-stats-grid">
                             <div class="audit-stat"><span>Média (modelo novo)</span><strong id="audit-api-media">—</strong></div>
-                            <div class="audit-stat"><span>Tendência (modelo novo)</span><strong id="audit-api-tend">—</strong></div>
+                            <div class="audit-stat"><span>Média (modelo antigo)</span><strong id="audit-api-media-antigo">—</strong></div>
                             <div class="audit-stat"><span>Vigência</span><strong>a partir de 01/10/2026</strong></div>
+                        </div>
+
+                        <div class="api-modo-switch" style="margin-bottom:12px;">
+                            <button class="api-modo-btn" id="audit-api-modo-antigo" onclick="setApiModo('antigo')">Cobrança Antiga</button>
+                            <button class="api-modo-btn" id="audit-api-modo-novo" onclick="setApiModo('novo')">Cobrança Nova (out/2026)</button>
                         </div>
 
                         <!-- Aba/bloco separado: meta de reduzir o volume de mensagens trocadas
