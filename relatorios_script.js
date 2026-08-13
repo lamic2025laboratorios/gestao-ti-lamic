@@ -71,7 +71,7 @@ function _fbInitListeners() {
 let financeiroData = {
     valores: {},
     metas: {},
-    apiCost: { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, antigo: {} }
+    apiCost: { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, pctEmpresa: 50, antigo: {} }
 };
 
 function _fbListenFinanceiro() {
@@ -82,7 +82,7 @@ function _fbListenFinanceiro() {
         financeiroData.valores = val.valores || {};
         financeiroData.metas   = val.metas   || {};
         financeiroData.apiCost = Object.assign(
-            { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, antigo: {} },
+            { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, pctEmpresa: 50, antigo: {} },
             val.apiCost || {}
         );
         const btnAntigo = document.getElementById('api-modo-antigo');
@@ -231,14 +231,21 @@ function _custoApiAntigo(ano, mes) {
     return parseFloat(usd) * (financeiroData.apiCost.dolarCotacao || 0);
 }
 
-// Estimativa do modelo novo (vigente a partir de 01/10/2026): cobra por
-// mensagem de atendimento entregue, R$0,035/msg. Como a planilha não separa
-// mensagens enviadas pela empresa das recebidas do cliente, usa o TOTAL de
-// mensagens do período como base — é uma estimativa conservadora/aproximada,
-// deixada clara na tela (serve pra "ter uma base", como pedido).
+// Estimativa do modelo novo (vigente a partir de 01/10/2026, confirmado pela
+// documentação oficial da Meta — cobrança POR MENSAGEM, não mais por
+// conversa/template. O valor final por mensagem só é publicado pela Meta até
+// 01/09/2026 — R$0,035 aqui é o valor preliminar informado, editável a
+// qualquer momento).
+// Só é cobrada a mensagem de atendimento ENVIADA PELA EMPRESA (a recebida do
+// cliente nunca é cobrada, nem hoje nem no modelo novo). Como a planilha só
+// tem o total de mensagens trocadas (sem separar quem enviou), usa um %
+// configurável do total como proxy de "mensagens da empresa" — 50% por
+// padrão (conversa tende a ir e voltar), ajustável em "＋ Gasto US$"
+// conforme o padrão real de conversa da equipe.
 function _custoApiNovoEstimado(p) {
     if (!p || !p.mensagens) return null;
-    return p.mensagens * (financeiroData.apiCost.precoPorMsgBRL || 0.035);
+    const pct = (financeiroData.apiCost.pctEmpresa != null ? financeiroData.apiCost.pctEmpresa : 50) / 100;
+    return p.mensagens * pct * (financeiroData.apiCost.precoPorMsgBRL || 0.035);
 }
 
 // ── Render: os 2 cards da Projeção Financeira ───────────────────
@@ -528,7 +535,9 @@ function abrirValorApiModal() {
     const anoEl = document.getElementById('va-ano'), mesEl = document.getElementById('va-mes');
     anoEl.value = filtro.ano || new Date().getFullYear();
     mesEl.value = filtro.mes || (new Date().getMonth() + 1);
-    document.getElementById('va-cotacao').value = financeiroData.apiCost.dolarCotacao || 5.40;
+    document.getElementById('va-cotacao').value    = financeiroData.apiCost.dolarCotacao || 5.40;
+    document.getElementById('va-preco-msg').value  = financeiroData.apiCost.precoPorMsgBRL != null ? financeiroData.apiCost.precoPorMsgBRL : 0.035;
+    document.getElementById('va-pct-empresa').value = financeiroData.apiCost.pctEmpresa != null ? financeiroData.apiCost.pctEmpresa : 50;
 
     const refresh = () => {
         const a = parseInt(anoEl.value) || 0, m = parseInt(mesEl.value) || 0;
@@ -542,13 +551,19 @@ function abrirValorApiModal() {
 }
 
 function salvarValorApi() {
-    const ano     = parseInt(document.getElementById('va-ano').value);
-    const mes     = parseInt(document.getElementById('va-mes').value);
-    const usd     = parseFloat(document.getElementById('va-usd').value);
-    const cotacao = parseFloat(document.getElementById('va-cotacao').value);
+    const ano        = parseInt(document.getElementById('va-ano').value);
+    const mes        = parseInt(document.getElementById('va-mes').value);
+    const usd        = parseFloat(document.getElementById('va-usd').value);
+    const cotacao    = parseFloat(document.getElementById('va-cotacao').value);
+    const precoMsg   = parseFloat(document.getElementById('va-preco-msg').value);
+    const pctEmpresa = parseFloat(document.getElementById('va-pct-empresa').value);
     if (!ano || !mes || isNaN(usd)) { alert('Preencha ano, mês e valor gasto.'); return; }
     _fbSetApiCostAntigo(ano, mes, usd);
-    if (!isNaN(cotacao) && cotacao > 0) _fbSetApiCost({ dolarCotacao: cotacao });
+    const cfg = {};
+    if (!isNaN(cotacao) && cotacao > 0) cfg.dolarCotacao = cotacao;
+    if (!isNaN(precoMsg) && precoMsg >= 0) cfg.precoPorMsgBRL = precoMsg;
+    if (!isNaN(pctEmpresa) && pctEmpresa >= 0 && pctEmpresa <= 100) cfg.pctEmpresa = pctEmpresa;
+    if (Object.keys(cfg).length) _fbSetApiCost(cfg);
     fecharModalGenerico('valor-api-modal');
 }
 
@@ -644,6 +659,7 @@ function abrirAuditApiCost() {
     const dif = (antigo != null && novo != null) ? (novo - antigo) : null;
     document.getElementById('audit-api-dif').textContent = dif != null ? (dif >= 0 ? '+' : '') + fBRL(dif) : '—';
     document.getElementById('audit-api-preco').textContent = 'R$ ' + String(financeiroData.apiCost.precoPorMsgBRL || 0.035).replace('.', ',') + '/msg';
+    document.getElementById('audit-api-pct').textContent = (financeiroData.apiCost.pctEmpresa != null ? financeiroData.apiCost.pctEmpresa : 50) + '%';
     document.getElementById('audit-api-cotacao').textContent = financeiroData.apiCost.dolarCotacao ? 'R$ ' + Number(financeiroData.apiCost.dolarCotacao).toFixed(2) : '—';
 
     const meses = getPeriodsForMesComparacao(ano);
@@ -693,7 +709,95 @@ function _renderAuditApiChart(ano, meses) {
     });
 }
 
-// ── Fechamento genérico de modal (usado pelos 5 pop-ups novos) ──
+// ── Pop-up de auditoria: dashboard mensal do Atendente ──────────
+// Clique num atendente do ranking "Avaliação por Atendente" abre este
+// pop-up (mesma estética "Tintas Compradas") com o histórico mês a mês
+// de avaliações enviadas/respondidas/não respondidas dele no ano filtrado.
+function abrirAuditAtendente(nome) {
+    const ano = filtro.ano || new Date().getFullYear();
+    const meses = getPeriodsForMesComparacao(ano);
+    const porMes = meses.map(item => (item.p.atendentes || []).find(a => a.nome === nome) || null);
+
+    const atFiltro = (getPeriodoAtual()?.atendentes || []).find(a => a.nome === nome) || null;
+    const env = atFiltro?.avalEnviadas || 0;
+    const resp = atFiltro?.avalRespondidas || 0;
+    const naoResp = Math.max(0, env - resp);
+    const pctAtual = env ? Math.round(resp / env * 100) : null;
+
+    document.getElementById('audit-at-nome').textContent = nome;
+    document.getElementById('audit-at-sub').textContent = `${MESES_PT[(filtro.mes || 1) - 1]}/${ano}`;
+    const tagEl = document.getElementById('audit-at-tag');
+    tagEl.textContent = !atFiltro ? 'SEM DADO NO MÊS' : pctAtual >= 80 ? 'BOA RESPOSTA' : pctAtual >= 50 ? 'RESPOSTA MEDIANA' : 'RESPOSTA BAIXA';
+    tagEl.className = 'audit-side-tag' + (!atFiltro ? '' : pctAtual >= 80 ? ' st-batida' : pctAtual >= 50 ? ' st-perto' : ' st-falta');
+    document.getElementById('audit-at-big').textContent = pctAtual != null ? pctAtual + '%' : '—';
+    document.getElementById('audit-at-atend').textContent = atFiltro ? fNum(atFiltro.atendimentos) : '—';
+    document.getElementById('audit-at-aval').textContent = atFiltro ? fAval(atFiltro.avaliacao) : '—';
+    document.getElementById('audit-at-env').textContent = fNum(env);
+    document.getElementById('audit-at-resp').textContent = fNum(resp);
+    document.getElementById('audit-at-naoresp').textContent = fNum(naoResp);
+
+    const pctSerie = porMes.map(at => (at && at.avalEnviadas) ? +(at.avalRespondidas / at.avalEnviadas * 100).toFixed(1) : null);
+    const validos = pctSerie.filter(v => v != null);
+    const media = validos.length ? validos.reduce((a, b) => a + b, 0) / validos.length : null;
+    document.getElementById('audit-at-media').textContent = media != null ? media.toFixed(1) + '%' : '—';
+    const trend = _calcTrendLine(pctSerie);
+    const trendValidos = trend.filter(v => v != null);
+    document.getElementById('audit-at-tend').textContent = (trendValidos.length >= 2)
+        ? (trendValidos[trendValidos.length - 1] >= trendValidos[0] ? '▲ Melhorando' : '▼ Piorando') : '—';
+    let melhorIdx = -1, melhorVal = -1;
+    pctSerie.forEach((v, i) => { if (v != null && v > melhorVal) { melhorVal = v; melhorIdx = i; } });
+    document.getElementById('audit-at-melhor').textContent = melhorIdx >= 0 ? `${MESES_ABR[meses[melhorIdx].mes - 1]} (${melhorVal.toFixed(0)}%)` : '—';
+
+    _renderAuditAtendenteChart(meses, porMes, pctSerie);
+    document.getElementById('audit-atendente-modal').style.display = 'flex';
+}
+
+function _renderAuditAtendenteChart(meses, porMes, pctSerie) {
+    destroyChart('auditAt');
+    const ctx = getCtx('audit-at-chart');
+    if (!ctx) return;
+    const labels      = meses.map(item => MESES_ABR[item.mes - 1]);
+    const envData     = porMes.map(at => at ? at.avalEnviadas : null);
+    const respData    = porMes.map(at => at ? at.avalRespondidas : null);
+    const naoRespData = porMes.map(at => at ? Math.max(0, (at.avalEnviadas || 0) - (at.avalRespondidas || 0)) : null);
+    const trend = _calcTrendLine(pctSerie);
+    const avg   = _calcAvgLine(pctSerie);
+
+    charts['auditAt'] = new Chart(ctx, {
+        data: {
+            labels,
+            datasets: [
+                { type: 'bar',  label: 'Enviadas',         data: envData,     backgroundColor: 'rgba(100,116,139,0.55)', borderRadius: 4, order: 4, yAxisID: 'y' },
+                { type: 'bar',  label: 'Respondidas',      data: respData,    backgroundColor: 'rgba(5,150,105,0.75)',   borderRadius: 4, order: 4, yAxisID: 'y' },
+                { type: 'bar',  label: 'Não respondidas',  data: naoRespData, backgroundColor: 'rgba(220,38,38,0.7)',    borderRadius: 4, order: 4, yAxisID: 'y' },
+                { type: 'line', label: 'Taxa de resposta (%)', data: pctSerie, borderColor: '#2563eb', borderWidth: 2, pointRadius: 4, fill: false, spanGaps: true, order: 1, yAxisID: 'y1' },
+                { type: 'line', label: 'Tendência', data: trend, borderColor: '#d97706', borderDash: [7, 4], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 2, yAxisID: 'y1' },
+                { type: 'line', label: 'Média',     data: avg,   borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 3, yAxisID: 'y1' }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#475569', font: { size: 9 }, boxWidth: 10 } },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            if (ctx.raw == null) return ` ${ctx.dataset.label}: sem dado`;
+                            return ctx.dataset.yAxisID === 'y1' ? ` ${ctx.dataset.label}: ${ctx.raw}%` : ` ${ctx.dataset.label}: ${fNum(ctx.raw)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y:  { position: 'left',  grid: { color: '#e2e8f0' }, ticks: { color: '#64748b' }, beginAtZero: true, title: { display: true, text: 'Avaliações', color: '#94a3b8', font: { size: 9 } } },
+                y1: { position: 'right', grid: { display: false },   ticks: { color: '#2563eb' },  min: 0, max: 100,   title: { display: true, text: '% resposta',  color: '#94a3b8', font: { size: 9 } } },
+                x:  { grid: { display: false }, ticks: { color: '#475569' } }
+            }
+        }
+    });
+}
+
+// ── Fechamento genérico de modal (usado pelos pop-ups novos) ────
 function fecharModalGenerico(id) {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
@@ -1185,7 +1289,7 @@ function agregarLista(lista, meta) {
         tipo: meta.tipo, ano, mes: null, quinzena: null,
         nome: meta.nome,
         total: 0, contatos: 0, mensagens: 0,
-        avaliacao: 0, silenciosos: 0, concluidos: 0, clienteEncerrou: 0,
+        avaliacao: 0, silenciosos: 0, concluidos: 0, clienteEncerrou: 0, aberto: 0,
         avalEnviadas: 0, avalRespondidas: 0, avalPendentes: 0,
         avalEnviadas: 0,
         resultados: 0, coleta: 0, atendente: 0, info: 0,
@@ -1211,6 +1315,7 @@ function agregarLista(lista, meta) {
         base.silenciosos += p.silenciosos || 0;
         base.concluidos  += p.concluidos  || 0;
         base.clienteEncerrou += p.clienteEncerrou || 0;
+        base.aberto      += p.aberto      || 0;
         base.avalEnviadas    += p.avalEnviadas    || 0;
         base.avalRespondidas += p.avalRespondidas || 0;
         base.avalPendentes   += p.avalPendentes   || 0;
@@ -1375,7 +1480,7 @@ function atualizarKPIs(p) {
         return;
     }
 
-    const emAberto = Math.max(0, (p.total || 0) - (p.concluidos || 0) - (p.silenciosos || 0));
+    const emAberto = p.aberto || 0;   // literal status "Aberto" na planilha (não mais derivado por subtração)
 
     // Total de Atendimentos
     document.getElementById('kpi-total').textContent = fNum(p.total);
@@ -1471,9 +1576,8 @@ function renderRankings(p) {
             const cls = v >= 4 ? 'aval-verde' : v >= 3 ? 'aval-amarela' : 'aval-vermelha';
             const pct = Math.max(0, Math.min(100, (v / 5) * 100));
             const nAval = at.avaliacoes || 0;
-            const sel = (avalAtendenteSel === at.nome) ? ' sel' : '';
             return `
-            <div class="rank-item rank-aval-item${sel}" data-nome="${escHtml(at.nome)}" title="Clique para ver a resposta às avaliações deste atendente">
+            <div class="rank-item rank-aval-item" data-nome="${escHtml(at.nome)}" title="Clique para abrir o dashboard mensal deste atendente">
                 <div class="rank-pos ${posClass(i)}">${i+1}</div>
                 <div class="rank-aval-main">
                     <div class="rank-aval-top">
@@ -1490,22 +1594,15 @@ function renderRankings(p) {
             raEl._avalBound = true;
             raEl.addEventListener('click', (e) => {
                 const item = e.target.closest('.rank-aval-item');
-                if (item && item.dataset.nome != null) selecionarAtendenteAval(item.dataset.nome);
+                if (item && item.dataset.nome != null) abrirAuditAtendente(item.dataset.nome);
             });
         }
     }
 }
 
-// Seleciona/desseleciona um atendente → o card "Resposta às Avaliações" mostra os dados dele.
-function selecionarAtendenteAval(nome) {
-    avalAtendenteSel = (avalAtendenteSel === nome) ? null : nome;
-    const p = getPeriodoAtual();
-    renderRankings(p);
-    renderAvalResumo(p);
-}
-
-// Card "Resposta às Avaliações" — agregado do período. Gauge 0–100% da taxa de
-// resposta + contagem de enviadas / respondidas / não respondidas.
+// Card "Resposta às Avaliações" — SEMPRE geral (soma todos os atendentes).
+// Gauge 0–100% da taxa de resposta do período filtrado + contagem de
+// enviadas/respondidas/não respondidas + evolução mês a mês no ano (com média).
 function renderAvalResumo(p) {
     destroyChart('avalGauge');
     const ctx = getCtx('chart-aval-gauge');
@@ -1514,37 +1611,28 @@ function renderAvalResumo(p) {
     const tituloEl = document.getElementById('aval-resumo-titulo');
     if (!p) return;
 
-    // Se um atendente estiver selecionado no ranking, usa os dados dele; senão, o geral.
-    let enviadas, respondidas, titulo, selecionado = false;
-    if (avalAtendenteSel) {
-        const at = (p.atendentes || []).find(a => a.nome === avalAtendenteSel);
-        enviadas = at?.avalEnviadas || 0;
-        respondidas = at?.avalRespondidas || 0;
-        titulo = avalAtendenteSel;
-        selecionado = true;
-    } else {
-        enviadas = p.avalEnviadas || 0;
-        respondidas = p.avalRespondidas || 0;
-        titulo = 'Geral · todos os atendentes';
-    }
+    const enviadas    = p.avalEnviadas || 0;
+    const respondidas = p.avalRespondidas || 0;
     const naoResp = Math.max(0, enviadas - respondidas);
     const pct     = enviadas ? Math.round(respondidas / enviadas * 100) : 0;
 
-    if (tituloEl) {
-        tituloEl.innerHTML = selecionado
-            ? `<span class="aval-res-sel">${escHtml(titulo)}</span> <button class="aval-res-clear" type="button" onclick="selecionarAtendenteAval('')">✕ ver geral</button>`
-            : titulo;
-    }
+    if (tituloEl) tituloEl.textContent = 'Geral · todos os atendentes';
     if (pctEl) pctEl.textContent = pct + '%';
 
     if (ctx) {
         charts['avalGauge'] = new Chart(ctx, {
             type: 'doughnut',
-            data: { datasets: [{ data: [respondidas, naoResp], backgroundColor: ['#059669', '#e2e8f0'], borderWidth: 0 }] },
+            data: {
+                labels: ['Respondidas', 'Não respondidas'],
+                datasets: [{ data: [respondidas, naoResp], backgroundColor: ['#059669', '#e2e8f0'], borderWidth: 0 }]
+            },
             options: {
                 responsive: true, maintainAspectRatio: false, cutout: '78%',
                 rotation: -90, circumference: 360,
-                plugins: { legend: { display: false }, tooltip: { enabled: false } }
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fNum(ctx.raw)}` } }
+                }
             }
         });
     }
@@ -1553,6 +1641,46 @@ function renderAvalResumo(p) {
         <div class="aval-res-row"><span class="aval-det-dot" style="background:#64748b"></span>Avaliações enviadas <strong>${fNum(enviadas)}</strong></div>
         <div class="aval-res-row"><span class="aval-det-dot" style="background:#059669"></span>Respondida <strong>${fNum(respondidas)}</strong></div>
         <div class="aval-res-row"><span class="aval-det-dot" style="background:#dc2626"></span>Avaliação não respondida <strong>${fNum(naoResp)}</strong></div>`;
+
+    _renderAvalEvolucaoChart();
+}
+
+// Evolução da taxa de resposta (%) mês a mês no ano filtrado, com linha de média.
+function _renderAvalEvolucaoChart() {
+    destroyChart('avalEvolucao');
+    const ctx = getCtx('chart-aval-evolucao');
+    if (!ctx) return;
+    const ano = filtro.ano || new Date().getFullYear();
+    const meses = getPeriodsForMesComparacao(ano);
+    const labels = meses.map(item => MESES_ABR[item.mes - 1]);
+    const serie = meses.map(item => {
+        const env = item.p.avalEnviadas || 0;
+        if (!env) return null;
+        return +((item.p.avalRespondidas || 0) / env * 100).toFixed(1);
+    });
+    const avg = _calcAvgLine(serie);
+
+    charts['avalEvolucao'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: '% respondida', data: serie, borderColor: '#059669', backgroundColor: 'rgba(5,150,105,0.08)', fill: true, tension: .3, spanGaps: true, pointRadius: 3 },
+                { label: 'Média', data: avg, borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, labels: { color: '#475569', font: { size: 9 }, boxWidth: 10 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${ctx.raw}%` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 9 } }, min: 0, max: 100 },
+                x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 9 } } }
+            }
+        }
+    });
 }
 
 // Score de qualidade do atendente. Combina:
@@ -1671,7 +1799,7 @@ function chartDadosGerais(p) {
     if (!ctx || !p) return;
 
     const concluidos = p.concluidos || 0;
-    const emAberto   = Math.max(0, (p.total || 0) - concluidos - (p.silenciosos || 0));
+    const emAberto   = p.aberto || 0;
     const mensagens  = p.mensagens || 0;
 
     charts['geral'] = new Chart(ctx, {
@@ -1853,7 +1981,6 @@ function _calcAvgLine(vals) {
 }
 
 // Canal selecionado no card "Por Que Buscam" ('todos' | 'whatsapp' | 'instagram')
-let avalAtendenteSel = null;   // atendente selecionado no card Resposta às Avaliações
 let buscamCanal = 'todos';
 const _BUSCAM_CANAIS = ['todos', 'whatsapp', 'instagram'];
 const _BUSCAM_CANAL_LBL = { todos: 'Todos os canais', whatsapp: 'WhatsApp', instagram: 'Instagram' };
@@ -1869,6 +1996,7 @@ function chartBuscam(p) {
     const ctx = getCtx('chart-buscam');
     const lblEl = document.getElementById('buscam-canal-label');
     if (lblEl) lblEl.textContent = _BUSCAM_CANAL_LBL[buscamCanal];
+    _renderBuscamGrowthChart();   // independe de "p" (varre o ano inteiro) — roda mesmo sem período atual
     if (!ctx || !p) return;
 
     const labels = ['Resultados', 'Coleta Dom.', 'Falar Atend.', 'Info Gerais', 'Orçamentos', 'Reclamações', 'Vacinas'];
@@ -1922,6 +2050,61 @@ function chartBuscam(p) {
                         label: ctx => ` ${ctx.label}: ${fNum(ctx.raw)} (${((ctx.raw / data.reduce((a,b)=>a+b,0))*100).toFixed(1)}%)`
                     }
                 }
+            }
+        }
+    });
+}
+
+// Crescimento de atendimento por canal (Conexão), mês a mês no ano filtrado —
+// interativo com o mesmo seletor de canal do gráfico de pizza acima ("Todos"
+// mostra WhatsApp em verde + Instagram em vermelho + Outros se houver dado;
+// um canal específico mostra só a linha dele), com linha de média.
+function _renderBuscamGrowthChart() {
+    destroyChart('buscamGrowth');
+    const ctx = getCtx('chart-buscam-growth');
+    if (!ctx) return;
+
+    const ano   = filtro.ano || new Date().getFullYear();
+    const meses = getPeriodsForMesComparacao(ano);
+    const labels = meses.map(item => MESES_ABR[item.mes - 1]);
+
+    const seriesDef = [];
+    if (buscamCanal === 'todos') {
+        seriesDef.push({ key: 'whatsapp', label: 'WhatsApp', color: '#25D366' });
+        seriesDef.push({ key: 'instagram', label: 'Instagram', color: '#dc2626' });
+        if (meses.some(item => (item.p.canais?.outros || 0) > 0)) {
+            seriesDef.push({ key: 'outros', label: 'Outros', color: '#94a3b8' });
+        }
+    } else if (buscamCanal === 'whatsapp') {
+        seriesDef.push({ key: 'whatsapp', label: 'WhatsApp', color: '#25D366' });
+    } else if (buscamCanal === 'instagram') {
+        seriesDef.push({ key: 'instagram', label: 'Instagram', color: '#dc2626' });
+    }
+
+    const datasets = seriesDef.map(def => ({
+        label: def.label,
+        data: meses.map(item => item.p.canais?.[def.key] ?? 0),
+        borderColor: def.color,
+        backgroundColor: def.color + '22',
+        fill: false, tension: .3, pointRadius: 3, spanGaps: true
+    }));
+
+    // Média — da soma de todas as séries visíveis (1 canal só = a média dela mesma)
+    const somaSerie = meses.map((item, i) => datasets.reduce((s, ds) => s + (ds.data[i] || 0), 0));
+    datasets.push({ label: 'Média', data: _calcAvgLine(somaSerie), borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true });
+
+    charts['buscamGrowth'] = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, labels: { color: '#475569', font: { size: 9 }, boxWidth: 10 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fNum(ctx.raw)} atend.` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 9 } }, beginAtZero: true },
+                x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 9 } } }
             }
         }
     });
@@ -2046,7 +2229,7 @@ function chartClientes(p) {
     const concluidos  = p.concluidos  || 0;
     const silenciosos = p.silenciosos || 0;
     const cliente     = p.clienteEncerrou || 0;
-    const emAberto    = Math.max(0, (p.total || 0) - concluidos - silenciosos - cliente);
+    const emAberto    = p.aberto || 0;
 
     charts['clientes'] = new Chart(ctx, {
         type: 'doughnut',
@@ -2781,7 +2964,7 @@ function _motivosVazio() {
 function _novoBucket() {
     return {
         total:0, mensagens:0,
-        avaliacao:0, silenciosos:0, concluidos:0, clienteEncerrou:0,
+        avaliacao:0, silenciosos:0, concluidos:0, clienteEncerrou:0, aberto:0,
         avalEnviadas:0, avalRespondidas:0, avalPendentes:0,
         resultados:0, coleta:0, atendente:0, info:0,
         orcamentos:0, reclamacoes:0, vacinas:0,
@@ -2814,7 +2997,7 @@ function _applyToBucket(b, d) {
     } else if (d.motivo.includes('silencioso')) {
         b.silenciosos++;
     } else if (d.status === 'aberto') {
-        /* em andamento → derivado */
+        b.aberto++;   // Em Aberto = literalmente status "Aberto" na planilha (não mais derivado por subtração)
     } else {
         b.concluidos++;
     }
@@ -2841,7 +3024,7 @@ function _finalizarBucket(b, extra) {
         total: b.total, contatos: b.total, mensagens: b.mensagens || 0,
         avaliacao: b._avalQtd ? +(b._avalSoma / b._avalQtd).toFixed(2) : 0,
         avalEnviadas: b.avalEnviadas, avalRespondidas: b.avalRespondidas, avalPendentes: b.avalPendentes,
-        silenciosos: b.silenciosos, concluidos: b.concluidos, clienteEncerrou: b.clienteEncerrou,
+        silenciosos: b.silenciosos, concluidos: b.concluidos, clienteEncerrou: b.clienteEncerrou, aberto: b.aberto,
         resultados: b.resultados, coleta: b.coleta, atendente: b.atendente, info: b.info,
         orcamentos: b.orcamentos, reclamacoes: b.reclamacoes, vacinas: b.vacinas,
         dias: b.dias, horarios: b.horarios, heat: b.heat,

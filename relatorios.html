@@ -242,7 +242,7 @@
                             <!-- Card B: Projeção de Custo API -->
                             <div class="chart-card proj-fin-card" onclick="abrirAuditApiCost()" title="Clique para ver o detalhe completo">
                                 <div class="chart-title">
-                                    <span>Projeção de Custo — API Oficial (Meta)<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Projeção de Custo API.</strong> A partir de 01/10/2026 a Meta passa a cobrar também pelas mensagens de atendimento (Service Messages), a R$0,035 por mensagem entregue.<span class="info-pop-note">Modelo antigo: só cobra template (você lança o gasto mensal em US$, convertido em R$). Modelo novo (estimado): total de mensagens do período × R$0,035 — dá uma base de comparação pra já planejar a redução de custo.</span></span></span></span>
+                                    <span>Projeção de Custo — API Oficial (Meta)<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Projeção de Custo API.</strong> A partir de 01/10/2026 a Meta passa a cobrar também pelas mensagens de atendimento (Service Messages) enviadas pela empresa, cobrança por mensagem entregue (confirmado na documentação oficial). O valor definitivo por mensagem só é publicado pela Meta até 01/09/2026 — R$0,035 é o valor preliminar informado.<span class="info-pop-note">Modelo antigo: só cobra template (você lança o gasto mensal em US$, convertido em R$). Modelo novo (estimado): total de mensagens do período × % estimado enviado pela empresa (50% padrão) × R$/mensagem — ambos ficam sempre visíveis juntos pra já ter uma base de comparação e planejar a redução de custo.</span></span></span></span>
                                     <div class="proj-fin-actions" onclick="event.stopPropagation()">
                                         <button class="proj-fin-btn" onclick="abrirValorApiModal()">＋ Gasto US$</button>
                                     </div>
@@ -263,15 +263,18 @@
                 <!-- ================= 3) POR QUE BUSCAM (PIZZA) + 4) DIAS DA SEMANA ================= -->
                 <div class="chart-grid">
                     <div class="chart-card">
-                        <div class="chart-title"><span>Por Que Buscam o LAMIC<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Por Que Buscam.</strong> O motivo do contato, distribuído por categoria (coluna <em>Fila</em>).<span class="info-pop-note">Use as setas para alternar o canal (Todos / WhatsApp / Instagram). "Sem fila (paciente)" = atendimento sem fila, encerrado pelo paciente. Filas com <strong>BOT</strong> são descartadas.</span></span></span></span>
+                        <div class="chart-title"><span>Por Que Buscam o LAMIC<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Por Que Buscam.</strong> O motivo do contato, distribuído por categoria (coluna <em>Fila</em>).<span class="info-pop-note">Use as setas para alternar o canal (Todos / WhatsApp / Instagram). "Sem fila (paciente)" = atendimento sem fila, encerrado pelo paciente. Filas com <strong>BOT</strong> são descartadas. Embaixo, o crescimento de atendimento por canal (coluna <em>Conexão</em>) mês a mês no ano, acompanhando o mesmo seletor.</span></span></span></span>
                             <div class="canal-switch">
                                 <button class="canal-arrow" type="button" onclick="ciclarBuscamCanal(-1)" title="Canal anterior">‹</button>
                                 <span class="canal-switch-lbl" id="buscam-canal-label">Todos os canais</span>
                                 <button class="canal-arrow" type="button" onclick="ciclarBuscamCanal(1)" title="Próximo canal">›</button>
                             </div>
                         </div>
-                        <div class="chart-body" style="height:280px;">
+                        <div class="chart-body" style="height:220px;">
                             <canvas id="chart-buscam"></canvas>
+                        </div>
+                        <div class="chart-body" style="height:150px;margin-top:8px;">
+                            <canvas id="chart-buscam-growth"></canvas>
                         </div>
                     </div>
 
@@ -302,12 +305,12 @@
                 <!-- ================= 6) RANKING + RESPOSTA ÀS AVALIAÇÕES + STATUS (3 lado a lado) ================= -->
                 <div class="chart-grid grid-3">
                     <div class="chart-card">
-                        <div class="chart-title"><span>Avaliação por Atendente — Ranking pela Média<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Qualidade por Atendente.</strong> Ranking que combina nota e volume de atendimento.<span class="info-pop-note">Score = média bayesiana da nota × volume (log). Poucas avaliações ou 1 nota ruim isolada não derrubam quem atende muito. Badge = nota média. Clique num atendente para ver a resposta às avaliações dele ao lado.</span></span></span></span></div>
+                        <div class="chart-title"><span>Avaliação por Atendente — Ranking pela Média<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Qualidade por Atendente.</strong> Ranking que combina nota e volume de atendimento.<span class="info-pop-note">Score = média bayesiana da nota × volume (log). Poucas avaliações ou 1 nota ruim isolada não derrubam quem atende muito. Badge = nota média. Clique num atendente para abrir o dashboard mensal dele (avaliações enviadas/respondidas/não respondidas, mês a mês).</span></span></span></span></div>
                         <div class="ranking-embed ranking-aval" id="rank-avaliacao"></div>
                     </div>
 
                     <div class="chart-card">
-                        <div class="chart-title"><span>Resposta às Avaliações<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Resposta às Avaliações.</strong> Quantas avaliações foram enviadas e quantas o cliente respondeu.<span class="info-pop-note"><strong>Enviadas</strong> = todos com status de avaliação. <strong>Respondida</strong> = status de avaliação com resposta, ou que recebeu nota. <strong>Avaliação não respondida</strong> = com status de avaliação, sem resposta. O anel mostra a % respondida. Clique num atendente no ranking para ver só os dados dele.</span></span></span></span></div>
+                        <div class="chart-title"><span>Resposta às Avaliações<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Resposta às Avaliações.</strong> Métrica geral — quantas avaliações foram enviadas e quantas o cliente respondeu, somando todos os atendentes.<span class="info-pop-note"><strong>Enviadas</strong> = todos com status de avaliação. <strong>Respondida</strong> = status de avaliação com resposta, ou que recebeu nota. <strong>Avaliação não respondida</strong> = com status de avaliação, sem resposta. O anel mostra a % respondida do período filtrado; a linha embaixo mostra a evolução mês a mês no ano, com a média.</span></span></span></span></div>
                         <div class="aval-resumo-titulo" id="aval-resumo-titulo">Geral · todos os atendentes</div>
                         <div class="aval-gauge-wrap">
                             <canvas id="chart-aval-gauge"></canvas>
@@ -317,6 +320,9 @@
                             </div>
                         </div>
                         <div class="aval-resumo" id="aval-resumo"></div>
+                        <div class="chart-body" style="height:110px;margin-top:8px;">
+                            <canvas id="chart-aval-evolucao"></canvas>
+                        </div>
                     </div>
 
                     <div class="chart-card">
@@ -864,6 +870,21 @@
                         </div>
                     </div>
                 </div>
+                <div class="card">
+                    <div class="card-title">Estimativa do modelo novo (a partir de out/2026)</div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="va-preco-msg">R$ por mensagem</label>
+                            <input type="number" id="va-preco-msg" min="0" step="0.001" placeholder="0.035">
+                            <span class="field-hint">Valor preliminar divulgado (R$0,035). A Meta só confirma o valor definitivo até 01/09/2026 — ajuste aqui quando ela publicar.</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="va-pct-empresa">% das mensagens enviadas pela empresa</label>
+                            <input type="number" id="va-pct-empresa" min="0" max="100" step="1" placeholder="50">
+                            <span class="field-hint">Só a mensagem enviada PELA EMPRESA é cobrada (a do cliente nunca é). A planilha não separa quem enviou — esse % é a estimativa usada sobre o total de mensagens.</span>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" onclick="fecharModalGenerico('valor-api-modal')">Cancelar</button>
@@ -950,6 +971,7 @@
                         <div class="audit-side-row"><span>Diferença</span><strong id="audit-api-dif">—</strong></div>
                         <div class="audit-side-divider"></div>
                         <div class="audit-side-row"><span>R$ por mensagem</span><strong id="audit-api-preco">R$ 0,035</strong></div>
+                        <div class="audit-side-row"><span>% mensagens da empresa (estim.)</span><strong id="audit-api-pct">50%</strong></div>
                         <div class="audit-side-row"><span>Cotação US$</span><strong id="audit-api-cotacao">—</strong></div>
                     </div>
                     <div class="audit-main">
@@ -960,6 +982,52 @@
                         </div>
                         <div class="audit-chart-wrap">
                             <div class="audit-chart-inner"><canvas id="audit-api-chart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================
+         MODAL — Auditoria: Dashboard mensal do Atendente (estética "Tintas Compradas")
+    ======================================================= -->
+    <div class="modal-overlay" id="audit-atendente-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'audit-atendente-modal')">
+        <div class="modal-panel" style="max-width:920px" onclick="event.stopPropagation()">
+            <div class="audit-modal-header">
+                <div class="audit-modal-header-left">
+                    <div class="audit-modal-icon">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div>
+                        <div class="audit-modal-title" id="audit-at-nome">Atendente</div>
+                        <div class="audit-modal-sub" id="audit-at-sub">—</div>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('audit-atendente-modal')">✕</button>
+            </div>
+            <div class="audit-modal-stripe"></div>
+            <div class="modal-body">
+                <div class="audit-grid">
+                    <div class="audit-side">
+                        <span class="audit-side-tag" id="audit-at-tag">—</span>
+                        <div class="audit-side-big" id="audit-at-big">—</div>
+                        <div class="audit-side-lbl">Taxa de resposta (mês filtrado)</div>
+                        <div class="audit-side-divider"></div>
+                        <div class="audit-side-row"><span>Atendimentos</span><strong id="audit-at-atend">—</strong></div>
+                        <div class="audit-side-row"><span>Avaliação média</span><strong id="audit-at-aval">—</strong></div>
+                        <div class="audit-side-row"><span>Avaliações enviadas</span><strong id="audit-at-env">—</strong></div>
+                        <div class="audit-side-row"><span>Respondidas</span><strong id="audit-at-resp">—</strong></div>
+                        <div class="audit-side-row"><span>Não respondidas</span><strong id="audit-at-naoresp">—</strong></div>
+                    </div>
+                    <div class="audit-main">
+                        <div class="audit-stats-grid">
+                            <div class="audit-stat"><span>Média (taxa de resposta)</span><strong id="audit-at-media">—</strong></div>
+                            <div class="audit-stat"><span>Tendência</span><strong id="audit-at-tend">—</strong></div>
+                            <div class="audit-stat"><span>Melhor mês</span><strong id="audit-at-melhor">—</strong></div>
+                        </div>
+                        <div class="audit-chart-wrap">
+                            <div class="audit-chart-inner"><canvas id="audit-at-chart"></canvas></div>
                         </div>
                     </div>
                 </div>

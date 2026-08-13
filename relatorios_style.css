@@ -1400,10 +1400,6 @@ select:focus {
 .aval-res-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text); }
 .aval-res-row strong { margin-left: auto; font-weight: 700; }
 .aval-resumo-titulo { text-align: center; font-size: 0.8rem; font-weight: 700; color: var(--text); margin: 2px 0 8px; min-height: 20px; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
-.aval-res-sel { color: var(--blue-v); }
-.aval-res-clear { border: none; background: none; color: var(--muted); font-size: 0.72rem; font-weight: 600; cursor: pointer; padding: 2px 4px; }
-.aval-res-clear:hover { color: var(--red); }
-/* Item do ranking selecionado */
+/* Item do ranking — clicável, abre o pop-up de auditoria do atendente */
 .rank-aval-item { cursor: pointer; border-radius: 8px; transition: background 0.15s; }
 .rank-aval-item:hover { background: var(--gray-1, #f1f5f9); }
-.rank-aval-item.sel { background: rgba(37,99,235,0.09); box-shadow: inset 0 0 0 1.5px var(--blue-v); }
