@@ -636,12 +636,17 @@ body {
    Faturamento x Meta + Projeção de custo da API oficial (Meta). */
 .proj-fin-card {
     cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s;
+    border-top: 3px solid var(--gray-2);
+    padding-top: 15px;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
 }
-.proj-fin-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-m); }
+.proj-fin-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-m); }
+.proj-fin-card-fat { border-top-color: var(--green); }
+.proj-fin-card-api { border-top-color: var(--blue-v); }
 .proj-fin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .proj-fin-btn {
-    font-size: 0.72rem; font-weight: 600; padding: 4px 9px;
+    display: inline-flex; align-items: center;
+    font-size: 0.72rem; font-weight: 600; padding: 4px 10px;
     border-radius: 6px; border: 1px solid var(--gray-2);
     background: var(--white); color: var(--muted); cursor: pointer;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -650,10 +655,11 @@ body {
 .proj-fin-btn:hover { background: var(--blue-l); border-color: var(--blue-v); color: var(--blue-v); }
 
 .proj-fin-status {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-size: 0.78rem; font-weight: 700; padding: 5px 11px;
-    border-radius: 100px; margin: 8px 0 4px; width: fit-content;
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 0.8rem; font-weight: 700; padding: 6px 13px;
+    border-radius: 100px; margin: 10px 0 6px; width: fit-content;
 }
+.proj-fin-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .proj-fin-status.st-batida { background: var(--green-l); color: #047857; }
 .proj-fin-status.st-perto  { background: var(--amber-l); color: #b45309; }
 .proj-fin-status.st-falta  { background: var(--red-l);   color: #b91c1c; }
@@ -689,19 +695,19 @@ body {
     display: flex; align-items: center; justify-content: center;
 }
 .audit-modal-icon svg { width: 19px; height: 19px; color: #7dd3fc; }
-.audit-modal-title { font-size: 1rem; font-weight: 700; letter-spacing: 0.02em; }
-.audit-modal-sub { font-size: 0.76rem; color: rgba(255,255,255,0.6); margin-top: 2px; }
+.audit-modal-title { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.02em; }
+.audit-modal-sub { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 2px; }
 .audit-modal-stripe { height: 4px; flex-shrink: 0; background: linear-gradient(90deg, #38bdf8, var(--blue-v)); }
 
-.audit-grid { display: grid; grid-template-columns: 240px 1fr; gap: 18px; }
+.audit-grid { display: grid; grid-template-columns: 270px 1fr; gap: 20px; }
 @media (max-width: 640px) { .audit-grid { grid-template-columns: 1fr; } }
 .audit-side {
     background: linear-gradient(160deg, var(--dark2), var(--primary));
-    border-radius: 10px; padding: 20px 18px; color: #fff;
+    border-radius: 10px; padding: 24px 20px; color: #fff;
     display: flex; flex-direction: column;
 }
-.audit-side-lbl { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.55); }
-.audit-side-big { font-size: 1.9rem; font-weight: 800; margin: 4px 0 8px; line-height: 1.1; }
+.audit-side-lbl { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.55); }
+.audit-side-big { font-size: 2.15rem; font-weight: 800; margin: 5px 0 9px; line-height: 1.1; }
 .audit-side-tag {
     align-self: flex-start; font-size: 0.74rem; font-weight: 700; padding: 4px 10px;
     border-radius: 100px; background: rgba(255,255,255,0.12);
@@ -722,9 +728,20 @@ body {
 }
 .audit-stat span { font-size: 0.68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .audit-stat strong { font-size: 0.9rem; font-weight: 700; color: var(--text); }
-.audit-chart-wrap { background: var(--gray-1); border: 1px solid var(--gray-2); border-radius: 8px; padding: 12px 14px; height: 240px; box-sizing: border-box; display: flex; flex-direction: column; }
+.audit-chart-wrap { background: var(--gray-1); border: 1px solid var(--gray-2); border-radius: 8px; padding: 12px 14px; height: 280px; box-sizing: border-box; display: flex; flex-direction: column; }
 .audit-chart-inner { position: relative; flex: 1; min-height: 0; }
 .audit-chart-inner canvas { position: absolute; inset: 0; }
+
+/* Bloco separado ("aba") dentro do pop-up de Projeção de Custo API — meta de
+   reduzir o volume de mensagens trocadas (bate menos mensagem = paga menos). */
+.audit-goal-box { background: var(--blue-l); border: 1.5px solid #bfdbfe; border-radius: 10px; padding: 14px 16px; }
+.audit-goal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.audit-goal-title { font-size: 0.84rem; font-weight: 700; color: var(--blue-v); }
+.audit-goal-rows { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.audit-goal-row { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text); }
+.audit-goal-row strong { font-weight: 700; }
+.audit-goal-progress { height: 7px; background: rgba(37,99,235,0.14); border-radius: 4px; overflow: hidden; }
+.audit-goal-progress-bar { height: 100%; background: linear-gradient(90deg, var(--blue-v), #60a5fa); border-radius: 4px; transition: width 0.3s; }
 
 /* ── Modal ─────────────────────────────────────────────────── */
 .modal-overlay {

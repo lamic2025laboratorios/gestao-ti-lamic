@@ -225,22 +225,22 @@
                         <div class="chart-grid">
 
                             <!-- Card A: Faturamento x Meta -->
-                            <div class="chart-card proj-fin-card" onclick="abrirAuditFaturamento()" title="Clique para ver o detalhe completo">
+                            <div class="chart-card proj-fin-card proj-fin-card-fat" onclick="abrirAuditFaturamento()" title="Clique para ver o detalhe completo">
                                 <div class="chart-title">
                                     <span>Faturamento x Meta<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Faturamento x Meta.</strong> Faturamento lançado mês a mês contra a meta configurada.<span class="info-pop-note">A meta pode ser um valor fixo ou % de crescimento sobre o mês anterior (ou mesmo mês do ano passado). Ao bater, pode subir sozinha um % configurado.</span></span></span></span>
                                     <div class="proj-fin-actions" onclick="event.stopPropagation()">
                                         <button class="proj-fin-btn" onclick="abrirValorModal('faturamento')">＋ Faturamento</button>
-                                        <button class="proj-fin-btn" onclick="abrirMetaModal()">🎯 Metas</button>
+                                        <button class="proj-fin-btn" onclick="abrirMetaModal()"><svg viewBox="0 0 24 24" fill="none" width="12" height="12" style="vertical-align:-1px;margin-right:2px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg> Metas</button>
                                     </div>
                                 </div>
                                 <div class="proj-fin-status" id="fat-status-badge">—</div>
-                                <div class="chart-body" style="height:190px;">
+                                <div class="chart-body" style="height:240px;">
                                     <canvas id="chart-faturamento"></canvas>
                                 </div>
                             </div>
 
                             <!-- Card B: Projeção de Custo API -->
-                            <div class="chart-card proj-fin-card" onclick="abrirAuditApiCost()" title="Clique para ver o detalhe completo">
+                            <div class="chart-card proj-fin-card proj-fin-card-api" onclick="abrirAuditApiCost()" title="Clique para ver o detalhe completo">
                                 <div class="chart-title">
                                     <span>Projeção de Custo — API Oficial (Meta)<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Projeção de Custo API.</strong> A partir de 01/10/2026 a Meta passa a cobrar também pelas mensagens de atendimento (Service Messages) enviadas pela empresa, cobrança por mensagem entregue (confirmado na documentação oficial). O valor definitivo por mensagem só é publicado pela Meta até 01/09/2026 — R$0,035 é o valor preliminar informado.<span class="info-pop-note">Modelo antigo: só cobra template (você lança o gasto mensal em US$, convertido em R$). Modelo novo (estimado): total de mensagens do período × % estimado enviado pela empresa (50% padrão) × R$/mensagem — ambos ficam sempre visíveis juntos pra já ter uma base de comparação e planejar a redução de custo.</span></span></span></span>
                                     <div class="proj-fin-actions" onclick="event.stopPropagation()">
@@ -251,7 +251,7 @@
                                     <button class="api-modo-btn active" id="api-modo-antigo" onclick="setApiModo('antigo')">Cobrança Antiga</button>
                                     <button class="api-modo-btn" id="api-modo-novo" onclick="setApiModo('novo')">Cobrança Nova (out/2026)</button>
                                 </div>
-                                <div class="chart-body" style="height:190px;">
+                                <div class="chart-body" style="height:240px;">
                                     <canvas id="chart-apicost"></canvas>
                                 </div>
                             </div>
@@ -263,7 +263,7 @@
                 <!-- ================= 3) POR QUE BUSCAM (PIZZA) + 4) DIAS DA SEMANA ================= -->
                 <div class="chart-grid">
                     <div class="chart-card">
-                        <div class="chart-title"><span>Por Que Buscam o LAMIC<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Por Que Buscam.</strong> O motivo do contato, distribuído por categoria (coluna <em>Fila</em>).<span class="info-pop-note">Use as setas para alternar o canal (Todos / WhatsApp / Instagram). "Sem fila (paciente)" = atendimento sem fila, encerrado pelo paciente. Filas com <strong>BOT</strong> são descartadas. Embaixo, o crescimento de atendimento por canal (coluna <em>Conexão</em>) mês a mês no ano, acompanhando o mesmo seletor.</span></span></span></span>
+                        <div class="chart-title"><span>Por Que Buscam o LAMIC<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Por Que Buscam.</strong> O motivo do contato, distribuído por categoria (coluna <em>Fila</em>).<span class="info-pop-note">Use as setas para alternar o canal (Todos / WhatsApp / Instagram). "Sem fila (paciente)" = atendimento sem fila, encerrado pelo paciente. Filas com <strong>BOT</strong> são descartadas. Embaixo, o crescimento de atendimento por canal (coluna <em>Conexão</em> da planilha) em barras mês a mês no ano, acompanhando o mesmo seletor, com uma linha de média por canal.</span></span></span></span>
                             <div class="canal-switch">
                                 <button class="canal-arrow" type="button" onclick="ciclarBuscamCanal(-1)" title="Canal anterior">‹</button>
                                 <span class="canal-switch-lbl" id="buscam-canal-label">Todos os canais</span>
@@ -721,6 +721,7 @@
                             <select id="mf-tipo" onchange="onMetaTipoChange()">
                                 <option value="faturamento">Faturamento</option>
                                 <option value="exames">Exames</option>
+                                <option value="mensagens">Mensagens (reduzir volume trocado)</option>
                                 <option value="__novo__">+ Novo tipo personalizado…</option>
                             </select>
                         </div>
@@ -744,10 +745,19 @@
                         </div>
 
                         <div class="form-group">
+                            <label for="mf-direcao">Direção da meta</label>
+                            <select id="mf-direcao" onchange="onMetaModoChange()">
+                                <option value="aumentar">Aumentar (crescer)</option>
+                                <option value="diminuir">Diminuir (reduzir)</option>
+                            </select>
+                            <span class="field-hint">"Diminuir" bate a meta quando o valor realizado fica igual ou abaixo do alvo — é o caso de Mensagens: reduzir o volume trocado pra pagar menos na API.</span>
+                        </div>
+
+                        <div class="form-group">
                             <label for="mf-modo">Como definir o alvo</label>
                             <select id="mf-modo" onchange="onMetaModoChange()">
                                 <option value="valor">Valor fixo</option>
-                                <option value="percentual">% de crescimento sobre uma base</option>
+                                <option value="percentual">% sobre uma base (crescer ou reduzir)</option>
                             </select>
                         </div>
 
@@ -897,7 +907,7 @@
          MODAL — Auditoria: Faturamento x Meta (estética "Tintas Compradas")
     ======================================================= -->
     <div class="modal-overlay" id="audit-faturamento-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'audit-faturamento-modal')">
-        <div class="modal-panel" style="max-width:920px" onclick="event.stopPropagation()">
+        <div class="modal-panel" style="max-width:1080px" onclick="event.stopPropagation()">
             <div class="audit-modal-header">
                 <div class="audit-modal-header-left">
                     <div class="audit-modal-icon">
@@ -945,7 +955,7 @@
          MODAL — Auditoria: Projeção de Custo API (estética "Tintas Compradas")
     ======================================================= -->
     <div class="modal-overlay" id="audit-apicost-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'audit-apicost-modal')">
-        <div class="modal-panel" style="max-width:920px" onclick="event.stopPropagation()">
+        <div class="modal-panel" style="max-width:1080px" onclick="event.stopPropagation()">
             <div class="audit-modal-header">
                 <div class="audit-modal-header-left">
                     <div class="audit-modal-icon">
@@ -980,6 +990,22 @@
                             <div class="audit-stat"><span>Tendência (modelo novo)</span><strong id="audit-api-tend">—</strong></div>
                             <div class="audit-stat"><span>Vigência</span><strong>a partir de 01/10/2026</strong></div>
                         </div>
+
+                        <!-- Aba/bloco separado: meta de reduzir o volume de mensagens trocadas
+                             (mesma tela, já que é o jeito mais direto de pagar menos na API) -->
+                        <div class="audit-goal-box" id="audit-api-goal-box" style="display:none;">
+                            <div class="audit-goal-head">
+                                <span class="audit-goal-title" id="audit-api-goal-nome">Meta de Redução de Mensagens</span>
+                                <span class="proj-fin-status" id="audit-api-goal-status" style="margin:0;">—</span>
+                            </div>
+                            <div class="audit-goal-rows">
+                                <div class="audit-goal-row"><span>Mensagens no mês</span><strong id="audit-api-goal-atual">—</strong></div>
+                                <div class="audit-goal-row"><span>Meta (alvo)</span><strong id="audit-api-goal-alvo">—</strong></div>
+                                <div class="audit-goal-row"><span>Progresso da redução</span><strong id="audit-api-goal-pct">—</strong></div>
+                            </div>
+                            <div class="audit-goal-progress"><div class="audit-goal-progress-bar" id="audit-api-goal-bar" style="width:0%"></div></div>
+                        </div>
+
                         <div class="audit-chart-wrap">
                             <div class="audit-chart-inner"><canvas id="audit-api-chart"></canvas></div>
                         </div>
@@ -993,7 +1019,7 @@
          MODAL — Auditoria: Dashboard mensal do Atendente (estética "Tintas Compradas")
     ======================================================= -->
     <div class="modal-overlay" id="audit-atendente-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'audit-atendente-modal')">
-        <div class="modal-panel" style="max-width:920px" onclick="event.stopPropagation()">
+        <div class="modal-panel" style="max-width:1080px" onclick="event.stopPropagation()">
             <div class="audit-modal-header">
                 <div class="audit-modal-header-left">
                     <div class="audit-modal-icon">

@@ -99,6 +99,13 @@ function _fbListenFinanceiro() {
 function _anoMesKey(ano, mes) { return `${ano}-${String(mes).padStart(2, '0')}`; }
 
 function _valorNoMes(tipo, ano, mes) {
+    // "mensagens" não é lançado manualmente aqui — vem direto do período
+    // (mesmo campo "Total de Mensagens" já preenchido no CC/IA) - meta de
+    // reduzir volume trocado usa o dado que já existe, sem duplicar entrada.
+    if (tipo === 'mensagens') {
+        const p = periodos.find(pp => pp.tipo === 'mes' && pp.ano === ano && pp.mes === mes);
+        return (p && p.mensagens) ? parseFloat(p.mensagens) : null;
+    }
     const v = (financeiroData.valores[tipo] || {})[_anoMesKey(ano, mes)];
     return (v == null) ? null : parseFloat(v);
 }
@@ -145,6 +152,7 @@ function _tiposDeMetaConhecidos() {
 function _labelTipoMeta(tipo) {
     if (tipo === 'faturamento') return 'Faturamento';
     if (tipo === 'exames') return 'Exames';
+    if (tipo === 'mensagens') return 'Mensagens';
     const m = Object.values(financeiroData.metas || {}).find(m => m.tipo === tipo);
     return m ? (m.tipoLabel || m.nome || tipo) : tipo;
 }
@@ -170,13 +178,17 @@ function _valorBaseMeta(meta, ano, mes) {
 
 // Alvo da meta para um mês específico — encadeia o auto-incremento: anda mês a
 // mês desde a criação da meta, e cada vez que o realizado bateu o alvo daquele
-// mês, o próximo alvo sobe autoIncrementoPct% sozinho.
+// mês, o próximo alvo fica ainda mais exigente na MESMA direção
+// (aumentar → sobe mais; diminuir → cai mais), autoIncrementoPct% sozinho.
 function _metaAlvoParaMes(meta, ano, mes) {
     if (!meta) return null;
+    const dir = meta.direcao === 'diminuir' ? 'diminuir' : 'aumentar';
     const alvoBase = (ay, am) => {
         if (meta.modoAlvo === 'percentual') {
             const base = _valorBaseMeta(meta, ay, am);
-            return base != null ? base * (1 + (parseFloat(meta.valorAlvo) || 0) / 100) : null;
+            if (base == null) return null;
+            const pct = (parseFloat(meta.valorAlvo) || 0) / 100;
+            return dir === 'diminuir' ? base * (1 - pct) : base * (1 + pct);
         }
         return parseFloat(meta.valorAlvo) || 0;
     };
@@ -190,8 +202,10 @@ function _metaAlvoParaMes(meta, ano, mes) {
     let guard = 0;
     while ((ay < ano || (ay === ano && am < mes)) && guard < 600) {
         const realizado = _valorNoMes(meta.tipo, ay, am);
-        if (realizado != null && alvoAtual != null && realizado >= alvoAtual) {
-            alvoAtual = alvoAtual * (1 + inc / 100);
+        const bateu = realizado != null && alvoAtual != null &&
+            (dir === 'diminuir' ? realizado <= alvoAtual : realizado >= alvoAtual);
+        if (bateu) {
+            alvoAtual = dir === 'diminuir' ? alvoAtual * (1 - inc / 100) : alvoAtual * (1 + inc / 100);
         }
         am++; if (am > 12) { am = 1; ay++; }
         guard++;
@@ -199,14 +213,30 @@ function _metaAlvoParaMes(meta, ano, mes) {
     return alvoAtual;
 }
 
-// Status da meta num mês: 'batida' (>=100%) · 'perto' (>=85%) · 'falta' (<85%) · 'sem-dado'
+// Status da meta num mês: 'batida' · 'perto' (>=85% do caminho) · 'falta' · 'sem-dado'.
+// Metas "diminuir" (ex.: reduzir mensagens) invertem a lógica — bate quando o
+// realizado fica IGUAL OU ABAIXO do alvo, e o % mede o quanto da redução
+// necessária (base → alvo) já foi percorrido.
 function _metaStatus(meta, ano, mes) {
     if (!meta) return { status: 'sem-dado', pct: null, alvo: null, atual: null };
+    const dir   = meta.direcao === 'diminuir' ? 'diminuir' : 'aumentar';
     const alvo  = _metaAlvoParaMes(meta, ano, mes);
     const atual = _valorNoMes(meta.tipo, ano, mes);
     if (alvo == null || atual == null) return { status: 'sem-dado', pct: null, alvo, atual };
-    const pct = alvo > 0 ? (atual / alvo) * 100 : 0;
-    let status = pct >= 100 ? 'batida' : pct >= 85 ? 'perto' : 'falta';
+
+    let pct, status;
+    if (dir === 'diminuir') {
+        const base = _valorBaseMeta(meta, ano, mes);
+        if (base != null && base > alvo) {
+            pct = ((base - atual) / (base - alvo)) * 100;
+        } else {
+            pct = atual > 0 ? (alvo / atual) * 100 : (atual <= alvo ? 100 : 0);
+        }
+        status = atual <= alvo ? 'batida' : pct >= 85 ? 'perto' : 'falta';
+    } else {
+        pct = alvo > 0 ? (atual / alvo) * 100 : 0;
+        status = pct >= 100 ? 'batida' : pct >= 85 ? 'perto' : 'falta';
+    }
     return { status, pct, alvo, atual };
 }
 
@@ -296,6 +326,7 @@ function chartFaturamento() {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: true, labels: { color: '#475569', font: { size: 11 }, boxWidth: 14 } },
                 tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
@@ -330,6 +361,7 @@ function chartApiCost() {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: true, labels: { color: '#475569', font: { size: 10 }, boxWidth: 12 } },
                 tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
@@ -391,6 +423,7 @@ function novaMetaForm() {
     document.getElementById('mf-tipo-custom').value = '';
     document.getElementById('mf-nome').value = 'Meta de Faturamento';
     document.getElementById('mf-periodicidade').value = 'mensal';
+    document.getElementById('mf-direcao').value = 'aumentar';
     document.getElementById('mf-modo').value = 'valor';
     document.getElementById('mf-valor').value = '';
     document.getElementById('mf-base').value = 'mes_anterior';
@@ -409,7 +442,7 @@ function cancelarMetaForm() {
 
 function editarMeta(id) {
     const m = financeiroData.metas[id]; if (!m) return;
-    const tipoConhecido = (m.tipo === 'faturamento' || m.tipo === 'exames');
+    const tipoConhecido = (m.tipo === 'faturamento' || m.tipo === 'exames' || m.tipo === 'mensagens');
     document.getElementById('mf-form-titulo').textContent = 'Editar Meta';
     document.getElementById('mf-id').value = id;
     document.getElementById('mf-tipo').value = tipoConhecido ? m.tipo : '__novo__';
@@ -417,6 +450,7 @@ function editarMeta(id) {
     document.getElementById('mf-tipo-custom').value = tipoConhecido ? '' : m.tipo;
     document.getElementById('mf-nome').value = m.nome || '';
     document.getElementById('mf-periodicidade').value = m.periodicidade || 'mensal';
+    document.getElementById('mf-direcao').value = m.direcao === 'diminuir' ? 'diminuir' : 'aumentar';
     document.getElementById('mf-modo').value = m.modoAlvo || 'valor';
     document.getElementById('mf-valor').value = (m.valorAlvo != null) ? m.valorAlvo : '';
     document.getElementById('mf-base').value = m.baseRef || 'mes_anterior';
@@ -439,11 +473,20 @@ function onMetaTipoChange() {
     const nomeEl = document.getElementById('mf-nome');
     if (v === 'faturamento' && !nomeEl.value) nomeEl.value = 'Meta de Faturamento';
     if (v === 'exames' && !nomeEl.value) nomeEl.value = 'Meta de Exames';
+    if (v === 'mensagens') {
+        if (!nomeEl.value) nomeEl.value = 'Meta de Redução de Mensagens';
+        document.getElementById('mf-direcao').value = 'diminuir';   // mensagens é sempre pra reduzir
+    }
+    onMetaModoChange();
 }
 
 function onMetaModoChange() {
     const isPct = document.getElementById('mf-modo').value === 'percentual';
-    document.getElementById('mf-valor-label').textContent = isPct ? 'Valor alvo (% de crescimento)' : 'Valor alvo (R$ ou nº)';
+    const isDiminuir = document.getElementById('mf-direcao').value === 'diminuir';
+    const unidade = document.getElementById('mf-tipo').value === 'mensagens' ? 'mensagens' : 'R$ ou nº';
+    document.getElementById('mf-valor-label').textContent = isPct
+        ? `Valor alvo (% de ${isDiminuir ? 'redução' : 'crescimento'})`
+        : `Valor alvo (${unidade})`;
     document.getElementById('mf-base-group').style.display = isPct ? '' : 'none';
     onMetaBaseChange();
 }
@@ -483,6 +526,7 @@ function salvarMetaFin() {
     const meta = {
         id, tipo, nome,
         periodicidade: document.getElementById('mf-periodicidade').value,
+        direcao: document.getElementById('mf-direcao').value === 'diminuir' ? 'diminuir' : 'aumentar',
         modoAlvo: document.getElementById('mf-modo').value,
         valorAlvo: valor,
         baseRef: document.getElementById('mf-base').value,
@@ -631,6 +675,7 @@ function _renderAuditFatChart(ano, meses, fatSerie, meta) {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { labels: { color: '#475569', font: { size: 10 }, boxWidth: 12 } },
                 tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
@@ -672,8 +717,31 @@ function abrirAuditApiCost() {
     document.getElementById('audit-api-tend').textContent = (trendValidos.length >= 2)
         ? (trendValidos[trendValidos.length - 1] >= trendValidos[0] ? '▲ Em alta' : '▼ Em queda') : '—';
 
+    _renderAuditApiGoalBox(ano, mes);
     _renderAuditApiChart(ano, meses);
     document.getElementById('audit-apicost-modal').style.display = 'flex';
+}
+
+// Bloco separado dentro do pop-up de custo da API: meta de reduzir o volume de
+// mensagens trocadas (menos mensagem = menos cobrança no modelo novo). Some
+// se não houver nenhuma meta desse tipo cadastrada.
+function _renderAuditApiGoalBox(ano, mes) {
+    const box = document.getElementById('audit-api-goal-box');
+    if (!box) return;
+    const meta = _metaAtivaDoTipo('mensagens');
+    if (!meta) { box.style.display = 'none'; return; }
+
+    const st = _metaStatus(meta, ano, mes);
+    box.style.display = '';
+    document.getElementById('audit-api-goal-nome').textContent = meta.nome || 'Meta de Redução de Mensagens';
+    const statusEl = document.getElementById('audit-api-goal-status');
+    statusEl.className = 'proj-fin-status st-' + (st.status === 'sem-dado' ? 'semdado' : st.status);
+    statusEl.textContent = st.status === 'batida' ? 'Meta batida' : st.status === 'perto' ? 'Perto de bater' : st.status === 'falta' ? 'Falta bater' : 'Sem dado no mês';
+    document.getElementById('audit-api-goal-atual').textContent = st.atual != null ? fNum(st.atual) + ' msgs' : '—';
+    document.getElementById('audit-api-goal-alvo').textContent = st.alvo != null ? fNum(Math.round(st.alvo)) + ' msgs' : '—';
+    const pctClamp = st.pct != null ? Math.max(0, Math.min(100, st.pct)) : 0;
+    document.getElementById('audit-api-goal-pct').textContent = st.pct != null ? pctClamp.toFixed(0) + '%' : '—';
+    document.getElementById('audit-api-goal-bar').style.width = pctClamp + '%';
 }
 
 function _renderAuditApiChart(ano, meses) {
@@ -697,6 +765,7 @@ function _renderAuditApiChart(ano, meses) {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { labels: { color: '#475569', font: { size: 10 }, boxWidth: 12 } },
                 tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
@@ -777,6 +846,7 @@ function _renderAuditAtendenteChart(meses, porMes, pctSerie) {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { labels: { color: '#475569', font: { size: 9 }, boxWidth: 10 } },
                 tooltip: {
@@ -1671,6 +1741,7 @@ function _renderAvalEvolucaoChart() {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: true, labels: { color: '#475569', font: { size: 9 }, boxWidth: 10 } },
                 tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${ctx.raw}%` } }
@@ -1933,6 +2004,7 @@ function chartComparacao(ano) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { labels: { color: '#475569', font: { size: 11 } } },
                 tooltip: {
@@ -2081,23 +2153,36 @@ function _renderBuscamGrowthChart() {
         seriesDef.push({ key: 'instagram', label: 'Instagram', color: '#dc2626' });
     }
 
+    // Coluna (barra) por canal — não linha; a média de cada série é que vem
+    // sobreposta em linha, igual ao padrão dos outros gráficos de coluna.
     const datasets = seriesDef.map(def => ({
+        type: 'bar',
         label: def.label,
         data: meses.map(item => item.p.canais?.[def.key] ?? 0),
-        borderColor: def.color,
-        backgroundColor: def.color + '22',
-        fill: false, tension: .3, pointRadius: 3, spanGaps: true
+        backgroundColor: def.color + 'cc',
+        borderRadius: 5,
+        order: 2
     }));
 
-    // Média — da soma de todas as séries visíveis (1 canal só = a média dela mesma)
-    const somaSerie = meses.map((item, i) => datasets.reduce((s, ds) => s + (ds.data[i] || 0), 0));
-    datasets.push({ label: 'Média', data: _calcAvgLine(somaSerie), borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true });
+    // 1 linha de média por série visível (mesma cor da barra, tracejada) — assim
+    // dá pra comparar cada canal com a própria média, não só uma média geral.
+    seriesDef.forEach((def, i) => {
+        datasets.push({
+            type: 'line',
+            label: `Média ${def.label}`,
+            data: _calcAvgLine(datasets[i].data),
+            borderColor: def.color,
+            borderDash: [6, 4], borderWidth: 1.5,
+            pointRadius: 0, pointHitRadius: 0, fill: false, spanGaps: true,
+            order: 1
+        });
+    });
 
     charts['buscamGrowth'] = new Chart(ctx, {
-        type: 'line',
         data: { labels, datasets },
         options: {
             responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: true, labels: { color: '#475569', font: { size: 9 }, boxWidth: 10 } },
                 tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fNum(ctx.raw)} atend.` } }
@@ -2157,6 +2242,7 @@ function chartDias(p) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: true, labels: { color: '#475569', font: { size: 11 }, boxWidth: 14 } },
                 tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fNum(ctx.raw, ctx.dataset.label === 'Média' ? 1 : 0)}` } }
