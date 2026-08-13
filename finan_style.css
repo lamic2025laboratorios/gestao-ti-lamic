@@ -2589,6 +2589,18 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .kpi-list-total-box .klt-label { font-size: .72rem; font-weight: 600; color: rgba(255,255,255,.8); text-transform: uppercase; letter-spacing: .03em; }
 .kpi-list-total-box .klt-qty { font-family: 'Rajdhani', sans-serif; font-size: 1.5rem; font-weight: 800; color: #fff; margin-top: 2px; }
 .kpi-list-total-box .klt-val { font-size: .92rem; font-weight: 700; color: #fff; }
+
+/* Pop-ups de Relatório (Solicitações/Estoque) — filtro/opções antes de gerar
+   o PDF. Reaproveita .req-filter-group/.req-status-chip/.req-filter-select/
+   .req-filter-date (mesmo visual do painel de filtro de Solicitações) e
+   .extrato-periodo/.extrato-per-btn (segmented control já usado no Extrato)
+   pros toggles do relatório de Estoque — só isso aqui é novo. */
+.rpt-field { margin-bottom: 16px; }
+.rpt-field:last-child { margin-bottom: 0; }
+.rpt-field > .req-filter-label { display: block; margin-bottom: 8px; }
+.rpt-checkbox { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: #334155; cursor: pointer; user-select: none; }
+.rpt-checkbox input { width: 16px; height: 16px; accent-color: var(--blue-500); cursor: pointer; }
+
 .kpi-card.k-red { background: linear-gradient(135deg,#fdecea,#fff5f5); border-color: rgba(217,64,64,.25); }
 .k-red .kpi-icon svg { color: var(--red); }
 .k-red .kpi-icon { background: rgba(217,64,64,.1); }

@@ -1002,19 +1002,61 @@
               <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               <span class="idle-timer">60:00</span>
             </div>
-            <div class="filter-popover-wrap">
-              <button class="btn-dash-print" id="btn-estoque-relatorio" onclick="App.toggleEstoqueRelatorioPopover(event)" title="Baixar relatório de estoque em PDF">
-                <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Relatório
-              </button>
-              <div class="filter-popover" id="estoque-relatorio-popover" style="left:auto;right:0">
-                <div class="filter-popover-row">
-                  <button class="btn-secondary" onclick="App.gerarRelatorioEstoque('itens')" title="Saldo atual de cada item cadastrado">Somente itens em estoque</button>
+            <button class="btn-dash-print" onclick="App.abrirRelatorioEstoque()" title="Baixar relatório de estoque em PDF (escolha as opções)">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Relatório
+            </button>
+          </div>
+        </div>
+
+        <!-- ── MODAL: Relatório de Estoque (escolha o que entra no PDF) ── -->
+        <div id="relatorio-estoque-modal" class="modal-overlay hidden">
+          <div class="modal-card form-modal" style="max-width:480px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
-                <div class="filter-popover-row">
-                  <button class="btn-secondary" onclick="App.gerarRelatorioEstoque('movs')" title="Histórico completo de entradas e saídas">Todas entradas e saídas</button>
+                <div class="eqd-header-name">Relatório de Estoque</div>
+              </div>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('relatorio-estoque-modal').classList.add('hidden')" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
+            <div class="modal-body">
+              <div class="rpt-field">
+                <span class="req-filter-label">Tipo de relatório</span>
+                <div class="extrato-periodo">
+                  <button type="button" class="extrato-per-btn active" data-tipo="itens" onclick="App.setRptEstoqueTipo('itens', this)">Itens em Estoque (saldo)</button>
+                  <button type="button" class="extrato-per-btn" data-tipo="movs" onclick="App.setRptEstoqueTipo('movs', this)">Entradas e Saídas</button>
                 </div>
               </div>
+              <div id="rpt-est-itens-opts" class="rpt-field">
+                <label class="rpt-checkbox">
+                  <input type="checkbox" id="rpt-est-zerados" checked>
+                  Incluir itens com saldo zerado
+                </label>
+              </div>
+              <div id="rpt-est-movs-opts" class="rpt-field hidden">
+                <span class="req-filter-label">Movimentação</span>
+                <div class="extrato-periodo">
+                  <button type="button" class="extrato-per-btn active" data-mov="ambos" onclick="App.setRptEstoqueMov('ambos', this)">Ambas</button>
+                  <button type="button" class="extrato-per-btn" data-mov="entrada" onclick="App.setRptEstoqueMov('entrada', this)">Só Entradas</button>
+                  <button type="button" class="extrato-per-btn" data-mov="saida" onclick="App.setRptEstoqueMov('saida', this)">Só Saídas</button>
+                </div>
+              </div>
+            </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-ghost" onclick="document.getElementById('relatorio-estoque-modal').classList.add('hidden')">Cancelar</button>
+              <button class="btn-primary" onclick="App.gerarRelatorioEstoque()">
+                <svg viewBox="0 0 24 24" fill="none" width="14" height="14" style="margin-right:4px;vertical-align:-2px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/></svg>
+                Gerar PDF
+              </button>
             </div>
           </div>
         </div>
@@ -1618,10 +1660,89 @@
               <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               <span class="idle-timer">60:00</span>
             </div>
-            <button class="btn-dash-print" onclick="App.printRequestsList()" title="Baixar relatório em PDF com a lista de solicitações (respeita os filtros ativos)">
+            <button class="btn-dash-print" onclick="App.abrirRelatorioSolicitacoes()" title="Baixar relatório em PDF (escolha os filtros)">
               <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Relatório
             </button>
+          </div>
+        </div>
+
+        <!-- ── MODAL: Relatório de Solicitações (filtro completo, independente da tela) ── -->
+        <div id="relatorio-solicitacoes-modal" class="modal-overlay hidden">
+          <div class="modal-card form-modal" style="max-width:660px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="eqd-header-name">Relatório de Solicitações</div>
+              </div>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('relatorio-solicitacoes-modal').classList.add('hidden')" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
+            <div class="modal-body">
+              <div class="req-filter-panel-inner" style="padding:0">
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Status</span>
+                  <button class="btn-toggle-all-status" id="rpt-sol-toggle-all" onclick="App.rptSolToggleAllStatus(this)">Todos ✓</button>
+                  <button class="req-status-chip chip-sol active" data-status="Solicitado" onclick="App.rptSolToggleStatus(this)">Solicitado</button>
+                  <button class="req-status-chip chip-agu active" data-status="Aguardando" onclick="App.rptSolToggleStatus(this)">Aguardando</button>
+                  <button class="req-status-chip chip-com active" data-status="Comprado"   onclick="App.rptSolToggleStatus(this)">Comprado</button>
+                  <button class="req-status-chip chip-est active" data-status="Estoque"    onclick="App.rptSolToggleStatus(this)">Estoque</button>
+                  <button class="req-status-chip chip-neg active" data-status="Negado"     onclick="App.rptSolToggleStatus(this)">Negado</button>
+                </div>
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Unidade</span>
+                  <select id="rpt-sol-unidade" class="req-filter-select"><option value="">Todas</option></select>
+                  <span class="req-filter-label" style="margin-left:12px">Grupo</span>
+                  <select id="rpt-sol-grupo" class="req-filter-select" onchange="App._rptSolOnGrupoChange()"><option value="">Todos</option></select>
+                  <span class="req-filter-label" style="margin-left:12px">Subgrupo</span>
+                  <select id="rpt-sol-subgrupo" class="req-filter-select"><option value="">Todos</option></select>
+                </div>
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Pagamento</span>
+                  <select id="rpt-sol-pagamento" class="req-filter-select">
+                    <option value="">Todos</option>
+                    <option value="parcelado">Parcelada</option>
+                    <option value="combinada">Combinada</option>
+                    <option value="boleto">Boleto</option>
+                    <option value="dinheiro">Dinheiro</option>
+                    <option value="cartao">Cartão</option>
+                  </select>
+                </div>
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Data solicitação</span>
+                  <input type="date" id="rpt-sol-req-from" class="req-filter-date">
+                  <span style="color:#8898b8">→</span>
+                  <input type="date" id="rpt-sol-req-to" class="req-filter-date">
+                </div>
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Data envio</span>
+                  <input type="date" id="rpt-sol-env-from" class="req-filter-date">
+                  <span style="color:#8898b8">→</span>
+                  <input type="date" id="rpt-sol-env-to" class="req-filter-date">
+                </div>
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Data compra</span>
+                  <input type="date" id="rpt-sol-compra-from" class="req-filter-date">
+                  <span style="color:#8898b8">→</span>
+                  <input type="date" id="rpt-sol-compra-to" class="req-filter-date">
+                </div>
+              </div>
+            </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-ghost" onclick="App.rptSolLimpar()">Limpar filtros</button>
+              <button class="btn-primary" onclick="App.printRequestsList()">
+                <svg viewBox="0 0 24 24" fill="none" width="14" height="14" style="margin-right:4px;vertical-align:-2px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/></svg>
+                Gerar PDF
+              </button>
+            </div>
           </div>
         </div>
 

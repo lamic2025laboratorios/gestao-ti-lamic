@@ -1659,7 +1659,6 @@ const App = {
     { pop: 'req-filter-panel', btn: 'btn-req-filter-toggle', label: 'btn-filter-label', labelOn: 'Ocultar Filtros', labelOff: 'Mostrar Filtros', reserveTab: 'tab-requests' },
     { pop: 'estoque-conf-popover', btn: 'btn-estoque-conf-toggle' },
     { pop: 'estoque-filter-popover', btn: 'btn-estoque-filter-toggle' },
-    { pop: 'estoque-relatorio-popover', btn: 'btn-estoque-relatorio' },
     { pop: 'activity-filter-popover', btn: 'btn-activity-filter' },
   ],
 
@@ -1786,11 +1785,6 @@ const App = {
   toggleEstoqueFilterPopover(ev) {
     ev?.stopPropagation();
     App._togglePopover('estoque-filter-popover', 'btn-estoque-filter-toggle');
-  },
-
-  toggleEstoqueRelatorioPopover(ev) {
-    ev?.stopPropagation();
-    App._togglePopover('estoque-relatorio-popover', 'btn-estoque-relatorio');
   },
 
   toggleReqConfPopover(ev) {
@@ -2255,48 +2249,128 @@ const App = {
       .trim();
   },
 
-  /* ── Relatório em PDF — lista de Solicitações (respeita os filtros/busca
-     ativos na tela: lê direto da tabela já renderizada, garante que o PDF
-     bate exatamente com o que está sendo visto, sem duplicar a lógica de
-     filtro/ordenação que já existe em renderRequests()) ── */
+  /* ── Relatório em PDF — Solicitações — pop-up de filtro próprio, independente
+     do que estiver filtrado na tela (status, unidade, grupo, subgrupo,
+     pagamento e 3 intervalos de data: solicitação/envio/compra) ── */
+  abrirRelatorioSolicitacoes() {
+    document.querySelectorAll('#relatorio-solicitacoes-modal .req-status-chip').forEach(b => b.classList.add('active'));
+    App._rptSolSyncAllLabel();
+    const uSel = document.getElementById('rpt-sol-unidade');
+    if (uSel) uSel.innerHTML = '<option value="">Todas</option>' + Object.values(State.units || {}).map(n => `<option value="${n}">${n}</option>`).join('');
+    const gSel = document.getElementById('rpt-sol-grupo');
+    if (gSel) gSel.innerHTML = '<option value="">Todos</option>' + Object.values(State.groups || {}).map(n => `<option value="${n}">${n}</option>`).join('');
+    App._rptSolPopulateSubgrupos('');
+    const pSel = document.getElementById('rpt-sol-pagamento');
+    if (pSel) pSel.value = '';
+    ['rpt-sol-req-from', 'rpt-sol-req-to', 'rpt-sol-env-from', 'rpt-sol-env-to', 'rpt-sol-compra-from', 'rpt-sol-compra-to']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('relatorio-solicitacoes-modal')?.classList.remove('hidden');
+  },
+
+  rptSolToggleStatus(btn) {
+    btn.classList.toggle('active');
+    App._rptSolSyncAllLabel();
+  },
+
+  rptSolToggleAllStatus(btn) {
+    const chips = document.querySelectorAll('#relatorio-solicitacoes-modal .req-status-chip');
+    const allOn = [...chips].every(c => c.classList.contains('active'));
+    chips.forEach(c => c.classList.toggle('active', !allOn));
+    App._rptSolSyncAllLabel();
+  },
+
+  _rptSolSyncAllLabel() {
+    const chips = document.querySelectorAll('#relatorio-solicitacoes-modal .req-status-chip');
+    const allOn = chips.length > 0 && [...chips].every(c => c.classList.contains('active'));
+    const btn = document.getElementById('rpt-sol-toggle-all');
+    if (!btn) return;
+    btn.textContent = allOn ? 'Todos ✓' : 'Todos';
+    btn.classList.toggle('all-off', !allOn);
+  },
+
+  _rptSolOnGrupoChange() {
+    App._rptSolPopulateSubgrupos(document.getElementById('rpt-sol-grupo')?.value || '');
+  },
+
+  _rptSolPopulateSubgrupos(gname) {
+    const sel = document.getElementById('rpt-sol-subgrupo'); if (!sel) return;
+    sel.innerHTML = '<option value="">Todos</option>';
+    const gid = Object.entries(State.groups || {}).find(([, n]) => n === gname)?.[0];
+    const list = gid ? (State.subgroups?.[gid] || []) : [];
+    list.forEach(sg => { const o = document.createElement('option'); o.value = o.textContent = sg; sel.appendChild(o); });
+  },
+
+  rptSolLimpar() {
+    document.querySelectorAll('#relatorio-solicitacoes-modal .req-status-chip').forEach(b => b.classList.add('active'));
+    App._rptSolSyncAllLabel();
+    const uSel = document.getElementById('rpt-sol-unidade'); if (uSel) uSel.value = '';
+    const gSel = document.getElementById('rpt-sol-grupo');   if (gSel) gSel.value = '';
+    App._rptSolPopulateSubgrupos('');
+    const pSel = document.getElementById('rpt-sol-pagamento'); if (pSel) pSel.value = '';
+    ['rpt-sol-req-from', 'rpt-sol-req-to', 'rpt-sol-env-from', 'rpt-sol-env-to', 'rpt-sol-compra-from', 'rpt-sol-compra-to']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  },
+
   printRequestsList() {
-    App.renderRequests();
-    const tbody = document.getElementById('requests-tbody');
-    const rows = [];
-    tbody?.querySelectorAll('tr').forEach(tr => {
-      const tds = tr.children;
-      if (tds.length < 8) return; // linha de "nenhuma solicitação encontrada"
-      const seq  = tds[0].querySelector('.req-seq-badge')?.textContent || '';
-      const dt   = tds[0].querySelector('span:last-child')?.textContent || '';
-      const resumoEl = tds[4].querySelector('[title]');
-      const resumo = resumoEl ? resumoEl.getAttribute('title') : tds[4].textContent;
-      const urgente = tds[5].querySelector('.badge-urgent-ico') ? 'Urgente' : '—';
-      rows.push([
+    const statuses = new Set();
+    document.querySelectorAll('#relatorio-solicitacoes-modal .req-status-chip.active').forEach(b => statuses.add(b.dataset.status));
+    const fUnit       = document.getElementById('rpt-sol-unidade')?.value || '';
+    const fGroup      = document.getElementById('rpt-sol-grupo')?.value || '';
+    const fSubgroup   = document.getElementById('rpt-sol-subgrupo')?.value || '';
+    const fPag        = document.getElementById('rpt-sol-pagamento')?.value || '';
+    const reqFrom     = document.getElementById('rpt-sol-req-from')?.value || '';
+    const reqTo       = document.getElementById('rpt-sol-req-to')?.value || '';
+    const envFrom     = document.getElementById('rpt-sol-env-from')?.value || '';
+    const envTo       = document.getElementById('rpt-sol-env-to')?.value || '';
+    const compraFrom  = document.getElementById('rpt-sol-compra-from')?.value || '';
+    const compraTo    = document.getElementById('rpt-sol-compra-to')?.value || '';
+
+    let list = Object.values(State.requests || {});
+    if (statuses.size)  list = list.filter(r => statuses.has(r.status));
+    if (fUnit)     list = list.filter(r => r.unitName === fUnit);
+    if (fGroup)    list = list.filter(r => r.groupName === fGroup);
+    if (fSubgroup) list = list.filter(r => r.subgrupo === fSubgroup);
+    if (fPag === 'parcelado')      list = list.filter(r => r.parcelas && r.parcelas.length > 0);
+    else if (fPag === 'combinada') list = list.filter(r => !!r.compraId);
+    else if (fPag === 'boleto' || fPag === 'dinheiro' || fPag === 'cartao') list = list.filter(r => (r.formaPagamento || 'dinheiro') === fPag);
+    const inRange = (dateVal, from, to) => {
+      const d = (dateVal || '').substring(0, 10);
+      if (!d) return false;
+      if (from && d < from) return false;
+      if (to   && d > to)   return false;
+      return true;
+    };
+    if (reqFrom || reqTo)       list = list.filter(r => inRange(r.createdAt, reqFrom, reqTo));
+    if (envFrom || envTo)       list = list.filter(r => inRange(r.shippedAt, envFrom, envTo));
+    if (compraFrom || compraTo) list = list.filter(r => inRange(r.boughtAt, compraFrom, compraTo));
+
+    list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    const rows = list.map(r => {
+      const seq = r.seq != null ? `SL-${r.seq}` : '';
+      const dt  = r.createdAt ? App._fmtDate(r.createdAt) : '—';
+      const envio = r.shippedAt ? App._fmtDate(r.shippedAt) : ((r.status === 'Comprado' || r.status === 'Estoque') ? 'Pendente' : '—');
+      return [
         App._pdfClean(`${seq} ${dt}`),
-        App._pdfClean(tds[1].textContent),
-        App._pdfClean(tds[2].textContent),
-        App._pdfClean(tds[3].textContent),
-        App._pdfClean(resumo),
-        urgente,
-        App._pdfClean(tds[6].textContent),
-        App._pdfClean(tds[7].textContent),
-      ]);
+        App._pdfClean(r.unitName || '—'),
+        App._pdfClean(r.groupName || '—'),
+        App._pdfClean(r.subgrupo || '—'),
+        App._pdfClean(App.reqSummary(r)),
+        r.urgent ? 'Urgente' : '—',
+        App._pdfClean(envio),
+        App._pdfClean(r.status || '—'),
+      ];
     });
 
-    const fStatus   = document.getElementById('filter-status')?.value || '';
-    const fUnit     = document.getElementById('filter-unit-req')?.value || '';
-    const fGroup    = document.getElementById('filter-group-req')?.value || '';
-    const fSubgroup = document.getElementById('filter-subgroup-req')?.value || '';
-    const qLive     = document.getElementById('req-live-search')?.value || '';
-    const fReqFrom  = document.getElementById('req-date-from')?.value || '';
-    const fReqTo    = document.getElementById('req-date-to')?.value || '';
     const filtros = [];
-    if (fStatus)   filtros.push(`Status: ${fStatus}`);
+    if (statuses.size && statuses.size < 5) filtros.push(`Status: ${[...statuses].join(', ')}`);
     if (fUnit)     filtros.push(`Unidade: ${fUnit}`);
     if (fGroup)    filtros.push(`Grupo: ${fGroup}`);
     if (fSubgroup) filtros.push(`Subgrupo: ${fSubgroup}`);
-    if (fReqFrom || fReqTo) filtros.push(`Período: ${fReqFrom ? App._fmtDate(fReqFrom) : '…'} → ${fReqTo ? App._fmtDate(fReqTo) : '…'}`);
-    if (qLive)     filtros.push(`Busca: "${qLive}"`);
+    if (fPag)      filtros.push(`Pagamento: ${document.getElementById('rpt-sol-pagamento')?.selectedOptions?.[0]?.textContent || fPag}`);
+    if (reqFrom || reqTo)       filtros.push(`Data solicitação: ${reqFrom ? App._fmtDate(reqFrom) : '…'} → ${reqTo ? App._fmtDate(reqTo) : '…'}`);
+    if (envFrom || envTo)       filtros.push(`Data envio: ${envFrom ? App._fmtDate(envFrom) : '…'} → ${envTo ? App._fmtDate(envTo) : '…'}`);
+    if (compraFrom || compraTo) filtros.push(`Data compra: ${compraFrom ? App._fmtDate(compraFrom) : '…'} → ${compraTo ? App._fmtDate(compraTo) : '…'}`);
     const filtrosTxt = filtros.length ? filtros.join(' · ') : 'Todas as solicitações (sem filtro)';
 
     App._pdfReport({
@@ -2309,17 +2383,55 @@ const App = {
           rows }
       ]
     });
+    document.getElementById('relatorio-solicitacoes-modal')?.classList.add('hidden');
   },
 
-  /* ── Relatório em PDF — Estoque (2 modos: saldo atual OU entradas/saídas) ── */
-  gerarRelatorioEstoque(tipo) {
-    App._closeAllPopovers();
+  /* ── Relatório em PDF — Estoque — pop-up com o tipo (saldo atual ou
+     entradas/saídas), e dentro de cada um a opção certa (zerados sim/não,
+     ou entrada/saída/ambas) ── */
+  _rptEstoqueTipo: 'itens',
+  _rptEstoqueMov: 'ambos',
+
+  abrirRelatorioEstoque() {
+    App._rptEstoqueTipo = 'itens';
+    App._rptEstoqueMov = 'ambos';
+    document.querySelectorAll('#relatorio-estoque-modal .extrato-per-btn[data-tipo]').forEach(b => b.classList.toggle('active', b.dataset.tipo === 'itens'));
+    document.querySelectorAll('#relatorio-estoque-modal .extrato-per-btn[data-mov]').forEach(b => b.classList.toggle('active', b.dataset.mov === 'ambos'));
+    const zerCk = document.getElementById('rpt-est-zerados'); if (zerCk) zerCk.checked = true;
+    App._syncRptEstoqueOpts();
+    document.getElementById('relatorio-estoque-modal')?.classList.remove('hidden');
+  },
+
+  setRptEstoqueTipo(tipo, btn) {
+    App._rptEstoqueTipo = tipo;
+    document.querySelectorAll('#relatorio-estoque-modal .extrato-per-btn[data-tipo]').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+    App._syncRptEstoqueOpts();
+  },
+
+  setRptEstoqueMov(mov, btn) {
+    App._rptEstoqueMov = mov;
+    document.querySelectorAll('#relatorio-estoque-modal .extrato-per-btn[data-mov]').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+  },
+
+  _syncRptEstoqueOpts() {
+    const isItens = App._rptEstoqueTipo === 'itens';
+    document.getElementById('rpt-est-itens-opts')?.classList.toggle('hidden', !isItens);
+    document.getElementById('rpt-est-movs-opts')?.classList.toggle('hidden', isItens);
+  },
+
+  gerarRelatorioEstoque() {
+    const tipo  = App._rptEstoqueTipo;
     const fmt   = v => 'R$ ' + (parseFloat(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const data  = new Date().toLocaleDateString('pt-BR');
     const admin = State.adminUser || 'LAMIC';
 
     if (tipo === 'movs') {
-      const movs = Object.values(State.estoqueMov || {}).slice().sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+      const movFiltro = App._rptEstoqueMov; // 'ambos' | 'entrada' | 'saida'
+      let movs = Object.values(State.estoqueMov || {}).slice().sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+      if (movFiltro === 'entrada') movs = movs.filter(m => m.tipo === 'entrada');
+      else if (movFiltro === 'saida') movs = movs.filter(m => m.tipo === 'saida');
       const nEnt = movs.filter(m => m.tipo === 'entrada').length;
       const nSai = movs.filter(m => m.tipo === 'saida').length;
       const rows = movs.map(m => [
@@ -2344,14 +2456,18 @@ const App = {
             rows }
         ]
       });
+      document.getElementById('relatorio-estoque-modal')?.classList.add('hidden');
       return;
     }
 
     // tipo === 'itens' — saldo atual de cada item cadastrado (todo o estoque, sem
-    // depender do filtro de busca/grupo/zerados que estiver ativo na tela nesse momento)
-    const items = Object.entries(State.estoque || {}).map(([id, i]) => ({ id, ...i }))
+    // depender do filtro de busca/grupo que estiver ativo na tela nesse momento;
+    // zerados entram ou não conforme o checkbox do pop-up)
+    const incluirZerados = document.getElementById('rpt-est-zerados')?.checked !== false;
+    let items = Object.entries(State.estoque || {}).map(([id, i]) => ({ id, ...i }))
       .sort((a, b) => (a.grupo || '').localeCompare(b.grupo || '') || (a.produto || '').localeCompare(b.produto || ''));
-    const zerados    = items.filter(i => (parseFloat(i.quantidade) || 0) <= 0).length;
+    const zerados = items.filter(i => (parseFloat(i.quantidade) || 0) <= 0).length;
+    if (!incluirZerados) items = items.filter(i => (parseFloat(i.quantidade) || 0) > 0);
     const saldoTotal = items.reduce((s, i) => s + (parseFloat(i.quantidade) || 0), 0);
     const porGrupo = {};
     items.forEach(i => { const g = i.grupo || '—'; porGrupo[g] = (porGrupo[g] || 0) + (parseFloat(i.quantidade) || 0); });
@@ -2380,6 +2496,7 @@ const App = {
           rows }
       ]
     });
+    document.getElementById('relatorio-estoque-modal')?.classList.add('hidden');
   },
 
   /* ── Relatório em PDF — Calendário (mês visível, dia a dia) ── */
