@@ -191,7 +191,6 @@
                     <div class="chart-card chart-card-wide">
                         <div class="chart-title">
                             <span>Dados Gerais — Concluídos · Em Aberto · Mensagens<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Dados Gerais.</strong> Compara Concluídos, Em Aberto e Mensagens do período.<span class="info-pop-note">Mensagens ÷ 100 para caber na escala. Ao lado, o volume por atendente.</span></span></span></span>
-                            <button class="toggle-comp-btn" id="btn-comp" onclick="toggleComparacao()">📈 Comparar Eficiência (meses)</button>
                         </div>
 
                         <div class="dados-gerais-row">
@@ -204,14 +203,59 @@
                             </div>
                         </div>
 
-                        <div id="comparacao-wrap" style="display:none;">
+                        <div id="comparacao-wrap">
                             <div class="chart-title" style="margin-top:14px;">
-                                <span>Evolução da Eficiência — <span id="comp-ano-label"></span><span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Evolução da Eficiência.</strong> Como o msgs/atendimento variou mês a mês no ano.<span class="info-pop-note">Ponto <span style="color:#34d399">verde</span> = caiu vs mês anterior (melhorou); <span style="color:#f87171">vermelho</span> = subiu (piorou).</span></span></span></span>
+                                <span>Evolução da Eficiência — <span id="comp-ano-label"></span><span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Evolução da Eficiência.</strong> Como o msgs/atendimento variou mês a mês no ano.<span class="info-pop-note">Ponto <span style="color:#34d399">verde</span> = caiu vs mês anterior (melhorou); <span style="color:#f87171">vermelho</span> = subiu (piorou). Linhas pontilhadas: tendência (laranja) e média (roxa) do ano.</span></span></span></span>
                                 <span class="comp-legend" id="comp-resumo"></span>
                             </div>
                             <div class="chart-body" style="height:220px;">
                                 <canvas id="chart-comp"></canvas>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= PROJEÇÃO FINANCEIRA ================= -->
+                <div class="chart-grid">
+                    <div class="chart-card chart-card-wide">
+                        <div class="chart-title">
+                            <span>Projeção Financeira<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Projeção Financeira.</strong> Faturamento x meta e projeção de custo com a API oficial da Meta (WhatsApp Business).<span class="info-pop-note">Clique em qualquer um dos 2 gráficos pra ver o detalhe completo, com métricas, tendência e média.</span></span></span></span>
+                        </div>
+
+                        <div class="chart-grid">
+
+                            <!-- Card A: Faturamento x Meta -->
+                            <div class="chart-card proj-fin-card" onclick="abrirAuditFaturamento()" title="Clique para ver o detalhe completo">
+                                <div class="chart-title">
+                                    <span>Faturamento x Meta<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Faturamento x Meta.</strong> Faturamento lançado mês a mês contra a meta configurada.<span class="info-pop-note">A meta pode ser um valor fixo ou % de crescimento sobre o mês anterior (ou mesmo mês do ano passado). Ao bater, pode subir sozinha um % configurado.</span></span></span></span>
+                                    <div class="proj-fin-actions" onclick="event.stopPropagation()">
+                                        <button class="proj-fin-btn" onclick="abrirValorModal('faturamento')">＋ Faturamento</button>
+                                        <button class="proj-fin-btn" onclick="abrirMetaModal()">🎯 Metas</button>
+                                    </div>
+                                </div>
+                                <div class="proj-fin-status" id="fat-status-badge">—</div>
+                                <div class="chart-body" style="height:190px;">
+                                    <canvas id="chart-faturamento"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Card B: Projeção de Custo API -->
+                            <div class="chart-card proj-fin-card" onclick="abrirAuditApiCost()" title="Clique para ver o detalhe completo">
+                                <div class="chart-title">
+                                    <span>Projeção de Custo — API Oficial (Meta)<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Projeção de Custo API.</strong> A partir de 01/10/2026 a Meta passa a cobrar também pelas mensagens de atendimento (Service Messages), a R$0,035 por mensagem entregue.<span class="info-pop-note">Modelo antigo: só cobra template (você lança o gasto mensal em US$, convertido em R$). Modelo novo (estimado): total de mensagens do período × R$0,035 — dá uma base de comparação pra já planejar a redução de custo.</span></span></span></span>
+                                    <div class="proj-fin-actions" onclick="event.stopPropagation()">
+                                        <button class="proj-fin-btn" onclick="abrirValorApiModal()">＋ Gasto US$</button>
+                                    </div>
+                                </div>
+                                <div class="api-modo-switch" onclick="event.stopPropagation()">
+                                    <button class="api-modo-btn active" id="api-modo-antigo" onclick="setApiModo('antigo')">Cobrança Antiga</button>
+                                    <button class="api-modo-btn" id="api-modo-novo" onclick="setApiModo('novo')">Cobrança Nova (out/2026)</button>
+                                </div>
+                                <div class="chart-body" style="height:190px;">
+                                    <canvas id="chart-apicost"></canvas>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -643,6 +687,285 @@
 
         </div><!-- /modal-panel -->
     </div><!-- /modal-overlay -->
+
+    <!-- ======================================================
+         MODAL — Nova/Editar Meta
+    ======================================================= -->
+    <div class="modal-overlay" id="meta-modal-fin" style="display:none;" onclick="modalOverlayClickGenerico(event,'meta-modal-fin')">
+        <div class="modal-panel" style="max-width:540px" onclick="event.stopPropagation()">
+            <input type="hidden" id="mf-id">
+            <div class="modal-header">
+                <span class="modal-header-title">Metas</span>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('meta-modal-fin')">✕</button>
+            </div>
+            <div class="modal-body">
+
+                <div class="card" id="mf-lista-card">
+                    <div class="card-title">Metas cadastradas</div>
+                    <div id="mf-lista"></div>
+                    <button class="btn-add" onclick="novaMetaForm()">＋ Nova Meta</button>
+                </div>
+
+                <div class="card" id="mf-form-card" style="display:none;">
+                    <div class="card-title" id="mf-form-titulo">Nova Meta</div>
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label for="mf-tipo">Tipo de Meta</label>
+                            <select id="mf-tipo" onchange="onMetaTipoChange()">
+                                <option value="faturamento">Faturamento</option>
+                                <option value="exames">Exames</option>
+                                <option value="__novo__">+ Novo tipo personalizado…</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="mf-tipo-custom-group" style="display:none;">
+                            <label for="mf-tipo-custom">Nome do novo tipo</label>
+                            <input type="text" id="mf-tipo-custom" placeholder="Ex: Novos Pacientes">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mf-nome">Nome da Meta</label>
+                            <input type="text" id="mf-nome" placeholder="Ex: Meta de Faturamento Mensal">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mf-periodicidade">Periodicidade</label>
+                            <select id="mf-periodicidade">
+                                <option value="mensal">Mensal</option>
+                                <option value="anual">Anual</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mf-modo">Como definir o alvo</label>
+                            <select id="mf-modo" onchange="onMetaModoChange()">
+                                <option value="valor">Valor fixo</option>
+                                <option value="percentual">% de crescimento sobre uma base</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mf-valor" id="mf-valor-label">Valor alvo (R$)</label>
+                            <input type="number" id="mf-valor" min="0" step="0.01" placeholder="0">
+                        </div>
+
+                        <div class="form-group" id="mf-base-group" style="display:none;">
+                            <label for="mf-base">Base de comparação</label>
+                            <select id="mf-base" onchange="onMetaBaseChange()">
+                                <option value="mes_anterior">Mês anterior</option>
+                                <option value="mesmo_mes_ano_passado">Mesmo mês do ano anterior</option>
+                                <option value="manual">Valor manual</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="mf-base-manual-group" style="display:none;">
+                            <label for="mf-base-manual">Valor base manual</label>
+                            <input type="number" id="mf-base-manual" min="0" step="0.01" placeholder="0">
+                        </div>
+
+                        <div class="form-group full">
+                            <label for="mf-autoinc">Auto-incremento ao bater a meta (%)</label>
+                            <input type="number" id="mf-autoinc" min="0" step="0.1" placeholder="Ex: 5 → sobe 5% sozinha a cada meta batida">
+                            <span class="field-hint">Opcional. Cada vez que o valor realizado bater essa meta, o próximo alvo sobe automaticamente esse percentual.</span>
+                        </div>
+
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
+                        <button class="btn-secondary" onclick="cancelarMetaForm()">Cancelar</button>
+                        <button class="btn-primary" onclick="salvarMetaFin()">Salvar Meta</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================
+         MODAL — Lançar Valor (Faturamento / Exames / outros tipos)
+    ======================================================= -->
+    <div class="modal-overlay" id="valor-modal-fin" style="display:none;" onclick="modalOverlayClickGenerico(event,'valor-modal-fin')">
+        <div class="modal-panel" style="max-width:420px" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-header-title" id="valor-modal-title">Lançar Valor</span>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('valor-modal-fin')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="card">
+                    <div class="form-grid">
+                        <div class="form-group" id="vf-tipo-group">
+                            <label for="vf-tipo">Tipo</label>
+                            <select id="vf-tipo"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="vf-ano">Ano</label>
+                            <input type="number" id="vf-ano" min="2020" max="2099">
+                        </div>
+                        <div class="form-group">
+                            <label for="vf-mes">Mês</label>
+                            <select id="vf-mes">
+                                <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+                                <option value="3">Março</option><option value="4">Abril</option>
+                                <option value="5">Maio</option><option value="6">Junho</option>
+                                <option value="7">Julho</option><option value="8">Agosto</option>
+                                <option value="9">Setembro</option><option value="10">Outubro</option>
+                                <option value="11">Novembro</option><option value="12">Dezembro</option>
+                            </select>
+                        </div>
+                        <div class="form-group full">
+                            <label for="vf-valor" id="vf-valor-label">Valor (R$)</label>
+                            <input type="number" id="vf-valor" min="0" step="0.01" placeholder="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fecharModalGenerico('valor-modal-fin')">Cancelar</button>
+                <button class="btn-primary" onclick="salvarValorFin()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================
+         MODAL — Lançar Gasto com API (modelo antigo — US$)
+    ======================================================= -->
+    <div class="modal-overlay" id="valor-api-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'valor-api-modal')">
+        <div class="modal-panel" style="max-width:420px" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-header-title">Gasto com API (modelo antigo)</span>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('valor-api-modal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="card">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="va-ano">Ano</label>
+                            <input type="number" id="va-ano" min="2020" max="2099">
+                        </div>
+                        <div class="form-group">
+                            <label for="va-mes">Mês</label>
+                            <select id="va-mes">
+                                <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+                                <option value="3">Março</option><option value="4">Abril</option>
+                                <option value="5">Maio</option><option value="6">Junho</option>
+                                <option value="7">Julho</option><option value="8">Agosto</option>
+                                <option value="9">Setembro</option><option value="10">Outubro</option>
+                                <option value="11">Novembro</option><option value="12">Dezembro</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="va-usd">Valor gasto (US$)</label>
+                            <input type="number" id="va-usd" min="0" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="va-cotacao">Cotação do dólar (R$)</label>
+                            <input type="number" id="va-cotacao" min="0" step="0.01" placeholder="5.40">
+                            <span class="field-hint">Usada pra converter US$ → R$ em todos os meses — ajuste quando quiser.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fecharModalGenerico('valor-api-modal')">Cancelar</button>
+                <button class="btn-primary" onclick="salvarValorApi()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================
+         MODAL — Auditoria: Faturamento x Meta (estética "Tintas Compradas")
+    ======================================================= -->
+    <div class="modal-overlay" id="audit-faturamento-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'audit-faturamento-modal')">
+        <div class="modal-panel" style="max-width:920px" onclick="event.stopPropagation()">
+            <div class="audit-modal-header">
+                <div class="audit-modal-header-left">
+                    <div class="audit-modal-icon">
+                        <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div>
+                        <div class="audit-modal-title">Faturamento x Meta</div>
+                        <div class="audit-modal-sub" id="audit-fat-sub">—</div>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('audit-faturamento-modal')">✕</button>
+            </div>
+            <div class="audit-modal-stripe"></div>
+            <div class="modal-body">
+                <div class="audit-grid">
+                    <div class="audit-side">
+                        <span class="audit-side-tag" id="audit-fat-tag">—</span>
+                        <div class="audit-side-big" id="audit-fat-big">R$ 0</div>
+                        <div class="audit-side-lbl">Faturamento do período</div>
+                        <div class="audit-side-divider"></div>
+                        <div class="audit-side-row"><span>Meta do período</span><strong id="audit-fat-meta">—</strong></div>
+                        <div class="audit-side-row"><span>% da meta atingido</span><strong id="audit-fat-pct">—</strong></div>
+                        <div class="audit-side-row"><span>Mês anterior</span><strong id="audit-fat-ant">—</strong></div>
+                        <div class="audit-side-row"><span>Auto-incremento</span><strong id="audit-fat-autoinc">—</strong></div>
+                        <div class="audit-side-divider"></div>
+                        <div class="audit-side-row"><span>Eficiência (msgs/atend.)</span><strong id="audit-fat-ef">—</strong></div>
+                        <div class="audit-side-row"><span>Eficiência financeira</span><strong id="audit-fat-effin">—</strong></div>
+                    </div>
+                    <div class="audit-main">
+                        <div class="audit-stats-grid">
+                            <div class="audit-stat"><span>Média do ano</span><strong id="audit-fat-media">—</strong></div>
+                            <div class="audit-stat"><span>Tendência</span><strong id="audit-fat-tend">—</strong></div>
+                            <div class="audit-stat"><span>Meses batidos</span><strong id="audit-fat-batidos">—</strong></div>
+                        </div>
+                        <div class="audit-chart-wrap">
+                            <div class="audit-chart-inner"><canvas id="audit-fat-chart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================
+         MODAL — Auditoria: Projeção de Custo API (estética "Tintas Compradas")
+    ======================================================= -->
+    <div class="modal-overlay" id="audit-apicost-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'audit-apicost-modal')">
+        <div class="modal-panel" style="max-width:920px" onclick="event.stopPropagation()">
+            <div class="audit-modal-header">
+                <div class="audit-modal-header-left">
+                    <div class="audit-modal-icon">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div>
+                        <div class="audit-modal-title">Projeção de Custo — API Oficial (Meta)</div>
+                        <div class="audit-modal-sub" id="audit-api-sub">—</div>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('audit-apicost-modal')">✕</button>
+            </div>
+            <div class="audit-modal-stripe"></div>
+            <div class="modal-body">
+                <div class="audit-grid">
+                    <div class="audit-side">
+                        <span class="audit-side-tag" id="audit-api-tag">MODELO ANTIGO</span>
+                        <div class="audit-side-big" id="audit-api-big">R$ 0</div>
+                        <div class="audit-side-lbl">Gasto no período (modelo selecionado)</div>
+                        <div class="audit-side-divider"></div>
+                        <div class="audit-side-row"><span>Modelo antigo (real)</span><strong id="audit-api-antigo">—</strong></div>
+                        <div class="audit-side-row"><span>Modelo novo (estimado)</span><strong id="audit-api-novo">—</strong></div>
+                        <div class="audit-side-row"><span>Diferença</span><strong id="audit-api-dif">—</strong></div>
+                        <div class="audit-side-divider"></div>
+                        <div class="audit-side-row"><span>R$ por mensagem</span><strong id="audit-api-preco">R$ 0,035</strong></div>
+                        <div class="audit-side-row"><span>Cotação US$</span><strong id="audit-api-cotacao">—</strong></div>
+                    </div>
+                    <div class="audit-main">
+                        <div class="audit-stats-grid">
+                            <div class="audit-stat"><span>Média (modelo novo)</span><strong id="audit-api-media">—</strong></div>
+                            <div class="audit-stat"><span>Tendência (modelo novo)</span><strong id="audit-api-tend">—</strong></div>
+                            <div class="audit-stat"><span>Vigência</span><strong>a partir de 01/10/2026</strong></div>
+                        </div>
+                        <div class="audit-chart-wrap">
+                            <div class="audit-chart-inner"><canvas id="audit-api-chart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
 </div><!-- /app -->
 

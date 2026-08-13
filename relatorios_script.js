@@ -57,6 +57,649 @@ function _fbListen(tipo) {
 function _fbInitListeners() {
     _fbListen('cc');
     _fbListen('ia');
+    _fbListenFinanceiro();
+}
+
+// ============================================================
+// PROJEÇÃO FINANCEIRA — Faturamento x Meta + Projeção de Custo API
+// ============================================================
+// Dados independentes de CC/IA, guardados em relatorios_lamic/financeiro:
+//   valores: { <tipo>: { 'AAAA-MM': número } }   — faturamento, exames, ou
+//            qualquer tipo personalizado criado junto de uma meta.
+//   metas:   { <id>: {...} }                     — ver novaMetaForm()/salvarMetaFin().
+//   apiCost: { modoAtivo, dolarCotacao, precoPorMsgBRL, antigo: {'AAAA-MM': US$} }
+let financeiroData = {
+    valores: {},
+    metas: {},
+    apiCost: { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, antigo: {} }
+};
+
+function _fbListenFinanceiro() {
+    if (!window._db || !window._ref || !window._onValue) return;
+    const r = window._ref(window._db, FB_PATH + '/financeiro');
+    window._onValue(r, snap => {
+        const val = snap.val() || {};
+        financeiroData.valores = val.valores || {};
+        financeiroData.metas   = val.metas   || {};
+        financeiroData.apiCost = Object.assign(
+            { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, antigo: {} },
+            val.apiCost || {}
+        );
+        const btnAntigo = document.getElementById('api-modo-antigo');
+        const btnNovo   = document.getElementById('api-modo-novo');
+        if (btnAntigo && btnNovo) {
+            btnAntigo.classList.toggle('active', financeiroData.apiCost.modoAtivo !== 'novo');
+            btnNovo.classList.toggle('active', financeiroData.apiCost.modoAtivo === 'novo');
+        }
+        const dashSec = document.getElementById('dashboard');
+        if (dashSec && dashSec.classList.contains('active')) renderProjecaoFinanceira();
+    });
+}
+
+function _anoMesKey(ano, mes) { return `${ano}-${String(mes).padStart(2, '0')}`; }
+
+function _valorNoMes(tipo, ano, mes) {
+    const v = (financeiroData.valores[tipo] || {})[_anoMesKey(ano, mes)];
+    return (v == null) ? null : parseFloat(v);
+}
+
+function _fbSetValor(tipo, ano, mes, valor) {
+    if (!window._db || !window._ref || !window._set) return;
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro/valores/${tipo}/${_anoMesKey(ano, mes)}`), valor)
+        .catch(e => console.warn('[Firebase] Erro ao salvar valor:', e));
+}
+
+function _fbSetMeta(meta) {
+    if (!window._db || !window._ref || !window._set) return;
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro/metas/${meta.id}`), meta)
+        .catch(e => console.warn('[Firebase] Erro ao salvar meta:', e));
+}
+
+function _fbRemoveMeta(id) {
+    if (!window._db || !window._ref || !window._remove) return;
+    window._remove(window._ref(window._db, `${FB_PATH}/financeiro/metas/${id}`))
+        .catch(e => console.warn('[Firebase] Erro ao remover meta:', e));
+}
+
+function _fbSetApiCost(partial) {
+    if (!window._db || !window._ref || !window._set) return;
+    Object.assign(financeiroData.apiCost, partial);
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro/apiCost`), financeiroData.apiCost)
+        .catch(e => console.warn('[Firebase] Erro ao salvar apiCost:', e));
+}
+
+function _fbSetApiCostAntigo(ano, mes, valorUSD) {
+    if (!window._db || !window._ref || !window._set) return;
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro/apiCost/antigo/${_anoMesKey(ano, mes)}`), valorUSD)
+        .catch(e => console.warn('[Firebase] Erro ao salvar gasto API:', e));
+}
+
+// Todos os tipos de meta conhecidos (faturamento/exames sempre aparecem, mesmo
+// sem meta cadastrada ainda — pra já poder lançar valor neles).
+function _tiposDeMetaConhecidos() {
+    const set = new Set(['faturamento', 'exames']);
+    Object.values(financeiroData.metas || {}).forEach(m => { if (m.tipo) set.add(m.tipo); });
+    return [...set];
+}
+
+function _labelTipoMeta(tipo) {
+    if (tipo === 'faturamento') return 'Faturamento';
+    if (tipo === 'exames') return 'Exames';
+    const m = Object.values(financeiroData.metas || {}).find(m => m.tipo === tipo);
+    return m ? (m.tipoLabel || m.nome || tipo) : tipo;
+}
+
+// Meta ATIVA de um tipo (assume 1 meta ativa por tipo — a mais recente cadastrada)
+function _metaAtivaDoTipo(tipo) {
+    const lista = Object.values(financeiroData.metas || {})
+        .filter(m => m.tipo === tipo && m.ativa !== false)
+        .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
+    return lista[0] || null;
+}
+
+// Valor de base (referência) pra meta em % — mês anterior, mesmo mês do ano
+// passado, ou um valor manual fixo.
+function _valorBaseMeta(meta, ano, mes) {
+    if (!meta) return null;
+    if (meta.baseRef === 'manual') return (meta.valorBaseManual != null) ? parseFloat(meta.valorBaseManual) : null;
+    if (meta.baseRef === 'mesmo_mes_ano_passado') return _valorNoMes(meta.tipo, ano - 1, mes);
+    let am = mes - 1, ay = ano;
+    if (am < 1) { am = 12; ay--; }
+    return _valorNoMes(meta.tipo, ay, am);
+}
+
+// Alvo da meta para um mês específico — encadeia o auto-incremento: anda mês a
+// mês desde a criação da meta, e cada vez que o realizado bateu o alvo daquele
+// mês, o próximo alvo sobe autoIncrementoPct% sozinho.
+function _metaAlvoParaMes(meta, ano, mes) {
+    if (!meta) return null;
+    const alvoBase = (ay, am) => {
+        if (meta.modoAlvo === 'percentual') {
+            const base = _valorBaseMeta(meta, ay, am);
+            return base != null ? base * (1 + (parseFloat(meta.valorAlvo) || 0) / 100) : null;
+        }
+        return parseFloat(meta.valorAlvo) || 0;
+    };
+    const inc = parseFloat(meta.autoIncrementoPct) || 0;
+    if (!inc) return alvoBase(ano, mes);
+
+    const criado = meta.criadoEm ? new Date(meta.criadoEm) : new Date();
+    let ay = criado.getFullYear(), am = criado.getMonth() + 1;
+    let alvoAtual = alvoBase(ay, am);
+    if (alvoAtual == null) return null;
+    let guard = 0;
+    while ((ay < ano || (ay === ano && am < mes)) && guard < 600) {
+        const realizado = _valorNoMes(meta.tipo, ay, am);
+        if (realizado != null && alvoAtual != null && realizado >= alvoAtual) {
+            alvoAtual = alvoAtual * (1 + inc / 100);
+        }
+        am++; if (am > 12) { am = 1; ay++; }
+        guard++;
+    }
+    return alvoAtual;
+}
+
+// Status da meta num mês: 'batida' (>=100%) · 'perto' (>=85%) · 'falta' (<85%) · 'sem-dado'
+function _metaStatus(meta, ano, mes) {
+    if (!meta) return { status: 'sem-dado', pct: null, alvo: null, atual: null };
+    const alvo  = _metaAlvoParaMes(meta, ano, mes);
+    const atual = _valorNoMes(meta.tipo, ano, mes);
+    if (alvo == null || atual == null) return { status: 'sem-dado', pct: null, alvo, atual };
+    const pct = alvo > 0 ? (atual / alvo) * 100 : 0;
+    let status = pct >= 100 ? 'batida' : pct >= 85 ? 'perto' : 'falta';
+    return { status, pct, alvo, atual };
+}
+
+// Eficiência financeira = faturamento ÷ eficiência (msgs/atendimento). Quanto
+// MENOR o msgs/atendimento (mais eficiente no atendimento) e MAIOR o
+// faturamento, MAIOR a eficiência financeira.
+function _eficienciaFinanceira(p, faturamento) {
+    const ef = calcEficiencia(p);
+    if (!ef.hasData || faturamento == null) return null;
+    return faturamento / ef.index;
+}
+
+function fBRL(v) {
+    if (v == null || isNaN(v)) return '—';
+    return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ── Custo com a API oficial (Meta/WhatsApp) ─────────────────────
+function _custoApiAntigo(ano, mes) {
+    const usd = (financeiroData.apiCost.antigo || {})[_anoMesKey(ano, mes)];
+    if (usd == null) return null;
+    return parseFloat(usd) * (financeiroData.apiCost.dolarCotacao || 0);
+}
+
+// Estimativa do modelo novo (vigente a partir de 01/10/2026): cobra por
+// mensagem de atendimento entregue, R$0,035/msg. Como a planilha não separa
+// mensagens enviadas pela empresa das recebidas do cliente, usa o TOTAL de
+// mensagens do período como base — é uma estimativa conservadora/aproximada,
+// deixada clara na tela (serve pra "ter uma base", como pedido).
+function _custoApiNovoEstimado(p) {
+    if (!p || !p.mensagens) return null;
+    return p.mensagens * (financeiroData.apiCost.precoPorMsgBRL || 0.035);
+}
+
+// ── Render: os 2 cards da Projeção Financeira ───────────────────
+function renderProjecaoFinanceira() {
+    chartFaturamento();
+    chartApiCost();
+}
+
+function chartFaturamento() {
+    destroyChart('faturamento');
+    const ctx = getCtx('chart-faturamento');
+    const badge = document.getElementById('fat-status-badge');
+    if (!ctx) return;
+
+    const ano   = filtro.ano || new Date().getFullYear();
+    const meses = getPeriodsForMesComparacao(ano);
+    const meta  = _metaAtivaDoTipo('faturamento');
+
+    const labels   = meses.map(item => MESES_ABR[item.mes - 1]);
+    const fatData  = meses.map(item => _valorNoMes('faturamento', ano, item.mes));
+    const metaData = meses.map(item => meta ? _metaAlvoParaMes(meta, ano, item.mes) : null);
+
+    const barColors = meses.map((item, i) => {
+        const v = fatData[i], m = metaData[i];
+        if (v == null || m == null) return '#94a3b8';
+        if (v >= m) return '#059669';
+        if (v >= m * 0.85) return '#d97706';
+        return '#dc2626';
+    });
+
+    const st = meta ? _metaStatus(meta, filtro.ano, filtro.mes) : { status: 'sem-dado', pct: null };
+    if (badge) {
+        badge.className = 'proj-fin-status st-' + (st.status === 'sem-dado' ? 'semdado' : st.status);
+        badge.textContent = !meta ? 'Nenhuma meta cadastrada'
+            : st.status === 'sem-dado' ? 'Sem dado no período'
+            : st.status === 'batida' ? `Meta batida (${st.pct.toFixed(0)}%)`
+            : st.status === 'perto'  ? `Perto de bater (${st.pct.toFixed(0)}%)`
+            : `Falta bater (${st.pct.toFixed(0)}%)`;
+    }
+
+    charts['faturamento'] = new Chart(ctx, {
+        data: {
+            labels,
+            datasets: [
+                { type: 'bar',  label: 'Faturamento', data: fatData,  backgroundColor: barColors, borderRadius: 6, borderSkipped: false, order: 2 },
+                { type: 'line', label: 'Meta',         data: metaData, borderColor: '#2563eb', borderDash: [6, 4], borderWidth: 2, pointRadius: 0, pointHitRadius: 0, fill: false, spanGaps: true, order: 1 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, labels: { color: '#475569', font: { size: 11 }, boxWidth: 14 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => fBRL(v) }, beginAtZero: true },
+                x: { grid: { display: false }, ticks: { color: '#475569' } }
+            }
+        }
+    });
+}
+
+function chartApiCost() {
+    destroyChart('apicost');
+    const ctx = getCtx('chart-apicost');
+    if (!ctx) return;
+
+    const ano   = filtro.ano || new Date().getFullYear();
+    const meses = getPeriodsForMesComparacao(ano);
+    const labels     = meses.map(item => MESES_ABR[item.mes - 1]);
+    const antigoData = meses.map(item => _custoApiAntigo(ano, item.mes));
+    const novoData   = meses.map(item => _custoApiNovoEstimado(item.p));
+
+    charts['apicost'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Modelo Antigo (real)', data: antigoData, backgroundColor: 'rgba(37,99,235,0.75)', borderRadius: 5 },
+                { label: 'Modelo Novo (estimado, a partir de out/2026)', data: novoData, backgroundColor: 'rgba(217,119,6,0.75)', borderRadius: 5 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, labels: { color: '#475569', font: { size: 10 }, boxWidth: 12 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => fBRL(v) }, beginAtZero: true },
+                x: { grid: { display: false }, ticks: { color: '#475569' } }
+            }
+        }
+    });
+}
+
+function setApiModo(modo) {
+    _fbSetApiCost({ modoAtivo: modo });
+    const btnA = document.getElementById('api-modo-antigo'), btnN = document.getElementById('api-modo-novo');
+    if (btnA) btnA.classList.toggle('active', modo !== 'novo');
+    if (btnN) btnN.classList.toggle('active', modo === 'novo');
+}
+
+// ── Modal: Metas (lista + formulário de nova/editar) ────────────
+function abrirMetaModal() {
+    renderListaMetas();
+    document.getElementById('mf-form-card').style.display  = 'none';
+    document.getElementById('mf-lista-card').style.display = '';
+    document.getElementById('meta-modal-fin').style.display = 'flex';
+}
+
+function renderListaMetas() {
+    const el = document.getElementById('mf-lista');
+    if (!el) return;
+    const metas = Object.values(financeiroData.metas || {}).sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
+    if (!metas.length) {
+        el.innerHTML = '<div class="empty-state" style="padding:14px;"><div class="empty-state-text">Nenhuma meta cadastrada</div></div>';
+        return;
+    }
+    el.innerHTML = metas.map(m => {
+        const st = _metaStatus(m, filtro.ano, filtro.mes);
+        const pctTxt = st.pct != null ? st.pct.toFixed(0) + '%' : '—';
+        const alvoTxt = m.modoAlvo === 'percentual' ? `+${m.valorAlvo}%` : (m.tipo === 'exames' ? fNum(m.valorAlvo) : fBRL(m.valorAlvo));
+        return `<div class="meta-list-item">
+            <div class="meta-list-info">
+                <strong>${escHtml(m.nome)}</strong>
+                <span>${escHtml(_labelTipoMeta(m.tipo))} · ${m.periodicidade === 'anual' ? 'Anual' : 'Mensal'} · alvo ${alvoTxt}${m.autoIncrementoPct ? ' · auto +' + m.autoIncrementoPct + '%' : ''}</span>
+            </div>
+            <span class="proj-fin-status st-${st.status === 'sem-dado' ? 'semdado' : st.status}" style="margin:0;">${pctTxt}</span>
+            <div class="meta-list-actions">
+                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;" onclick="editarMeta('${m.id}')">Editar</button>
+                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;color:#dc2626;" onclick="excluirMeta('${m.id}')">Excluir</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function novaMetaForm() {
+    document.getElementById('mf-form-titulo').textContent = 'Nova Meta';
+    document.getElementById('mf-id').value = '';
+    document.getElementById('mf-tipo').value = 'faturamento';
+    document.getElementById('mf-tipo-custom-group').style.display = 'none';
+    document.getElementById('mf-tipo-custom').value = '';
+    document.getElementById('mf-nome').value = 'Meta de Faturamento';
+    document.getElementById('mf-periodicidade').value = 'mensal';
+    document.getElementById('mf-modo').value = 'valor';
+    document.getElementById('mf-valor').value = '';
+    document.getElementById('mf-base').value = 'mes_anterior';
+    document.getElementById('mf-base-manual').value = '';
+    document.getElementById('mf-autoinc').value = '';
+    onMetaModoChange();
+    document.getElementById('mf-lista-card').style.display = 'none';
+    document.getElementById('mf-form-card').style.display  = '';
+}
+
+function cancelarMetaForm() {
+    document.getElementById('mf-form-card').style.display  = 'none';
+    document.getElementById('mf-lista-card').style.display = '';
+    renderListaMetas();
+}
+
+function editarMeta(id) {
+    const m = financeiroData.metas[id]; if (!m) return;
+    const tipoConhecido = (m.tipo === 'faturamento' || m.tipo === 'exames');
+    document.getElementById('mf-form-titulo').textContent = 'Editar Meta';
+    document.getElementById('mf-id').value = id;
+    document.getElementById('mf-tipo').value = tipoConhecido ? m.tipo : '__novo__';
+    document.getElementById('mf-tipo-custom-group').style.display = tipoConhecido ? 'none' : '';
+    document.getElementById('mf-tipo-custom').value = tipoConhecido ? '' : m.tipo;
+    document.getElementById('mf-nome').value = m.nome || '';
+    document.getElementById('mf-periodicidade').value = m.periodicidade || 'mensal';
+    document.getElementById('mf-modo').value = m.modoAlvo || 'valor';
+    document.getElementById('mf-valor').value = (m.valorAlvo != null) ? m.valorAlvo : '';
+    document.getElementById('mf-base').value = m.baseRef || 'mes_anterior';
+    document.getElementById('mf-base-manual').value = (m.valorBaseManual != null) ? m.valorBaseManual : '';
+    document.getElementById('mf-autoinc').value = (m.autoIncrementoPct != null) ? m.autoIncrementoPct : '';
+    onMetaModoChange();
+    document.getElementById('mf-lista-card').style.display = 'none';
+    document.getElementById('mf-form-card').style.display  = '';
+}
+
+function excluirMeta(id) {
+    if (!confirm('Excluir esta meta? Essa ação não pode ser desfeita.')) return;
+    _fbRemoveMeta(id);
+    setTimeout(renderListaMetas, 200);
+}
+
+function onMetaTipoChange() {
+    const v = document.getElementById('mf-tipo').value;
+    document.getElementById('mf-tipo-custom-group').style.display = (v === '__novo__') ? '' : 'none';
+    const nomeEl = document.getElementById('mf-nome');
+    if (v === 'faturamento' && !nomeEl.value) nomeEl.value = 'Meta de Faturamento';
+    if (v === 'exames' && !nomeEl.value) nomeEl.value = 'Meta de Exames';
+}
+
+function onMetaModoChange() {
+    const isPct = document.getElementById('mf-modo').value === 'percentual';
+    document.getElementById('mf-valor-label').textContent = isPct ? 'Valor alvo (% de crescimento)' : 'Valor alvo (R$ ou nº)';
+    document.getElementById('mf-base-group').style.display = isPct ? '' : 'none';
+    onMetaBaseChange();
+}
+
+function onMetaBaseChange() {
+    const isPct = document.getElementById('mf-modo').value === 'percentual';
+    const base  = isPct ? document.getElementById('mf-base').value : null;
+    document.getElementById('mf-base-manual-group').style.display = (base === 'manual') ? '' : 'none';
+}
+
+// Slug simples (sem acento/espaço) pro tipo de meta personalizado
+function _slugTipo(s) {
+    // ̀-ͯ = faixa Unicode dos acentos combinantes (depois do normalize
+    // NFD, "ç"/"ã" viram letra + acento separados; isso tira só o acento).
+    const semAcento = String(s || '').trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return semAcento.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'personalizado';
+}
+
+function salvarMetaFin() {
+    let tipo = document.getElementById('mf-tipo').value;
+    if (tipo === '__novo__') {
+        const custom = document.getElementById('mf-tipo-custom').value;
+        if (!custom || !custom.trim()) { alert('Informe o nome do novo tipo de meta.'); return; }
+        tipo = _slugTipo(custom);
+    }
+    const nome = (document.getElementById('mf-nome').value || '').trim();
+    if (!nome) { alert('Dê um nome para a meta.'); return; }
+    const valor = parseFloat(document.getElementById('mf-valor').value);
+    if (isNaN(valor)) { alert('Informe o valor alvo.'); return; }
+
+    const id = document.getElementById('mf-id').value || gerarId();
+    const existente = financeiroData.metas[id];
+    const autoIncStr = document.getElementById('mf-autoinc').value;
+    const baseManualStr = document.getElementById('mf-base-manual').value;
+
+    const meta = {
+        id, tipo, nome,
+        periodicidade: document.getElementById('mf-periodicidade').value,
+        modoAlvo: document.getElementById('mf-modo').value,
+        valorAlvo: valor,
+        baseRef: document.getElementById('mf-base').value,
+        valorBaseManual: baseManualStr ? parseFloat(baseManualStr) : null,
+        autoIncrementoPct: autoIncStr ? parseFloat(autoIncStr) : null,
+        ativa: true,
+        criadoEm: existente ? existente.criadoEm : Date.now(),
+        atualizadoEm: Date.now()
+    };
+    _fbSetMeta(meta);
+    cancelarMetaForm();
+}
+
+// ── Modal: Lançar Valor (faturamento/exames/tipo personalizado) ─
+function abrirValorModal(tipoPreSel) {
+    const sel = document.getElementById('vf-tipo');
+    const tipos = _tiposDeMetaConhecidos();
+    sel.innerHTML = tipos.map(t => `<option value="${escAttr(t)}">${escHtml(_labelTipoMeta(t))}</option>`).join('');
+    sel.value = tipoPreSel && tipos.includes(tipoPreSel) ? tipoPreSel : tipos[0];
+
+    const anoEl = document.getElementById('vf-ano'), mesEl = document.getElementById('vf-mes');
+    anoEl.value = filtro.ano || new Date().getFullYear();
+    mesEl.value = filtro.mes || (new Date().getMonth() + 1);
+
+    const refresh = () => {
+        const t = sel.value, a = parseInt(anoEl.value) || 0, m = parseInt(mesEl.value) || 0;
+        const v = _valorNoMes(t, a, m);
+        document.getElementById('vf-valor').value = (v != null) ? v : '';
+        document.getElementById('vf-valor-label').textContent = (t === 'exames') ? 'Valor (quantidade)' : 'Valor (R$)';
+    };
+    sel.onchange = refresh; anoEl.oninput = refresh; mesEl.onchange = refresh;
+    refresh();
+
+    document.getElementById('valor-modal-title').textContent = 'Lançar Valor';
+    document.getElementById('valor-modal-fin').style.display = 'flex';
+}
+
+function salvarValorFin() {
+    const tipo  = document.getElementById('vf-tipo').value;
+    const ano   = parseInt(document.getElementById('vf-ano').value);
+    const mes   = parseInt(document.getElementById('vf-mes').value);
+    const valor = parseFloat(document.getElementById('vf-valor').value);
+    if (!ano || !mes || isNaN(valor)) { alert('Preencha ano, mês e valor.'); return; }
+    _fbSetValor(tipo, ano, mes, valor);
+    fecharModalGenerico('valor-modal-fin');
+}
+
+// ── Modal: Lançar Gasto com API — modelo antigo (US$) ───────────
+function abrirValorApiModal() {
+    const anoEl = document.getElementById('va-ano'), mesEl = document.getElementById('va-mes');
+    anoEl.value = filtro.ano || new Date().getFullYear();
+    mesEl.value = filtro.mes || (new Date().getMonth() + 1);
+    document.getElementById('va-cotacao').value = financeiroData.apiCost.dolarCotacao || 5.40;
+
+    const refresh = () => {
+        const a = parseInt(anoEl.value) || 0, m = parseInt(mesEl.value) || 0;
+        const usd = (financeiroData.apiCost.antigo || {})[_anoMesKey(a, m)];
+        document.getElementById('va-usd').value = (usd != null) ? usd : '';
+    };
+    anoEl.oninput = refresh; mesEl.onchange = refresh;
+    refresh();
+
+    document.getElementById('valor-api-modal').style.display = 'flex';
+}
+
+function salvarValorApi() {
+    const ano     = parseInt(document.getElementById('va-ano').value);
+    const mes     = parseInt(document.getElementById('va-mes').value);
+    const usd     = parseFloat(document.getElementById('va-usd').value);
+    const cotacao = parseFloat(document.getElementById('va-cotacao').value);
+    if (!ano || !mes || isNaN(usd)) { alert('Preencha ano, mês e valor gasto.'); return; }
+    _fbSetApiCostAntigo(ano, mes, usd);
+    if (!isNaN(cotacao) && cotacao > 0) _fbSetApiCost({ dolarCotacao: cotacao });
+    fecharModalGenerico('valor-api-modal');
+}
+
+// ── Pop-ups de auditoria (mesma estética do "Tintas Compradas") ─
+function abrirAuditFaturamento() {
+    const p    = getPeriodoAtual();
+    const ano  = filtro.ano, mes = filtro.mes;
+    const meta = _metaAtivaDoTipo('faturamento');
+    const st   = meta ? _metaStatus(meta, ano, mes) : { status: 'sem-dado', pct: null, alvo: null, atual: null };
+    const atual = _valorNoMes('faturamento', ano, mes);
+    let amAnt = mes - 1, ayAnt = ano; if (amAnt < 1) { amAnt = 12; ayAnt--; }
+    const anterior = _valorNoMes('faturamento', ayAnt, amAnt);
+
+    document.getElementById('audit-fat-sub').textContent = meta
+        ? `${meta.nome} · ${MESES_PT[mes - 1]}/${ano}`
+        : `${MESES_PT[mes - 1]}/${ano} · nenhuma meta cadastrada ainda`;
+    const tagEl = document.getElementById('audit-fat-tag');
+    tagEl.textContent = st.status === 'batida' ? 'META BATIDA' : st.status === 'perto' ? 'PERTO DE BATER' : st.status === 'falta' ? 'FALTA BATER' : 'SEM DADO';
+    tagEl.className = 'audit-side-tag st-' + st.status;
+    document.getElementById('audit-fat-big').textContent = fBRL(atual);
+    document.getElementById('audit-fat-meta').textContent = st.alvo != null ? fBRL(st.alvo) : '—';
+    document.getElementById('audit-fat-pct').textContent = st.pct != null ? st.pct.toFixed(1) + '%' : '—';
+    document.getElementById('audit-fat-ant').textContent = anterior != null ? fBRL(anterior) : '—';
+    document.getElementById('audit-fat-autoinc').textContent = (meta && meta.autoIncrementoPct) ? `+${meta.autoIncrementoPct}% ao bater` : 'Não configurado';
+
+    const ef = calcEficiencia(p);
+    document.getElementById('audit-fat-ef').textContent = ef.hasData ? fNum(ef.index, 1) + ' msgs/atend.' : '—';
+    const effin = _eficienciaFinanceira(p, atual);
+    document.getElementById('audit-fat-effin').textContent = (effin != null) ? fBRL(effin) + ' /msg-atend.' : '—';
+
+    const meses = getPeriodsForMesComparacao(ano);
+    const fatSerie = meses.map(item => _valorNoMes('faturamento', ano, item.mes));
+    const validos  = fatSerie.filter(v => v != null);
+    const media    = validos.length ? validos.reduce((a, b) => a + b, 0) / validos.length : null;
+    document.getElementById('audit-fat-media').textContent = media != null ? fBRL(media) : '—';
+    const trend = _calcTrendLine(fatSerie);
+    const trendValidos = trend.filter(v => v != null);
+    document.getElementById('audit-fat-tend').textContent = (trendValidos.length >= 2)
+        ? (trendValidos[trendValidos.length - 1] >= trendValidos[0] ? '▲ Em alta' : '▼ Em queda') : '—';
+    const batidos = meta ? meses.filter(item => _metaStatus(meta, ano, item.mes).status === 'batida').length : null;
+    document.getElementById('audit-fat-batidos').textContent = (batidos != null) ? `${batidos}/${meses.length}` : '—';
+
+    _renderAuditFatChart(ano, meses, fatSerie, meta);
+    document.getElementById('audit-faturamento-modal').style.display = 'flex';
+}
+
+function _renderAuditFatChart(ano, meses, fatSerie, meta) {
+    destroyChart('auditFat');
+    const ctx = getCtx('audit-fat-chart');
+    if (!ctx) return;
+    const labels    = meses.map(item => MESES_ABR[item.mes - 1]);
+    const metaSerie = meses.map(item => meta ? _metaAlvoParaMes(meta, ano, item.mes) : null);
+    const trend = _calcTrendLine(fatSerie);
+    const avg   = _calcAvgLine(fatSerie);
+    charts['auditFat'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Faturamento', data: fatSerie,  borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.08)', fill: true,  tension: .3, spanGaps: true, pointRadius: 4 },
+                { label: 'Meta',        data: metaSerie, borderColor: '#059669', borderDash: [6, 4], borderWidth: 2,   pointRadius: 0, fill: false, spanGaps: true },
+                { label: 'Tendência',   data: trend,     borderColor: '#d97706', borderDash: [7, 4], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true },
+                { label: 'Média',       data: avg,       borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#475569', font: { size: 10 }, boxWidth: 12 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => fBRL(v) }, beginAtZero: true },
+                x: { grid: { display: false }, ticks: { color: '#475569' } }
+            }
+        }
+    });
+}
+
+function abrirAuditApiCost() {
+    const ano = filtro.ano, mes = filtro.mes;
+    const p = getPeriodoAtual();
+    const antigo = _custoApiAntigo(ano, mes);
+    const novo   = _custoApiNovoEstimado(p);
+    const modo   = financeiroData.apiCost.modoAtivo;
+    const ativo  = modo === 'novo' ? novo : antigo;
+
+    document.getElementById('audit-api-sub').textContent = `${MESES_PT[mes - 1]}/${ano} · modelo ${modo === 'novo' ? 'novo (estimado)' : 'antigo'} selecionado`;
+    document.getElementById('audit-api-tag').textContent = modo === 'novo' ? 'MODELO NOVO (ESTIMADO)' : 'MODELO ANTIGO (REAL)';
+    document.getElementById('audit-api-big').textContent = ativo != null ? fBRL(ativo) : '—';
+    document.getElementById('audit-api-antigo').textContent = antigo != null ? fBRL(antigo) : '—';
+    document.getElementById('audit-api-novo').textContent = novo != null ? fBRL(novo) : '—';
+    const dif = (antigo != null && novo != null) ? (novo - antigo) : null;
+    document.getElementById('audit-api-dif').textContent = dif != null ? (dif >= 0 ? '+' : '') + fBRL(dif) : '—';
+    document.getElementById('audit-api-preco').textContent = 'R$ ' + String(financeiroData.apiCost.precoPorMsgBRL || 0.035).replace('.', ',') + '/msg';
+    document.getElementById('audit-api-cotacao').textContent = financeiroData.apiCost.dolarCotacao ? 'R$ ' + Number(financeiroData.apiCost.dolarCotacao).toFixed(2) : '—';
+
+    const meses = getPeriodsForMesComparacao(ano);
+    const novoSerie = meses.map(item => _custoApiNovoEstimado(item.p));
+    const validos = novoSerie.filter(v => v != null);
+    const media = validos.length ? validos.reduce((a, b) => a + b, 0) / validos.length : null;
+    document.getElementById('audit-api-media').textContent = media != null ? fBRL(media) : '—';
+    const trend = _calcTrendLine(novoSerie);
+    const trendValidos = trend.filter(v => v != null);
+    document.getElementById('audit-api-tend').textContent = (trendValidos.length >= 2)
+        ? (trendValidos[trendValidos.length - 1] >= trendValidos[0] ? '▲ Em alta' : '▼ Em queda') : '—';
+
+    _renderAuditApiChart(ano, meses);
+    document.getElementById('audit-apicost-modal').style.display = 'flex';
+}
+
+function _renderAuditApiChart(ano, meses) {
+    destroyChart('auditApi');
+    const ctx = getCtx('audit-api-chart');
+    if (!ctx) return;
+    const labels      = meses.map(item => MESES_ABR[item.mes - 1]);
+    const antigoSerie = meses.map(item => _custoApiAntigo(ano, item.mes));
+    const novoSerie   = meses.map(item => _custoApiNovoEstimado(item.p));
+    const trend = _calcTrendLine(novoSerie);
+    const avg   = _calcAvgLine(novoSerie);
+    charts['auditApi'] = new Chart(ctx, {
+        data: {
+            labels,
+            datasets: [
+                { type: 'bar',  label: 'Modelo Antigo (real)',     data: antigoSerie, backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 5, order: 3 },
+                { type: 'bar',  label: 'Modelo Novo (estimado)',   data: novoSerie,   backgroundColor: 'rgba(217,119,6,0.7)', borderRadius: 5, order: 3 },
+                { type: 'line', label: 'Tendência (novo)', data: trend, borderColor: '#dc2626', borderDash: [7, 4], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 1 },
+                { type: 'line', label: 'Média (novo)',     data: avg,   borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 2 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#475569', font: { size: 10 }, boxWidth: 12 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => fBRL(v) }, beginAtZero: true },
+                x: { grid: { display: false }, ticks: { color: '#475569' } }
+            }
+        }
+    });
+}
+
+// ── Fechamento genérico de modal (usado pelos 5 pop-ups novos) ──
+function fecharModalGenerico(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+}
+function modalOverlayClickGenerico(e, id) {
+    if (e.target === document.getElementById(id)) fecharModalGenerico(id);
 }
 
 // ── Planilha base (linhas cruas) no Firebase ────────────────────
@@ -124,7 +767,6 @@ function _mesKeyFromDate(str) {
 }
 let atendentesForm   = [];
 let charts           = {};
-let mostrarComparacao = false;   // inicia fechado; abre só ao clicar
 
 // ── Seed ──────────────────────────────────────────────────────
 const SEED = [];
@@ -702,8 +1344,10 @@ function renderDashboard() {
         renderRankings(null);
         const heatEl = document.getElementById('heat-horario');
         if (heatEl) heatEl.innerHTML = '';
-        // Limpar todos os charts
-        Object.keys(charts).forEach(k => destroyChart(k));
+        // Limpar todos os charts (exceto Projeção Financeira — depende do ANO
+        // filtrado, não do período exato sem CC, então continua útil mostrar)
+        Object.keys(charts).forEach(k => { if (k !== 'faturamento' && k !== 'apicost') destroyChart(k); });
+        renderProjecaoFinanceira();
         return;
     }
 
@@ -711,6 +1355,7 @@ function renderDashboard() {
     atualizarKPIs(p);
     renderRankings(p);
     renderCharts(p);
+    renderProjecaoFinanceira();
 
     // Label comparação
     document.getElementById('comp-ano-label').textContent = filtro.ano;
@@ -951,21 +1596,6 @@ function toggleInfo(ev, btn) {
     }
 }
 
-function toggleComparacao() {
-    mostrarComparacao = !mostrarComparacao;
-    const btn  = document.getElementById('btn-comp');
-    const wrap = document.getElementById('comparacao-wrap');
-
-    btn.classList.toggle('active', mostrarComparacao);
-    wrap.style.display = mostrarComparacao ? 'block' : 'none';
-
-    if (mostrarComparacao) {
-        chartComparacao(filtro.ano);
-    } else {
-        destroyChart('comp');
-    }
-}
-
 // ============================================================
 // CHARTS
 // ============================================================
@@ -978,7 +1608,8 @@ function renderCharts(p) {
     chartCanais(p);
     chartClientes(p);
     renderAvalResumo(p);
-    if (mostrarComparacao) chartComparacao(filtro.ano);
+    // Sempre aberto — antes só renderizava com o card expandido (toggleComparacao)
+    chartComparacao(filtro.ano);
 }
 
 function chartCanais(p) {
@@ -1119,23 +1750,57 @@ function chartComparacao(ano) {
         }
     }
 
+    // Linha de tendência (regressão linear sobre os meses com dado) e linha de
+    // média (valor médio dos meses com dado) — mesmo período/eixo do gráfico.
+    const trendData = _calcTrendLine(efData);
+    const avgData   = _calcAvgLine(efData);
+
     charts['comp'] = new Chart(ctx, {
         type: 'line',
         data: {
             labels: lista.map(item => MESES_ABR[item.mes - 1]),
-            datasets: [{
-                label: 'Eficiência (msgs/atendimento)',
-                data: efData,
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37,99,235,0.08)',
-                pointBackgroundColor: pointColors,
-                pointBorderColor: pointColors,
-                pointRadius: 5,
-                pointHoverRadius: 7,
-                tension: 0.35,
-                fill: true,
-                spanGaps: true
-            }]
+            datasets: [
+                {
+                    label: 'Eficiência (msgs/atendimento)',
+                    data: efData,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37,99,235,0.08)',
+                    pointBackgroundColor: pointColors,
+                    pointBorderColor: pointColors,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    tension: 0.35,
+                    fill: true,
+                    spanGaps: true,
+                    order: 1
+                },
+                {
+                    label: 'Tendência',
+                    data: trendData,
+                    borderColor: '#d97706',
+                    borderDash: [7, 4],
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHitRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    spanGaps: true,
+                    order: 2
+                },
+                {
+                    label: 'Média',
+                    data: avgData,
+                    borderColor: '#8b5cf6',
+                    borderDash: [2, 3],
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    pointHitRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    spanGaps: true,
+                    order: 3
+                }
+            ]
         },
         options: {
             responsive: true,
@@ -1144,9 +1809,10 @@ function chartComparacao(ano) {
                 legend: { labels: { color: '#475569', font: { size: 11 } } },
                 tooltip: {
                     callbacks: {
-                        label: ctx => ctx.raw == null
-                            ? ' sem dados de mensagens'
-                            : ` ${ctx.raw} msgs por atendimento`
+                        label: ctx => {
+                            if (ctx.raw == null) return ` ${ctx.dataset.label}: sem dados`;
+                            return ` ${ctx.dataset.label}: ${ctx.raw} msgs por atendimento`;
+                        }
                     }
                 }
             },
@@ -1157,6 +1823,33 @@ function chartComparacao(ano) {
             }
         }
     });
+}
+
+// Regressão linear simples (y = a + b·x) sobre os pontos não-nulos de um array;
+// devolve um array do mesmo tamanho, com null nas posições sem dado (spanGaps
+// cuida do visual). Usada nas linhas de "Tendência" dos gráficos de linha.
+function _calcTrendLine(vals) {
+    const pts = vals.map((v, i) => v == null ? null : [i, v]).filter(Boolean);
+    if (pts.length < 2) return vals.map(() => null);
+    const n = pts.length;
+    const sumX  = pts.reduce((s, [x])    => s + x, 0);
+    const sumY  = pts.reduce((s, [, y])  => s + y, 0);
+    const sumXY = pts.reduce((s, [x, y]) => s + x * y, 0);
+    const sumX2 = pts.reduce((s, [x])    => s + x * x, 0);
+    const denom = n * sumX2 - sumX * sumX;
+    if (!denom) return vals.map(() => null);
+    const b = (n * sumXY - sumX * sumY) / denom;
+    const a = (sumY - b * sumX) / n;
+    return vals.map((v, i) => v == null ? null : +(a + b * i).toFixed(2));
+}
+
+// Linha de média — mesmo valor (a média dos pontos com dado) repetido em toda
+// a extensão do eixo X, só null onde o próprio ponto não tem dado.
+function _calcAvgLine(vals) {
+    const nums = vals.filter(v => v != null);
+    if (!nums.length) return vals.map(() => null);
+    const avg = nums.reduce((s, v) => s + v, 0) / nums.length;
+    return vals.map(v => v == null ? null : +avg.toFixed(2));
 }
 
 // Canal selecionado no card "Por Que Buscam" ('todos' | 'whatsapp' | 'instagram')
@@ -1245,25 +1938,46 @@ function chartDias(p) {
     // Cores sólidas: dia de maior fluxo em âmbar, demais em azul. Só destaca se houver dado.
     const cores  = vals.map(v => (maxV > 0 && v === maxV) ? '#d97706' : '#2563eb');
     const bordas = vals.map(v => (maxV > 0 && v === maxV) ? '#b45309' : '#1d4ed8');
+    const soma  = vals.reduce((a, b) => a + b, 0);
+    const media = soma ? soma / vals.length : 0;
 
     charts['dias'] = new Chart(ctx, {
-        type: 'bar',
         data: {
             labels: dias,
-            datasets: [{
-                label: 'Atendimentos',
-                data: vals,
-                backgroundColor: cores,
-                borderColor: bordas,
-                borderWidth: 1,
-                borderRadius: 6,
-                borderSkipped: false
-            }]
+            datasets: [
+                {
+                    type: 'bar',
+                    label: 'Atendimentos',
+                    data: vals,
+                    backgroundColor: cores,
+                    borderColor: bordas,
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    order: 2
+                },
+                {
+                    type: 'line',
+                    label: 'Média',
+                    data: dias.map(() => +media.toFixed(1)),
+                    borderColor: '#8b5cf6',
+                    borderDash: [7, 4],
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHitRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    order: 1
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: {
+                legend: { display: true, labels: { color: '#475569', font: { size: 11 }, boxWidth: 14 } },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fNum(ctx.raw, ctx.dataset.label === 'Média' ? 1 : 0)}` } }
+            },
             scales: {
                 y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b' }, beginAtZero: true },
                 x: { grid: { display: false }, ticks: { color: '#475569', font: { weight: '600' } } }
