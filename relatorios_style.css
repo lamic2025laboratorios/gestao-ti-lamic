@@ -699,14 +699,13 @@ body {
 .audit-modal-sub { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 2px; }
 .audit-modal-stripe { height: 4px; flex-shrink: 0; background: linear-gradient(90deg, #38bdf8, var(--blue-v)); }
 
-/* Altura mínima FIXA e igual pros 3 pop-ups de auditoria (Faturamento/API/
-   Atendente) — sem isso cada um ficava de um tamanho, dependendo de quanto
-   conteúdo tinha (ex.: o bloco de meta de mensagens só aparece no de API).
-   align-items:stretch (grid já faz isso por padrão, mas deixado explícito)
-   garante que o painel escuro sempre acompanha a altura da coluna principal —
-   "sincronizado" com o gráfico do lado, não sobra nem falta pedaço. */
-.audit-grid { display: grid; grid-template-columns: 270px 1fr; gap: 20px; align-items: stretch; min-height: 520px; }
-@media (max-width: 640px) { .audit-grid { grid-template-columns: 1fr; min-height: 0; } }
+/* align-items:stretch (grid já faz por padrão, deixado explícito) garante que
+   o painel escuro sempre acompanha a altura NATURAL da coluna principal —
+   "sincronizado" com o gráfico do lado, sem sobrar pedaço torto de nenhum
+   lado. Sem min-height fixo: cada pop-up fica do tamanho do próprio
+   conteúdo — um min-height grande deixava espaço vazio sobrando embaixo. */
+.audit-grid { display: grid; grid-template-columns: 270px 1fr; gap: 20px; align-items: stretch; }
+@media (max-width: 640px) { .audit-grid { grid-template-columns: 1fr; } }
 .audit-side {
     background: linear-gradient(160deg, var(--dark2), var(--primary));
     border-radius: 10px; padding: 24px 20px; color: #fff;
