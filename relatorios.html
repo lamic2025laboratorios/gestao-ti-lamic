@@ -729,9 +729,10 @@
             <div class="modal-body">
 
                 <div class="card" id="mf-lista-card">
-                    <div class="card-title">Metas cadastradas</div>
+                    <div class="card-title" id="mf-lista-titulo">Metas cadastradas</div>
                     <div id="mf-lista"></div>
-                    <button class="btn-add" onclick="novaMetaForm()">＋ Nova Meta</button>
+                    <button class="btn-add" id="mf-nova-meta-btn" onclick="novaMetaForm()">＋ Nova Meta</button>
+                    <p class="field-hint" id="mf-lista-hint" style="display:none;margin-top:8px;">As metas são cadastradas em <strong>Inserir Dados</strong> → aba <strong>Metas</strong> do card CC ou IA. Aqui é só consulta.</p>
                 </div>
 
                 <div class="card" id="mf-form-card" style="display:none;">

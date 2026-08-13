@@ -430,21 +430,26 @@ function setApiModo(modo) {
 // Aberto a partir do card "Faturamento x Meta" do dashboard — sempre o tipo
 // (CC/IA) que está sendo visto na hora. Cadastro em si fica em "Inserir
 // Dados"; aqui é basicamente "puxar" (ver/editar/excluir) as metas já feitas.
+// Aberto a partir do card "Faturamento x Meta" do dashboard — SÓ CONSULTA
+// (as metas são cadastradas exclusivamente em Inserir Dados). "puxa" as
+// metas do tipo (CC/IA) que está sendo visto agora, sem opção de criar/
+// editar/excluir por aqui.
 function abrirMetaModal() {
     financeiroData = (dashTipo === 'ia') ? financeiroData_ia : financeiroData_cc;
     _financeiroTipoAtivo = dashTipo;
-    renderListaMetas();
+    renderListaMetas(true);
     document.getElementById('mf-form-card').style.display  = 'none';
     document.getElementById('mf-lista-card').style.display = '';
     document.getElementById('meta-modal-fin').style.display = 'flex';
 }
 
 // Aberto a partir da aba "Metas" de um dos cards (CC/IA) em Inserir Dados —
-// tipo explícito, independe de qual dashboard estiver ativo.
+// aqui sim é onde se cadastra/edita/exclui, tipo explícito, independe de
+// qual dashboard estiver ativo.
 function abrirMetaModalEntrada(tipo) {
     financeiroData = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc;
     _financeiroTipoAtivo = tipo;
-    renderListaMetas();
+    renderListaMetas(false);
     document.getElementById('mf-form-card').style.display  = 'none';
     document.getElementById('mf-lista-card').style.display = '';
     document.getElementById('meta-modal-fin').style.display = 'flex';
@@ -452,20 +457,29 @@ function abrirMetaModalEntrada(tipo) {
 
 // Lista dentro do MODAL (#mf-lista) — sempre reflete o tipo ativo no momento
 // (setado por abrirMetaModal/abrirMetaModalEntrada logo antes de chamar aqui).
-function renderListaMetas() {
-    _renderMetasListInto('mf-lista', _financeiroTipoAtivo);
+// somenteLeitura: esconde "+ Nova Meta" e os botões Editar/Excluir — usado
+// quando o modal foi aberto a partir do dashboard (só consulta).
+function renderListaMetas(somenteLeitura) {
+    _renderMetasListInto('mf-lista', _financeiroTipoAtivo, !!somenteLeitura);
+    const novaBtn = document.getElementById('mf-nova-meta-btn');
+    const hint    = document.getElementById('mf-lista-hint');
+    const titulo  = document.getElementById('mf-lista-titulo');
+    if (novaBtn) novaBtn.style.display = somenteLeitura ? 'none' : '';
+    if (hint)    hint.style.display    = somenteLeitura ? '' : 'none';
+    if (titulo)  titulo.textContent    = `Metas cadastradas — ${(_financeiroTipoAtivo || 'cc').toUpperCase()}`;
 }
 
 // Painel INLINE de Metas dentro de cada card de Inserir Dados — só troca o
 // ponteiro global pelo tempo da própria renderização (síncrona) e devolve
 // como estava, pra não bagunçar o que o dashboard ou o modal estejam usando.
+// Aqui sempre com CRUD completo (é o lugar de cadastro).
 function renderMetasEntradaTab(tipo) {
     const container = document.getElementById('metas-lista-' + tipo);
     if (!container) return;
     const prevData = financeiroData, prevTipo = _financeiroTipoAtivo;
     financeiroData = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc;
     _financeiroTipoAtivo = tipo;
-    _renderMetasListInto('metas-lista-' + tipo, tipo);
+    _renderMetasListInto('metas-lista-' + tipo, tipo, false);
     financeiroData = prevData;
     _financeiroTipoAtivo = prevTipo;
 }
@@ -474,7 +488,7 @@ function renderMetasEntradaTab(tipo) {
 // por quem chamou) dentro de containerId; os botões Editar/Excluir carregam
 // o tipo explícito, pra funcionar mesmo clicados fora de uma sessão já aberta
 // (ex.: direto do painel inline, sem passar por abrirMetaModal*).
-function _renderMetasListInto(containerId, tipo) {
+function _renderMetasListInto(containerId, tipo, somenteLeitura) {
     const el = document.getElementById(containerId);
     if (!el) return;
     const metas = Object.values(financeiroData.metas || {}).sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
@@ -487,16 +501,18 @@ function _renderMetasListInto(containerId, tipo) {
         const pctTxt = st.pct != null ? st.pct.toFixed(0) + '%' : '—';
         const sinal = m.direcao === 'diminuir' ? '-' : '+';
         const alvoTxt = m.modoAlvo === 'percentual' ? `${sinal}${m.valorAlvo}%` : (m.tipo === 'exames' || m.tipo === 'mensagens' ? fNum(m.valorAlvo) : fBRL(m.valorAlvo));
+        const acoes = somenteLeitura ? '' : `
+            <div class="meta-list-actions">
+                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;" onclick="editarMeta('${m.id}','${tipo}')">Editar</button>
+                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;color:#dc2626;" onclick="excluirMeta('${m.id}','${tipo}')">Excluir</button>
+            </div>`;
         return `<div class="meta-list-item">
             <div class="meta-list-info">
                 <strong>${escHtml(m.nome)}</strong>
                 <span>${escHtml(_labelTipoMeta(m.tipo))} · ${m.periodicidade === 'anual' ? 'Anual' : 'Mensal'} · alvo ${alvoTxt}${m.autoIncrementoPct ? ' · auto +' + m.autoIncrementoPct + '%' : ''}</span>
             </div>
             <span class="proj-fin-status st-${st.status === 'sem-dado' ? 'semdado' : st.status}" style="margin:0;">${pctTxt}</span>
-            <div class="meta-list-actions">
-                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;" onclick="editarMeta('${m.id}','${tipo}')">Editar</button>
-                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;color:#dc2626;" onclick="excluirMeta('${m.id}','${tipo}')">Excluir</button>
-            </div>
+            ${acoes}
         </div>`;
     }).join('');
 }
