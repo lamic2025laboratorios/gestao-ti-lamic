@@ -828,12 +828,39 @@ function _renderAuditFatChart(ano, meses, fatSerie, meta) {
     });
 }
 
+// Mês/ano que o pop-up de Custo API está exibindo — navegável com as setas
+// do próprio cabeçalho, independente do filtro geral do dashboard.
+let _auditApiAno = null, _auditApiMes = null;
+
+// Período de um mês específico (independe do filtro geral aplicado) — mesma
+// busca que getPeriodsForMesComparacao já faz mês a mês.
+function _periodoDoMes(ano, mes) {
+    return periodos.find(p => p.tipo === 'mes' && p.ano === ano && p.mes === mes) || null;
+}
+
 function abrirAuditApiCost() {
-    const ano = filtro.ano, mes = filtro.mes;
-    const p = getPeriodoAtual();
+    _auditApiAno = filtro.ano || new Date().getFullYear();
+    _auditApiMes = filtro.mes || (new Date().getMonth() + 1);
+    _renderAuditApiPopup();
+    document.getElementById('audit-apicost-modal').style.display = 'flex';
+}
+
+// Setas do cabeçalho do pop-up — troca o mês exibido sem mexer no filtro
+// geral do dashboard, com virada de ano nas pontas (jan ↔ dez).
+function auditApiMudarMes(delta) {
+    _auditApiMes += delta;
+    if (_auditApiMes < 1)  { _auditApiMes = 12; _auditApiAno--; }
+    if (_auditApiMes > 12) { _auditApiMes = 1;  _auditApiAno++; }
+    _renderAuditApiPopup();
+}
+
+function _renderAuditApiPopup() {
+    const ano = _auditApiAno, mes = _auditApiMes;
+    const p = _periodoDoMes(ano, mes);
     const antigo = _custoApiAntigo(ano, mes);
     const novo   = _custoApiNovoEstimado(p);
 
+    document.getElementById('audit-api-mes-lbl').textContent = `${MESES_ABR[mes - 1]}/${ano}`;
     _atualizarAuditApiCabecalho();
     document.getElementById('audit-api-antigo').textContent = antigo != null ? fBRL(antigo) : '—';
     document.getElementById('audit-api-novo').textContent = novo != null ? fBRL(novo) : '—';
@@ -853,15 +880,14 @@ function abrirAuditApiCost() {
 
     _renderAuditApiGoalBox(ano, mes);
     _renderAuditApiChart(ano, meses);
-    document.getElementById('audit-apicost-modal').style.display = 'flex';
 }
 
 // Só a etiqueta/valor "ativo" (e o estado dos botões novo/antigo de dentro do
 // próprio pop-up) — separado pra poder ser chamado de novo ao trocar de
 // modelo pelo toggle sem re-renderizar o gráfico inteiro.
 function _atualizarAuditApiCabecalho() {
-    const ano = filtro.ano, mes = filtro.mes;
-    const p = getPeriodoAtual();
+    const ano = _auditApiAno, mes = _auditApiMes;
+    const p = _periodoDoMes(ano, mes);
     const antigo = _custoApiAntigo(ano, mes);
     const novo   = _custoApiNovoEstimado(p);
     const modo   = financeiroData.apiCost.modoAtivo;

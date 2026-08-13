@@ -265,7 +265,7 @@
                                 </div>
                                 <div class="api-modo-switch" onclick="event.stopPropagation()">
                                     <button class="api-modo-btn active" id="api-modo-antigo" onclick="setApiModo('antigo')">Cobrança Antiga</button>
-                                    <button class="api-modo-btn" id="api-modo-novo" onclick="setApiModo('novo')">Cobrança Nova (out/2026)</button>
+                                    <button class="api-modo-btn" id="api-modo-novo" onclick="setApiModo('novo')">Cobrança Nova</button>
                                 </div>
                                 <div class="chart-body" style="height:240px;">
                                     <canvas id="chart-apicost"></canvas>
@@ -1015,6 +1015,11 @@
                         <div class="audit-modal-sub" id="audit-api-sub">—</div>
                     </div>
                 </div>
+                <div class="canal-switch" onclick="event.stopPropagation()">
+                    <button class="canal-arrow" onclick="auditApiMudarMes(-1)" title="Mês anterior">‹</button>
+                    <span class="canal-switch-lbl" id="audit-api-mes-lbl">—</span>
+                    <button class="canal-arrow" onclick="auditApiMudarMes(1)" title="Próximo mês">›</button>
+                </div>
                 <button class="modal-close-btn" onclick="fecharModalGenerico('audit-apicost-modal')">✕</button>
             </div>
             <div class="audit-modal-stripe"></div>
@@ -1034,15 +1039,14 @@
                         <div class="audit-side-row"><span>Cotação US$</span><strong id="audit-api-cotacao">—</strong></div>
                     </div>
                     <div class="audit-main">
-                        <div class="audit-stats-grid">
+                        <div class="audit-stats-grid" style="grid-template-columns:repeat(2,1fr);">
                             <div class="audit-stat"><span>Média (modelo novo)</span><strong id="audit-api-media">—</strong></div>
                             <div class="audit-stat"><span>Média (modelo antigo)</span><strong id="audit-api-media-antigo">—</strong></div>
-                            <div class="audit-stat"><span>Vigência</span><strong>a partir de 01/10/2026</strong></div>
                         </div>
 
                         <div class="api-modo-switch" style="margin-bottom:12px;">
                             <button class="api-modo-btn" id="audit-api-modo-antigo" onclick="setApiModo('antigo')">Cobrança Antiga</button>
-                            <button class="api-modo-btn" id="audit-api-modo-novo" onclick="setApiModo('novo')">Cobrança Nova (out/2026)</button>
+                            <button class="api-modo-btn" id="audit-api-modo-novo" onclick="setApiModo('novo')">Cobrança Nova</button>
                         </div>
 
                         <!-- Aba/bloco separado: meta de reduzir o volume de mensagens trocadas
