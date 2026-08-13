@@ -889,6 +889,9 @@ function _renderAuditFatChart(ano, meses, fatSerie, meta) {
 // Mês/ano que o pop-up de Custo API está exibindo — navegável com as setas
 // do próprio cabeçalho, independente do filtro geral do dashboard.
 let _auditApiAno = null, _auditApiMes = null;
+// Visão do gráfico: 'total' (todos os meses com dado, qualquer ano) · 'anual'
+// (os 12 meses de _auditApiAno) · 'mensal' (só o mês escolhido nas setas).
+let _auditApiVisao = 'anual';
 
 // Período de um mês específico (independe do filtro geral aplicado) — mesma
 // busca que getPeriodsForMesComparacao já faz mês a mês.
@@ -912,6 +915,32 @@ function auditApiMudarMes(delta) {
     _renderAuditApiPopup();
 }
 
+// Troca Total / Anual / Mensal — só muda o recorte do gráfico (e das médias,
+// que acompanham o mesmo recorte); o mês de referência do painel lateral e
+// da caixa de meta continua sendo o das setas, sempre.
+function setAuditApiVisao(v) {
+    _auditApiVisao = v;
+    ['total', 'anual', 'mensal'].forEach(k => {
+        const b = document.getElementById('audit-api-visao-' + k);
+        if (b) b.classList.toggle('active', k === v);
+    });
+    _renderAuditApiPopup();
+}
+
+// Lista de meses ({ano, mes, p}) que o gráfico vai plotar, de acordo com a
+// visão escolhida.
+function _listaMesesParaVisao() {
+    if (_auditApiVisao === 'total') {
+        return periodos.filter(p => p.tipo === 'mes')
+            .sort((a, b) => (a.ano - b.ano) || (a.mes - b.mes))
+            .map(p => ({ ano: p.ano, mes: p.mes, p }));
+    }
+    if (_auditApiVisao === 'mensal') {
+        return [{ ano: _auditApiAno, mes: _auditApiMes, p: _periodoDoMes(_auditApiAno, _auditApiMes) }];
+    }
+    return getPeriodsForMesComparacao(_auditApiAno).map(item => ({ ano: _auditApiAno, mes: item.mes, p: item.p }));
+}
+
 function _renderAuditApiPopup() {
     const ano = _auditApiAno, mes = _auditApiMes;
     const p = _periodoDoMes(ano, mes);
@@ -928,16 +957,16 @@ function _renderAuditApiPopup() {
     document.getElementById('audit-api-pct').textContent = (financeiroData.apiCost.pctEmpresa != null ? financeiroData.apiCost.pctEmpresa : 50) + '%';
     document.getElementById('audit-api-cotacao').textContent = financeiroData.apiCost.dolarCotacao ? 'R$ ' + Number(financeiroData.apiCost.dolarCotacao).toFixed(2) : '—';
 
-    const meses = getPeriodsForMesComparacao(ano);
-    const antigoSerie = meses.map(item => _custoApiAntigo(ano, item.mes));
-    const novoSerie   = meses.map(item => _custoApiNovoEstimado(item.p));
+    const lista = _listaMesesParaVisao();
+    const antigoSerie = lista.map(item => _custoApiAntigo(item.ano, item.mes));
+    const novoSerie   = lista.map(item => _custoApiNovoEstimado(item.p));
     const mediaDe = serie => { const v = serie.filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
     const mediaNovo = mediaDe(novoSerie), mediaAntigo = mediaDe(antigoSerie);
     document.getElementById('audit-api-media').textContent = mediaNovo != null ? fBRL(mediaNovo) : '—';
     document.getElementById('audit-api-media-antigo').textContent = mediaAntigo != null ? fBRL(mediaAntigo) : '—';
 
     _renderAuditApiGoalBox(ano, mes);
-    _renderAuditApiChart(ano, meses);
+    _renderAuditApiChart(lista);
 }
 
 // Só a etiqueta/valor "ativo" (e o estado dos botões novo/antigo de dentro do
@@ -982,13 +1011,16 @@ function _renderAuditApiGoalBox(ano, mes) {
     document.getElementById('audit-api-goal-bar').style.width = pctClamp + '%';
 }
 
-function _renderAuditApiChart(ano, meses) {
+function _renderAuditApiChart(lista) {
     destroyChart('auditApi');
     const ctx = getCtx('audit-api-chart');
     if (!ctx) return;
-    const labels      = meses.map(item => MESES_ABR[item.mes - 1]);
-    const antigoSerie = meses.map(item => _custoApiAntigo(ano, item.mes));
-    const novoSerie   = meses.map(item => _custoApiNovoEstimado(item.p));
+    // Na visão "total" (todos os meses, qualquer ano) o rótulo leva o ano
+    // junto pra não confundir mês repetido de anos diferentes.
+    const multiAno    = _auditApiVisao === 'total';
+    const labels      = lista.map(item => multiAno ? `${MESES_ABR[item.mes - 1]}/${String(item.ano).slice(2)}` : MESES_ABR[item.mes - 1]);
+    const antigoSerie = lista.map(item => _custoApiAntigo(item.ano, item.mes));
+    const novoSerie   = lista.map(item => _custoApiNovoEstimado(item.p));
     const avgAntigo = _calcAvgLine(antigoSerie);
     const avgNovo   = _calcAvgLine(novoSerie);
 
@@ -996,7 +1028,7 @@ function _renderAuditApiChart(ano, meses) {
     // parte porque é contada em mensagens, não em R$. Cor vem do cadastro
     // da própria meta (Inserir Dados → Metas).
     const metaMsg   = _metaDoSlot('apicost', 'mensagens');
-    const metaSerie = metaMsg ? meses.map(item => _metaAlvoParaMes(metaMsg, ano, item.mes)) : null;
+    const metaSerie = metaMsg ? lista.map(item => _metaAlvoParaMes(metaMsg, item.ano, item.mes)) : null;
     const metaCor   = metaMsg ? (metaMsg.cor || _corPadraoTipoMeta('mensagens')) : null;
 
     const datasets = [

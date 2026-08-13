@@ -1043,15 +1043,20 @@
                         </div>
 
                         <div class="api-modo-row">
-                            <div class="api-modo-switch">
-                                <button class="api-modo-btn" id="audit-api-modo-antigo" onclick="setApiModo('antigo')">Cobrança Antiga</button>
-                                <button class="api-modo-btn" id="audit-api-modo-novo" onclick="setApiModo('novo')">Cobrança Nova</button>
+                            <div class="api-modo-switch" title="Recorte do gráfico abaixo">
+                                <button class="api-modo-btn" id="audit-api-visao-total" onclick="setAuditApiVisao('total')">Total</button>
+                                <button class="api-modo-btn active" id="audit-api-visao-anual" onclick="setAuditApiVisao('anual')">Anual</button>
+                                <button class="api-modo-btn" id="audit-api-visao-mensal" onclick="setAuditApiVisao('mensal')">Mensal</button>
                             </div>
-                            <div class="canal-switch">
+                            <div class="canal-switch" title="Mês de referência do painel ao lado (e do gráfico, na visão Mensal)">
                                 <button class="canal-arrow" onclick="auditApiMudarMes(-1)" title="Mês anterior">‹</button>
                                 <span class="canal-switch-lbl" id="audit-api-mes-lbl">—</span>
                                 <button class="canal-arrow" onclick="auditApiMudarMes(1)" title="Próximo mês">›</button>
                             </div>
+                        </div>
+                        <div class="api-modo-switch">
+                            <button class="api-modo-btn" id="audit-api-modo-antigo" onclick="setApiModo('antigo')">Cobrança Antiga</button>
+                            <button class="api-modo-btn" id="audit-api-modo-novo" onclick="setApiModo('novo')">Cobrança Nova</button>
                         </div>
 
                         <!-- Aba/bloco separado: meta de reduzir o volume de mensagens trocadas
