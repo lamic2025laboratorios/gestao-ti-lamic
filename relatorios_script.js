@@ -57,42 +57,79 @@ function _fbListen(tipo) {
 function _fbInitListeners() {
     _fbListen('cc');
     _fbListen('ia');
-    _fbListenFinanceiro();
+    _migrarFinanceiroAntigo();
+    _fbListenFinanceiro('cc');
+    _fbListenFinanceiro('ia');
+}
+
+// Migração única: a Projeção Financeira nasceu com 1 nó só (relatorios_lamic/
+// financeiro) antes de virar CC/IA separados. Se ainda tiver algo salvo lá
+// (ex.: a cotação/modo da API que já foi configurado) e financeiro_cc ainda
+// não existir, copia pra financeiro_cc — não sobrescreve nada, não apaga o
+// nó antigo, só evita perder o que já tinha sido configurado.
+function _migrarFinanceiroAntigo() {
+    if (!window._db || !window._ref || !window._get || !window._set) return;
+    const rOld = window._ref(window._db, FB_PATH + '/financeiro');
+    window._get(rOld).then(snapOld => {
+        const old = snapOld.val();
+        if (!old) return;
+        const rNewCC = window._ref(window._db, FB_PATH + '/financeiro_cc');
+        window._get(rNewCC).then(snapNew => {
+            if (snapNew.val()) return;   // financeiro_cc já tem dado — não mexe
+            window._set(rNewCC, old).catch(e => console.warn('[Firebase] Erro ao migrar financeiro antigo:', e));
+        }).catch(() => {});
+    }).catch(() => {});
 }
 
 // ============================================================
 // PROJEÇÃO FINANCEIRA — Faturamento x Meta + Projeção de Custo API
 // ============================================================
-// Dados independentes de CC/IA, guardados em relatorios_lamic/financeiro:
+// Dados SEPARADOS por CC/IA (mesmo padrão de periodos_cc/periodos_ia),
+// guardados em relatorios_lamic/financeiro_cc e /financeiro_ia:
 //   valores: { <tipo>: { 'AAAA-MM': número } }   — faturamento, exames, ou
 //            qualquer tipo personalizado criado junto de uma meta.
 //   metas:   { <id>: {...} }                     — ver novaMetaForm()/salvarMetaFin().
 //   apiCost: { modoAtivo, dolarCotacao, precoPorMsgBRL, antigo: {'AAAA-MM': US$} }
-let financeiroData = {
-    valores: {},
-    metas: {},
-    apiCost: { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, pctEmpresa: 50, antigo: {} }
-};
+// financeiroData é um PONTEIRO pro objeto do tipo ativo (troca junto do
+// dashTipo, igual "periodos"); _financeiroTipoAtivo diz pra qual dos dois nós
+// do Firebase as próximas escritas (_fbSet*) vão — normalmente igual a
+// dashTipo, mas o painel de Metas em "Inserir Dados" pode apontar pro outro
+// tipo mesmo com o dashboard mostrando o outro (os dois cards CC/IA de lá
+// ficam visíveis ao mesmo tempo, sem depender de qual dashboard está aberto).
+function _novoFinanceiroVazio() {
+    return { valores: {}, metas: {}, apiCost: { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, pctEmpresa: 50, antigo: {} } };
+}
+let financeiroData_cc  = _novoFinanceiroVazio();
+let financeiroData_ia  = _novoFinanceiroVazio();
+let financeiroData     = financeiroData_cc;   // ponteiro pro tipo ativo do dashboard
+let _financeiroTipoAtivo = 'cc';              // pra onde os _fbSet* miram agora
 
-function _fbListenFinanceiro() {
+function _fbListenFinanceiro(tipo) {
     if (!window._db || !window._ref || !window._onValue) return;
-    const r = window._ref(window._db, FB_PATH + '/financeiro');
+    const r = window._ref(window._db, FB_PATH + '/financeiro_' + tipo);
     window._onValue(r, snap => {
         const val = snap.val() || {};
-        financeiroData.valores = val.valores || {};
-        financeiroData.metas   = val.metas   || {};
-        financeiroData.apiCost = Object.assign(
+        const alvo = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+        alvo.valores = val.valores || {};
+        alvo.metas   = val.metas   || {};
+        alvo.apiCost = Object.assign(
             { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, pctEmpresa: 50, antigo: {} },
             val.apiCost || {}
         );
-        const btnAntigo = document.getElementById('api-modo-antigo');
-        const btnNovo   = document.getElementById('api-modo-novo');
-        if (btnAntigo && btnNovo) {
-            btnAntigo.classList.toggle('active', financeiroData.apiCost.modoAtivo !== 'novo');
-            btnNovo.classList.toggle('active', financeiroData.apiCost.modoAtivo === 'novo');
+        // Só reflete nos botões/telas se o tipo que chegou é o que está sendo visto agora
+        if (dashTipo === tipo) {
+            const btnAntigo = document.getElementById('api-modo-antigo');
+            const btnNovo   = document.getElementById('api-modo-novo');
+            if (btnAntigo && btnNovo) {
+                btnAntigo.classList.toggle('active', alvo.apiCost.modoAtivo !== 'novo');
+                btnNovo.classList.toggle('active', alvo.apiCost.modoAtivo === 'novo');
+            }
+            const dashSec = document.getElementById('dashboard');
+            if (dashSec && dashSec.classList.contains('active')) renderProjecaoFinanceira();
         }
-        const dashSec = document.getElementById('dashboard');
-        if (dashSec && dashSec.classList.contains('active')) renderProjecaoFinanceira();
+        // Painel de Metas em "Inserir Dados" (os 2 cards ficam visíveis sempre,
+        // independente do dashboard ativo) — atualiza o painel desse tipo se existir.
+        if (typeof renderMetasEntradaTab === 'function') renderMetasEntradaTab(tipo);
     });
 }
 
@@ -102,8 +139,11 @@ function _valorNoMes(tipo, ano, mes) {
     // "mensagens" não é lançado manualmente aqui — vem direto do período
     // (mesmo campo "Total de Mensagens" já preenchido no CC/IA) - meta de
     // reduzir volume trocado usa o dado que já existe, sem duplicar entrada.
+    // Lê do array do tipo FINANCEIRO ativo no momento (não necessariamente o
+    // dashTipo do dashboard — pode ser o tipo aberto no painel de Metas).
     if (tipo === 'mensagens') {
-        const p = periodos.find(pp => pp.tipo === 'mes' && pp.ano === ano && pp.mes === mes);
+        const src = (_financeiroTipoAtivo === 'ia') ? periodos_ia : periodos_cc;
+        const p = src.find(pp => pp.tipo === 'mes' && pp.ano === ano && pp.mes === mes);
         return (p && p.mensagens) ? parseFloat(p.mensagens) : null;
     }
     const v = (financeiroData.valores[tipo] || {})[_anoMesKey(ano, mes)];
@@ -112,32 +152,32 @@ function _valorNoMes(tipo, ano, mes) {
 
 function _fbSetValor(tipo, ano, mes, valor) {
     if (!window._db || !window._ref || !window._set) return;
-    window._set(window._ref(window._db, `${FB_PATH}/financeiro/valores/${tipo}/${_anoMesKey(ano, mes)}`), valor)
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/valores/${tipo}/${_anoMesKey(ano, mes)}`), valor)
         .catch(e => console.warn('[Firebase] Erro ao salvar valor:', e));
 }
 
 function _fbSetMeta(meta) {
     if (!window._db || !window._ref || !window._set) return;
-    window._set(window._ref(window._db, `${FB_PATH}/financeiro/metas/${meta.id}`), meta)
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/metas/${meta.id}`), meta)
         .catch(e => console.warn('[Firebase] Erro ao salvar meta:', e));
 }
 
 function _fbRemoveMeta(id) {
     if (!window._db || !window._ref || !window._remove) return;
-    window._remove(window._ref(window._db, `${FB_PATH}/financeiro/metas/${id}`))
+    window._remove(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/metas/${id}`))
         .catch(e => console.warn('[Firebase] Erro ao remover meta:', e));
 }
 
 function _fbSetApiCost(partial) {
     if (!window._db || !window._ref || !window._set) return;
     Object.assign(financeiroData.apiCost, partial);
-    window._set(window._ref(window._db, `${FB_PATH}/financeiro/apiCost`), financeiroData.apiCost)
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/apiCost`), financeiroData.apiCost)
         .catch(e => console.warn('[Firebase] Erro ao salvar apiCost:', e));
 }
 
 function _fbSetApiCostAntigo(ano, mes, valorUSD) {
     if (!window._db || !window._ref || !window._set) return;
-    window._set(window._ref(window._db, `${FB_PATH}/financeiro/apiCost/antigo/${_anoMesKey(ano, mes)}`), valorUSD)
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/apiCost/antigo/${_anoMesKey(ano, mes)}`), valorUSD)
         .catch(e => console.warn('[Firebase] Erro ao salvar gasto API:', e));
 }
 
@@ -280,6 +320,11 @@ function _custoApiNovoEstimado(p) {
 
 // ── Render: os 2 cards da Projeção Financeira ───────────────────
 function renderProjecaoFinanceira() {
+    // Ressincroniza defensivamente com o dashTipo atual — o painel de Metas em
+    // "Inserir Dados" pode ter apontado financeiroData pro OUTRO tipo por
+    // último; o dashboard sempre precisa refletir o tipo que está na tela.
+    financeiroData = (dashTipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+    _financeiroTipoAtivo = dashTipo;
     chartFaturamento();
     chartApiCost();
 }
@@ -382,15 +427,55 @@ function setApiModo(modo) {
 }
 
 // ── Modal: Metas (lista + formulário de nova/editar) ────────────
+// Aberto a partir do card "Faturamento x Meta" do dashboard — sempre o tipo
+// (CC/IA) que está sendo visto na hora. Cadastro em si fica em "Inserir
+// Dados"; aqui é basicamente "puxar" (ver/editar/excluir) as metas já feitas.
 function abrirMetaModal() {
+    financeiroData = (dashTipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+    _financeiroTipoAtivo = dashTipo;
     renderListaMetas();
     document.getElementById('mf-form-card').style.display  = 'none';
     document.getElementById('mf-lista-card').style.display = '';
     document.getElementById('meta-modal-fin').style.display = 'flex';
 }
 
+// Aberto a partir da aba "Metas" de um dos cards (CC/IA) em Inserir Dados —
+// tipo explícito, independe de qual dashboard estiver ativo.
+function abrirMetaModalEntrada(tipo) {
+    financeiroData = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+    _financeiroTipoAtivo = tipo;
+    renderListaMetas();
+    document.getElementById('mf-form-card').style.display  = 'none';
+    document.getElementById('mf-lista-card').style.display = '';
+    document.getElementById('meta-modal-fin').style.display = 'flex';
+}
+
+// Lista dentro do MODAL (#mf-lista) — sempre reflete o tipo ativo no momento
+// (setado por abrirMetaModal/abrirMetaModalEntrada logo antes de chamar aqui).
 function renderListaMetas() {
-    const el = document.getElementById('mf-lista');
+    _renderMetasListInto('mf-lista', _financeiroTipoAtivo);
+}
+
+// Painel INLINE de Metas dentro de cada card de Inserir Dados — só troca o
+// ponteiro global pelo tempo da própria renderização (síncrona) e devolve
+// como estava, pra não bagunçar o que o dashboard ou o modal estejam usando.
+function renderMetasEntradaTab(tipo) {
+    const container = document.getElementById('metas-lista-' + tipo);
+    if (!container) return;
+    const prevData = financeiroData, prevTipo = _financeiroTipoAtivo;
+    financeiroData = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+    _financeiroTipoAtivo = tipo;
+    _renderMetasListInto('metas-lista-' + tipo, tipo);
+    financeiroData = prevData;
+    _financeiroTipoAtivo = prevTipo;
+}
+
+// Renderiza a lista de metas de financeiroData (já apontado pro tipo certo
+// por quem chamou) dentro de containerId; os botões Editar/Excluir carregam
+// o tipo explícito, pra funcionar mesmo clicados fora de uma sessão já aberta
+// (ex.: direto do painel inline, sem passar por abrirMetaModal*).
+function _renderMetasListInto(containerId, tipo) {
+    const el = document.getElementById(containerId);
     if (!el) return;
     const metas = Object.values(financeiroData.metas || {}).sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
     if (!metas.length) {
@@ -400,7 +485,8 @@ function renderListaMetas() {
     el.innerHTML = metas.map(m => {
         const st = _metaStatus(m, filtro.ano, filtro.mes);
         const pctTxt = st.pct != null ? st.pct.toFixed(0) + '%' : '—';
-        const alvoTxt = m.modoAlvo === 'percentual' ? `+${m.valorAlvo}%` : (m.tipo === 'exames' ? fNum(m.valorAlvo) : fBRL(m.valorAlvo));
+        const sinal = m.direcao === 'diminuir' ? '-' : '+';
+        const alvoTxt = m.modoAlvo === 'percentual' ? `${sinal}${m.valorAlvo}%` : (m.tipo === 'exames' || m.tipo === 'mensagens' ? fNum(m.valorAlvo) : fBRL(m.valorAlvo));
         return `<div class="meta-list-item">
             <div class="meta-list-info">
                 <strong>${escHtml(m.nome)}</strong>
@@ -408,11 +494,20 @@ function renderListaMetas() {
             </div>
             <span class="proj-fin-status st-${st.status === 'sem-dado' ? 'semdado' : st.status}" style="margin:0;">${pctTxt}</span>
             <div class="meta-list-actions">
-                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;" onclick="editarMeta('${m.id}')">Editar</button>
-                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;color:#dc2626;" onclick="excluirMeta('${m.id}')">Excluir</button>
+                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;" onclick="editarMeta('${m.id}','${tipo}')">Editar</button>
+                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;color:#dc2626;" onclick="excluirMeta('${m.id}','${tipo}')">Excluir</button>
             </div>
         </div>`;
     }).join('');
+}
+
+// Toggle Dados/Metas de um card (CC ou IA) em Inserir Dados.
+function setEntradaView(tipo, view) {
+    document.getElementById('ev-' + tipo + '-dados').classList.toggle('active', view === 'dados');
+    document.getElementById('ev-' + tipo + '-metas').classList.toggle('active', view === 'metas');
+    document.getElementById('entrada-dados-' + tipo).style.display = view === 'dados' ? '' : 'none';
+    document.getElementById('entrada-metas-' + tipo).style.display = view === 'metas' ? '' : 'none';
+    if (view === 'metas') renderMetasEntradaTab(tipo);
 }
 
 function novaMetaForm() {
@@ -440,7 +535,12 @@ function cancelarMetaForm() {
     renderListaMetas();
 }
 
-function editarMeta(id) {
+// tipo é opcional: só é preciso quando chamado FORA de uma sessão de modal já
+// aberta (ex.: direto do painel inline de Metas em Inserir Dados) — garante
+// que financeiroData aponta pro tipo certo antes de ler a meta, e abre o
+// modal (que nesse caso ainda está fechado).
+function editarMeta(id, tipo) {
+    if (tipo) { financeiroData = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc; _financeiroTipoAtivo = tipo; }
     const m = financeiroData.metas[id]; if (!m) return;
     const tipoConhecido = (m.tipo === 'faturamento' || m.tipo === 'exames' || m.tipo === 'mensagens');
     document.getElementById('mf-form-titulo').textContent = 'Editar Meta';
@@ -459,12 +559,14 @@ function editarMeta(id) {
     onMetaModoChange();
     document.getElementById('mf-lista-card').style.display = 'none';
     document.getElementById('mf-form-card').style.display  = '';
+    document.getElementById('meta-modal-fin').style.display = 'flex';
 }
 
-function excluirMeta(id) {
+function excluirMeta(id, tipo) {
+    if (tipo) { financeiroData = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc; _financeiroTipoAtivo = tipo; }
     if (!confirm('Excluir esta meta? Essa ação não pode ser desfeita.')) return;
     _fbRemoveMeta(id);
-    setTimeout(renderListaMetas, 200);
+    setTimeout(() => { renderListaMetas(); if (tipo) renderMetasEntradaTab(tipo); }, 200);
 }
 
 function onMetaTipoChange() {

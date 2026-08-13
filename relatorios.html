@@ -357,7 +357,11 @@
                                 <input type="file" id="import-xlsx-cc" accept=".xlsx,.xls" style="display:none;" onchange="importarXLSXTipo(event,'cc')">
                             </div>
                         </div>
-                        <div class="spreadsheet-wrap">
+                        <div class="entrada-view-switch">
+                            <button class="entrada-view-btn active" id="ev-cc-dados" onclick="setEntradaView('cc','dados')">Dados</button>
+                            <button class="entrada-view-btn" id="ev-cc-metas" onclick="setEntradaView('cc','metas')">Metas</button>
+                        </div>
+                        <div class="spreadsheet-wrap" id="entrada-dados-cc">
                             <table class="spreadsheet" id="tabela-cc">
                                 <thead><tr>
                                     <th>Nome</th><th>Tipo</th><th>Período</th><th>Atend.</th>
@@ -372,6 +376,13 @@
                                     </div></td></tr>
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="metas-entrada-panel" id="entrada-metas-cc" style="display:none;">
+                            <div class="metas-entrada-toolbar">
+                                <span class="card-title" style="margin:0;">Metas cadastradas — CC</span>
+                                <button class="btn-add" onclick="abrirMetaModalEntrada('cc')">＋ Nova Meta</button>
+                            </div>
+                            <div id="metas-lista-cc"></div>
                         </div>
                     </div><!-- /card CC -->
 
@@ -389,7 +400,11 @@
                                 <input type="file" id="import-xlsx-ia" accept=".xlsx,.xls" style="display:none;" onchange="importarXLSXTipo(event,'ia')">
                             </div>
                         </div>
-                        <div class="spreadsheet-wrap">
+                        <div class="entrada-view-switch">
+                            <button class="entrada-view-btn active" id="ev-ia-dados" onclick="setEntradaView('ia','dados')">Dados</button>
+                            <button class="entrada-view-btn" id="ev-ia-metas" onclick="setEntradaView('ia','metas')">Metas</button>
+                        </div>
+                        <div class="spreadsheet-wrap" id="entrada-dados-ia">
                             <table class="spreadsheet" id="tabela-ia">
                                 <thead><tr>
                                     <th>Nome</th><th>Tipo</th><th>Período</th><th>Atend.</th>
@@ -404,6 +419,13 @@
                                     </div></td></tr>
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="metas-entrada-panel" id="entrada-metas-ia" style="display:none;">
+                            <div class="metas-entrada-toolbar">
+                                <span class="card-title" style="margin:0;">Metas cadastradas — IA</span>
+                                <button class="btn-add" onclick="abrirMetaModalEntrada('ia')">＋ Nova Meta</button>
+                            </div>
+                            <div id="metas-lista-ia"></div>
                         </div>
                     </div><!-- /card IA -->
 
@@ -846,52 +868,56 @@
          MODAL — Lançar Gasto com API (modelo antigo — US$)
     ======================================================= -->
     <div class="modal-overlay" id="valor-api-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'valor-api-modal')">
-        <div class="modal-panel" style="max-width:420px" onclick="event.stopPropagation()">
+        <div class="modal-panel" style="max-width:760px" onclick="event.stopPropagation()">
             <div class="modal-header">
                 <span class="modal-header-title">Gasto com API (modelo antigo)</span>
                 <button class="modal-close-btn" onclick="fecharModalGenerico('valor-api-modal')">✕</button>
             </div>
             <div class="modal-body">
-                <div class="card">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="va-ano">Ano</label>
-                            <input type="number" id="va-ano" min="2020" max="2099">
-                        </div>
-                        <div class="form-group">
-                            <label for="va-mes">Mês</label>
-                            <select id="va-mes">
-                                <option value="1">Janeiro</option><option value="2">Fevereiro</option>
-                                <option value="3">Março</option><option value="4">Abril</option>
-                                <option value="5">Maio</option><option value="6">Junho</option>
-                                <option value="7">Julho</option><option value="8">Agosto</option>
-                                <option value="9">Setembro</option><option value="10">Outubro</option>
-                                <option value="11">Novembro</option><option value="12">Dezembro</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="va-usd">Valor gasto (US$)</label>
-                            <input type="number" id="va-usd" min="0" step="0.01" placeholder="0.00">
-                        </div>
-                        <div class="form-group">
-                            <label for="va-cotacao">Cotação do dólar (R$)</label>
-                            <input type="number" id="va-cotacao" min="0" step="0.01" placeholder="5.40">
-                            <span class="field-hint">Usada pra converter US$ → R$ em todos os meses — ajuste quando quiser.</span>
+                <div class="va-modal-grid">
+                    <div class="card">
+                        <div class="card-title">Modelo Antigo (real, você lança)</div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="va-ano">Ano</label>
+                                <input type="number" id="va-ano" min="2020" max="2099">
+                            </div>
+                            <div class="form-group">
+                                <label for="va-mes">Mês</label>
+                                <select id="va-mes">
+                                    <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+                                    <option value="3">Março</option><option value="4">Abril</option>
+                                    <option value="5">Maio</option><option value="6">Junho</option>
+                                    <option value="7">Julho</option><option value="8">Agosto</option>
+                                    <option value="9">Setembro</option><option value="10">Outubro</option>
+                                    <option value="11">Novembro</option><option value="12">Dezembro</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="va-usd">Valor gasto (US$)</label>
+                                <input type="number" id="va-usd" min="0" step="0.01" placeholder="0.00">
+                                <span class="field-hint">O valor real já cobrado pela Meta — cobrança por mensagem de template iniciada pela empresa.</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="va-cotacao">Cotação do dólar (R$)</label>
+                                <input type="number" id="va-cotacao" min="0" step="0.01" placeholder="5.40">
+                                <span class="field-hint">Usada pra converter US$ → R$ em todos os meses — ajuste quando quiser.</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">Estimativa do modelo novo (a partir de out/2026)</div>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="va-preco-msg">R$ por mensagem</label>
-                            <input type="number" id="va-preco-msg" min="0" step="0.001" placeholder="0.035">
-                            <span class="field-hint">Valor preliminar divulgado (R$0,035). A Meta só confirma o valor definitivo até 01/09/2026 — ajuste aqui quando ela publicar.</span>
-                        </div>
-                        <div class="form-group">
-                            <label for="va-pct-empresa">% das mensagens enviadas pela empresa</label>
-                            <input type="number" id="va-pct-empresa" min="0" max="100" step="1" placeholder="50">
-                            <span class="field-hint">Só a mensagem enviada PELA EMPRESA é cobrada (a do cliente nunca é). A planilha não separa quem enviou — esse % é a estimativa usada sobre o total de mensagens.</span>
+                    <div class="card">
+                        <div class="card-title">Estimativa do modelo novo (a partir de out/2026)</div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="va-preco-msg">R$ por mensagem</label>
+                                <input type="number" id="va-preco-msg" min="0" step="0.001" placeholder="0.035">
+                                <span class="field-hint">Valor preliminar divulgado (R$0,035). A Meta só confirma o valor definitivo até 01/09/2026 — ajuste aqui quando ela publicar.</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="va-pct-empresa">% das mensagens enviadas pela empresa</label>
+                                <input type="number" id="va-pct-empresa" min="0" max="100" step="1" placeholder="50">
+                                <span class="field-hint">Confirmado na documentação oficial da Meta: só a mensagem enviada PELA EMPRESA é cobrada, a do cliente nunca é — nem hoje, nem no modelo novo. A planilha não separa quem enviou, então esse % é a estimativa usada sobre o total de mensagens.</span>
+                            </div>
                         </div>
                     </div>
                 </div>
