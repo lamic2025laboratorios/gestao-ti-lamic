@@ -96,8 +96,13 @@ function _migrarFinanceiroAntigo() {
 // dashTipo, mas o painel de Metas em "Inserir Dados" pode apontar pro outro
 // tipo mesmo com o dashboard mostrando o outro (os dois cards CC/IA de lá
 // ficam visíveis ao mesmo tempo, sem depender de qual dashboard está aberto).
+// vinculos: { <slot>: <id da meta> } — qual meta está ANEXADA a cada card/
+// gráfico (slot = 'faturamento' | 'apicost' | 'eficiencia'). Controlado
+// explicitamente pelo botão Metas de cada card (anexarMeta/desanexarMeta);
+// sem vínculo salvo ainda, os gráficos caem no fallback de conveniência
+// (meta mais recente do tipo esperado — ver _metaDoSlot).
 function _novoFinanceiroVazio() {
-    return { valores: {}, metas: {}, apiCost: { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, pctEmpresa: 50, antigo: {} } };
+    return { valores: {}, metas: {}, vinculos: {}, apiCost: { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, pctEmpresa: 50, antigo: {} } };
 }
 let financeiroData_cc  = _novoFinanceiroVazio();
 let financeiroData_ia  = _novoFinanceiroVazio();
@@ -110,8 +115,9 @@ function _fbListenFinanceiro(tipo) {
     window._onValue(r, snap => {
         const val = snap.val() || {};
         const alvo = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc;
-        alvo.valores = val.valores || {};
-        alvo.metas   = val.metas   || {};
+        alvo.valores  = val.valores  || {};
+        alvo.metas    = val.metas    || {};
+        alvo.vinculos = val.vinculos || {};
         alvo.apiCost = Object.assign(
             { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, pctEmpresa: 50, antigo: {} },
             val.apiCost || {}
@@ -166,6 +172,24 @@ function _fbRemoveMeta(id) {
     if (!window._db || !window._ref || !window._remove) return;
     window._remove(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/metas/${id}`))
         .catch(e => console.warn('[Firebase] Erro ao remover meta:', e));
+}
+
+// Anexa (ou remove, com metaId null) a meta atrelada a um slot (card/gráfico).
+function _fbSetVinculo(slot, metaId) {
+    financeiroData.vinculos = financeiroData.vinculos || {};
+    if (metaId) financeiroData.vinculos[slot] = metaId; else delete financeiroData.vinculos[slot];
+    if (!window._db || !window._ref || !window._set) return;
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/vinculos/${slot}`), metaId || null)
+        .catch(e => console.warn('[Firebase] Erro ao salvar vínculo de meta:', e));
+}
+
+// Meta anexada a um slot. Sem vínculo salvo ainda, cai no fallback de
+// conveniência (meta mais recente do tipo esperado) pra quem nunca usou o
+// botão Anexar — nada quebra pra quem já tinha meta cadastrada antes disso.
+function _metaDoSlot(slot, tipoFallback) {
+    const id = financeiroData.vinculos && financeiroData.vinculos[slot];
+    if (id && financeiroData.metas[id]) return financeiroData.metas[id];
+    return tipoFallback ? _metaAtivaDoTipo(tipoFallback) : null;
 }
 
 function _fbSetApiCost(partial) {
@@ -346,7 +370,7 @@ function chartFaturamento() {
 
     const ano   = filtro.ano || new Date().getFullYear();
     const meses = getPeriodsForMesComparacao(ano);
-    const meta  = _metaAtivaDoTipo('faturamento');
+    const meta  = _metaDoSlot('faturamento', 'faturamento');
 
     const labels   = meses.map(item => MESES_ABR[item.mes - 1]);
     const fatData  = meses.map(item => _valorNoMes('faturamento', ano, item.mes));
@@ -443,16 +467,16 @@ function setApiModo(modo) {
 }
 
 // ── Modal: Metas (lista + formulário de nova/editar) ────────────
-// Aberto a partir do card "Faturamento x Meta" do dashboard — sempre o tipo
+// Aberto a partir do botão "Metas" de um card do dashboard — sempre o tipo
 // (CC/IA) que está sendo visto na hora. Cadastro em si fica em "Inserir
-// Dados"; aqui é basicamente "puxar" (ver/editar/excluir) as metas já feitas.
-// Aberto a partir do card "Faturamento x Meta" do dashboard — SÓ CONSULTA
-// (as metas são cadastradas exclusivamente em Inserir Dados). "puxa" as
-// metas do tipo (CC/IA) que está sendo visto agora, sem opção de criar/
-// editar/excluir por aqui.
-function abrirMetaModal() {
+// Dados"; aqui é onde se ANEXA uma meta já cadastrada àquele card/gráfico
+// específico (slot: 'faturamento' | 'apicost' | 'eficiencia'), sem opção de
+// criar/editar/excluir por aqui.
+let _metaModalSlot = null;
+function abrirMetaModal(slot) {
     financeiroData = (dashTipo === 'ia') ? financeiroData_ia : financeiroData_cc;
     _financeiroTipoAtivo = dashTipo;
+    _metaModalSlot = slot || null;
     renderListaMetas(true);
     document.getElementById('mf-form-card').style.display  = 'none';
     document.getElementById('mf-lista-card').style.display = '';
@@ -461,28 +485,51 @@ function abrirMetaModal() {
 
 // Aberto a partir da aba "Metas" de um dos cards (CC/IA) em Inserir Dados —
 // aqui sim é onde se cadastra/edita/exclui, tipo explícito, independe de
-// qual dashboard estiver ativo.
+// qual dashboard estiver ativo (nunca em modo "anexar").
 function abrirMetaModalEntrada(tipo) {
     financeiroData = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc;
     _financeiroTipoAtivo = tipo;
+    _metaModalSlot = null;
     renderListaMetas(false);
     document.getElementById('mf-form-card').style.display  = 'none';
     document.getElementById('mf-lista-card').style.display = '';
     document.getElementById('meta-modal-fin').style.display = 'flex';
 }
 
+// Anexa/desanexa a meta de um slot — chamado pelos botões da lista quando o
+// modal foi aberto a partir de um card do dashboard (_metaModalSlot setado).
+function anexarMeta(slot, metaId) {
+    _fbSetVinculo(slot, metaId);
+    renderListaMetas(true);
+    const dashSec = document.getElementById('dashboard');
+    if (dashSec && dashSec.classList.contains('active')) renderProjecaoFinanceira();
+}
+function desanexarMeta(slot) {
+    _fbSetVinculo(slot, null);
+    renderListaMetas(true);
+    const dashSec = document.getElementById('dashboard');
+    if (dashSec && dashSec.classList.contains('active')) renderProjecaoFinanceira();
+}
+
 // Lista dentro do MODAL (#mf-lista) — sempre reflete o tipo ativo no momento
 // (setado por abrirMetaModal/abrirMetaModalEntrada logo antes de chamar aqui).
 // somenteLeitura: esconde "+ Nova Meta" e os botões Editar/Excluir — usado
-// quando o modal foi aberto a partir do dashboard (só consulta).
+// quando o modal foi aberto a partir do dashboard (só consulta/anexa).
 function renderListaMetas(somenteLeitura) {
-    _renderMetasListInto('mf-lista', _financeiroTipoAtivo, !!somenteLeitura);
+    _renderMetasListInto('mf-lista', _financeiroTipoAtivo, !!somenteLeitura, _metaModalSlot);
     const novaBtn = document.getElementById('mf-nova-meta-btn');
     const hint    = document.getElementById('mf-lista-hint');
     const titulo  = document.getElementById('mf-lista-titulo');
     if (novaBtn) novaBtn.style.display = somenteLeitura ? 'none' : '';
-    if (hint)    hint.style.display    = somenteLeitura ? '' : 'none';
-    if (titulo)  titulo.textContent    = `Metas cadastradas — ${(_financeiroTipoAtivo || 'cc').toUpperCase()}`;
+    if (hint) {
+        hint.style.display = somenteLeitura ? '' : 'none';
+        hint.innerHTML = _metaModalSlot
+            ? 'Clique em <strong>Anexar</strong> pra vincular uma meta a este gráfico. Cadastro de novas metas fica em <strong>Inserir Dados</strong> → aba <strong>Metas</strong>.'
+            : 'As metas são cadastradas em <strong>Inserir Dados</strong> → aba <strong>Metas</strong> do card CC ou IA. Aqui é só consulta.';
+    }
+    if (titulo) titulo.textContent = _metaModalSlot
+        ? `Anexar meta — ${(_financeiroTipoAtivo || 'cc').toUpperCase()}`
+        : `Metas cadastradas — ${(_financeiroTipoAtivo || 'cc').toUpperCase()}`;
 }
 
 // Painel INLINE de Metas dentro de cada card de Inserir Dados — só troca o
@@ -504,7 +551,9 @@ function renderMetasEntradaTab(tipo) {
 // por quem chamou) dentro de containerId; os botões Editar/Excluir carregam
 // o tipo explícito, pra funcionar mesmo clicados fora de uma sessão já aberta
 // (ex.: direto do painel inline, sem passar por abrirMetaModal*).
-function _renderMetasListInto(containerId, tipo, somenteLeitura) {
+// slot: quando setado (aberto a partir de um card do dashboard), troca os
+// botões Editar/Excluir por Anexar/Remover, vinculando a meta àquele slot.
+function _renderMetasListInto(containerId, tipo, somenteLeitura, slot) {
     const el = document.getElementById(containerId);
     if (!el) return;
     const metas = Object.values(financeiroData.metas || {}).sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
@@ -512,18 +561,27 @@ function _renderMetasListInto(containerId, tipo, somenteLeitura) {
         el.innerHTML = '<div class="empty-state" style="padding:14px;"><div class="empty-state-text">Nenhuma meta cadastrada</div></div>';
         return;
     }
+    const anexadaId = slot ? (financeiroData.vinculos && financeiroData.vinculos[slot]) : null;
     el.innerHTML = metas.map(m => {
         const st = _metaStatus(m, filtro.ano, filtro.mes);
         const pctTxt = st.pct != null ? st.pct.toFixed(0) + '%' : '—';
         const sinal = m.direcao === 'diminuir' ? '-' : '+';
         const alvoTxt = m.modoAlvo === 'percentual' ? `${sinal}${m.valorAlvo}%` : (m.tipo === 'exames' || m.tipo === 'mensagens' ? fNum(m.valorAlvo) : fBRL(m.valorAlvo));
-        const acoes = somenteLeitura ? '' : `
+        const anexada = slot && anexadaId === m.id;
+        let acoes;
+        if (slot) {
+            acoes = anexada
+                ? `<div class="meta-list-actions"><span class="meta-anexada-tag">✓ Anexada</span><button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;" onclick="desanexarMeta('${slot}')">Remover</button></div>`
+                : `<div class="meta-list-actions"><button class="btn-primary" style="padding:4px 10px;font-size:.72rem;" onclick="anexarMeta('${slot}','${m.id}')">Anexar</button></div>`;
+        } else {
+            acoes = somenteLeitura ? '' : `
             <div class="meta-list-actions">
                 <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;" onclick="editarMeta('${m.id}','${tipo}')">Editar</button>
                 <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;color:#dc2626;" onclick="excluirMeta('${m.id}','${tipo}')">Excluir</button>
             </div>`;
+        }
         const cor = m.cor || _corPadraoTipoMeta(m.tipo);
-        return `<div class="meta-list-item">
+        return `<div class="meta-list-item${anexada ? ' meta-list-item-anexada' : ''}">
             <div class="meta-list-info">
                 <strong><span class="meta-cor-dot" style="background:${escAttr(cor)}"></span>${escHtml(m.nome)}</strong>
                 <span>${escHtml(_labelTipoMeta(m.tipo))} · ${m.periodicidade === 'anual' ? 'Anual' : 'Mensal'} · alvo ${alvoTxt}${m.autoIncrementoPct ? ' · auto +' + m.autoIncrementoPct + '%' : ''}</span>
@@ -754,7 +812,7 @@ function salvarValorApi() {
 function abrirAuditFaturamento() {
     const p    = getPeriodoAtual();
     const ano  = filtro.ano, mes = filtro.mes;
-    const meta = _metaAtivaDoTipo('faturamento');
+    const meta = _metaDoSlot('faturamento', 'faturamento');
     const st   = meta ? _metaStatus(meta, ano, mes) : { status: 'sem-dado', pct: null, alvo: null, atual: null };
     const atual = _valorNoMes('faturamento', ano, mes);
     let amAnt = mes - 1, ayAnt = ano; if (amAnt < 1) { amAnt = 12; ayAnt--; }
@@ -908,7 +966,7 @@ function _atualizarAuditApiCabecalho() {
 function _renderAuditApiGoalBox(ano, mes) {
     const box = document.getElementById('audit-api-goal-box');
     if (!box) return;
-    const meta = _metaAtivaDoTipo('mensagens');
+    const meta = _metaDoSlot('apicost', 'mensagens');
     if (!meta) { box.style.display = 'none'; return; }
 
     const st = _metaStatus(meta, ano, mes);
@@ -937,7 +995,7 @@ function _renderAuditApiChart(ano, meses) {
     // Linha de meta (tipo "mensagens" — reduzir volume trocado), num eixo à
     // parte porque é contada em mensagens, não em R$. Cor vem do cadastro
     // da própria meta (Inserir Dados → Metas).
-    const metaMsg   = _metaAtivaDoTipo('mensagens');
+    const metaMsg   = _metaDoSlot('apicost', 'mensagens');
     const metaSerie = metaMsg ? meses.map(item => _metaAlvoParaMes(metaMsg, ano, item.mes)) : null;
     const metaCor   = metaMsg ? (metaMsg.cor || _corPadraoTipoMeta('mensagens')) : null;
 
@@ -2191,7 +2249,7 @@ function chartComparacao(ano) {
     // trocado). O alvo é em nº de mensagens; aqui é convertido pro mesmo eixo
     // do gráfico (msgs/atendimento) dividindo pelos atendimentos reais do mês,
     // pra já mostrar em que nível de eficiência aquela meta colocaria o mês.
-    const metaMsg  = _metaAtivaDoTipo('mensagens');
+    const metaMsg  = _metaDoSlot('eficiencia', 'mensagens');
     const metaData = metaMsg ? lista.map(item => {
         const alvoMsgs = _metaAlvoParaMes(metaMsg, ano, item.mes);
         if (alvoMsgs == null || !item.p || !item.p.total) return null;
@@ -3201,7 +3259,7 @@ function gerarRelatorioComOpcoes() {
     }
     if (opt('rpt-opt-fatmeta')) {
         const lista = getPeriodsForMesComparacao(ano);
-        const meta = _metaAtivaDoTipo('faturamento');
+        const meta = _metaDoSlot('faturamento', 'faturamento');
         sections.push({ heading: `Faturamento x Meta — ${ano}`, headers: ['Mês', 'Faturamento', 'Meta', 'Status'],
             cols: [{ w: .3 }, { w: .25, align: 'right' }, { w: .25, align: 'right' }, { w: .2, align: 'right' }],
             image: imgFrom('faturamento'),

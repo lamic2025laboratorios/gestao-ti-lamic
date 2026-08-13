@@ -1291,6 +1291,8 @@ select:focus {
     padding: 10px 4px; border-bottom: 1px solid var(--gray-2);
 }
 .meta-list-item:last-child { border-bottom: none; }
+.meta-list-item-anexada { background: var(--blue-l); border-radius: 8px; padding-left: 8px; padding-right: 8px; }
+.meta-anexada-tag { font-size: 0.72rem; font-weight: 700; color: var(--blue-v); white-space: nowrap; }
 .meta-list-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .meta-list-info strong { font-size: 0.86rem; color: var(--text); }
 .meta-cor-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
