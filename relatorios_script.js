@@ -1166,6 +1166,41 @@ function init() {
     renderDashboard();
     renderSpreadsheet();
     carregarNomeAdmin();
+    relStartIdleWatch();
+    relResetIdle();
+}
+
+// ── Sessão: auto-logout por inatividade (60 min) + contagem regressiva ──
+// Mesmo padrão do módulo Financeiro (.idle-chip/.idle-timer), replicado aqui
+// porque esse módulo ainda não tinha logout automático nenhum.
+const _REL_IDLE_MS = 60 * 60 * 1000;
+let _relIdleTimer = null;
+let _relIdleTick  = null;
+let _relIdleDeadline = 0;
+
+function relResetIdle() {
+    clearTimeout(_relIdleTimer);
+    _relIdleDeadline = Date.now() + _REL_IDLE_MS;
+    _relIdleTimer = setTimeout(relIdleLogout, _REL_IDLE_MS);
+    if (!_relIdleTick) _relIdleTick = setInterval(_relUpdateIdleChip, 1000);
+    _relUpdateIdleChip();
+}
+
+function _relUpdateIdleChip() {
+    let ms = _relIdleDeadline - Date.now(); if (ms < 0) ms = 0;
+    const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+    const txt = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    document.querySelectorAll('.idle-timer').forEach(el => { el.textContent = txt; });
+    document.querySelectorAll('.idle-chip').forEach(chip => chip.classList.toggle('idle-timer-warn', ms <= 60000));
+}
+
+function relIdleLogout() {
+    relLogout();
+}
+
+function relStartIdleWatch() {
+    ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(ev =>
+        document.addEventListener(ev, relResetIdle, { passive: true }));
 }
 
 function carregarNomeAdmin() {
@@ -2944,66 +2979,104 @@ function exportarCSV() {
 // RELATÓRIO (IMPRIMIR)
 // ============================================================
 
-function gerarRelatorio() {
+// Abre o pop-up de escolha do que entra no relatório (todas as seções vêm
+// pré-marcadas — desmarca quem não quiser).
+function abrirRelatorioModal() {
     const p = getPeriodoAtual();
     if (!p) {
         alert('Nenhum dado disponível para o período selecionado.');
         return;
     }
+    document.getElementById('relatorio-opcoes-modal').style.display = 'flex';
+}
 
-    const ef   = calcEficiencia(p);
-    const data = new Date().toLocaleDateString('pt-BR');
-    const emAberto = Math.max(0, (p.total||0) - (p.concluidos||0) - (p.silenciosos||0) - (p.clienteEncerrou||0));
-    const avalEnv  = p.avalEnviadas || 0;
-    const avalResp = p.avalRespondidas || 0;
-    const avalNao  = Math.max(0, avalEnv - avalResp);
-    const c        = p.canais || { whatsapp:0, instagram:0, outros:0 };
+// Gera o PDF conforme as caixinhas marcadas no pop-up. Cada seção que tem um
+// gráfico já renderizado na tela ganha a imagem dele (toBase64Image) além dos
+// dados em número/porcentagem — se "incluir gráficos" estiver desmarcado, ou
+// se o gráfico daquela seção não estiver disponível/der erro ao desenhar, a
+// seção sai só com a tabela de dados mesmo (nunca fica sem nada).
+function gerarRelatorioComOpcoes() {
+    const p = getPeriodoAtual();
+    if (!p) { alert('Nenhum dado disponível para o período selecionado.'); return; }
 
-    const sections = [
-        { heading: 'Indicadores Gerais', headers: ['Indicador', 'Valor'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: [
-            ['Total de Atendimentos', fNum(p.total)],
-            ['Atendimentos em Aberto', fNum(emAberto)],
-            ['Avaliação Média', fAval(p.avaliacao)],
-            ['Eficiência (msgs/atend.)', ef.hasData ? fNum(ef.index, 1) : '—'],
-          ] },
-        { heading: 'Status dos Clientes', headers: ['Situação', 'Quantidade'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: [
-            ['Resolvidos (finalizados)', fNum(p.concluidos)],
-            ['Silenciosos (não responderam)', fNum(p.silenciosos)],
-            ['Em andamento (status Aberto)', fNum(emAberto)],
-            ['Cliente encerrou (fila vazia, sem usuário)', fNum(p.clienteEncerrou || 0)],
-          ] },
-        { heading: 'Resposta às Avaliações', headers: ['Indicador', 'Valor'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: [
-            ['Avaliações enviadas', fNum(avalEnv)],
-            ['Respondida', fNum(avalResp)],
-            ['Avaliação não respondida', fNum(avalNao)],
-            ['Taxa de resposta', (avalEnv ? Math.round(avalResp / avalEnv * 100) : 0) + '%'],
-            ['Total de Mensagens', fNum(p.mensagens)],
-          ] },
-        { heading: 'Volume por Canal (Conexão)', headers: ['Canal', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: [
-            ['WhatsApp', fNum(c.whatsapp || 0)],
-            ['Instagram', fNum(c.instagram || 0)],
-            ['Outros', fNum(c.outros || 0)],
-          ] },
-        { heading: 'Por Que Buscam o LAMIC', headers: ['Motivo', 'Quantidade'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: [
-            ['Resultados de Exames', fNum(p.resultados)],
-            ['Coleta Domiciliar', fNum(p.coleta)],
-            ['Falar com Atendente', fNum(p.atendente)],
-            ['Informações Gerais', fNum(p.info)],
-            ['Orçamentos', fNum(p.orcamentos)],
-            ['Reclamações', fNum(p.reclamacoes)],
-            ['Vacinas', fNum(p.vacinas)],
-          ] },
-        { heading: 'Fluxo por Dia da Semana', headers: ['Dia', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: Object.entries(p.dias || {}).map(([d, v]) => [d, fNum(v)]) },
-        { heading: 'Fluxo por Horário', headers: ['Horário', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: Object.entries(p.horarios || {}).map(([h, v]) => [String(h).replace('-', 'h–') + 'h', fNum(v)]) },
-    ];
-    if (p.atendentes?.length) {
+    // Ressincroniza a Projeção Financeira com o tipo (CC/IA) que está na tela.
+    financeiroData = (dashTipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+    _financeiroTipoAtivo = dashTipo;
+
+    const opt = id => !!document.getElementById(id)?.checked;
+    const incluirGraficos = opt('rpt-opt-graficos');
+    const imgFrom = (key) => {
+        if (!incluirGraficos) return null;
+        const c = charts[key];
+        if (!c || !c.canvas) return null;
+        try { return { data: c.toBase64Image(), w: c.canvas.width, h: c.canvas.height }; }
+        catch (e) { console.warn('[Relatório] Gráfico', key, 'não pôde ser capturado, seguindo só com os dados:', e); return null; }
+    };
+
+    const ano = filtro.ano || new Date().getFullYear();
+    const sections = [];
+
+    if (opt('rpt-opt-indicadores')) {
+        const ef = calcEficiencia(p);
+        sections.push({ heading: 'Indicadores Gerais', headers: ['Indicador', 'Valor'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            rows: [
+                ['Total de Atendimentos', fNum(p.total)],
+                ['Atendimentos em Aberto', fNum(p.aberto || 0)],
+                ['Avaliação Média', fAval(p.avaliacao)],
+                ['Eficiência (msgs/atend.)', ef.hasData ? fNum(ef.index, 1) : '—'],
+            ] });
+    }
+    if (opt('rpt-opt-status')) {
+        sections.push({ heading: 'Status dos Clientes', headers: ['Situação', 'Quantidade'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('clientes'),
+            rows: [
+                ['Resolvidos (finalizados)', fNum(p.concluidos)],
+                ['Silenciosos (não responderam)', fNum(p.silenciosos)],
+                ['Em andamento (status Aberto)', fNum(p.aberto || 0)],
+                ['Cliente encerrou (fila vazia, sem usuário)', fNum(p.clienteEncerrou || 0)],
+            ] });
+    }
+    if (opt('rpt-opt-avaliacoes')) {
+        const avalEnv = p.avalEnviadas || 0, avalResp = p.avalRespondidas || 0, avalNao = Math.max(0, avalEnv - avalResp);
+        sections.push({ heading: 'Resposta às Avaliações', headers: ['Indicador', 'Valor'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('avalGauge'),
+            rows: [
+                ['Avaliações enviadas', fNum(avalEnv)],
+                ['Respondida', fNum(avalResp)],
+                ['Avaliação não respondida', fNum(avalNao)],
+                ['Taxa de resposta', (avalEnv ? Math.round(avalResp / avalEnv * 100) : 0) + '%'],
+                ['Total de Mensagens', fNum(p.mensagens)],
+            ] });
+    }
+    if (opt('rpt-opt-canal')) {
+        const c = p.canais || { whatsapp: 0, instagram: 0, outros: 0 };
+        sections.push({ heading: 'Volume por Canal (Conexão)', headers: ['Canal', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('canais'),
+            rows: [['WhatsApp', fNum(c.whatsapp || 0)], ['Instagram', fNum(c.instagram || 0)], ['Outros', fNum(c.outros || 0)]] });
+    }
+    if (opt('rpt-opt-buscam')) {
+        sections.push({ heading: 'Por Que Buscam o LAMIC', headers: ['Motivo', 'Quantidade'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('buscam'),
+            rows: [
+                ['Resultados de Exames', fNum(p.resultados)],
+                ['Coleta Domiciliar', fNum(p.coleta)],
+                ['Falar com Atendente', fNum(p.atendente)],
+                ['Informações Gerais', fNum(p.info)],
+                ['Orçamentos', fNum(p.orcamentos)],
+                ['Reclamações', fNum(p.reclamacoes)],
+                ['Vacinas', fNum(p.vacinas)],
+            ] });
+    }
+    if (opt('rpt-opt-dias')) {
+        sections.push({ heading: 'Fluxo por Dia da Semana', headers: ['Dia', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('dias'),
+            rows: Object.entries(p.dias || {}).map(([d, v]) => [d, fNum(v)]) });
+    }
+    if (opt('rpt-opt-horario')) {
+        sections.push({ heading: 'Fluxo por Horário', headers: ['Horário', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            rows: Object.entries(p.horarios || {}).map(([h, v]) => [String(h).replace('-', 'h–') + 'h', fNum(v)]) });
+    }
+    if (opt('rpt-opt-atendentes') && p.atendentes?.length) {
         sections.push({
             heading: 'Desempenho por Atendente',
             headers: ['#', 'Nome', 'Atend.', 'Avaliação', 'Aval. env.', 'Respond.'],
@@ -3011,13 +3084,60 @@ function gerarRelatorio() {
             rows: p.atendentes.map((at, i) => [String(i + 1), at.nome, fNum(at.atendimentos), fAval(at.avaliacao), fNum(at.avalEnviadas || 0), fNum(at.avalRespondidas || 0)])
         });
     }
+    if (opt('rpt-opt-eficiencia')) {
+        const lista = getPeriodsForMesComparacao(ano);
+        sections.push({ heading: `Evolução da Eficiência — ${ano}`, headers: ['Mês', 'Msgs/Atendimento'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('comp'),
+            rows: lista.map(item => { const ef = calcEficiencia(item.p); return [MESES_PT[item.mes - 1], ef.hasData ? fNum(ef.index, 1) : '—']; }) });
+    }
+    if (opt('rpt-opt-fatmeta')) {
+        const lista = getPeriodsForMesComparacao(ano);
+        const meta = _metaAtivaDoTipo('faturamento');
+        sections.push({ heading: `Faturamento x Meta — ${ano}`, headers: ['Mês', 'Faturamento', 'Meta', 'Status'],
+            cols: [{ w: .3 }, { w: .25, align: 'right' }, { w: .25, align: 'right' }, { w: .2, align: 'right' }],
+            image: imgFrom('faturamento'),
+            rows: lista.map(item => {
+                const v  = _valorNoMes('faturamento', ano, item.mes);
+                const st = meta ? _metaStatus(meta, ano, item.mes) : null;
+                const stTxt = !st ? '—' : st.status === 'batida' ? 'Batida' : st.status === 'perto' ? 'Perto' : st.status === 'falta' ? 'Falta' : '—';
+                return [MESES_PT[item.mes - 1], v != null ? fBRL(v) : '—', (st && st.alvo != null) ? fBRL(st.alvo) : '—', stTxt];
+            }) });
+    }
+    if (opt('rpt-opt-apicusto')) {
+        const lista = getPeriodsForMesComparacao(ano);
+        sections.push({ heading: `Projeção de Custo — API Oficial — ${ano}`, headers: ['Mês', 'Modelo Antigo', 'Modelo Novo (estim.)'],
+            cols: [{ w: .4 }, { w: .3, align: 'right' }, { w: .3, align: 'right' }],
+            image: imgFrom('apicost'),
+            rows: lista.map(item => {
+                const a = _custoApiAntigo(ano, item.mes);
+                const n = _custoApiNovoEstimado(item.p);
+                return [MESES_PT[item.mes - 1], a != null ? fBRL(a) : '—', n != null ? fBRL(n) : '—'];
+            }) });
+    }
+    if (opt('rpt-opt-metas')) {
+        const metas = Object.values(financeiroData.metas || {});
+        const mesRef = filtro.mes || (new Date().getMonth() + 1);
+        sections.push({ heading: 'Metas Cadastradas', headers: ['Nome', 'Tipo', 'Alvo', 'Status'],
+            cols: [{ w: .34 }, { w: .22 }, { w: .22, align: 'right' }, { w: .22, align: 'right' }],
+            rows: metas.map(m => {
+                const st = _metaStatus(m, ano, mesRef);
+                const sinal = m.direcao === 'diminuir' ? '-' : '+';
+                const alvoTxt = m.modoAlvo === 'percentual' ? `${sinal}${m.valorAlvo}%` : (m.tipo === 'exames' || m.tipo === 'mensagens' ? fNum(m.valorAlvo) : fBRL(m.valorAlvo));
+                const stTxt = st.status === 'batida' ? 'Batida' : st.status === 'perto' ? 'Perto de bater' : st.status === 'falta' ? 'Falta bater' : 'Sem dado';
+                return [m.nome, _labelTipoMeta(m.tipo), alvoTxt, stTxt];
+            }) });
+    }
 
+    if (!sections.length) { alert('Escolha pelo menos uma seção pra incluir no relatório.'); return; }
+
+    const data = new Date().toLocaleDateString('pt-BR');
     gerarPdfSimples({
         filename: `Relatorio-${String(p.nome || 'LAMIC').replace(/[^\w-]+/g, '_')}.pdf`,
         title: `Relatório de Atendimento — ${p.nome}`,
-        subtitle: `Gerado em ${data} | LAMIC`,
+        subtitle: `Gerado em ${data} | LAMIC | Canal do Cliente — ${dashTipo.toUpperCase()}`,
         sections
     });
+    fecharModalGenerico('relatorio-opcoes-modal');
 }
 
 // PDF simples (jsPDF) com download direto — mesmo formato do dashboard
@@ -3045,6 +3165,19 @@ function gerarPdfSimples({ filename, title, subtitle, sections }) {
         pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor(71, 85, 105);
         pdf.text(String(sec.heading).toUpperCase(), M, y); y += 6;
         pdf.setDrawColor(226, 232, 240); pdf.setLineWidth(0.6); pdf.line(M, y, W - M, y); y += 14;
+
+        // Gráfico como imagem (se a seção trouxe um e a opção "incluir gráficos"
+        // estava marcada) — escala mantendo proporção, largura máx = largura útil.
+        if (sec.image && sec.image.data && sec.image.w && sec.image.h) {
+            const maxIW = CW, maxIH = 190;
+            let iw = maxIW, ih = iw * (sec.image.h / sec.image.w);
+            if (ih > maxIH) { ih = maxIH; iw = ih * (sec.image.w / sec.image.h); }
+            if (y + ih + 12 > BOT) brk();
+            try {
+                pdf.addImage(sec.image.data, 'PNG', M, y, iw, ih);
+                y += ih + 14;
+            } catch (e) { console.warn('[Relatório] Não deu pra desenhar o gráfico, seguindo só com os dados:', e); }
+        }
 
         const cols = sec.cols, widths = cols.map(c => c.w * CW), xs = [];
         let acc = M; cols.forEach((c, i) => { xs.push(acc); acc += widths[i]; });

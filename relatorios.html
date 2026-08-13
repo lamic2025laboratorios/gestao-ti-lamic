@@ -131,6 +131,24 @@
             =================================================== -->
             <section id="dashboard" class="section active">
 
+                <!-- CABEÇALHO BRANCO (mesmo padrão do topo de cada aba em Financeiro) -->
+                <div class="dash-topbar-rel">
+                    <div>
+                        <h2>Dashboard Canal do Cliente</h2>
+                        <p class="tab-subtitle">Atendimento, avaliações e projeção financeira — CC / IA</p>
+                    </div>
+                    <div class="dash-controls-rel">
+                        <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
+                            <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span class="idle-timer">60:00</span>
+                        </div>
+                        <button class="btn-dash-print-rel" onclick="abrirRelatorioModal()" title="Escolher o que entra no relatório e baixar em PDF">
+                            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            Relatório
+                        </button>
+                    </div>
+                </div>
+
                 <!-- FILTER BAR -->
                 <div class="filtro-bar">
                     <span class="dash-tipo-badge" id="dash-tipo-badge">CC</span>
@@ -157,9 +175,6 @@
                     <span class="filtro-no-data" id="sem-dados-aviso" style="display:none;">
                         ⚠ Sem dados para este período
                     </span>
-
-                    <!-- Botões direita -->
-                    <button class="btn-secondary" style="height:34px;font-size:0.82rem;" onclick="gerarRelatorio()">📄 Relatório</button>
                 </div>
 
                 <!-- ================= 1) CARDS — DADOS GERAIS ================= -->
@@ -1084,6 +1099,52 @@
                             <div class="audit-chart-inner"><canvas id="audit-at-chart"></canvas></div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pop-up: escolher o que entra no relatório em PDF -->
+    <div class="modal-overlay" id="relatorio-opcoes-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'relatorio-opcoes-modal')">
+        <div class="modal-panel" style="max-width:620px" onclick="event.stopPropagation()">
+            <div class="audit-modal-header">
+                <div class="audit-modal-header-left">
+                    <div class="audit-modal-icon">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div>
+                        <div class="audit-modal-title">Gerar Relatório em PDF</div>
+                        <div class="audit-modal-sub">Escolha o que entra no documento</div>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('relatorio-opcoes-modal')">✕</button>
+            </div>
+            <div class="audit-modal-stripe"></div>
+            <div class="modal-body">
+                <label class="rpt-opcao rpt-opcao-master">
+                    <input type="checkbox" id="rpt-opt-graficos" checked>
+                    <span>Incluir os gráficos como imagem (além dos dados em número/porcentagem)</span>
+                </label>
+                <div class="rpt-opcoes-grid">
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-indicadores" checked><span>Indicadores Gerais</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-status" checked><span>Status dos Clientes</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-avaliacoes" checked><span>Resposta às Avaliações</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-canal" checked><span>Volume por Canal</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-buscam" checked><span>Por Que Buscam o LAMIC</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-dias" checked><span>Fluxo por Dia da Semana</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-horario" checked><span>Fluxo por Horário</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-atendentes" checked><span>Desempenho por Atendente</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-eficiencia" checked><span>Evolução da Eficiência</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-fatmeta" checked><span>Faturamento x Meta</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-apicusto" checked><span>Projeção de Custo API</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-metas" checked><span>Metas Cadastradas</span></label>
+                </div>
+                <div class="rpt-opcoes-actions">
+                    <button class="btn-secondary" onclick="fecharModalGenerico('relatorio-opcoes-modal')">Cancelar</button>
+                    <button class="btn-primary" onclick="gerarRelatorioComOpcoes()">
+                        <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+                        Gerar PDF
+                    </button>
                 </div>
             </div>
         </div>

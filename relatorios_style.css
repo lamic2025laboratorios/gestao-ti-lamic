@@ -283,6 +283,43 @@ body {
 .section { display: none; flex-direction: column; gap: 20px; }
 .section.active { display: flex; animation: fadeUp 0.28s ease; }
 
+/* ── Cabeçalho branco do topo do Dashboard (mesmo padrão usado em cada aba
+   do módulo Financeiro) — estoura o padding de .sections-wrap (24px) pra
+   ficar coladinho nas bordas, título fixo + timer de inatividade + relatório. */
+.dash-topbar-rel {
+    background: var(--white);
+    border-bottom: 1px solid var(--gray-2);
+    box-shadow: 0 2px 10px rgba(6,15,30,0.05);
+    margin: -24px -24px 0;
+    padding: 20px 24px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+}
+.dash-topbar-rel h2 { font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.dash-topbar-rel .tab-subtitle { color: var(--muted); font-size: 0.85rem; }
+.dash-controls-rel { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* Chip do timer de inatividade — reaproveitado em todas as abas que o pedirem */
+.idle-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 13px; border-radius: 100px;
+    background: var(--gray-1); border: 1px solid var(--gray-2);
+    color: var(--muted); font-size: 0.82rem; font-weight: 700;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+    transition: all 0.2s;
+}
+.idle-chip svg { color: var(--gray-4); flex-shrink: 0; }
+.idle-chip.idle-timer-warn { background: #fff0f0; border-color: rgba(220,38,38,0.3); color: var(--red); }
+.idle-chip.idle-timer-warn svg { color: var(--red); }
+
+.btn-dash-print-rel {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 36px; padding: 0 16px; border-radius: 8px;
+    background: var(--blue-v); color: #fff; border: none; cursor: pointer;
+    font-size: 0.84rem; font-weight: 600; font-family: inherit;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+.btn-dash-print-rel:hover { background: #1d4ed8; box-shadow: 0 2px 8px rgba(37,99,235,0.3); }
+
 /* ── Filter Bar ────────────────────────────────────────────── */
 .filtro-bar {
     background: var(--white);
@@ -964,6 +1001,27 @@ select:focus {
 }
 
 .btn-secondary:hover { background: var(--gray-1); border-color: var(--gray-4); }
+
+/* ── Pop-up: opções do relatório em PDF ───────────────────────── */
+.rpt-opcao {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--gray-2); background: var(--gray-1);
+    cursor: pointer; font-size: 0.85rem; font-weight: 500; color: var(--text);
+    transition: background 0.15s, border-color 0.15s;
+}
+.rpt-opcao:hover { background: #eef2ff; border-color: var(--blue-v); }
+.rpt-opcao input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--blue-v); flex-shrink: 0; }
+.rpt-opcao-master {
+    margin-bottom: 14px; background: #eef4ff; border-color: rgba(37,99,235,0.25); font-weight: 600;
+}
+.rpt-opcoes-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.rpt-opcoes-actions {
+    display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;
+    padding-top: 16px; border-top: 1px solid var(--gray-2);
+}
 
 .btn-add {
     width: 100%;
