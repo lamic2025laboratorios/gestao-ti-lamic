@@ -1,0 +1,3029 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestão de TI</title>
+  <link rel="stylesheet" href="finan_style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, set, push, onValue, update, remove, get, runTransaction }
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+    const firebaseConfig = {
+      apiKey: "AIzaSyDH2gCOq5hbKTzaNVgaAZfKs0MvSTI2QkA",
+      authDomain: "lamicdadosti.firebaseapp.com",
+      databaseURL: "https://lamicdadosti-default-rtdb.firebaseio.com",
+      projectId: "lamicdadosti",
+      storageBucket: "lamicdadosti.firebasestorage.app",
+      messagingSenderId: "533996674439",
+      appId: "1:533996674439:web:69f92d42f621bd2ed50722"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+    window._db=db; window._ref=ref; window._set=set; window._push=push;
+    window._onValue=onValue; window._update=update; window._remove=remove; window._get=get;
+    window._runTransaction=runTransaction;
+    window._firebaseReady=true;
+    document.dispatchEvent(new Event("firebaseReady"));
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Telas de entrada e login vivem no index.html (casca do sistema).
+     Este arquivo e um modulo: so o painel de solicitacao da unidade
+     e o portal financeiro. -->
+
+<!-- ══ TELA 4 — PAINEL SOLICITAÇÃO ══ -->
+<div id="screen-request" class="screen">
+  <div class="req-topbar">
+    <div class="req-topbar-left">
+      <div class="req-brand">
+        <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="8" fill="#1a3a6b"/><rect x="6" y="6" width="10" height="10" rx="2" fill="#4a90d9"/><rect x="20" y="6" width="10" height="10" rx="2" fill="#4a90d9" opacity=".5"/><rect x="6" y="20" width="10" height="10" rx="2" fill="#4a90d9" opacity=".5"/><rect x="20" y="20" width="10" height="10" rx="2" fill="#fff" opacity=".9"/></svg>
+        <div>
+          <div class="req-brand-name">TI Compras</div>
+          <div class="req-brand-unit" id="topbar-unit-name">—</div>
+        </div>
+      </div>
+    </div>
+    <button class="btn-topbar-exit" onclick="App.adminLogout()">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2"/></svg>
+      Sair
+    </button>
+  </div>
+  <div class="request-wrap">
+    <div class="request-card">
+      <div class="request-card-header">
+        <h2>Nova Solicitação</h2>
+        <p>Preencha os dados abaixo para enviar sua solicitação ao TI</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label required">Tipo de Solicitação</label>
+        <div class="type-selector" id="type-selector"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Setor solicitante</label>
+        <select id="req-setor" class="input-field select-styled"></select>
+      </div>
+      <div id="sub-ink" class="sub-panel hidden">
+        <div class="sub-panel-inner">
+          <div class="form-group">
+            <label class="form-label">Numeração da Tinta</label>
+            <div id="ink-numbers" class="check-grid"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cores</label>
+            <div id="ink-colors" class="check-grid"></div>
+          </div>
+        </div>
+      </div>
+      <div id="sub-battery" class="sub-panel hidden">
+        <div class="sub-panel-inner">
+          <div class="form-group">
+            <label class="form-label">Modelos <span class="opt-tag">pode selecionar mais de 1</span></label>
+            <div id="battery-models" class="bat-models-list"></div>
+          </div>
+          <div id="conserto-motivo-wrap" class="form-group hidden">
+            <label class="form-label required">Motivo / Justificativa</label>
+            <textarea id="conserto-motivo" rows="3" placeholder="O que precisa ser consertado?" class="input-field"></textarea>
+          </div>
+        </div>
+      </div>
+      <div id="sub-other" class="sub-panel hidden">
+        <div class="sub-panel-inner">
+          <div class="form-group">
+            <label class="form-label required">Produto Desejado</label>
+            <input type="text" id="other-product" placeholder="Nome do produto" class="input-field" />
+          </div>
+          <div class="form-group">
+            <label class="form-label required">Motivo / Justificativa</label>
+            <textarea id="other-reason" rows="3" placeholder="Por que você precisa desse produto?" class="input-field"></textarea>
+          </div>
+        </div>
+      </div>
+      <div id="urgency-row" class="urgency-row" style="display:none">
+        <label class="urgency-toggle">
+          <input type="checkbox" id="chk-urgency" />
+          <span class="urgency-track">
+            <span class="urgency-thumb"></span>
+          </span>
+          <span class="urgency-text">
+            <span class="urgency-label">🚨 Marcar como URGENTE</span>
+            <span class="urgency-hint">O administrador será notificado da prioridade</span>
+          </span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observação <span class="opt-tag">opcional</span></label>
+        <textarea id="req-obs" rows="2" placeholder="Alguma observação adicional?" class="input-field"></textarea>
+      </div>
+      <div class="req-submit-row">
+        <button class="btn-back-unit" onclick="App.backToUnits()">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" stroke-width="2"/></svg>
+          Trocar Unidade
+        </button>
+        <button class="btn-submit" onclick="App.submitRequest()">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2"/></svg>
+          Enviar Solicitação
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TELA 5 — PAINEL ADMIN ══ -->
+<div id="screen-admin" class="screen">
+  <div class="admin-layout">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="main-sidebar">
+      <!-- Hambúrguer: fora do brand, sempre visível mesmo colapsado -->
+      <div class="sb-hamburger-row">
+        <div class="sb-brand-inline">
+          <img class="sb-logo-svg" src="img/LAMIC BRANCA.png" alt="LAMIC enter" onerror="this.style.display='none'" />
+        </div>
+        <button class="sidebar-hamburger" onclick="App.toggleSidebar()" title="Recolher/expandir menu">
+          <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <!-- sidebar-brand mantido vazio para não quebrar seletores CSS existentes -->
+      <div class="sidebar-brand" style="display:none"></div>
+      <nav class="sidebar-nav">
+        <!-- ══════ PORTAL FINANCEIRO (só aparece dentro do modo) ══════ -->
+        <div class="nav-section-label sb-txt">Financeiro</div>
+        <button class="nav-item active" data-tab="tab-dashboard" onclick="App.adminTab(this)" data-tip="Dashboard">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="ni-txt">Dashboard</span>
+          <span class="ni-tip">Dashboard</span>
+        </button>
+        <button class="nav-item" data-tab="tab-calendar" onclick="App.adminTab(this)" data-tip="Calendário">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="ni-txt">Calendário</span>
+          <span class="ni-tip">Calendário</span>
+        </button>
+        <button class="nav-item" data-tab="tab-requests" onclick="App.adminTab(this)" data-tip="Solicitações">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="ni-txt">Solicitações</span>
+          <span class="nav-badge" id="nav-badge-pending">0</span>
+          <span class="ni-tip">Solicitações <span class="ni-tip-badge" id="ni-tip-badge">0</span></span>
+        </button>
+        <button class="nav-item" data-tab="tab-estoque" onclick="App.adminTab(this)" data-tip="Estoque">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="ni-txt">Estoque</span>
+          <span class="ni-tip">Estoque</span>
+        </button>
+        <button class="nav-item" data-tab="tab-settings" onclick="App.adminTab(this)" data-tip="Configurações">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="ni-txt">Configurações</span>
+          <span class="ni-tip">Configurações</span>
+        </button>
+      </nav>
+      <div class="sidebar-account">
+        <div class="sb-user-menu hidden" id="sb-user-menu">
+          <!-- Voltar ao menu principal fica junto da conta, como nos outros módulos -->
+          <button class="sb-user-menu-item" onclick="App.backToCompras()">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Voltar ao menu principal
+          </button>
+          <button class="sb-user-menu-item danger" onclick="App.adminLogout()">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2"/></svg>
+            Sair do sistema
+          </button>
+        </div>
+        <div class="sidebar-user" onclick="App.toggleUserMenu(event)" data-tip="Conta">
+          <div class="sad-avatar" id="sad-avatar-letter">A</div>
+          <div class="sb-user-info">
+            <div class="sad-name" id="sad-name-text">Admin</div>
+            <div class="sad-role">Administrador</div>
+          </div>
+          <svg class="sb-user-caret" viewBox="0 0 24 24" fill="none"><path d="M6 15l6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="ni-tip">Conta</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="admin-main">
+
+      <!-- ── DASHBOARD ── -->
+      <div id="tab-dashboard" class="tab-panel">
+        <div class="tab-header dash-topbar">
+          <div>
+            <h2>Dashboard</h2>
+            <p class="tab-subtitle">Visão geral das solicitações e gastos</p>
+          </div>
+          <div class="dash-controls">
+            <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="idle-timer">60:00</span>
+            </div>
+            <button class="btn-dash-print" onclick="App.printDashboard()" title="Baixar relatório em PDF">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Relatório
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Ring: Status (só a rosca, sem título/índice) no centro, KPIs ao redor,
+             centralizados e com uma cor só (sem o arco-íris de antes) -->
+        <div class="kpi-ring-section">
+          <!-- Linhas conectando cada card à rosca (calculadas em JS —
+               App._renderKpiConnectors — pra acompanhar o layout real) -->
+          <svg id="kpi-ring-connectors" class="kpi-ring-connectors"></svg>
+          <div class="kpi-ring-col">
+            <div class="kpi-card kpi-clickable" onclick="App.showTotalKpi()" title="Clique para ver por unidade">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado ↗</div></div>
+            </div>
+            <div class="kpi-card kpi-clickable" onclick="App.showKpiList('Comprado')" title="Clique para ver pedidos comprados">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><polyline points="20 12 20 22 4 22 4 12" stroke="currentColor" stroke-width="2"/><rect x="2" y="7" width="20" height="5" stroke="currentColor" stroke-width="2"/><path d="M12 22V7" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados ↗</div></div>
+            </div>
+            <div class="kpi-card kpi-clickable" onclick="App.showKpiList('Negado')" title="Clique para ver pedidos negados">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados ↗</div></div>
+            </div>
+          </div>
+
+          <!-- Só a rosca — sem título, sem índice/legenda embaixo -->
+          <div class="kpi-ring-center status-big-card">
+            <canvas id="chart-status" height="220" style="max-height:220px"></canvas>
+            <!-- title do status-card fica escondido; a lógica que escreve nele (filtro
+                 ativo) continua rodando, só não aparece mais na tela -->
+            <span id="status-card-title" class="hidden"></span>
+            <div id="status-legend" class="status-legend-list hidden"></div>
+          </div>
+
+          <div class="kpi-ring-col">
+            <!-- Só informativo: atendidos com item já em estoque, sem compra nova -->
+            <div class="kpi-card" title="Pedidos atendidos com item já em estoque — não geram compra nem entram no Gasto do Período">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-estoque">0</div><div class="kpi-lbl">Do Estoque<small style="display:block;font-weight:600;opacity:.75">não foram comprados</small></div></div>
+            </div>
+            <!-- Só informativo: pedidos ainda em aprovação/decisão -->
+            <div class="kpi-card" title="Pedidos aguardando aprovação/decisão">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+              <div class="kpi-body"><div class="kpi-val" id="kpi-aguardando">0</div><div class="kpi-lbl">Aguardando</div></div>
+            </div>
+            <div class="kpi-card kpi-clickable" onclick="App.showExtrato()" title="Clique para ver o extrato de compras">
+              <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg></div>
+              <div class="kpi-body">
+                <div class="kpi-val" id="kpi-month-spent">R$ 0</div>
+                <div class="kpi-lbl">Gasto do Período <span id="kpi-period-sub" class="kpi-period-sub-hidden"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal: Extrato de Compras -->
+        <div id="extrato-modal" class="modal-overlay hidden">
+          <div class="modal-card form-modal" style="max-width:820px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <div class="eqd-header-name">Extrato de Compras</div>
+              </div>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('extrato-modal').classList.add('hidden')" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
+            <div class="modal-body">
+              <div class="extrato-toolbar">
+                <div class="extrato-periodo">
+                  <button class="extrato-per-btn active" data-per="tudo"   onclick="App.setExtratoPeriodo('tudo',this)">Tudo</button>
+                  <button class="extrato-per-btn"        data-per="ano"    onclick="App.setExtratoPeriodo('ano',this)">Ano</button>
+                  <button class="extrato-per-btn"        data-per="mes"    onclick="App.setExtratoPeriodo('mes',this)">Mês</button>
+                  <button class="extrato-per-btn"        data-per="semana" onclick="App.setExtratoPeriodo('semana',this)">Semana</button>
+                  <button class="extrato-per-btn"        data-per="dia"    onclick="App.setExtratoPeriodo('dia',this)">Dia</button>
+                </div>
+                <div class="extrato-periodo-picker" id="extrato-periodo-picker">
+                  <select id="extrato-ano-select" class="input-field extrato-picker-input" style="display:none" onchange="App._renderExtrato()"></select>
+                  <input type="month" id="extrato-mes-input" class="input-field extrato-picker-input" style="display:none" onchange="App._renderExtrato()" />
+                  <div class="extrato-semana-picker" id="extrato-semana-wrap" style="display:none">
+                    <input type="date" id="extrato-semana-input" class="input-field extrato-picker-input" onchange="App._onExtratoSemanaChange()" title="Escolha um dia — a semana inteira (7 dias) é calculada a partir dele" />
+                    <span class="extrato-semana-range" id="extrato-semana-range"></span>
+                  </div>
+                  <div class="extrato-dia-picker" id="extrato-dia-wrap" style="display:none">
+                    <button type="button" class="extrato-dia-nav" onclick="App.extratoDiaMover(-1)" title="Dia anterior">‹</button>
+                    <input type="date" id="extrato-dia-input" class="input-field extrato-picker-input" onchange="App._renderExtrato()" />
+                    <button type="button" class="extrato-dia-nav" onclick="App.extratoDiaMover(1)" title="Próximo dia">›</button>
+                  </div>
+                </div>
+              </div>
+              <div class="extrato-resumo-bar" id="extrato-resumo"></div>
+              <div class="table-wrap">
+                <table class="data-table extrato-table">
+                  <thead><tr><th>Data</th><th>Compra</th><th>Valor</th><th>Saldo antes</th><th>Saldo depois</th></tr></thead>
+                  <tbody id="extrato-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Date range filter for all charts -->
+        <div class="date-range-bar">
+          <div class="date-range-label">
+            <svg viewBox="0 0 24 24" fill="none" style="width:15px"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>
+            Período de análise
+          </div>
+          <div class="date-range-inputs">
+            <!-- Filtro rápido por ano -->
+            <label class="date-range-field">
+              <span>Ano</span>
+              <select id="dash-year-select" class="input-field" style="width:90px;height:34px;padding:6px 8px;font-size:.82rem" onchange="App.onYearFilterChange(this)">
+                <option value="">Todos</option>
+              </select>
+            </label>
+            <span class="date-range-sep" style="color:#c8d4e8">|</span>
+            <label class="date-range-field">
+              <span>De</span>
+              <input type="date" id="filter-date-from" class="input-field" onchange="App.clearYearSelect();App.renderDashboard()" />
+            </label>
+            <span class="date-range-sep">→</span>
+            <label class="date-range-field">
+              <span>Até</span>
+              <input type="date" id="filter-date-to" class="input-field" onchange="App.clearYearSelect();App.renderDashboard()" />
+            </label>
+            <button class="btn-date-clear" onclick="App.clearDateRange()" title="Limpar datas">✕ Limpar</button>
+          </div>
+          <div class="date-range-actions">
+            <div class="dash-search-wrap">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
+              <input type="text" id="dash-search" placeholder="Buscar..." oninput="App.dashSearch(this.value)" />
+            </div>
+            <div class="filter-popover-wrap">
+              <button class="btn-filter-toggle" id="btn-dash-filter" onclick="App.toggleDashFilterPopover(event)" title="Filtros">
+                <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
+                <span class="filter-toggle-badge" id="dash-filter-badge" style="display:none">0</span>
+              </button>
+              <div class="filter-popover" id="dash-filter-popover">
+                <div class="filter-popover-row">
+                  <label>UNIDADE</label>
+                  <select id="dash-filter-unit" class="filter-select" onchange="App.renderDashboard(); App.updateDashFilterBadge();">
+                    <option value="">Unidade: Todas</option>
+                  </select>
+                </div>
+                <div class="filter-popover-row">
+                  <label>GRUPO</label>
+                  <select id="dash-filter-group" class="filter-select" onchange="App.renderDashboard(); App.updateDashFilterBadge();">
+                    <option value="">Grupo: Todos</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI Detail Modal -->
+        <div id="kpi-list-modal" class="modal-overlay hidden">
+          <div class="modal-card form-modal" style="max-width:1200px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <div class="eqd-header-name" id="kpi-list-title">Pedidos</div>
+              </div>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('kpi-list-modal').classList.add('hidden')" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
+            <div class="modal-body">
+              <div class="kpi-list-toolbar" id="kpi-list-toolbar" style="display:none">
+                <div class="extrato-periodo">
+                  <button class="extrato-per-btn kpi-list-per-btn active" data-per="todos" onclick="App.setKpiListPeriodo('todos',this)">Todos</button>
+                  <button class="extrato-per-btn kpi-list-per-btn"        data-per="ano"   onclick="App.setKpiListPeriodo('ano',this)">Ano</button>
+                  <button class="extrato-per-btn kpi-list-per-btn"        data-per="mes"   onclick="App.setKpiListPeriodo('mes',this)">Mês</button>
+                  <button class="extrato-per-btn kpi-list-per-btn"        data-per="dia"   onclick="App.setKpiListPeriodo('dia',this)">Dia</button>
+                </div>
+                <div class="extrato-periodo-picker" id="kpi-list-periodo-picker">
+                  <select id="kpi-list-ano-select" class="input-field extrato-picker-input" style="display:none" onchange="App._renderKpiList()"></select>
+                  <input type="month" id="kpi-list-mes-input" class="input-field extrato-picker-input" style="display:none" onchange="App._renderKpiList()" />
+                  <input type="date" id="kpi-list-dia-input" class="input-field extrato-picker-input" style="display:none" onchange="App._renderKpiList()" />
+                </div>
+                <select id="kpi-list-grupo-select" class="filter-select extrato-picker-input" onchange="App._onKpiListGrupoChange()">
+                  <option value="">Grupo: Todos</option>
+                </select>
+                <select id="kpi-list-subgrupo-select" class="filter-select extrato-picker-input" onchange="App.onKpiListSubgrupoChange()">
+                  <option value="">Subgrupo: Todos</option>
+                </select>
+              </div>
+              <div class="table-wrap"><table class="data-table">
+                <thead id="kpi-list-thead"><tr><th>Data</th><th>Unidade</th><th>Grupo</th><th>Subgrupo</th><th>Resumo</th><th>Fornecedor</th><th>Status</th><th>Valor</th></tr></thead>
+                <tbody id="kpi-list-tbody"></tbody>
+              </table></div>
+              <div class="kpi-list-total-box" id="kpi-list-total-box" style="display:none"></div>
+            </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="dash-grid">
+          <!-- Row 1 Col 1: 3 mini charts side by side -->
+          <div class="charts-trio">
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <span>Por Unidade</span>
+                <span class="chart-badge" id="chart-units-top"></span>
+              </div>
+              <canvas id="chart-units"></canvas>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-header"><span>Grupo</span></div>
+              <canvas id="chart-groups"></canvas>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-header">
+                <span>Sub-opções</span>
+                <span class="chart-badge" id="subopts-total"></span>
+              </div>
+              <canvas id="chart-subopts"></canvas>
+              <div id="subopts-more-line"></div>
+            </div>
+          </div>
+          <!-- Row 1+2 Col 2: Status card spans both rows -->
+          <div class="dash-col-right">
+            <!-- Central de Tratamento de Novas Solicitações -->
+            <div class="chart-card mgmt-card mgmt-card-right">
+              <div class="chart-card-header">
+                <span>Central de Tratamento — Novas Solicitações</span>
+                <span class="chart-badge" id="novas-sol-count"></span>
+              </div>
+              <div id="novas-sol-feed" class="mgmt-feed"></div>
+            </div>
+
+            <!-- Card Comparativo Anual -->
+            <div class="chart-card compare-year-card">
+              <div class="chart-card-header">
+                <span>Comparativo Anual de Gastos</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span id="compare-trend-badge" class="compare-trend-badge"></span>
+                  <button class="btn-meta-config" onclick="App.openMetaModal()" title="Definir meta de gastos do ano">
+                    <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.66 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2.5a2 2 0 010-4h.09A1.65 1.65 0 004.6 8.66a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5"/></svg>
+                    Meta
+                  </button>
+                </div>
+              </div>
+              <!-- Velocímetro central: % consumido da meta (ou do ano anterior, sem meta) -->
+              <div class="cmp-gauge-section">
+                <div class="cmp-gauge-wrap">
+                  <canvas id="chart-cmp-gauge"></canvas>
+                  <div class="cmp-gauge-center">
+                    <div class="cmp-gauge-pct" id="cmp-gauge-pct">—</div>
+                    <div class="cmp-gauge-lbl" id="cmp-gauge-lbl">da meta</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Ano atual x Ano anterior, lado a lado -->
+              <div class="cmp-years-row">
+                <div class="cmp-year-card cmp-year-card--cur">
+                  <div class="cmp-year-top">
+                    <span class="cmp-year-num" id="cmp-cur-year">—</span>
+                    <span class="cmp-year-tag">Atual</span>
+                  </div>
+                  <div class="cmp-year-val" id="cmp-cur-val">R$ 0</div>
+                  <div class="compare-bar-wrap"><div class="compare-bar compare-bar-cur" id="cmp-cur-bar" style="width:0%"></div></div>
+                </div>
+                <div class="cmp-year-card cmp-year-card--prev">
+                  <div class="cmp-year-top">
+                    <span class="cmp-year-num" id="cmp-prev-year">—</span>
+                    <span class="cmp-year-tag cmp-year-tag--prev">Anterior</span>
+                  </div>
+                  <div class="cmp-year-val" id="cmp-prev-val">R$ 0</div>
+                  <div class="compare-bar-wrap"><div class="compare-bar compare-bar-prev" id="cmp-prev-bar" style="width:0%"></div></div>
+                </div>
+              </div>
+
+              <!-- Indicador de meta -->
+              <div class="compare-status-row" id="cmp-status-row">
+                <span class="cmp-status-tag" id="cmp-status-tag">
+                  <span id="cmp-status-icon"></span>
+                  <span id="cmp-status-tag-txt">Aguardando dados</span>
+                </span>
+                <div class="cmp-status-metrics" id="cmp-status-metrics"></div>
+              </div>
+            </div>
+
+            <!-- Log de Atividades Recentes (auditoria multiusuário) — antes ficava
+                 embaixo, ao lado de Compras Parceladas; agora fica aqui, no lugar
+                 que era do Comparativo Anual. -->
+            <div class="chart-card mgmt-card mgmt-card-log">
+              <div class="chart-card-header">
+                <span>Log de Atividades Recentes</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="chart-badge" id="activity-log-count"></span>
+                  <div class="filter-popover-wrap">
+                    <button class="btn-filter-toggle" id="btn-activity-filter" onclick="App.toggleActivityFilterPopover(event)" title="Filtrar log de atividades">
+                      <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
+                      <span class="filter-toggle-badge" id="activity-filter-badge" style="display:none">0</span>
+                    </button>
+                    <div class="filter-popover" id="activity-filter-popover" style="left:auto;right:0">
+                      <div class="filter-popover-row">
+                        <div class="req-search-wrap" style="width:100%;max-width:none">
+                          <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
+                          <input type="text" id="activity-search" class="req-search-input" placeholder="Buscar por quem, ação, detalhe..." oninput="App.renderActivityLog()">
+                        </div>
+                      </div>
+                      <div class="filter-popover-row">
+                        <label>TIPO</label>
+                        <select id="activity-filter-modulo" class="filter-select" onchange="App.renderActivityLog()">
+                          <option value="">Todos</option>
+                          <option value="Solicitações">Solicitações</option>
+                          <option value="Estoque">Estoque</option>
+                          <option value="Configurações">Configurações</option>
+                          <option value="Calendário">Calendário</option>
+                        </select>
+                      </div>
+                      <div class="filter-popover-row">
+                        <label>ANO</label>
+                        <select id="activity-filter-year" class="filter-select" onchange="App.renderActivityLog()">
+                          <option value="">Todos</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div id="activity-log-feed" class="mgmt-feed"></div>
+            </div>
+
+          </div>
+          <!-- Row 2 Col 1: Gastos por mês -->
+          <div class="chart-card spending-card">
+            <div class="chart-card-header">
+              <span>Gastos por Período</span>
+            </div>
+            <canvas id="chart-monthly" height="260" style="max-height:260px"></canvas>
+            <div id="unit-spending-list" class="unit-spending-list"></div>
+          </div>
+
+          <!-- ── Parcelas + Log de Atividades (dentro da coluna esquerda) ── -->
+          <div class="dash-mgmt-grid">
+
+          <!-- Card 1: Métrica de Compras Parceladas -->
+          <div class="chart-card mgmt-card parcelas-card" onclick="App.openParcelasModal()" title="Clique para ver as compras parceladas e o status das parcelas">
+            <div class="chart-card-header">
+              <span>Compras Parceladas</span>
+              <span class="chart-badge" id="parcelas-count"></span>
+            </div>
+            <div class="parcelas-body">
+              <div class="parcelas-chart-wrap">
+                <canvas id="chart-parcelas"></canvas>
+              </div>
+              <div class="parcelas-legend" id="parcelas-legend"></div>
+            </div>
+          </div>
+
+          <!-- Card 2: Gastos por Grupo de Produto (fluxo de caixa, barra horizontal) —
+               antes era o Log de Atividades, que mudou pra coluna da direita. -->
+          <div class="chart-card mgmt-card groupspend-card">
+            <div class="chart-card-header">
+              <span>Gastos por Grupo de Produto</span>
+              <span class="chart-badge" id="groupspend-total"></span>
+            </div>
+            <canvas id="chart-groupspend"></canvas>
+          </div>
+
+          </div>
+        </div>
+
+        <!-- Modal: detalhe de uma atividade do log -->
+        <div id="activity-detail-modal" class="modal-overlay hidden">
+          <div class="modal-card" style="max-width:480px">
+            <div class="modal-header">
+              <h3>Detalhe da Atividade</h3>
+              <button class="modal-close" onclick="document.getElementById('activity-detail-modal').classList.add('hidden')">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+            <div class="modal-body" id="activity-detail-body"></div>
+          </div>
+        </div>
+
+        <!-- Modal: detalhe das compras parceladas -->
+        <div id="parcelas-modal" class="modal-overlay hidden">
+          <div class="modal-card form-modal" style="max-width:760px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><rect x="1" y="4" width="22" height="16" rx="2" stroke="currentColor" stroke-width="2"/><line x1="1" y1="10" x2="23" y2="10" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <div class="eqd-header-name">Compras Parceladas — status das parcelas</div>
+              </div>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('parcelas-modal').classList.add('hidden')" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
+            <div class="modal-body" id="parcelas-modal-body"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal: configuração de meta anual -->
+        <div id="meta-modal" class="modal-overlay hidden">
+          <div class="modal-card form-modal" style="max-width:560px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="6" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <div class="eqd-header-name">Meta de Gastos Anual</div>
+              </div>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('meta-modal').classList.add('hidden')" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
+            <div class="modal-body">
+              <div class="meta-form">
+                <label class="meta-field">
+                  <span>Ano da meta</span>
+                  <select id="meta-year" class="input-field" onchange="App.onMetaYearChange()"></select>
+                </label>
+
+                <div class="meta-field">
+                  <span>Gasto do ano anterior (<b id="meta-prev-year-lbl">—</b>)</span>
+                  <div class="meta-prev-wrap">
+                    <input type="text" id="meta-prev-val" class="input-field" placeholder="R$ 0,00" oninput="App.recalcMetaPreview()">
+                    <span class="meta-prev-src" id="meta-prev-src"></span>
+                  </div>
+                  <small id="meta-prev-hint" class="meta-hint"></small>
+                </div>
+
+                <label class="meta-field">
+                  <span>Meta de redução para o ano atual (%)</span>
+                  <input type="number" id="meta-reduction" class="input-field" min="0" max="100" step="1" placeholder="Ex: 10" oninput="App.recalcMetaPreview()">
+                </label>
+
+                <div class="meta-preview" id="meta-preview">
+                  <div class="meta-preview-row">
+                    <span>Gasto atual (<b id="meta-cur-year-lbl">—</b>, automático)</span>
+                    <strong id="meta-cur-val">R$ 0,00</strong>
+                  </div>
+                  <div class="meta-preview-row meta-preview-target">
+                    <span>Meta calculada</span>
+                    <strong id="meta-target-val">R$ 0,00</strong>
+                  </div>
+                  <div class="meta-preview-row">
+                    <span>Pode gastar por mês</span>
+                    <strong id="meta-permonth-val">R$ 0,00</strong>
+                  </div>
+                  <div class="meta-status-box" id="meta-status-box"></div>
+                </div>
+
+                <!-- Histórico de metas por ano — bateu / não bateu -->
+                <div class="meta-hist-section">
+                  <div class="meta-hist-title">Histórico de Metas</div>
+                  <div class="meta-hist-list" id="meta-hist-list"></div>
+                </div>
+              </div>
+            </div>
+            </div>
+            <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:14px 20px">
+              <button class="btn-ghost" id="meta-clear-btn" onclick="App.clearMeta()">Remover meta</button>
+              <button class="btn-primary" onclick="App.saveMeta()">Salvar meta</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Cards de Consumo: Tintas e Pilhas/Baterias ── -->
+        <div class="consumo-grid">
+
+          <!-- Card Tintas -->
+          <div class="chart-card consumo-card" onclick="App.openConsumoAudit('ink')" title="Clique para ver a auditoria completa">
+            <div class="consumo-card-head">
+              <div class="consumo-card-title">
+                <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span>Tintas Compradas</span>
+              </div>
+              <div class="consumo-head-controls" onclick="event.stopPropagation()">
+                <input type="date"  id="ink-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('ink',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
+                <input type="month" id="ink-month" class="cons-month-sel hidden" onchange="App.setConsMonth('ink',this.value)">
+                <select id="ink-year"  class="cons-year-sel"  onchange="App.setConsYear('ink',this.value)"></select>
+                <div class="consumo-period-toggle">
+                  <button class="cons-per-btn"        data-kind="ink" data-period="week"  onclick="App.setConsPeriod('ink','week',this)">Semana</button>
+                  <button class="cons-per-btn"        data-kind="ink" data-period="month" onclick="App.setConsPeriod('ink','month',this)">Mês</button>
+                  <button class="cons-per-btn active" data-kind="ink" data-period="year"  onclick="App.setConsPeriod('ink','year',this)">Ano</button>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-body">
+              <div class="consumo-main">
+                <div class="consumo-big" id="ink-count">0</div>
+                <div class="consumo-big-lbl">tintas no período</div>
+                <span class="consumo-trend" id="ink-trend">—</span>
+              </div>
+              <div class="consumo-stats">
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Gasto total</span>
+                  <span class="consumo-stat-val" id="ink-spent">R$ 0,00</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Cor mais comprada</span>
+                  <span class="consumo-stat-val" id="ink-top-color">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Unidade que mais comprou</span>
+                  <span class="consumo-stat-val" id="ink-top-unit">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Maior solicitante</span>
+                  <span class="consumo-stat-val" id="ink-top-solicitante">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl" id="ink-prev-lbl">Período anterior</span>
+                  <span class="consumo-stat-val consumo-stat-muted" id="ink-prev">0 · R$ 0,00</span>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-breakdown" id="ink-breakdown"></div>
+          </div>
+
+          <!-- Card Pilhas/Baterias -->
+          <div class="chart-card consumo-card" onclick="App.openConsumoAudit('bat')" title="Clique para ver a auditoria completa">
+            <div class="consumo-card-head">
+              <div class="consumo-card-title">
+                <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><rect x="2" y="7" width="18" height="10" rx="2" stroke="currentColor" stroke-width="2"/><line x1="22" y1="10" x2="22" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="10" x2="6" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+                <span>Pilhas &amp; Baterias</span>
+              </div>
+              <div class="consumo-head-controls" onclick="event.stopPropagation()">
+                <input type="date"  id="bat-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('bat',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
+                <input type="month" id="bat-month" class="cons-month-sel hidden" onchange="App.setConsMonth('bat',this.value)">
+                <select id="bat-year"  class="cons-year-sel"  onchange="App.setConsYear('bat',this.value)"></select>
+                <div class="consumo-period-toggle">
+                  <button class="cons-per-btn"        data-kind="bat" data-period="week"  onclick="App.setConsPeriod('bat','week',this)">Semana</button>
+                  <button class="cons-per-btn"        data-kind="bat" data-period="month" onclick="App.setConsPeriod('bat','month',this)">Mês</button>
+                  <button class="cons-per-btn active" data-kind="bat" data-period="year"  onclick="App.setConsPeriod('bat','year',this)">Ano</button>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-body">
+              <div class="consumo-main">
+                <div class="consumo-big" id="bat-count">0</div>
+                <div class="consumo-big-lbl">unidades no período</div>
+                <span class="consumo-trend" id="bat-trend">—</span>
+              </div>
+              <div class="consumo-stats">
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Gasto total</span>
+                  <span class="consumo-stat-val" id="bat-spent">R$ 0,00</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Modelo mais comprado</span>
+                  <span class="consumo-stat-val" id="bat-top-model">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Unidade que mais comprou</span>
+                  <span class="consumo-stat-val" id="bat-top-unit">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Maior solicitante</span>
+                  <span class="consumo-stat-val" id="bat-top-solicitante">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl" id="bat-prev-lbl">Período anterior</span>
+                  <span class="consumo-stat-val consumo-stat-muted" id="bat-prev">0 · R$ 0,00</span>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-breakdown" id="bat-breakdown"></div>
+          </div>
+
+          <!-- Card Outros -->
+          <div class="chart-card consumo-card" onclick="App.openConsumoAudit('outros')" title="Clique para ver a auditoria completa">
+            <div class="consumo-card-head">
+              <div class="consumo-card-title">
+                <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/><polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="currentColor" stroke-width="2"/><line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2"/></svg></span>
+                <span>Outros</span>
+              </div>
+              <div class="consumo-head-controls" onclick="event.stopPropagation()">
+                <input type="date"  id="outros-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('outros',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
+                <input type="month" id="outros-month" class="cons-month-sel hidden" onchange="App.setConsMonth('outros',this.value)">
+                <select id="outros-year"  class="cons-year-sel"  onchange="App.setConsYear('outros',this.value)"></select>
+                <div class="consumo-period-toggle">
+                  <button class="cons-per-btn"        data-kind="outros" data-period="week"  onclick="App.setConsPeriod('outros','week',this)">Semana</button>
+                  <button class="cons-per-btn"        data-kind="outros" data-period="month" onclick="App.setConsPeriod('outros','month',this)">Mês</button>
+                  <button class="cons-per-btn active" data-kind="outros" data-period="year"  onclick="App.setConsPeriod('outros','year',this)">Ano</button>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-body">
+              <div class="consumo-main">
+                <div class="consumo-big" id="outros-count">0</div>
+                <div class="consumo-big-lbl">itens no período</div>
+                <span class="consumo-trend" id="outros-trend">—</span>
+              </div>
+              <div class="consumo-stats">
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Gasto total</span>
+                  <span class="consumo-stat-val" id="outros-spent">R$ 0,00</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Subgrupo mais comprado</span>
+                  <span class="consumo-stat-val" id="outros-top-subgrupo">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Unidade que mais comprou</span>
+                  <span class="consumo-stat-val" id="outros-top-unit">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Maior solicitante</span>
+                  <span class="consumo-stat-val" id="outros-top-solicitante">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl" id="outros-prev-lbl">Período anterior</span>
+                  <span class="consumo-stat-val consumo-stat-muted" id="outros-prev">0 · R$ 0,00</span>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-breakdown" id="outros-breakdown"></div>
+          </div>
+
+          <!-- Card Conserto -->
+          <div class="chart-card consumo-card" onclick="App.openConsumoAudit('concerto')" title="Clique para ver a auditoria completa">
+            <div class="consumo-card-head">
+              <div class="consumo-card-title">
+                <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke="currentColor" stroke-width="2"/></svg></span>
+                <span>Conserto</span>
+              </div>
+              <div class="consumo-head-controls" onclick="event.stopPropagation()">
+                <input type="date"  id="concerto-week"  class="cons-week-sel hidden"  onchange="App.setConsWeek('concerto',this.value)" title="Escolha um dia — a semana (7 dias) é calculada a partir dele">
+                <input type="month" id="concerto-month" class="cons-month-sel hidden" onchange="App.setConsMonth('concerto',this.value)">
+                <select id="concerto-year"  class="cons-year-sel"  onchange="App.setConsYear('concerto',this.value)"></select>
+                <div class="consumo-period-toggle">
+                  <button class="cons-per-btn"        data-kind="concerto" data-period="week"  onclick="App.setConsPeriod('concerto','week',this)">Semana</button>
+                  <button class="cons-per-btn"        data-kind="concerto" data-period="month" onclick="App.setConsPeriod('concerto','month',this)">Mês</button>
+                  <button class="cons-per-btn active" data-kind="concerto" data-period="year"  onclick="App.setConsPeriod('concerto','year',this)">Ano</button>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-body">
+              <div class="consumo-main">
+                <div class="consumo-big" id="concerto-count">0</div>
+                <div class="consumo-big-lbl">consertos no período</div>
+                <span class="consumo-trend" id="concerto-trend">—</span>
+              </div>
+              <div class="consumo-stats">
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Gasto total</span>
+                  <span class="consumo-stat-val" id="concerto-spent">R$ 0,00</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Modelo que mais deu problema</span>
+                  <span class="consumo-stat-val" id="concerto-top-model">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Unidade que mais deu problema</span>
+                  <span class="consumo-stat-val" id="concerto-top-unit">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl">Maior solicitante</span>
+                  <span class="consumo-stat-val" id="concerto-top-solicitante">—</span>
+                </div>
+                <div class="consumo-stat">
+                  <span class="consumo-stat-lbl" id="concerto-prev-lbl">Período anterior</span>
+                  <span class="consumo-stat-val consumo-stat-muted" id="concerto-prev">0 · R$ 0,00</span>
+                </div>
+              </div>
+            </div>
+            <div class="consumo-breakdown" id="concerto-breakdown"></div>
+          </div>
+
+        </div>
+
+        <!-- Modal: Auditoria de um card de consumo (Tintas/Pilhas/Outros/Conserto).
+             Cabeçalho segue o padrão do Inventário (.form-modal/.form-modal-header/
+             .form-modal-stripe) — padrão de TODO popup novo daqui pra frente. -->
+        <div id="consumo-audit-modal" class="modal-overlay hidden">
+          <div class="modal-card form-modal audit-modal-card" style="max-width:1000px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 15l4-5 3 3 5-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div>
+                  <div class="eqd-header-name" id="audit-title">Auditoria</div>
+                  <div class="eqd-header-sub audit-modal-sub" id="audit-sub">Período: —</div>
+                </div>
+              </div>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="App.closeConsumoAudit()" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
+            <div class="modal-body audit-modal-body">
+              <div class="audit-grid">
+                <!-- Painel esquerdo escuro, estilo auditoria -->
+                <div class="audit-side">
+                  <div class="audit-side-lbl">Gasto Total</div>
+                  <div class="audit-side-big" id="audit-spent">R$ 0,00</div>
+                  <div class="audit-side-tag" id="audit-trend-tag">—</div>
+                  <div class="audit-side-divider"></div>
+                  <div class="audit-side-row"><span id="audit-count-lbl">Comprados no período</span><strong id="audit-count">0</strong></div>
+                  <div class="audit-side-row"><span>Período anterior</span><strong id="audit-prev">0 · R$ 0,00</strong></div>
+                  <!-- Box azul: % da meta anual já consumida por esse material -->
+                  <div class="audit-meta-box hidden" id="audit-meta-box">
+                    <div class="audit-meta-lbl">% da meta anual já gasta com esse material</div>
+                    <div class="audit-meta-pct" id="audit-meta-pct">—</div>
+                  </div>
+                </div>
+                <!-- Painel direito: estatísticas + ranking -->
+                <div class="audit-main">
+                  <div class="audit-stats-grid">
+                    <div class="audit-stat"><span id="audit-top-lbl">Mais comprado</span><strong id="audit-top">—</strong></div>
+                    <div class="audit-stat"><span id="audit-unit-lbl">Unidade que mais comprou</span><strong id="audit-top-unit">—</strong></div>
+                    <div class="audit-stat"><span id="audit-sol-lbl">Maior solicitante</span><strong id="audit-top-sol">—</strong></div>
+                  </div>
+                  <div class="audit-bd">
+                    <div class="consumo-bd-title" id="audit-bd-title">Por item</div>
+                    <div class="audit-bd-chart-wrap"><canvas id="audit-breakdown-chart"></canvas></div>
+                    <div class="consumo-bd-empty hidden" id="audit-breakdown-empty">Nenhuma compra no período</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Comparativo de gastos: semanal / mensal / anual, com Tendência e Média -->
+              <div class="audit-chart-section">
+                <div class="audit-chart-head">
+                  <span>Comparativo de Gastos</span>
+                  <div class="consumo-period-toggle" id="audit-gran-toggle">
+                    <button class="cons-per-btn" data-g="week" onclick="App.setAuditGranularity('week',this)">Semanal</button>
+                    <button class="cons-per-btn active" data-g="month" onclick="App.setAuditGranularity('month',this)">Mensal</button>
+                    <button class="cons-per-btn" data-g="year" onclick="App.setAuditGranularity('year',this)">Anual</button>
+                  </div>
+                </div>
+                <div class="audit-chart-canvas-wrap"><canvas id="audit-chart"></canvas></div>
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ESTOQUE ── -->
+      <div id="tab-estoque" class="tab-panel">
+        <div class="tab-header dash-topbar">
+          <div>
+            <h2>Gestão de Estoque</h2>
+            <p class="tab-subtitle">Controle itens disponíveis para retirada nas solicitações</p>
+          </div>
+          <div class="dash-controls">
+            <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="idle-timer">60:00</span>
+            </div>
+            <button class="btn-dash-print" onclick="App.abrirRelatorioEstoque()" title="Baixar relatório de estoque em PDF (escolha as opções)">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Relatório
+            </button>
+          </div>
+        </div>
+
+        <!-- ── MODAL: Relatório de Estoque (escolha o que entra no PDF) ── -->
+        <div id="relatorio-estoque-modal" class="modal-overlay hidden">
+          <div class="modal-card form-modal" style="max-width:480px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="eqd-header-name">Relatório de Estoque</div>
+              </div>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('relatorio-estoque-modal').classList.add('hidden')" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
+            <div class="modal-body">
+              <div class="rpt-field">
+                <span class="req-filter-label">Tipo de relatório</span>
+                <div class="extrato-periodo">
+                  <button type="button" class="extrato-per-btn active" data-tipo="itens" onclick="App.setRptEstoqueTipo('itens', this)">Itens em Estoque (saldo)</button>
+                  <button type="button" class="extrato-per-btn" data-tipo="movs" onclick="App.setRptEstoqueTipo('movs', this)">Entradas e Saídas</button>
+                </div>
+              </div>
+              <div id="rpt-est-itens-opts" class="rpt-field">
+                <label class="rpt-checkbox">
+                  <input type="checkbox" id="rpt-est-zerados" checked>
+                  Incluir itens com saldo zerado
+                </label>
+              </div>
+              <div id="rpt-est-movs-opts" class="rpt-field hidden">
+                <span class="req-filter-label">Movimentação</span>
+                <div class="extrato-periodo">
+                  <button type="button" class="extrato-per-btn active" data-mov="ambos" onclick="App.setRptEstoqueMov('ambos', this)">Ambas</button>
+                  <button type="button" class="extrato-per-btn" data-mov="entrada" onclick="App.setRptEstoqueMov('entrada', this)">Só Entradas</button>
+                  <button type="button" class="extrato-per-btn" data-mov="saida" onclick="App.setRptEstoqueMov('saida', this)">Só Saídas</button>
+                </div>
+              </div>
+            </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-ghost" onclick="document.getElementById('relatorio-estoque-modal').classList.add('hidden')">Cancelar</button>
+              <button class="btn-primary" onclick="App.gerarRelatorioEstoque()">
+                <svg viewBox="0 0 24 24" fill="none" width="14" height="14" style="margin-right:4px;vertical-align:-2px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/></svg>
+                Gerar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toolbar: busca + conf + filtros -->
+        <div class="estoque-toolbar-card">
+          <div class="req-search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
+            <input type="text" id="estoque-search" class="req-search-input" placeholder="Buscar produto..." oninput="App.estoquePagina=1;App.renderEstoque()" />
+          </div>
+          <div class="filter-popover-wrap">
+            <button class="btn-filter-toggle labeled" id="btn-estoque-conf-toggle" onclick="App.toggleEstoqueConfPopover(event)" title="Configurações">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.66 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2.5a2 2 0 010-4h.09A1.65 1.65 0 004.6 8.66a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5"/></svg>
+              <span>Conf</span>
+            </button>
+            <div class="filter-popover" id="estoque-conf-popover">
+              <div class="filter-popover-row">
+                <button class="btn-ghost" id="btn-limpar-mov" onclick="App.limparMovimentacoes()" title="Apaga entradas/saídas geradas por compras (preserva itens e movimentos manuais)" style="color:#d94040;border-color:#fca5a5;width:100%">
+                  <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:4px"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke="currentColor" stroke-width="2"/></svg>
+                  Limpar Entr./Saí.
+                </button>
+              </div>
+              <div class="filter-popover-row">
+                <button class="btn-ghost" id="btn-importar-compras" onclick="App.backfillEstoqueCompras()" title="Importa todas as compras já registradas para o estoque (entrada/saída)" style="width:100%">
+                  <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:4px"><path d="M21 12a9 9 0 11-9-9c2.5 0 4.8 1 6.5 2.7L21 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M21 3v5h-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  Importar Compras
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="filter-popover-wrap">
+            <button class="btn-filter-toggle" id="btn-estoque-filter-toggle" onclick="App.toggleEstoqueFilterPopover(event)" title="Filtros">
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <div class="filter-popover filt-panel" id="estoque-filter-popover">
+              <div class="filt-grid">
+                <div class="filt-field">
+                  <label>Grupo</label>
+                  <select id="estoque-filter-grupo" class="filter-select" onchange="App.estoquePagina=1;App.renderEstoque()">
+                    <option value="">Todos os grupos</option>
+                  </select>
+                </div>
+                <div class="filt-field">
+                  <label>Subgrupo</label>
+                  <select id="estoque-filter-subgrupo" class="filter-select" onchange="App.estoquePagina=1;App.renderEstoque()">
+                    <option value="">Todos</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="btn-nova-solic" onclick="App.escolherTipoEstoque()" title="Novo Item">
+            <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+
+        <!-- Estado vazio geral -->
+        <div id="estoque-empty-all" class="estoque-empty-all hidden">
+          <svg viewBox="0 0 24 24" fill="none" style="width:38px;opacity:.4"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+          <p>Nenhum item em estoque. Clique em <strong>Novo Item</strong> para adicionar.</p>
+        </div>
+
+        <!-- Card resumo de movimentação -->
+        <div id="estoque-resumo-card" class="estoque-resumo-card hidden">
+          <div class="resumo-box resumo-ent">
+            <div class="resumo-ico">↓</div>
+            <div><div class="resumo-val" id="resumo-entradas">0</div><div class="resumo-lbl">Entradas</div></div>
+          </div>
+          <div class="resumo-box resumo-sai">
+            <div class="resumo-ico">↑</div>
+            <div><div class="resumo-val" id="resumo-saidas">0</div><div class="resumo-lbl">Saídas</div></div>
+          </div>
+          <div class="resumo-box resumo-sld">
+            <div class="resumo-ico">∑</div>
+            <div><div class="resumo-val" id="resumo-saldo">0</div><div class="resumo-lbl">Saldo Total</div></div>
+          </div>
+          <div class="resumo-box resumo-zer">
+            <div class="resumo-ico">⚠</div>
+            <div><div class="resumo-val" id="resumo-zerados">0</div><div class="resumo-lbl">Zerados</div></div>
+          </div>
+        </div>
+
+        <!-- Tabela de itens -->
+        <div id="estoque-inv-section" class="hidden">
+          <div class="estoque-sec-title">
+            Itens em Estoque
+            <button id="btn-ver-zerados" class="btn-ver-zerados hidden" onclick="App.toggleVerZerados(this)">Ver zerados</button>
+          </div>
+          <div class="table-wrap" style="margin-top:8px">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Lote</th>
+                  <th>Produto</th>
+                  <th>Grupo</th>
+                  <th>Subgrupo</th>
+                  <th>Quantidade</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="estoque-tbody"></tbody>
+            </table>
+          </div>
+          <div id="estoque-pager" class="estoque-pager hidden">
+            <button id="estoque-prev" class="estoque-pager-btn" onclick="App.estoquePage('prev')">‹ Anterior</button>
+            <span id="estoque-pager-info" class="estoque-pager-info">1 / 1</span>
+            <button id="estoque-next" class="estoque-pager-btn" onclick="App.estoquePage('next')">Próximo ›</button>
+          </div>
+        </div>
+
+        <!-- Cards Entrada / Saída (preview 5 itens + scroll) -->
+        <div id="estoque-cards-grid" class="estoque-cards-grid hidden">
+
+          <!-- Card Entradas -->
+          <div class="estoque-mov-card">
+            <div class="estoque-mov-card-head">
+              <div class="emc-title"><span class="sec-dot dot-ent"></span> Entradas
+                <span id="estoque-entradas-count" class="estoque-sec-badge" style="background:#1db87a">0</span>
+              </div>
+              <div class="emc-actions">
+                <div class="emc-sort">
+                  <button class="emc-sort-btn active" id="sort-ent-desc" onclick="App.setMovSort('entrada','desc',this)" title="Mais recente">↓</button>
+                  <button class="emc-sort-btn" id="sort-ent-asc" onclick="App.setMovSort('entrada','asc',this)" title="Mais antiga">↑</button>
+                </div>
+                <button class="emc-ver-btn" onclick="App.openMovHist('entrada')">Histórico</button>
+              </div>
+            </div>
+            <div class="emc-search-wrap">
+              <input type="text" id="estoque-entradas-search" class="emc-search" placeholder="Buscar produto, lote, origem..." oninput="App.setMovSearch('entrada', this.value)">
+              <button type="button" class="emc-search-clear" onclick="App.clearMovSearch('entrada')" title="Limpar busca">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+            <div id="estoque-entradas-list" class="estoque-mov-list"></div>
+          </div>
+
+          <!-- Card Saídas -->
+          <div class="estoque-mov-card">
+            <div class="estoque-mov-card-head">
+              <div class="emc-title"><span class="sec-dot dot-sai"></span> Saídas
+                <span id="estoque-saidas-count" class="estoque-sec-badge" style="background:#e8830a">0</span>
+              </div>
+              <div class="emc-actions">
+                <div class="emc-sort">
+                  <button class="emc-sort-btn active" id="sort-sai-desc" onclick="App.setMovSort('saida','desc',this)" title="Mais recente">↓</button>
+                  <button class="emc-sort-btn" id="sort-sai-asc" onclick="App.setMovSort('saida','asc',this)" title="Mais antiga">↑</button>
+                </div>
+                <button class="emc-ver-btn" onclick="App.openMovHist('saida')">Histórico</button>
+              </div>
+            </div>
+            <div class="emc-search-wrap">
+              <input type="text" id="estoque-saidas-search" class="emc-search" placeholder="Buscar produto, destino, origem..." oninput="App.setMovSearch('saida', this.value)">
+              <button type="button" class="emc-search-clear" onclick="App.clearMovSearch('saida')" title="Limpar busca">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+            <div id="estoque-saidas-list" class="estoque-mov-list"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Modal: Histórico completo de movimentações -->
+      <div id="mov-hist-modal" class="modal-overlay hidden">
+        <div class="modal-card form-modal" style="max-width:880px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M12 8v4l2.5 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="mov-hist-title">Histórico</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeMovHist()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
+          <div class="modal-body">
+            <input type="text" id="mov-hist-search" class="req-search-input" placeholder="Buscar..." oninput="App.setMovHistSearch(this.value)" style="max-width:100%;margin-bottom:10px">
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead id="mov-hist-thead"></thead>
+                <tbody id="mov-hist-tbody"></tbody>
+              </table>
+            </div>
+            <div class="estoque-pager" style="margin-top:14px">
+              <button id="mov-hist-prev" class="estoque-pager-btn" onclick="App.movHistPage('prev')">‹ Anterior</button>
+              <span id="mov-hist-pager-info" class="estoque-pager-info">1 / 1</span>
+              <button id="mov-hist-next" class="estoque-pager-btn" onclick="App.movHistPage('next')">Próximo ›</button>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Detalhe de uma movimentação -->
+      <div id="mov-detail-modal" class="modal-overlay hidden">
+        <div class="modal-card form-modal" style="max-width:720px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="mov-detail-title">Detalhe da Movimentação</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeMovDetail()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
+          <div class="modal-body" id="mov-detail-body"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="App.closeMovDetail()">Fechar</button>
+            <button class="btn-delete" id="mov-detail-del-btn" onclick="App.deleteMovimento()">Apagar movimento</button>
+            <button class="btn-primary" id="mov-detail-date-btn" onclick="App.movDetailEditDate()">Alterar Data</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Editar data da movimentação -->
+      <div id="mov-date-modal" class="modal-overlay hidden">
+        <div class="modal-card form-modal" style="max-width:400px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name">Alterar Data da Movimentação</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeMovDate()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
+          <div class="modal-body">
+            <input type="hidden" id="mov-date-id">
+            <div class="form-group">
+              <label class="form-label">Data</label>
+              <input type="date" id="mov-date-input" class="input-field">
+            </div>
+          </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="App.closeMovDate()">Cancelar</button>
+            <button class="btn-primary" onclick="App.saveMovDate()">Salvar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Novo/Editar Item de Estoque -->
+      <!-- ── MODAL: escolher tipo (Nova compra x Nova entrada) ── -->
+      <div id="estoque-tipo-modal" class="modal-overlay hidden">
+        <div class="modal-card form-modal" style="max-width:460px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name">Adicionar ao Estoque</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="document.getElementById('estoque-tipo-modal').classList.add('hidden')" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
+          <div class="modal-body">
+            <p style="color:var(--ink-500);margin-bottom:14px">O que você está adicionando?</p>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <button type="button" class="estoque-tipo-opt" onclick="App.openEstoqueForm(null,'compra')">
+                <span class="estoque-tipo-ico" style="background:#dbeafe;color:#1d4ed8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
+                <span class="estoque-tipo-txt"><strong>Nova compra</strong><small>Produto comprado — entra no total gasto do dashboard.</small></span>
+              </button>
+              <button type="button" class="estoque-tipo-opt" onclick="App.openEstoqueForm(null,'entrada')">
+                <span class="estoque-tipo-ico" style="background:#dcfce7;color:#059669"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg></span>
+                <span class="estoque-tipo-txt"><strong>Nova entrada</strong><small>Item que já existe fisicamente (não foi comprado) — NÃO conta como gasto.</small></span>
+              </button>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="estoque-modal" class="modal-overlay hidden">
+        <div class="modal-card form-modal" style="max-width:620px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="estoque-form-title">Novo Item em Estoque</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeEstoqueForm()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
+          <div class="modal-body">
+            <input type="hidden" id="estoque-edit-id">
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label">Grupo *</label>
+                <select id="estoque-grupo" class="input-field select-styled" onchange="App.onEstoqueGrupoChange()">
+                  <option value="">— Selecione —</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Subgrupo</label>
+                <select id="estoque-subgrupo" class="input-field select-styled">
+                  <option value="">— Selecione —</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:10px">
+              <label class="form-label">Produto / Descrição *</label>
+              <select id="estoque-produto-select" class="input-field select-styled hidden">
+                <option value="">— Selecione —</option>
+              </select>
+              <input type="text" id="estoque-produto" class="input-field" list="estoque-produto-list" placeholder="Ex: Tinta Ciano HP 122">
+              <datalist id="estoque-produto-list"></datalist>
+            </div>
+            <div class="form-row-2" style="margin-top:10px">
+              <div class="form-group estoque-money">
+                <label class="form-label">Fornecedor</label>
+                <select id="estoque-fornecedor" class="input-field select-styled">
+                  <option value="">— Selecione —</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Quantidade *</label>
+                <input type="number" id="estoque-qtd" class="input-field" min="0" placeholder="0" oninput="App.calcEstoqueValorTotal()">
+              </div>
+            </div>
+            <div id="estoque-compra-fields">
+              <div class="form-row-2" style="margin-top:10px">
+                <div class="form-group">
+                  <label class="form-label">Unidade de destino *</label>
+                  <select id="estoque-unidade-destino" class="input-field select-styled" onchange="App._popularSelectSetor('estoque-solicitante', this.value==='__central__'?null:this.value, '')">
+                    <option value="">— Selecione —</option>
+                  </select>
+                </div>
+                <div class="form-group estoque-money">
+                  <label class="form-label">Valor unitário (R$) *</label>
+                  <input type="number" id="estoque-valor" class="input-field" min="0" step="0.01" placeholder="0,00" oninput="App.calcEstoqueValorTotal()">
+                </div>
+              </div>
+              <div class="form-row-2" style="margin-top:10px">
+                <div class="form-group">
+                  <label class="form-label">Setor solicitante</label>
+                  <select id="estoque-solicitante" class="input-field select-styled"></select>
+                </div>
+                <div class="form-group estoque-money">
+                  <label class="form-label">Valor total</label>
+                  <input type="text" id="estoque-valor-total" class="input-field" readonly style="background:#f8fafc;font-weight:600;color:#1a7a4a">
+                </div>
+              </div>
+              <div class="form-row-2 estoque-money" style="margin-top:10px;align-items:flex-end">
+                <div class="form-group">
+                  <label class="form-label">Forma de Pagamento</label>
+                  <select id="estoque-forma-pagamento" class="input-field select-styled">
+                    <option value="dinheiro">Dinheiro</option>
+                    <option value="boleto">Boleto</option>
+                    <option value="cartao">Cartão</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="toggle-label">
+                    <input type="checkbox" id="chk-estoque-parcelas" onchange="App.toggleEstoqueParcelas()">
+                    <span class="toggle-switch"></span>
+                    Parcelar
+                  </label>
+                </div>
+              </div>
+              <div class="form-group" id="estoque-parcelas-wrap" style="display:none;margin-top:10px">
+                <label class="form-label">Nº de Parcelas</label>
+                <input type="number" id="estoque-parcelas-n" class="input-field" min="2" placeholder="Ex.: 3" oninput="App.calcEstoqueValorTotal()" style="max-width:130px">
+              </div>
+              <!-- Brinde: item extra que veio junto na MESMA compra, sem custo próprio -->
+              <div id="estoque-brinde-wrap" class="estoque-brinde-box hidden">
+                <label class="toggle-label">
+                  <input type="checkbox" id="chk-estoque-brinde" onchange="App.toggleEstoqueBrinde()">
+                  <span class="toggle-switch"></span>
+                  Veio brinde / item extra nesta compra
+                </label>
+                <div id="estoque-brinde-fields" style="display:none">
+                  <p class="estoque-brinde-hint">Entra no estoque como <strong>entrada sem custo</strong>, herdando fornecedor, unidade, solicitante e data da compra acima. Recebe o mesmo nº de lote com a marca <strong>REF</strong>.</p>
+                  <div class="form-row-2">
+                    <div class="form-group">
+                      <label class="form-label">Grupo *</label>
+                      <select id="estoque-brinde-grupo" class="input-field select-styled" onchange="App.onEstoqueBrindeGrupoChange()">
+                        <option value="">— Selecione —</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Subgrupo</label>
+                      <select id="estoque-brinde-subgrupo" class="input-field select-styled">
+                        <option value="">— Selecione —</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-row-2" style="margin-top:10px">
+                    <div class="form-group">
+                      <label class="form-label">Produto / Descrição *</label>
+                      <input type="text" id="estoque-brinde-produto" class="input-field" placeholder="Ex: Prego 17x27">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Quantidade *</label>
+                      <input type="number" id="estoque-brinde-qtd" class="input-field" min="0" placeholder="0">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:10px">
+              <label class="form-label" id="estoque-data-label">Data da compra</label>
+              <input type="date" id="estoque-data" class="input-field">
+            </div>
+          </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="App.closeEstoqueForm()">Cancelar</button>
+            <button class="btn-primary" onclick="App.saveEstoqueItem()">
+              <svg viewBox="0 0 24 24" fill="none" style="width:14px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8" stroke="currentColor" stroke-width="2"/></svg>
+              Salvar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: COMPRA COMBINADA ── -->
+      <div id="compra-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:720px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="compra-modal-title">Compra Combinada — Seleção</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeCompraModal()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+
+          <!-- PASSO 1: Seleção -->
+          <div id="compra-step-1">
+            <div class="modal-body">
+              <div class="compra-step1-header">
+                <span style="font-size:.85rem;font-weight:600;color:#1a3a6b">Selecione as solicitações para esta compra</span>
+                <select id="compra-sort" class="input-field select-styled" onchange="App.renderCompraReqList()" style="max-width:170px;font-size:.78rem;padding:4px 8px">
+                  <option value="recente">Mais recente</option>
+                  <option value="antiga">Mais antiga</option>
+                  <option value="sl">Código SL</option>
+                </select>
+              </div>
+              <input type="text" id="compra-search" class="req-search-input" placeholder="Buscar por SL, unidade, grupo..." oninput="App.renderCompraReqList()" style="max-width:100%;margin-bottom:8px">
+              <div id="compra-req-list" class="compra-req-list"></div>
+              <div id="compra-sel-count" style="font-size:.76rem;color:#6680a0;margin-top:6px;text-align:right"></div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-ghost" onclick="App.closeCompraModal()">Cancelar</button>
+              <button class="btn-primary" id="btn-compra-prosseguir" onclick="App.compraStep2()" title="Prosseguir" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
+            </div>
+          </div>
+
+          <!-- PASSO 2: Dados da compra -->
+          <div id="compra-step-2" class="hidden">
+            <div class="modal-body" style="max-height:72vh;overflow-y:auto;padding-right:6px">
+              <div id="compra-autz-info"></div>
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label class="form-label">Fornecedor</label>
+                  <select id="compra-fornecedor" class="input-field select-styled"></select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Data da Compra</label>
+                  <input type="date" id="compra-data" class="input-field">
+                </div>
+              </div>
+              <div class="form-group" style="margin-top:10px">
+                <label class="form-label">Forma de Pagamento</label>
+                <select id="compra-forma-pagamento" class="input-field select-styled">
+                  <option value="dinheiro">Dinheiro</option>
+                  <option value="boleto">Boleto</option>
+                  <option value="cartao">Cartão</option>
+                </select>
+              </div>
+              <div class="form-row-2" style="margin-top:10px;align-items:flex-end">
+                <div class="form-group">
+                  <label class="toggle-label">
+                    <input type="checkbox" id="chk-compra-parcelas" onchange="App.toggleCompraParcelas()">
+                    <span class="toggle-switch"></span>
+                    Parcelar
+                  </label>
+                </div>
+                <div class="form-group" id="compra-parcelas-wrap" style="display:none">
+                  <label class="form-label">Nº de Parcelas</label>
+                  <input type="number" id="compra-parcelas-n" class="input-field" min="2" placeholder="Ex.: 3" oninput="App.calcCompraStep2Total()" style="max-width:130px">
+                </div>
+              </div>
+              <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="font-size:.82rem;color:#6680a0;font-weight:500">Rastreabilidade do Envio:</span>
+                <span id="compra-envio-display" style="font-size:.82rem;font-weight:600;color:#1a3a6b">—</span>
+                <button class="btn-ghost" onclick="App.toggleEnvioEdit()" style="font-size:.72rem;padding:2px 8px" title="Editar data de envio">⚙</button>
+              </div>
+              <div id="compra-envio-edit-wrap" style="display:none;margin-top:6px">
+                <input type="date" id="compra-envio-data" class="input-field" style="max-width:180px;display:inline-block">
+                <button class="btn-secondary" onclick="App.applyEnvioEdit()" style="font-size:.78rem;padding:5px 12px;margin-left:8px">Confirmar</button>
+              </div>
+              <hr style="margin:14px 0;border:none;border-top:1px solid #e2e8f0">
+              <div id="compra-items-wrap"></div>
+              <div id="compra-step2-resumo" class="compra-resumo" style="margin-top:12px;display:none"></div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-ghost" id="btn-compra-voltar" onclick="App.compraBackStep1()">← Voltar</button>
+              <button class="btn-ghost" id="btn-compra-descombinar" onclick="App.descombinarCompra()" style="display:none;color:#dc2626;border-color:#fecaca">Descombinar</button>
+              <button class="btn-primary" id="btn-salvar-compra" onclick="App.saveCompraCombinada()">Registrar Compra</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CALENDÁRIO ── -->
+      <div id="tab-calendar" class="tab-panel">
+        <div class="tab-header dash-topbar">
+          <div>
+            <h2>Calendário de Compras</h2>
+            <p class="tab-subtitle">Visualize gastos por dia, parcelas e compras diretas</p>
+          </div>
+          <div class="dash-controls">
+            <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="idle-timer">60:00</span>
+            </div>
+            <button class="btn-dash-print" onclick="App.printCalendarReport()" title="Baixar relatório em PDF com os itens do mês, dia a dia">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Relatório
+            </button>
+          </div>
+        </div>
+        <div class="cal-toolbar-row">
+          <div class="cal-nav">
+            <button class="btn-cal-nav" onclick="App.calPrev()">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+            <span id="cal-month-label" class="cal-month-label"></span>
+            <button class="btn-cal-nav" onclick="App.calNext()">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+          <div class="cal-legend-row">
+            <span class="cal-leg parcela"><span></span>Parcela</span>
+            <span class="cal-leg direta"><span></span>Compra Direta</span>
+          </div>
+        </div>
+        <div class="calendar-wrap">
+          <div class="cal-header-row">
+            <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+          </div>
+          <div id="calendar-grid" class="calendar-grid"></div>
+        </div>
+        <div id="cal-day-detail" class="cal-day-detail hidden"></div>
+      </div>
+
+       <!-- ── geradorpdf ── -->
+
+
+      <!-- ── SOLICITAÇÕES ── -->
+      <div id="tab-requests" class="tab-panel">
+        <div class="tab-header dash-topbar">
+          <div>
+            <h2>Gestão de Solicitações</h2>
+            <p class="tab-subtitle">Gerencie e atualize o status de cada pedido</p>
+          </div>
+          <div class="filter-row" style="flex-wrap:wrap;gap:8px;align-items:center">
+            <!-- Selects ocultos (usados pelo renderRequests) -->
+            <select id="filter-status" style="display:none" onchange="App.renderRequests()">
+              <option value="">Todos os status</option>
+              <option value="Solicitado">Solicitado</option>
+              <option value="Aguardando">Aguardando</option>
+              <option value="Comprado">Comprado</option>
+              <option value="Estoque">Estoque</option>
+              <option value="Negado">Negado</option>
+            </select>
+            <select id="filter-unit-req" style="display:none" onchange="App.renderRequests()"></select>
+            <select id="filter-group-req" style="display:none" onchange="App.renderRequests()"></select>
+            <select id="filter-subgroup-req" style="display:none" onchange="App.renderRequests()"></select>
+          </div>
+          <div class="dash-controls">
+            <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="idle-timer">60:00</span>
+            </div>
+            <button class="btn-dash-print" onclick="App.abrirRelatorioSolicitacoes()" title="Baixar relatório em PDF (escolha os filtros)">
+              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Relatório
+            </button>
+          </div>
+        </div>
+
+        <!-- ── MODAL: Relatório de Solicitações (filtro completo, independente da tela) ── -->
+        <div id="relatorio-solicitacoes-modal" class="modal-overlay hidden">
+          <div class="modal-card form-modal" style="max-width:660px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="eqd-header-name">Relatório de Solicitações</div>
+              </div>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('relatorio-solicitacoes-modal').classList.add('hidden')" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
+            <div class="modal-body">
+              <div class="req-filter-panel-inner" style="padding:0">
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Status</span>
+                  <button class="btn-toggle-all-status" id="rpt-sol-toggle-all" onclick="App.rptSolToggleAllStatus(this)">Todos ✓</button>
+                  <button class="req-status-chip chip-sol active" data-status="Solicitado" onclick="App.rptSolToggleStatus(this)">Solicitado</button>
+                  <button class="req-status-chip chip-agu active" data-status="Aguardando" onclick="App.rptSolToggleStatus(this)">Aguardando</button>
+                  <button class="req-status-chip chip-com active" data-status="Comprado"   onclick="App.rptSolToggleStatus(this)">Comprado</button>
+                  <button class="req-status-chip chip-est active" data-status="Estoque"    onclick="App.rptSolToggleStatus(this)">Estoque</button>
+                  <button class="req-status-chip chip-neg active" data-status="Negado"     onclick="App.rptSolToggleStatus(this)">Negado</button>
+                </div>
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Unidade</span>
+                  <select id="rpt-sol-unidade" class="req-filter-select"><option value="">Todas</option></select>
+                  <span class="req-filter-label" style="margin-left:12px">Grupo</span>
+                  <select id="rpt-sol-grupo" class="req-filter-select" onchange="App._rptSolOnGrupoChange()"><option value="">Todos</option></select>
+                  <span class="req-filter-label" style="margin-left:12px">Subgrupo</span>
+                  <select id="rpt-sol-subgrupo" class="req-filter-select"><option value="">Todos</option></select>
+                </div>
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Pagamento</span>
+                  <select id="rpt-sol-pagamento" class="req-filter-select">
+                    <option value="">Todos</option>
+                    <option value="parcelado">Parcelada</option>
+                    <option value="combinada">Combinada</option>
+                    <option value="boleto">Boleto</option>
+                    <option value="dinheiro">Dinheiro</option>
+                    <option value="cartao">Cartão</option>
+                  </select>
+                </div>
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Data solicitação</span>
+                  <input type="date" id="rpt-sol-req-from" class="req-filter-date">
+                  <span style="color:#8898b8">→</span>
+                  <input type="date" id="rpt-sol-req-to" class="req-filter-date">
+                </div>
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Data envio</span>
+                  <input type="date" id="rpt-sol-env-from" class="req-filter-date">
+                  <span style="color:#8898b8">→</span>
+                  <input type="date" id="rpt-sol-env-to" class="req-filter-date">
+                </div>
+                <div class="req-filter-group">
+                  <span class="req-filter-label">Data compra</span>
+                  <input type="date" id="rpt-sol-compra-from" class="req-filter-date">
+                  <span style="color:#8898b8">→</span>
+                  <input type="date" id="rpt-sol-compra-to" class="req-filter-date">
+                </div>
+              </div>
+            </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-ghost" onclick="App.rptSolLimpar()">Limpar filtros</button>
+              <button class="btn-primary" onclick="App.printRequestsList()">
+                <svg viewBox="0 0 24 24" fill="none" width="14" height="14" style="margin-right:4px;vertical-align:-2px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/></svg>
+                Gerar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Mini-KPIs (5 cards) ── -->
+        <div class="rk-grid">
+
+          <!-- Card 1: Unidade — mais/menos solicitou -->
+          <div class="rk-card rk-acc-blue">
+            <div class="rk-card-header">
+              <div class="rk-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" width="16"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <span class="rk-card-label">Solicitações por Unidade</span>
+            </div>
+            <div class="rk-duo">
+              <div class="rk-half">
+                <div class="rk-pill rk-pill-green">↑ Mais</div>
+                <div class="rk-name" id="rk-sol-max">—</div>
+                <div class="rk-count" id="rk-sol-max-n"></div>
+              </div>
+              <div class="rk-vsep"></div>
+              <div class="rk-half">
+                <div class="rk-pill rk-pill-red">↓ Menos</div>
+                <div class="rk-name" id="rk-sol-min">—</div>
+                <div class="rk-count" id="rk-sol-min-n"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Unidade — mais/menos comprou -->
+          <div class="rk-card rk-acc-green">
+            <div class="rk-card-header">
+              <div class="rk-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" width="16"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <span class="rk-card-label">Compras por Unidade</span>
+            </div>
+            <div class="rk-duo">
+              <div class="rk-half">
+                <div class="rk-pill rk-pill-green">↑ Mais</div>
+                <div class="rk-name" id="rk-buy-max">—</div>
+                <div class="rk-count" id="rk-buy-max-n"></div>
+              </div>
+              <div class="rk-vsep"></div>
+              <div class="rk-half">
+                <div class="rk-pill rk-pill-red">↓ Menos</div>
+                <div class="rk-name" id="rk-buy-min">—</div>
+                <div class="rk-count" id="rk-buy-min-n"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Grupo mais solicitado -->
+          <div class="rk-card rk-acc-gold">
+            <div class="rk-card-header">
+              <div class="rk-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" width="16"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <span class="rk-card-label">Grupo Mais Solicitado</span>
+            </div>
+            <div class="rk-single">
+              <div class="rk-pill rk-pill-gold"><svg viewBox="0 0 24 24" fill="none" width="11" height="11"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM7 4H4a2 2 0 002 2v0a1 1 0 001-1V4zM17 4h3a2 2 0 01-2 2v0a1 1 0 01-1-1V4z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> Top</div>
+              <div class="rk-name rk-name-lg" id="rk-grp-top">—</div>
+              <div class="rk-count" id="rk-grp-top-n"></div>
+            </div>
+          </div>
+
+          <!-- Card 4: Fornecedor com mais compras -->
+          <div class="rk-card rk-acc-purple">
+            <div class="rk-card-header">
+              <div class="rk-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" width="16"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <span class="rk-card-label">Fornecedor com Mais Compras</span>
+            </div>
+            <div class="rk-single">
+              <div class="rk-pill rk-pill-blue"><svg viewBox="0 0 24 24" fill="none" width="11" height="11"><path d="M12 2l2.9 6.5 7.1.6-5.4 4.7 1.7 6.9L12 17.3 5.7 20.7l1.7-6.9L2 9.1l7.1-.6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg> Destaque</div>
+              <div class="rk-name rk-name-lg" id="rk-sup-top">—</div>
+              <div class="rk-count" id="rk-sup-top-n"></div>
+            </div>
+          </div>
+
+          <!-- Card 5: Forma de pagamento mais/menos usada -->
+          <div class="rk-card rk-acc-orange">
+            <div class="rk-card-header">
+              <div class="rk-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" width="16"><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M2 10h20" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <span class="rk-card-label">Forma de Pagamento</span>
+            </div>
+            <div class="rk-duo">
+              <div class="rk-half">
+                <div class="rk-pill rk-pill-green">↑ Mais usada</div>
+                <div class="rk-name" id="rk-pag-max">—</div>
+                <div class="rk-count" id="rk-pag-max-n"></div>
+              </div>
+              <div class="rk-vsep"></div>
+              <div class="rk-half">
+                <div class="rk-pill rk-pill-red">↓ Menos usada</div>
+                <div class="rk-name" id="rk-pag-min">—</div>
+                <div class="rk-count" id="rk-pag-min-n"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <!-- fim mini-KPIs -->
+
+        <!-- Busca + Conf + Toggle filtro -->
+        <div class="req-toolbar-row">
+          <div class="req-search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
+            <input type="text" id="req-live-search" class="req-search-input" placeholder="Buscar por unidade, grupo, status, fornecedor, resumo..." oninput="App.renderRequests()" />
+          </div>
+          <div class="filter-popover-wrap">
+            <button class="btn-filter-toggle" id="btn-req-conf-toggle" onclick="App.toggleReqConfPopover(event)" title="Configurações">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.66 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2.5a2 2 0 010-4h.09A1.65 1.65 0 004.6 8.66a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5"/></svg>
+            </button>
+            <div class="filter-popover" id="req-conf-popover">
+              <div class="filter-popover-row">
+                <button id="btn-numerar-seq" class="btn-secondary" onclick="App.backfillSeq()" title="Atribui número (#) às solicitações que ainda não têm">Numerar</button>
+              </div>
+              <div class="filter-popover-row">
+                <button id="btn-compra-combinada" class="btn-secondary" onclick="App.openCompraModal()" title="Comprar vários pedidos juntos (parcelado ou à vista)">Compra combinada</button>
+              </div>
+              <div class="filter-popover-row">
+                <button id="btn-autorizar-compra" class="btn-secondary" onclick="App.abrirAutorizarCompra()" title="Pedir autorização de várias solicitações de uma vez">Autorizar compra</button>
+              </div>
+            </div>
+          </div>
+          <div class="filter-popover-wrap">
+            <button class="btn-filter-toggle" id="btn-req-filter-toggle" onclick="App.toggleReqFilterPanel(event)" title="Filtros">
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <!-- ── Filtro completo — grade padronizada (label em cima, controle
+                 embaixo), mesma estética do filtro de Estoque ── -->
+            <div id="req-filter-panel" class="req-filter-panel">
+              <div class="filt-panel" style="width:640px">
+                <div class="filt-grid">
+                  <div class="filt-field filt-field-full">
+                    <label>Status</label>
+                    <div class="req-filter-group" style="gap:6px">
+                      <button class="btn-toggle-all-status" id="btn-toggle-all-status" onclick="App.toggleAllStatus(this)">Todos ✓</button>
+                      <button class="req-status-chip chip-sol active" data-status="Solicitado" onclick="App.toggleStatusFilter(this)">Solicitado</button>
+                      <button class="req-status-chip chip-agu active" data-status="Aguardando" onclick="App.toggleStatusFilter(this)">Aguardando</button>
+                      <button class="req-status-chip chip-com active" data-status="Comprado"   onclick="App.toggleStatusFilter(this)">Comprado</button>
+                      <button class="req-status-chip chip-est active" data-status="Estoque"    onclick="App.toggleStatusFilter(this)">Estoque</button>
+                      <button class="req-status-chip chip-neg active" data-status="Negado"     onclick="App.toggleStatusFilter(this)">Negado</button>
+                    </div>
+                  </div>
+
+                  <div class="filt-field">
+                    <label>Pagamento</label>
+                    <select id="filter-parcelado" class="req-filter-select" onchange="App.renderRequests()" title="Filtrar por parcelamento/forma de pagamento">
+                      <option value="">Todos</option>
+                      <option value="parcelado">Parcelada</option>
+                      <option value="combinada">Combinada</option>
+                      <option value="boleto">Boleto</option>
+                      <option value="dinheiro">Dinheiro</option>
+                      <option value="cartao">Cartão</option>
+                    </select>
+                  </div>
+                  <div class="filt-field">
+                    <label>Unidade</label>
+                    <select id="req-filter-unit-vis" class="req-filter-select" onchange="document.getElementById('filter-unit-req').value=this.value; App.renderRequests()">
+                      <option value="">Todas</option>
+                    </select>
+                  </div>
+                  <div class="filt-field">
+                    <label>Grupo</label>
+                    <select id="req-filter-group-vis" class="req-filter-select" onchange="document.getElementById('filter-group-req').value=this.value; App.renderRequests()">
+                      <option value="">Todos</option>
+                    </select>
+                  </div>
+                  <div class="filt-field">
+                    <label>Subgrupo</label>
+                    <select id="req-filter-subgroup-vis" class="req-filter-select" onchange="document.getElementById('filter-subgroup-req').value=this.value; App.renderRequests()">
+                      <option value="">Todos</option>
+                    </select>
+                  </div>
+
+                  <div class="filt-divider"></div>
+
+                  <div class="filt-field">
+                    <label>Ord. Solicitação</label>
+                    <div class="filt-toggle-row">
+                      <button class="req-sort-btn" id="sort-req-desc" onclick="App.setReqSort('createdAt','desc',this)" title="Mais recente primeiro">
+                        <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        Recente
+                      </button>
+                      <button class="req-sort-btn" id="sort-req-asc" onclick="App.setReqSort('createdAt','asc',this)" title="Mais antiga primeiro">
+                        <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        Antiga
+                      </button>
+                    </div>
+                  </div>
+                  <div class="filt-field">
+                    <label>Ord. Envio</label>
+                    <div class="filt-toggle-row">
+                      <button class="req-sort-btn" id="sort-sent-desc" onclick="App.setReqSort('shippedAt','desc',this)" title="Mais recente primeiro">
+                        <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        Recente
+                      </button>
+                      <button class="req-sort-btn" id="sort-sent-asc" onclick="App.setReqSort('shippedAt','asc',this)" title="Mais antiga primeiro">
+                        <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        Antiga
+                      </button>
+                    </div>
+                  </div>
+                  <div class="filt-field">
+                    <label>Data solicitação</label>
+                    <div class="filt-field-daterange">
+                      <input type="date" id="req-date-from" class="req-filter-date" onchange="App.renderRequests()">
+                      <span>→</span>
+                      <input type="date" id="req-date-to" class="req-filter-date" onchange="App.renderRequests()">
+                    </div>
+                  </div>
+                  <div class="filt-field">
+                    <label>Data envio</label>
+                    <div class="filt-field-daterange">
+                      <input type="date" id="req-sent-from" class="req-filter-date" onchange="App.renderRequests()">
+                      <span>→</span>
+                      <input type="date" id="req-sent-to" class="req-filter-date" onchange="App.renderRequests()">
+                    </div>
+                  </div>
+                </div>
+                <div class="filt-footer">
+                  <button class="btn-req-clear-all" onclick="App.clearAllReqFilters()">
+                    <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    Limpar filtros
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="btn-nova-solic" onclick="App.openNovaSolic()" title="Nova solicitação">
+            <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+
+        <div id="dash-stats-bar" class="req-stats-bar"></div>
+        <div id="dash-negados-bar" class="req-negados-bar" style="display:none"></div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Unidade</th>
+                <th>Grupo</th>
+                <th>Subgrupo</th>
+                <th>Resumo</th>
+                <th>Urgência</th>
+                <th>Envio</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="requests-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── CONFIGURAÇÕES ── -->
+      <div id="tab-settings" class="tab-panel">
+        <div class="tab-header dash-topbar">
+          <div>
+            <h2>Configurações do Sistema</h2>
+            <p class="tab-subtitle">Gerencie unidades, grupos, subgrupos e usuários</p>
+          </div>
+          <div class="dash-controls">
+            <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span class="idle-timer">60:00</span>
+            </div>
+          </div>
+        </div>
+        <div class="settings-grid">
+
+          <!-- Gestores (autorização de solicitações) -->
+          <div class="cfg-card">
+            <div class="cfg-card-head">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" stroke-width="2"/></svg>
+              <h3>Gestores (Autorização)</h3>
+            </div>
+            <div class="cfg-card-body">
+              <div class="settings-list-box">
+                <div id="list-gestores" class="settings-list"></div>
+              </div>
+              <div class="add-row" style="flex-wrap:wrap;gap:8px">
+                <input type="text" id="gestor-nome-input" placeholder="Nome (ex: Diretor)" class="input-field" style="flex:1 1 130px" />
+                <input type="text" id="gestor-whats-input" placeholder="Ex: 88 9 8176-5537" class="input-field" style="flex:1 1 150px" oninput="App._formatGestorInput()" onkeydown="if(event.key==='Enter') App.salvarGestor()" />
+                <button class="btn-add" onclick="App.salvarGestor()">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+                  Adicionar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fornecedores -->
+          <div class="cfg-card">
+            <div class="cfg-card-head">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2"/><path d="M9 22V12h6v10" stroke="currentColor" stroke-width="2"/></svg>
+              <h3>Fornecedores</h3>
+            </div>
+            <div class="cfg-card-body">
+              <div class="settings-list-box">
+                <div id="list-suppliers-admin" class="settings-list"></div>
+              </div>
+              <div class="add-row">
+                <input type="text" id="inp-supplier" placeholder="Nome do fornecedor" class="input-field" onkeydown="if(event.key==='Enter') App.addSupplier()" />
+                <button class="btn-add" onclick="App.addSupplier()">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+                  Adicionar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grupos de Produto & Mapeamento -->
+          <div class="cfg-card">
+            <div class="cfg-card-head">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/></svg>
+              <h3>Grupos de Produto &amp; Mapeamento</h3>
+            </div>
+            <div class="cfg-card-body">
+              <!-- selects ocultos, lidos pelas funções existentes -->
+              <select id="sel-group-sub" onchange="App.loadSubOpts()" style="display:none"><option value="">—</option></select>
+              <select id="sel-subgroup-filter" onchange="App.filterSubgroupsView()" style="display:none"><option value="">Todos os grupos</option></select>
+              <select id="sel-subgroup-group" style="display:none"><option value="">Grupo pai</option></select>
+
+              <div class="settings-list-box">
+                <div id="list-groups-admin" class="settings-list"></div>
+              </div>
+              <div class="add-row">
+                <input type="text" id="inp-group" placeholder="Novo grupo" class="input-field" onkeydown="if(event.key==='Enter') App.addGroup()" />
+                <button class="btn-add" onclick="App.addGroup()">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+                  Adicionar
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── REGISTRO DE CÓDIGOS ── -->
+        <div class="cfg-card codigos-section" style="margin-top:18px">
+          <div class="cfg-card-head">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 7V4h16v3M9 20h6M12 4v16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <h3>Registro de Códigos</h3>
+          </div>
+          <div class="cfg-card-body">
+          <div class="codigos-grid">
+
+            <!-- Lotes de Entrada -->
+            <div class="codigos-panel">
+              <div class="codigos-panel-header">
+                <span class="codigos-panel-icon" style="background:#fff7ed;color:#b45309"><svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg></span>
+                <div>
+                  <strong class="codigos-panel-title">Registro de lotes</strong>
+                  <span class="codigos-panel-nom" title="Prefixo do grupo · dia da solicitação + dia do envio · nº da solicitação">PREFIXO-DiaSolDiaEnv-NºSL</span>
+                </div>
+                <span class="codigos-count" id="codigos-lotes-count">0</span>
+              </div>
+              <div class="codigos-toolbar">
+                <input type="text" id="codigos-lotes-search" class="codigos-search" placeholder="Buscar lote, produto..." oninput="App.renderCodigosTab()">
+                <button class="btn-add codigos-add" onclick="App.escolherTipoEstoque()" title="Cadastrar entrada de estoque">+ Entrada</button>
+              </div>
+              <div id="codigos-lotes-list" class="codigos-list"></div>
+            </div>
+
+            <!-- Solicitações -->
+            <div class="codigos-panel">
+              <div class="codigos-panel-header">
+                <span class="codigos-panel-icon" style="background:#eef4ff;color:#3a7ee8">SL</span>
+                <div>
+                  <strong class="codigos-panel-title">Registro de solicitações</strong>
+                  <span class="codigos-panel-nom">SL-000</span>
+                </div>
+                <span class="codigos-count" id="codigos-seq-count">0</span>
+              </div>
+              <div class="codigos-toolbar">
+                <input type="text" id="codigos-seq-search" class="codigos-search" placeholder="Buscar SL, unidade, grupo..." oninput="App.renderCodigosTab()">
+                <button class="btn-add codigos-add" onclick="App.backToUnits()" title="Nova solicitação">+ Solicitação</button>
+              </div>
+              <div id="codigos-seq-list" class="codigos-list"></div>
+            </div>
+
+            <!-- Parceladas / Combinadas -->
+            <div class="codigos-panel">
+              <div class="codigos-panel-header">
+                <span class="codigos-panel-icon" style="background:#f5f1fe;color:#7c52d4">CMP</span>
+                <div>
+                  <strong class="codigos-panel-title">Registro de CMP / P</strong>
+                  <span class="codigos-panel-nom">CMP-0000</span>
+                </div>
+                <span class="codigos-count" id="codigos-cmp-count">0</span>
+              </div>
+              <div class="codigos-toolbar">
+                <input type="text" id="codigos-cmp-search" class="codigos-search" placeholder="Buscar código, unidade..." oninput="App.renderCodigosTab()">
+                <button class="btn-add codigos-add" onclick="App.openAddCompraChooser()" title="Adicionar compra">+ Adicionar</button>
+              </div>
+              <div id="codigos-cmp-list" class="codigos-list"></div>
+            </div>
+
+          </div>
+          </div>
+        </div>
+
+        <!-- ── BACKUP E RESTAURAÇÃO + LOGS ── -->
+        <div class="cfg-grid-2">
+
+          <!-- Backup e Restauração -->
+          <div class="cfg-card">
+            <div class="cfg-card-head">
+              <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="5" rx="9" ry="3" stroke="currentColor" stroke-width="2"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" stroke="currentColor" stroke-width="2"/></svg>
+              <h3>Backup e Restauração</h3>
+            </div>
+            <div class="cfg-card-body">
+              <div class="cfg-action-list">
+                <div class="cfg-action-card">
+                  <div class="cfg-action-ico">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div class="cfg-action-info">
+                    <strong>Exportar Backup</strong>
+                    <span>Salve todos os dados do financeiro em um arquivo JSON</span>
+                  </div>
+                  <button class="cfg-ico-btn" onclick="App.exportBackupSistema()" title="Baixar backup">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                </div>
+                <div class="cfg-action-card">
+                  <div class="cfg-action-ico ico-restore">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div class="cfg-action-info">
+                    <strong>Restaurar Dados</strong>
+                    <span>Importe um backup JSON — substitui os dados atuais</span>
+                  </div>
+                  <button class="cfg-ico-btn" onclick="document.getElementById('restore-sys-file').click()" title="Restaurar dados">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                  <input type="file" id="restore-sys-file" accept=".json" style="display:none" onchange="App.importBackupSistema(event)">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Logs de Atividade -->
+          <div class="cfg-card">
+            <div class="cfg-card-head">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M3 3v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3.05 13A9 9 0 106 5.3L3 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <h3>Logs de Atividade</h3>
+            </div>
+            <div class="cfg-card-body">
+              <div class="cfg-action-list">
+                <div class="cfg-action-card">
+                  <div class="cfg-action-ico">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2"/></svg>
+                  </div>
+                  <div class="cfg-action-info">
+                    <strong>Histórico completo</strong>
+                    <span id="config-logs-count">Quem fez o quê e quando, dia a dia</span>
+                  </div>
+                  <div class="cfg-action-btns">
+                    <button class="cfg-ico-btn" onclick="App.showLogsCompletos()" title="Ver logs">
+                      <svg viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
+                    </button>
+                    <button class="cfg-ico-btn" onclick="App.baixarLogs()" title="Baixar logs">
+                      <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Modal: Logs completos por dia -->
+        <div id="logs-full-modal" class="modal-overlay hidden">
+          <div class="modal-card form-modal" style="max-width:760px">
+            <div class="form-modal-header">
+              <div class="eqd-header-left">
+                <div class="eqd-header-icon-box">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg>
+                </div>
+                <div class="eqd-header-name">Logs de Atividade — Histórico Completo</div>
+              </div>
+              <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('logs-full-modal').classList.add('hidden')" title="Fechar">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-modal-stripe"></div>
+            <div class="form-modal-scroll">
+            <div class="modal-body" id="logs-full-body"></div>
+            </div>
+            <div class="modal-footer" id="logs-full-footer" style="display:none">
+              <button class="btn-delete" onclick="App.apagarLogs()">
+                <svg viewBox="0 0 24 24" fill="none" style="width:14px;vertical-align:middle;margin-right:5px"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                Apagar todos os logs
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── MODAL: EDITAR GRUPO (sub-opções + subgrupos) ── -->
+      <div id="modal-grupo-edit" class="modal-overlay hidden">
+        <div class="modal-card form-modal" style="max-width:560px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="cfg-detail-title">Grupo</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeGroupEdit()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
+          <div class="modal-body">
+            <div class="cfg-block">
+              <div class="cfg-block-head">
+                <span class="cfg-col-title">Sub-opções por Grupo</span>
+                <select id="sel-subopt-key" class="filter-select" style="display:none" onchange="App.loadSubOpts()">
+                  <option value="numeracoes">Numerações</option>
+                  <option value="cores">Cores</option>
+                  <option value="modelos">Modelos</option>
+                </select>
+              </div>
+              <div class="settings-list-box">
+                <div id="list-subopts-admin" class="settings-list"></div>
+              </div>
+              <div class="add-row" id="add-subopt-row" style="display:none">
+                <input type="text" id="inp-subopt" placeholder="Nova sub-opção" class="input-field" onkeydown="if(event.key==='Enter') App.addSubOpt()" />
+                <button class="btn-add" onclick="App.addSubOpt()" title="Adicionar sub-opção">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="cfg-block">
+              <div class="cfg-block-head">
+                <span class="cfg-col-title">Subgrupos — Mapeamento Interno</span>
+              </div>
+              <div class="settings-list-box">
+                <div id="list-subgroups-admin" class="settings-list"></div>
+              </div>
+              <div class="add-row">
+                <input type="text" id="inp-subgroup" placeholder="Novo subgrupo" class="input-field" onkeydown="if(event.key==='Enter') App.addSubgroup()" />
+                <button class="btn-add" onclick="App.addSubgroup()" title="Adicionar subgrupo">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: NOVA SOLICITAÇÃO (ADMIN) ── -->
+      <div id="modal-nova-solic" class="modal-overlay hidden">
+        <div class="modal-card form-modal" style="max-width:560px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name">Nova Solicitação</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="App.closeNovaSolic()" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
+          <div class="modal-body">
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label required">Unidade</label>
+                <select id="nsol-unit" class="input-field" onchange="App._nsolUnitChange()"></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Setor solicitante</label>
+                <select id="nsol-setor" class="input-field select-styled"></select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label required">Tipo / Grupo</label>
+              <div class="type-selector" id="nsol-groups"></div>
+            </div>
+
+            <div id="nsol-sub-ink" class="sub-panel hidden">
+              <div class="sub-panel-inner">
+                <div class="form-group">
+                  <label class="form-label">Numeração da Tinta</label>
+                  <div id="nsol-ink-numbers" class="check-grid"></div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Cores</label>
+                  <div id="nsol-ink-colors" class="check-grid"></div>
+                </div>
+              </div>
+            </div>
+
+            <div id="nsol-sub-battery" class="sub-panel hidden">
+              <div class="sub-panel-inner">
+                <div class="form-group">
+                  <label class="form-label">Modelos <span class="opt-tag">pode selecionar mais de 1</span></label>
+                  <div id="nsol-battery-models" class="bat-models-list"></div>
+                </div>
+                <div id="nsol-conserto-motivo-wrap" class="form-group hidden">
+                  <label class="form-label required">Motivo / Justificativa</label>
+                  <textarea id="nsol-conserto-motivo" rows="3" placeholder="O que precisa ser consertado?" class="input-field"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div id="nsol-sub-other" class="sub-panel hidden">
+              <div class="sub-panel-inner">
+                <div class="form-group">
+                  <label class="form-label required">Produto Desejado</label>
+                  <input type="text" id="nsol-product" placeholder="Nome do produto" class="input-field" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label required">Motivo / Justificativa</label>
+                  <textarea id="nsol-reason" rows="3" placeholder="Por que precisa desse produto?" class="input-field"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="check-item"><input type="checkbox" id="nsol-urgency" /> 🚨 Marcar como URGENTE</label>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Observação <span class="opt-tag">opcional</span></label>
+              <textarea id="nsol-obs" rows="2" placeholder="Alguma observação adicional?" class="input-field"></textarea>
+            </div>
+          </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-secondary" onclick="App.closeNovaSolic()">Cancelar</button>
+            <button class="btn-primary" onclick="App.nsolSubmit()">Criar Solicitação</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: DETALHE COMPRA COMBINADA ── -->
+      <div id="compra-detalhe-modal" class="modal-overlay hidden">
+        <div class="modal-card form-modal" style="max-width:600px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="compra-detalhe-titulo">Compra CMP-0000</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="document.getElementById('compra-detalhe-modal').classList.add('hidden')" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
+          <div class="modal-body" id="compra-detalhe-body" style="max-height:65vh;overflow-y:auto"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="document.getElementById('compra-detalhe-modal').classList.add('hidden')">Fechar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: INFO DO LOTE (ESTOQUE) ── -->
+      <div id="lote-info-modal" class="modal-overlay hidden">
+        <div class="modal-card form-modal" style="max-width:560px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="lote-info-titulo">Lote</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="document.getElementById('lote-info-modal').classList.add('hidden')" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
+          <div class="modal-body" id="lote-info-body" style="max-height:65vh;overflow-y:auto"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="document.getElementById('lote-info-modal').classList.add('hidden')">Fechar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: VER SOLICITAÇÃO (somente leitura) ── -->
+      <div id="sol-view-modal" class="modal-overlay hidden">
+        <div class="modal-card form-modal" style="max-width:540px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
+              <div class="eqd-header-name" id="sol-view-titulo">Solicitação</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="document.getElementById('sol-view-modal').classList.add('hidden')" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
+          <div class="modal-body" id="sol-view-body" style="max-height:65vh;overflow-y:auto"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="document.getElementById('sol-view-modal').classList.add('hidden')">Fechar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: TODAS AS SUB-OPÇÕES ── -->
+      <div id="subopts-all-modal" class="modal-overlay hidden">
+        <div class="modal-card form-modal" style="max-width:560px">
+          <div class="form-modal-header">
+            <div class="eqd-header-left">
+              <div class="eqd-header-icon-box">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </div>
+              <div class="eqd-header-name" id="subopts-all-titulo">Sub-opções — Todas</div>
+            </div>
+            <div class="eqd-header-right">
+              <button class="eqd-icon-btn" onclick="document.getElementById('subopts-all-modal').classList.add('hidden')" title="Fechar">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-modal-stripe"></div>
+          <div class="form-modal-scroll">
+          <div class="modal-body" id="subopts-all-body" style="max-height:68vh;overflow-y:auto"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="document.getElementById('subopts-all-modal').classList.add('hidden')">Fechar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: ESCOLHER TIPO DE COMPRA ── -->
+      <div id="add-compra-chooser" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:440px">
+          <div class="modal-header">
+            <h3>Adicionar Compra</h3>
+            <button class="modal-close" onclick="document.getElementById('add-compra-chooser').classList.add('hidden')">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p class="tab-subtitle" style="margin:0 0 14px">O que você quer adicionar?</p>
+            <div class="chooser-grid">
+              <button class="chooser-opt" onclick="App.escolherCombinada()">
+                <span class="chooser-opt-ico" style="background:#f5f1fe;color:#7c52d4">CMP</span>
+                <strong>Compra Combinada</strong>
+                <span>Vários pedidos num só pagamento</span>
+              </button>
+              <button class="chooser-opt" onclick="App.escolherParcelada()">
+                <span class="chooser-opt-ico" style="background:#fff7ed;color:#b45309"><svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg></span>
+                <strong>Parcelada (item único)</strong>
+                <span>Entrada de estoque parcelada</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MODAL: ADICIONAR ITEM PARCELADO ── -->
+      <div id="parcelada-add-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width:600px">
+          <div class="modal-header">
+            <h3>Entrada Parcelada</h3>
+            <button class="modal-close" onclick="document.getElementById('parcelada-add-modal').classList.add('hidden')">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label">Grupo *</label>
+                <select id="parc-grupo" class="input-field select-styled" onchange="App.onParcGrupoChange()"><option value="">— Selecione —</option></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Subgrupo</label>
+                <select id="parc-subgrupo" class="input-field select-styled"><option value="">— Selecione —</option></select>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:10px">
+              <label class="form-label">Produto / Descrição *</label>
+              <input type="text" id="parc-produto" class="input-field" placeholder="Ex: Tinta Ciano HP 122">
+            </div>
+            <div class="form-row-2" style="margin-top:10px">
+              <div class="form-group">
+                <label class="form-label">Fornecedor</label>
+                <select id="parc-fornecedor" class="input-field select-styled"><option value="">— Selecione —</option></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Quantidade *</label>
+                <input type="number" id="parc-qtd" class="input-field" min="0" placeholder="0" oninput="App.calcParcResumo()">
+              </div>
+            </div>
+            <div class="form-row-2" style="margin-top:10px">
+              <div class="form-group">
+                <label class="form-label">Valor Total (R$) *</label>
+                <input type="number" id="parc-valor" class="input-field" min="0" step="0.01" placeholder="0,00" oninput="App.calcParcResumo()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Nº de Parcelas *</label>
+                <input type="number" id="parc-n" class="input-field" min="2" placeholder="Ex.: 3" oninput="App.calcParcResumo()">
+              </div>
+            </div>
+            <div class="form-row-2" style="margin-top:10px">
+              <div class="form-group">
+                <label class="form-label">Data da Compra</label>
+                <input type="date" id="parc-data" class="input-field">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Data do Envio</label>
+                <input type="date" id="parc-envio" class="input-field">
+              </div>
+            </div>
+            <div class="form-group" style="margin-top:10px">
+              <label class="form-label">Forma de Pagamento</label>
+              <select id="parc-forma-pagamento" class="input-field select-styled">
+                <option value="boleto">Boleto</option>
+                <option value="cartao">Cartão</option>
+                <option value="dinheiro">Dinheiro</option>
+              </select>
+            </div>
+            <div id="parc-resumo" class="compra-resumo" style="margin-top:12px;display:none"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" onclick="document.getElementById('parcelada-add-modal').classList.add('hidden')">Cancelar</button>
+            <button class="btn-primary" onclick="App.saveParceladaItem()">Registrar Parcelada</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ MODAL: enviar para autorização (escolher gestor + valor) ══ -->
+<div id="autz-send-modal" class="modal-overlay hidden">
+  <div class="modal-card form-modal" style="max-width:480px">
+    <div class="form-modal-header">
+      <div class="eqd-header-left">
+        <div class="eqd-header-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <div class="eqd-header-name">Enviar para autorização</div>
+      </div>
+      <div class="eqd-header-right">
+        <button class="eqd-icon-btn" onclick="document.getElementById('autz-send-modal').classList.add('hidden')" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="form-modal-stripe"></div>
+    <div class="form-modal-scroll">
+    <div class="modal-body">
+      <p id="autz-send-resumo" style="font-weight:600;color:var(--ink-900);background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:14px"></p>
+      <div class="form-row-2" style="margin-bottom:14px">
+        <div class="form-group">
+          <label class="form-label">Quantidade pedida</label>
+          <input type="text" id="autz-send-qtd" class="input-field" readonly style="background:#f1f5f9">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Valor da solicitação</label>
+          <input type="text" id="autz-send-valor" class="input-field" placeholder="Ex: R$ 250,00">
+        </div>
+      </div>
+      <label class="form-label">Abrir WhatsApp no</label>
+      <div class="autz-mode-row" style="display:flex;gap:8px;margin-bottom:14px">
+        <button id="autz-mode-app" class="autz-mode-btn" onclick="App._autzSetMode('app')" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> App</button>
+        <button id="autz-mode-web" class="autz-mode-btn" onclick="App._autzSetMode('web')" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Web</button>
+      </div>
+      <label class="form-label">Escolha o gestor</label>
+      <div id="autz-send-gestores" class="autz-gestores-box"></div>
+      <a id="autz-enviar-btn" class="btn-primary autz-enviar-btn is-disabled" href="#">Escolha um gestor</a>
+    </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: autorizar compra em LOTE (várias solicitações) ══ -->
+<div id="autz-lote-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:560px">
+    <div class="form-modal-header">
+      <div class="eqd-header-left">
+        <div class="eqd-header-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <div class="eqd-header-name" id="autz-lote-title">Autorizar compra — Solicitações</div>
+      </div>
+      <div class="eqd-header-right">
+        <button class="eqd-icon-btn" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="form-modal-stripe"></div>
+
+    <!-- PASSO 1: escolher solicitações -->
+    <div id="autz-lote-step1">
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <p style="color:var(--ink-500);margin-bottom:8px">Escolha as solicitações (status Solicitado) que vão pedir autorização juntas.</p>
+        <input type="text" id="autz-lote-search" class="req-search-input" placeholder="Buscar por SL, unidade, grupo..." oninput="App._autzLoteRenderList()" style="max-width:100%;margin-bottom:8px">
+        <div id="autz-lote-list" class="compra-req-list"></div>
+        <div id="autz-lote-sel-count" style="font-size:.76rem;color:#6680a0;margin-top:6px;text-align:right"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')">Cancelar</button>
+        <button class="btn-primary" id="autz-lote-next1" onclick="App._autzLoteStep2()" title="Próximo" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
+
+    <!-- PASSO 2: valor + quantidade por item -->
+    <div id="autz-lote-step2" class="hidden">
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <p style="color:var(--ink-500);margin-bottom:10px">Informe o valor de cada item. A quantidade vem do sistema — clique no cadeado para editar.</p>
+        <div id="autz-lote-itens"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="App._autzLoteBackStep1()">← Voltar</button>
+        <button class="btn-primary" onclick="App._autzLoteStep3()" title="Próximo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
+
+    <!-- PASSO 3: gestor + envio -->
+    <div id="autz-lote-step3" class="hidden">
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <label class="form-label">Abrir WhatsApp no</label>
+        <div class="autz-mode-row" style="display:flex;gap:8px;margin-bottom:12px">
+          <button id="autz-lote-mode-app" class="autz-mode-btn" onclick="App._autzLoteSetMode('app')" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> App</button>
+          <button id="autz-lote-mode-web" class="autz-mode-btn" onclick="App._autzLoteSetMode('web')" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Web</button>
+        </div>
+        <label class="form-label">Escolha o gestor</label>
+        <div id="autz-lote-gestores" class="autz-gestores-box"></div>
+        <a id="autz-lote-enviar" class="btn-primary autz-enviar-btn is-disabled" href="#">Escolha o gestor</a>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="App._autzLoteBackStep2()">← Voltar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: decisão de autorização (gestor respondeu) ══ -->
+<div id="autorizacao-modal" class="modal-overlay hidden">
+  <div class="modal-card form-modal" style="max-width:460px">
+    <div class="form-modal-header">
+      <div class="eqd-header-left">
+        <div class="eqd-header-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <div class="eqd-header-name">Decisão de Autorização</div>
+      </div>
+      <div class="eqd-header-right">
+        <button class="eqd-icon-btn" onclick="document.getElementById('autorizacao-modal').classList.add('hidden')" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="form-modal-stripe"></div>
+    <div class="form-modal-scroll">
+    <div class="modal-body">
+      <p style="color:var(--ink-500);margin-bottom:6px">O que o gestor decidiu?</p>
+      <p id="autz-resumo" style="font-weight:600;color:var(--ink-900);background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:16px"></p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button id="autz-autorizado" class="btn-primary" style="background:#059669">Autorizado</button>
+        <button id="autz-negado" class="btn-primary" style="background:#dc2626">Negado</button>
+      </div>
+      <p style="font-size:.78rem;color:var(--ink-500);margin-top:10px">Autorizado abre a compra (Comprado ou Estoque). Negado marca a solicitação como negada.</p>
+    </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL SOLICITAÇÃO ══ -->
+<div id="modal-request" class="modal-overlay hidden">
+  <div class="modal-card form-modal">
+    <div class="form-modal-header">
+      <div class="eqd-header-left">
+        <div class="eqd-header-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          <div class="eqd-header-name" id="modal-title">Solicitação</div>
+          <span id="modal-header-badge"></span>
+        </div>
+      </div>
+      <div class="eqd-header-right">
+        <button class="eqd-icon-btn" onclick="App.closeModal()" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="form-modal-stripe"></div>
+    <div class="form-modal-scroll">
+    <div class="modal-body">
+      <div id="modal-info" class="modal-info-block"></div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label">
+          <svg viewBox="0 0 24 24" fill="none" style="width:13px;vertical-align:middle;margin-right:4px"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>
+          Data da Solicitação
+        </label>
+        <input type="date" id="modal-created-date" class="input-field" style="max-width:200px" />
+      </div>
+      <div id="modal-subgroup-always" class="form-group" style="margin-bottom:16px">
+        <label class="form-label">Subgrupo</label>
+        <select id="modal-subgroup-always-sel" class="input-field select-styled"></select>
+      </div>
+      <div class="form-group" id="modal-status-group">
+        <label class="form-label">Status da Solicitação</label>
+        <div class="status-btn-row">
+          <button class="status-btn sol" data-s="Solicitado"  onclick="App.setModalStatus(this)">Solicitado</button>
+          <button class="status-btn agu" data-s="Aguardando"  onclick="App.setModalStatus(this)">Aguardando</button>
+          <button class="status-btn com" data-s="Comprado"    onclick="App.setModalStatus(this)">Comprado</button>
+          <button class="status-btn est" data-s="Estoque"     onclick="App.setModalStatus(this)">Estoque</button>
+          <button class="status-btn neg" data-s="Negado"      onclick="App.setModalStatus(this)">Negado</button>
+        </div>
+      </div>
+      <div class="form-group hidden" id="modal-dados-toggle-row" style="display:flex;align-items:center;gap:8px">
+        <button type="button" class="btn-ico" id="modal-dados-eye" onclick="App.toggleModalDadosVisibility()" title="Mostrar dados da compra/estoque">
+          <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <span id="modal-dados-toggle-label" style="font-size:.8rem;color:#6680a0">Dados da compra/estoque ocultos</span>
+      </div>
+      <div id="modal-bought-fields" class="modal-section hidden">
+        <div class="modal-section-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" stroke="currentColor" stroke-width="2"/></svg>
+          Dados da Compra
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Data da Compra</label>
+            <input type="date" id="modal-buy-date" class="input-field" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fornecedor</label>
+            <select id="modal-supplier-sel" class="input-field select-styled" onchange="App.onSupplierSelChange()">
+              <option value="">— Selecione —</option>
+            </select>
+            <input type="text" id="modal-supplier" class="input-field" placeholder="Ou digite o nome" style="margin-top:6px;display:none" />
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Solicitante (setor)</label>
+            <select id="modal-requester" class="input-field select-styled"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Forma de Pagamento</label>
+            <select id="modal-forma-pagamento" class="input-field select-styled">
+              <option value="dinheiro">Dinheiro</option>
+              <option value="boleto">Boleto</option>
+              <option value="cartao">Cartão</option>
+            </select>
+          </div>
+        </div>
+        <select id="modal-subgroup" style="display:none"></select>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Quantidade</label>
+            <input type="number" id="modal-qty" class="input-field" placeholder="0" oninput="App.calcTotal()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valor Unitário (R$)</label>
+            <input type="number" id="modal-val" class="input-field" placeholder="0,00" oninput="App.calcTotal()" />
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Valor Total</label>
+            <input type="text" id="modal-total" class="input-field total-field" readonly placeholder="Calculado automaticamente" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Descrição do Produto</label>
+            <input type="text" id="modal-desc" class="input-field" placeholder="Descrição" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descrição Técnica</label>
+          <textarea id="modal-tech-desc" rows="2" class="input-field" placeholder="Especificações técnicas"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="toggle-label">
+            <input type="checkbox" id="chk-parcelas" onchange="App.toggleParcelas()" />
+            <span class="toggle-switch"></span>
+            Compra Parcelada
+          </label>
+        </div>
+        <div id="parcelas-wrap" class="hidden parcelas-box">
+          <div class="form-row-2">
+            <div class="form-group">
+              <label class="form-label">Nº de Parcelas</label>
+              <input type="number" id="modal-parcelas-n" class="input-field" min="2" placeholder="Ex.: 3" onchange="App.calcTotal()" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Valor por Parcela (R$)</label>
+              <input type="text" id="modal-parcela-val" class="input-field total-field" readonly />
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Painel Estoque — aparece só quando status = Estoque -->
+      <div id="modal-estoque-panel" class="modal-section hidden">
+        <div class="modal-section-title">
+          <svg viewBox="0 0 24 24" fill="none" style="width:16px"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
+          Retirada do Estoque
+        </div>
+        <!-- Já processada: mostra só o que foi retirado + opção de cancelar (evita reduzir de novo) -->
+        <div id="modal-estoque-ja-retirado" class="hidden" style="background:var(--surf-2,#eef3fb);border:1px solid var(--surf-border,#c8d4e8);border-radius:var(--r-md,10px);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div>
+            <div style="font-size:.78rem;color:#6680a0;font-weight:600">Já retirado do estoque</div>
+            <div id="modal-estoque-ja-retirado-info" style="font-size:.88rem;font-weight:700;color:#1a3a6b;margin-top:2px">—</div>
+          </div>
+          <button type="button" class="btn-ghost" onclick="App.cancelarRetiradaEstoque()" title="Devolve a quantidade ao estoque e permite escolher outro item">Cancelar retirada</button>
+        </div>
+        <div id="modal-estoque-selecao-wrap">
+          <div id="modal-estoque-lista" class="estoque-modal-lista">
+            <div class="estoque-modal-empty">Nenhum item em estoque para este grupo/subgrupo.</div>
+          </div>
+          <div class="form-group" style="margin-top:8px">
+            <label class="form-label">Item selecionado</label>
+            <select id="modal-estoque-sel" class="input-field select-styled" onchange="App.onEstoqueSelChange()">
+              <option value="">— Selecione o item —</option>
+            </select>
+          </div>
+          <div class="form-row-2" style="margin-top:8px">
+            <div class="form-group">
+              <label class="form-label">Disponível em estoque</label>
+              <input type="text" id="modal-estoque-disp" class="input-field" readonly style="background:var(--surface-2)">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Quantidade a retirar</label>
+              <input type="number" id="modal-estoque-qty" class="input-field" min="1" placeholder="1" oninput="App.validateRetiradaQty()">
+            </div>
+          </div>
+          <div id="estoque-retirada-warn" class="hidden" style="margin-top:6px;font-size:.78rem;font-weight:700;color:#d94040"></div>
+        </div>
+      </div>
+
+      <div id="modal-shipping-fields" class="modal-section hidden">
+        <div class="modal-section-title">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="1" y="3" width="15" height="13" stroke="currentColor" stroke-width="2"/><path d="M16 8h4l3 3v5h-7V8zM5.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" stroke="currentColor" stroke-width="2"/></svg>
+          Rastreabilidade de Envio
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Status do Envio</label>
+            <select id="modal-shipped" class="input-field select-styled" onchange="App.toggleShipDate()">
+              <option value="Não">Não enviado</option>
+              <option value="Sim">Enviado</option>
+            </select>
+          </div>
+          <div class="form-group" id="ship-date-wrap">
+            <label class="form-label">Data do Envio</label>
+            <input type="date" id="modal-ship-date" class="input-field" />
+          </div>
+        </div>
+        <!-- Quantidade enviada vs. comprada (só Comprado) -->
+        <div id="modal-qty-enviada-wrap" class="form-row-2 hidden" style="margin-top:8px">
+          <div class="form-group">
+            <label class="form-label">Quantidade Enviada</label>
+            <input type="number" id="modal-qty-enviada" class="input-field" min="0" placeholder="0" oninput="App.calcRestoEstoque()" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Vai p/ Estoque</label>
+            <input type="text" id="modal-qty-resto" class="input-field" readonly style="background:var(--surface-2)" />
+          </div>
+        </div>
+        <!-- Combo: também enviar itens do estoque (só Comprado) -->
+        <div id="modal-combo-estoque-wrap" class="hidden" style="margin-top:10px">
+          <label class="toggle-label">
+            <input type="checkbox" id="chk-combo-estoque" onchange="App.toggleComboEstoque()" />
+            <span class="toggle-switch"></span>
+            Também enviar itens do estoque
+          </label>
+          <div id="combo-estoque-fields" class="hidden" style="margin-top:8px">
+            <div class="form-group">
+              <label class="form-label">Item do estoque</label>
+              <select id="modal-combo-estoque-sel" class="input-field select-styled" onchange="App.onComboEstoqueSelChange()">
+                <option value="">— Selecione —</option>
+              </select>
+            </div>
+            <div class="form-row-2" style="margin-top:8px">
+              <div class="form-group">
+                <label class="form-label">Disponível em estoque</label>
+                <input type="text" id="modal-combo-estoque-disp" class="input-field" readonly style="background:var(--surface-2)" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Qtd retirada do estoque</label>
+                <input type="number" id="modal-combo-estoque-qty" class="input-field" min="0" placeholder="0" oninput="App.validateComboQty()" />
+              </div>
+            </div>
+            <div id="combo-estoque-warn" class="hidden" style="margin-top:6px;font-size:.78rem;font-weight:700;color:#d94040"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-left">
+        <button class="btn-delete" id="modal-btn-delete" onclick="App.deleteRequest()">
+          <svg viewBox="0 0 24 24" fill="none" style="width:15px;vertical-align:middle;margin-right:5px"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke="currentColor" stroke-width="2"/></svg>
+          Apagar Solicitação
+        </button>
+      </div>
+      <div class="modal-footer-right">
+        <button class="btn-ghost" onclick="App.closeModal()">Cancelar</button>
+        <button class="btn-primary" id="modal-btn-save" onclick="App.saveModalRequest()">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2"/><polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" stroke-width="2"/><polyline points="7 3 7 8 15 8" stroke="currentColor" stroke-width="2"/></svg>
+          Salvar Alterações
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR SUBGRUPO / SUBOPT -->
+<div id="modal-edit-item" class="modal-overlay hidden">
+  <div class="modal-card form-modal small-modal">
+    <div class="form-modal-header">
+      <div class="eqd-header-left">
+        <div class="eqd-header-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2"/></svg>
+        </div>
+        <div class="eqd-header-name" id="edit-modal-title">Editar</div>
+      </div>
+      <div class="eqd-header-right">
+        <button class="eqd-icon-btn" onclick="App.closeEditModal()" title="Fechar">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="form-modal-stripe"></div>
+    <div class="form-modal-scroll">
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Novo nome</label>
+        <input type="text" id="edit-item-value" class="input-field" />
+      </div>
+    </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="App.closeEditModal()">Cancelar</button>
+      <button class="btn-primary" onclick="App.confirmEditItem()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="finan_script.js"></script>
+</body>
+</html>

@@ -336,6 +336,11 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
 .units-scroll-area::-webkit-scrollbar { width: 5px; }
 .units-scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
+.unit-card-acts {
+  position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 2;
+  opacity: 0; transition: opacity .15s;
+}
+.unit-card:hover .unit-card-acts { opacity: 1; }
 .unit-card {
   background: var(--surface);
   border-top: 4px solid var(--navy);
@@ -449,8 +454,13 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
   height: 100%; min-height: 160px; color: var(--text-muted); font-size: .85rem; text-align: center;
 }
 .estoque-comps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-.estoque-comp-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding-left: 24px; }
-.estoque-comp-head i { color: var(--blue); font-size: 1.05rem; }
+.estoque-comp-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding-left: 24px; }
+.estoque-comp-icon-box {
+    width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px;
+    background: var(--blue-pale); border: 1px solid #bfdbfe;
+    display: flex; align-items: center; justify-content: center;
+}
+.estoque-comp-icon-box i { color: var(--blue); font-size: 1.05rem; }
 .estoque-comp-head strong { font-size: .88rem; color: var(--navy); flex: 1; }
 .estoque-badge-pend {
   display: inline-flex; align-items: center; gap: 4px;
@@ -641,6 +651,13 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 100px; padding: 4px 10px;
 }
+/* Contadores clicáveis do Gráfico (filtram por status) */
+.lista-counter-btn { cursor: pointer; font-family: inherit; transition: all .15s; }
+.lista-counter-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-pale); }
+.lista-counter-btn.active {
+  border-color: var(--blue); background: var(--blue); color: #fff;
+  box-shadow: 0 2px 8px rgba(30,58,138,.25);
+}
 
 /* Destaques do popup de Template de PC: Localização em azul bem claro e
    Acessos & Senhas num cinza mais escuro, pra diferenciar as seções */
@@ -652,23 +669,50 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
   background: #e2e8f0; border: 1px solid #cbd5e1; border-radius: var(--r-lg);
   padding: 12px 14px;
 }
+/* Dentro de uma caixa já destacada (fundo + borda própria), o traço de cima
+   do cabeçalho do bloco fica redundante — a própria caixa já separa. */
+.pc-preset-loc-highlight .equip-section-divider,
+.pc-preset-acessos-highlight .equip-section-divider {
+  border-top: none; margin-top: 0; padding-top: 0;
+}
 
-/* Botão de histórico (relógio) nos cards do Estoque — ao lado da lixeira */
+/* Botão de histórico (relógio) nos cards do Estoque — ao lado da lixeira.
+   Base pensada pro card da aba Unidades (log + del, sem info). */
 .estoque-modelo-log {
   position: absolute; top: 8px; right: 40px; z-index: 1;
   width: 26px; height: 26px; padding: 0;
   display: flex; align-items: center; justify-content: center;
 }
-/* Botão de informações do Template — à esquerda do relógio */
+/* Botão de informações do Template — só existe no card do Gráfico */
 .estoque-modelo-info {
-  position: absolute; top: 8px; right: 72px; z-index: 1;
+  position: absolute; top: 8px; right: 104px; z-index: 1;
   width: 26px; height: 26px; padding: 0;
   display: flex; align-items: center; justify-content: center;
 }
-/* Card de Template (Gráfico) tem só info + log — encosta os dois na direita
-   pra não deixar buraco onde ficava a lixeira/lápis */
-.estoque-modelo-card.card-pc-preset .estoque-modelo-log  { right: 8px; }
-.estoque-modelo-card.card-pc-preset .estoque-modelo-info { right: 40px; }
+/* Card do Gráfico (card-pc-preset = Template; card-grafico = periférico/
+   celular/AC/licença): Template volta a ter lixeira aqui (desmonta — peças
+   voltam Disponível na Lista); periférico/celular/AC/licença continuam sem
+   (apagar deles já é feito pela aba Unidades ou pela Lista). */
+.estoque-modelo-card.card-pc-preset .estoque-modelo-del  { right: 8px; }
+.estoque-modelo-card.card-pc-preset .estoque-modelo-log  { right: 40px; }
+.estoque-modelo-card.card-pc-preset .estoque-modelo-info { right: 72px; }
+.estoque-modelo-card.card-grafico   .estoque-modelo-log  { right: 8px; }
+
+/* Só no Gráfico (card-pc-preset / card-grafico identificam essas telas — a
+   aba Unidades reusa os mesmos cards SEM essas classes, então fica de fora):
+   histórico/informações/lixeira ocultos por padrão, aparecem só no hover. */
+.estoque-modelo-card.card-pc-preset .estoque-modelo-info,
+.estoque-modelo-card.card-pc-preset .estoque-modelo-log,
+.estoque-modelo-card.card-pc-preset .estoque-modelo-del,
+.estoque-modelo-card.card-grafico .estoque-modelo-log {
+  opacity: 0; transition: opacity .15s;
+}
+.estoque-modelo-card.card-pc-preset:hover .estoque-modelo-info,
+.estoque-modelo-card.card-pc-preset:hover .estoque-modelo-log,
+.estoque-modelo-card.card-pc-preset:hover .estoque-modelo-del,
+.estoque-modelo-card.card-grafico:hover .estoque-modelo-log {
+  opacity: 1;
+}
 
 /* Botão de editar Template (lápis) — no canto direito do card do Gráfico */
 .estoque-modelo-edit {
@@ -712,6 +756,22 @@ button { font-family: inherit; cursor: pointer; border: none; transition: all .1
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg);
   padding: 10px 14px;
 }
+/* Lixeira: barra de seleção + item com checkbox à esquerda */
+.trash-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 12px; margin-top: 10px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+.trash-bar.hidden { display: none; }
+.trash-check-all { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; font-size: .82rem; font-weight: 600; color: var(--text-mid); }
+.trash-check-all input { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--blue); }
+.trash-bar .btn-small:disabled { opacity: .45; cursor: not-allowed; }
+.trash-bar .btn-small:disabled:hover { background: var(--surface); border-color: var(--border); }
+.trash-entry { display: flex; align-items: flex-start; gap: 10px; }
+.trash-check { display: flex; align-items: center; margin: 2px 0 0; cursor: pointer; }
+.trash-check input { width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--blue); }
+.trash-entry-body { flex: 1; min-width: 0; }
+
 .log-entry-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .log-entry-head strong { font-size: .84rem; color: var(--navy); }
 .log-entry-when { font-size: .72rem; color: var(--text-muted); white-space: nowrap; }
@@ -1135,6 +1195,7 @@ select { appearance: none; cursor: pointer; }
     display: flex; align-items: flex-start; gap: 8px;
     background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--r-md, 8px);
     padding: .65rem .85rem; font-size: .78rem; color: #1e40af; line-height: 1.5;
+    margin-top: .75rem;
 }
 .equip-cfg-notice i { font-size: 1rem; flex-shrink: 0; color: var(--blue); margin-top: 1px; }
 .grid-peripherals { display: grid; grid-template-columns: 1fr; gap: 1rem; }
@@ -1223,6 +1284,35 @@ select { appearance: none; cursor: pointer; }
 .medium-modal { max-width: 1000px; width: 95%; }
 .large-modal  { max-width: 1050px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+/* Cabeçalho azul-escuro dos popups de criar/editar do Estoque — mesmo
+   visual do popup de detalhe de Equipamentos (fundo escuro, ícone numa
+   caixinha — reaproveita .eqd-header-left/-icon-box/-name/-right/.eqd-icon-btn
+   direto). Fica FIXO em cima mesmo rolando os dados: o .modal-content vira
+   coluna flex com padding:0 (.form-modal), cabeçalho/listra não encolhem,
+   e só o .form-modal-scroll (que carrega o padding de sempre) rola —
+   mesmo truque já usado no .eqd-modal do popup de detalhe. */
+.modal-content.form-modal {
+    padding: 0; display: flex; flex-direction: column; max-height: 90vh;
+    overflow: hidden; /* só o .form-modal-scroll rola — evita barra dupla */
+}
+.form-modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #0f172a; padding: 14px 18px; gap: 12px;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    flex-shrink: 0;
+}
+.form-modal-stripe {
+    height: 4px; flex-shrink: 0;
+    background: linear-gradient(90deg, #38bdf8, var(--blue));
+}
+.form-modal-scroll {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    padding: 2rem;
+}
+.form-modal .modal-actions {
+    flex-shrink: 0; margin: 0; padding: 1rem 2rem;
+}
 
 /* ============================================================
    SETTINGS
@@ -1407,7 +1497,7 @@ select { appearance: none; cursor: pointer; }
    ============================================================ */
 .equip-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
     gap: 1.25rem;
     padding-bottom: 2rem;
 }
@@ -1425,9 +1515,15 @@ select { appearance: none; cursor: pointer; }
 .equip-card .card-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; z-index: 2; }
 .equip-card:hover .card-actions { opacity: 1; }
 
-.equip-card-body { padding: 34px 18px 14px; }
-.equip-card-top  { margin-bottom: 10px; }
-.equip-card-name { font-size: 1.05rem; font-weight: 800; color: var(--navy); margin-bottom: 5px; letter-spacing: -.01em; }
+.equip-card-body { padding: 44px 24px 22px; }
+.equip-card-top  { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.equip-card-icon-box {
+    width: 48px; height: 48px; flex-shrink: 0; border-radius: 12px;
+    background: var(--blue-pale); border: 1px solid #bfdbfe;
+    display: flex; align-items: center; justify-content: center;
+}
+.equip-card-icon-box i { font-size: 1.4rem; color: var(--blue); }
+.equip-card-name { font-size: 1.25rem; font-weight: 800; color: var(--navy); letter-spacing: -.01em; line-height: 1.2; }
 
 /* Badge de código estilo screenshot */
 .equip-code-badge {
@@ -1439,23 +1535,26 @@ select { appearance: none; cursor: pointer; }
 .equip-code-badge i { font-size: .85rem; }
 
 /* Linhas de informação */
-.equip-card-rows { margin: 10px 0; display: flex; flex-direction: column; gap: 0; }
+.equip-card-rows { margin: 4px 0 10px; display: flex; flex-direction: column; gap: 0; }
 .equip-row {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 7px 0; border-bottom: 1px solid #f1f5f9;
-    font-size: .8rem;
+    padding: 8px 0; border-bottom: 1px solid #f1f5f9;
+    font-size: .82rem;
 }
 .equip-row:last-child { border-bottom: none; }
-.equip-row-lbl { font-size: .68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.equip-row-lbl { display: inline-flex; align-items: center; gap: 5px; font-size: .68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.equip-row-lbl i { font-size: .85rem; color: #94a3b8; }
 .equip-row-val { font-weight: 600; color: var(--navy); text-align: right; }
 
-/* Tags de categoria */
-.equip-card-tags { display: flex; flex-wrap: wrap; gap: 5px; padding: 10px 0 4px; border-top: 1px solid #f1f5f9; }
+/* Tags — Setor (categoria) em azul, Tipo/Subtipo em cinza. Quadradinhas
+   (raio pequeno), não pílula. Rodapé do card, depois das linhas de dado. */
+.equip-card-tags { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 0 2px; border-top: 1px solid #f1f5f9; }
 .equip-tag {
-    background: #f1f5f9; color: #475569;
-    border: 1px solid #e2e8f0; border-radius: 6px;
-    font-size: .7rem; font-weight: 600; padding: 3px 9px;
+    border-radius: 5px;
+    font-size: .72rem; font-weight: 700; padding: 4px 12px;
 }
+.equip-tag-categoria { background: #dbeafe; color: #1d4ed8; }
+.equip-tag-tipo      { background: #e2e8f0; color: #475569; }
 
 /* ============================================================
    EQUIPAMENTOS — MODAL DE EDIÇÃO
@@ -1485,7 +1584,12 @@ select { appearance: none; cursor: pointer; }
     flex-shrink: 0;
 }
 .eqd-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.eqd-header-icon { font-size: 1.4rem; color: #38bdf8; flex-shrink: 0; }
+.eqd-header-icon-box {
+    width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+    background: #1e293b; border: 1px solid #334155;
+    display: flex; align-items: center; justify-content: center;
+}
+.eqd-header-icon-box i { font-size: 1.3rem; color: #38bdf8; }
 .eqd-header-name { font-size: 1rem; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .eqd-header-sub  { font-size: .75rem; color: #64748b; margin-top: 2px; }
 .eqd-header-right { display: flex; gap: 6px; flex-shrink: 0; }
@@ -1497,20 +1601,37 @@ select { appearance: none; cursor: pointer; }
 }
 .eqd-icon-btn:hover { background: #334155; color: #fff; }
 
-/* Tabs */
+/* Listra de destaque entre o cabeçalho escuro e a faixa de abas */
+.eqd-stripe {
+    height: 4px; flex-shrink: 0;
+    background: linear-gradient(90deg, #38bdf8, var(--blue));
+}
+
+/* Tabs — faixa cinza logo abaixo da listra */
 .eqd-tabs {
-    display: flex; gap: 0;
+    display: flex; gap: 6px;
     border-bottom: 1px solid var(--border);
-    padding: 0 18px; background: var(--surface);
+    padding: 0 18px; background: var(--surface-2);
+    flex-shrink: 0;
 }
 .eqd-tab {
-    padding: 11px 16px; font-size: .83rem; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 15px 18px; font-size: .92rem; font-weight: 700;
     color: var(--text-muted); background: none; border: none; cursor: pointer;
     border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s;
     font-family: inherit;
 }
+.eqd-tab i { font-size: 1.1rem; }
 .eqd-tab:hover { color: var(--navy); }
 .eqd-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+/* Conteúdo de cada aba — só a ativa aparece */
+.eqd-tab-panel { display: none; flex-direction: column; gap: 12px; }
+.eqd-tab-panel.active { display: flex; }
+/* Documentos e Atividades têm bem menos conteúdo que Informações — sem
+   altura mínima o popup encolhia de leve ao trocar de aba. Fixando as duas
+   no mesmo tamanho, a troca de aba não "pula". */
+#eqd-panel-docs, #eqd-panel-activities { min-height: 320px; }
 
 /* Corpo — flex:1 + min-height:0 obrigatório para overflow-y funcionar em flex child */
 .eqd-body { padding: 16px; overflow: hidden; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
@@ -1547,11 +1668,20 @@ select { appearance: none; cursor: pointer; }
 }
 .eqd-status-tag {
     background: rgba(16,185,129,.15); color: #34d399;
-    border: 1px solid rgba(16,185,129,.3); border-radius: 100px;
+    border: 1px solid rgba(16,185,129,.3); border-radius: 5px;
     font-size: .72rem; font-weight: 700; padding: 3px 11px;
 }
 .eqd-status-tag.manut { background: rgba(245,158,11,.15); color: #fbbf24; border-color: rgba(245,158,11,.3); }
 .eqd-status-tag.inativo { background: rgba(239,68,68,.15); color: #f87171; border-color: rgba(239,68,68,.3); }
+
+/* Etiqueta de Setor/Tipo (Bioquímica, Equipamentos Analíticos) — quadrada,
+   pra diferenciar da etiqueta de Status (essa sim em pílula/arredondada) */
+.eqd-tag {
+    display: inline-flex; align-items: center;
+    background: var(--blue-pale); color: var(--navy);
+    border: 1px solid #bfdbfe; border-radius: 5px;
+    font-size: .72rem; font-weight: 700; padding: 3px 11px;
+}
 
 /* Grid de info cards */
 .eqd-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -1566,7 +1696,14 @@ select { appearance: none; cursor: pointer; }
 }
 .eqd-info-val { font-size: .95rem; font-weight: 700; color: var(--navy); }
 
-/* Observações */
+/* Observações — vermelho bem leve, só pra destacar do resto (info neutra) */
+#eqd-observacoes-card {
+    background: rgba(239,68,68,.06); border-color: rgba(239,68,68,.18);
+}
+#eqd-observacoes-card .eqd-info-lbl { color: #b91c1c; }
+#eqd-observacoes-card .eqd-info-val { color: #7f1d1d; font-weight: 600; }
+
+/* Observações (bloco antigo, sem uso hoje) */
 .eqd-obs-card {
     background: var(--surface-2); border: 1px solid var(--border);
     border-left: 3px solid var(--blue); border-radius: var(--r); padding: 12px 14px;
@@ -1587,11 +1724,11 @@ select { appearance: none; cursor: pointer; }
 .eqd-btn-delete:hover { background: var(--red); color: #fff; border-color: var(--red); }
 .eqd-btn-edit {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 8px 18px; border-radius: var(--r); border: none;
-    background: var(--blue); color: #fff; font-size: .85rem; font-weight: 700;
+    padding: 8px 16px; border-radius: var(--r); border: 1.5px solid #93c5fd;
+    background: #eff6ff; color: var(--blue); font-size: .85rem; font-weight: 700;
     cursor: pointer; transition: all .15s; font-family: inherit;
 }
-.eqd-btn-edit:hover { background: var(--blue-light); }
+.eqd-btn-edit:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
 
 
 /* ── Upload de imagem no formulário ── */
@@ -1616,8 +1753,27 @@ select { appearance: none; cursor: pointer; }
 }
 .eqd-car-img-el {
     width: 100%; height: 100%; object-fit: contain; object-position: center; display: block;
-    padding: 6px;
+    padding: 6px; cursor: zoom-in;
 }
+/* Dica de zoom no canto — só aparece no hover da imagem */
+.eqd-car-zoom-hint {
+    position: absolute; top: 8px; left: 8px; z-index: 2;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(0,0,0,.45); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .9rem; opacity: 0; transition: opacity .15s; pointer-events: none;
+}
+.eqd-car-wrap:hover .eqd-car-zoom-hint { opacity: 1; }
+
+/* Modal de zoom da imagem — tela cheia escura, imagem grande no centro */
+.img-zoom-modal { background: rgba(0,0,0,.9); z-index: 4000; cursor: zoom-out; }
+.img-zoom-img {
+    max-width: 92vw; max-height: 92vh; object-fit: contain;
+    border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,.5);
+    cursor: default;
+}
+.img-zoom-close { position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; }
+.img-zoom-close i { font-size: 1.3rem; }
 .eqd-car-nav {
     position: absolute; top: 50%; transform: translateY(-50%);
     width: 32px; height: 32px; border-radius: 50%;
@@ -1805,6 +1961,31 @@ select { appearance: none; cursor: pointer; }
 }
 .equip-section-divider i { font-size: 1rem; color: var(--blue); }
 
+/* Blocos do form de Novo/Editar Equipamento — Identificação, Especificações
+   Técnicas, Observações, Imagens, Documentos e Anexos. Todos usam o mesmo
+   cabeçalho (.equip-section-divider) e o mesmo grid de 2 colunas, pra manter
+   fonte/tamanho padronizados entre os 5 blocos. */
+.equip-form-block { margin-bottom: 2px; }
+.equip-form-block:first-of-type .equip-section-divider {
+    border-top: none; margin-top: 0; padding-top: 0;
+}
+.equip-block-hint { font-weight: 400; font-size: .75rem; color: #94a3b8; }
+
+/* Status do Equipamento — 3 botões (Em Uso/Em Manutenção/Inativo) em vez de
+   select; equip-status (hidden input) continua guardando o valor de sempre,
+   então saveEquipamento()/openEquipModal()/_checkEquipChanges() não mudam. */
+.equip-status-btns { display: flex; gap: 8px; }
+.equip-status-btn {
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: .6rem .75rem; border-radius: var(--r); border: 1.5px solid var(--border);
+    background: var(--surface); color: var(--text-mid); font-size: .85rem; font-weight: 700;
+    cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.equip-status-btn:hover { border-color: var(--border-2); }
+.equip-status-btn.st-uso.active     { border-color: var(--green); background: #ecfdf5; color: var(--green); }
+.equip-status-btn.st-manut.active   { border-color: var(--amber); background: #fffbeb; color: #b45309; }
+.equip-status-btn.st-inativo.active { border-color: var(--red);   background: #fef2f2; color: var(--red); }
+
 /* Lista de docs no modal de edição */
 .equip-docs-edit-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .equip-docs-edit-item {
@@ -1906,6 +2087,7 @@ select { appearance: none; cursor: pointer; }
 .status-dot-mini {
     width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0;
 }
+.status-dot-mini.dot-disp    { background: #3b82f6; }
 .status-dot-mini.dot-uso     { background: #22c55e; }
 .status-dot-mini.dot-manut   { background: #f59e0b; }
 .status-dot-mini.dot-inativo { background: #ef4444; }
@@ -2116,6 +2298,12 @@ select { appearance: none; cursor: pointer; }
 .equip-status-dot.dot-uso     { background: #22c55e; box-shadow: 0 0 6px #22c55e88; }
 .equip-status-dot.dot-manut   { background: #f59e0b; box-shadow: 0 0 6px #f59e0b88; }
 .equip-status-dot.dot-inativo { background: #ef4444; box-shadow: 0 0 6px #ef444488; }
+.equip-status-dot.dot-descartado { background: #111827; box-shadow: 0 0 6px #11182788; }
+
+/* Select de Status com a bolinha da cor do status escolhido do lado —
+   usado no popup de Entrada de Peça (Lista do Estoque). */
+.status-select-wrap { display: flex; align-items: center; gap: 8px; }
+.status-select-wrap select { flex: 1; }
 
 .eqd-docs-list { display: flex; flex-direction: column; gap: 6px; }
 .eqd-doc-view-item {
@@ -2411,7 +2599,10 @@ main.main-expanded {
   justify-content: space-between;
   gap: 10px;
   padding: .875rem 1.25rem;
-  background: linear-gradient(90deg, var(--navy) 0%, var(--navy-mid) 100%);
+  /* Mesma cor do cabeçalho das Configurações do Financeiro/Home (.cfg-card-head) —
+     hex fixo em vez de var(--navy)/var(--navy-mid) pra não puxar o resto do tema
+     do Inventário, que usa um navy um pouco mais escuro nesses tokens. */
+  background: linear-gradient(90deg, #1a3050 0%, #254870 100%);
 }
 .config-section-header h4 { flex: 1; }
 .config-section-header i { font-size: 1.1rem; color: rgba(255,255,255,.8); }
@@ -2461,3 +2652,66 @@ main.main-expanded {
 .backup-card-info { flex: 1; }
 .backup-card-info strong { display: block; font-size: .9rem; font-weight: 700; color: var(--navy); margin-bottom: 3px; }
 .backup-card-info span { font-size: .8rem; color: var(--text-muted); }
+
+/* Backup e Logs lado a lado (a div .cfg-cols-2 existia no HTML sem CSS,
+   por isso os dois cartões empilhavam em vez de dividir a linha) */
+.cfg-cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: stretch; }
+.cfg-cols-2 .config-section { margin-bottom: 0; display: flex; flex-direction: column; }
+.cfg-cols-2 .backup-restore-area { flex: 1; }
+@media (max-width: 1100px) { .cfg-cols-2 { grid-template-columns: 1fr; } }
+
+/* 4 logs em grade 2x2 — cartão compacto (ícone em cima, texto, botões
+   embaixo), pra caber lado a lado com o card do Backup e ficar do mesmo
+   tamanho dele (2 linhas, mesma altura geral). */
+.cfg-log-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 12px;
+}
+.cfg-log-grid .backup-card {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 1rem;
+}
+.cfg-log-grid .backup-card-info { width: 100%; }
+.cfg-log-grid .cfg-log-btns { width: 100%; justify-content: flex-end; }
+@media (max-width: 640px) { .cfg-log-grid { grid-template-columns: 1fr; } }
+
+/* Setores / Categorias de Acessos (Configurações) */
+.cat-acesso-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 2px; border-bottom: 1px solid var(--border);
+}
+.cat-acesso-item:last-child { border-bottom: none; }
+.cat-acesso-cor-dot {
+  width: 16px; height: 16px; border-radius: 5px; flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
+}
+.cat-acesso-nome { flex: 1; font-size: .92rem; font-weight: 600; color: var(--navy); }
+.cat-acesso-count { font-size: .74rem; color: var(--text-muted); white-space: nowrap; }
+.cat-acesso-acts { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* Cores prontas do modal de setor */
+.cat-acesso-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.cat-swatch {
+  width: 30px; height: 30px; border-radius: 8px; cursor: pointer;
+  border: 2px solid transparent; padding: 0;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
+  transition: transform .12s, border-color .12s;
+}
+.cat-swatch:hover { transform: scale(1.1); }
+.cat-swatch.active { border-color: var(--navy); transform: scale(1.1); }
+
+/* Logs: botões só-ícone (ver / baixar) */
+.cfg-log-btns { display: flex; gap: 8px; flex-shrink: 0; }
+.btn-icon-only {
+  width: 36px; height: 36px; border-radius: var(--r); flex-shrink: 0;
+  border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.btn-icon-only:hover { border-color: var(--blue); color: var(--blue); background: #eef4ff; }
+.btn-icon-only i { font-size: 1.05rem; }

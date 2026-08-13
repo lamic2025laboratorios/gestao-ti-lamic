@@ -131,6 +131,24 @@
             =================================================== -->
             <section id="dashboard" class="section active">
 
+                <!-- CABEÇALHO BRANCO (mesmo padrão do topo de cada aba em Financeiro) -->
+                <div class="dash-topbar-rel">
+                    <div>
+                        <h2>Dashboard Canal do Cliente</h2>
+                        <p class="tab-subtitle">Atendimento, avaliações e projeção financeira — CC / IA</p>
+                    </div>
+                    <div class="dash-controls-rel">
+                        <div class="idle-chip" title="Tempo restante até o logout automático por inatividade">
+                            <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span class="idle-timer">60:00</span>
+                        </div>
+                        <button class="btn-dash-print-rel" onclick="abrirRelatorioModal()" title="Escolher o que entra no relatório e baixar em PDF">
+                            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            Relatório
+                        </button>
+                    </div>
+                </div>
+
                 <!-- FILTER BAR -->
                 <div class="filtro-bar">
                     <span class="dash-tipo-badge" id="dash-tipo-badge">CC</span>
@@ -157,9 +175,6 @@
                     <span class="filtro-no-data" id="sem-dados-aviso" style="display:none;">
                         ⚠ Sem dados para este período
                     </span>
-
-                    <!-- Botões direita -->
-                    <button class="btn-secondary" style="height:34px;font-size:0.82rem;" onclick="gerarRelatorio()">📄 Relatório</button>
                 </div>
 
                 <!-- ================= 1) CARDS — DADOS GERAIS ================= -->
@@ -191,7 +206,6 @@
                     <div class="chart-card chart-card-wide">
                         <div class="chart-title">
                             <span>Dados Gerais — Concluídos · Em Aberto · Mensagens<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Dados Gerais.</strong> Compara Concluídos, Em Aberto e Mensagens do período.<span class="info-pop-note">Mensagens ÷ 100 para caber na escala. Ao lado, o volume por atendente.</span></span></span></span>
-                            <button class="toggle-comp-btn" id="btn-comp" onclick="toggleComparacao()">📈 Comparar Eficiência (meses)</button>
                         </div>
 
                         <div class="dados-gerais-row">
@@ -204,9 +218,9 @@
                             </div>
                         </div>
 
-                        <div id="comparacao-wrap" style="display:none;">
+                        <div id="comparacao-wrap">
                             <div class="chart-title" style="margin-top:14px;">
-                                <span>Evolução da Eficiência — <span id="comp-ano-label"></span><span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Evolução da Eficiência.</strong> Como o msgs/atendimento variou mês a mês no ano.<span class="info-pop-note">Ponto <span style="color:#34d399">verde</span> = caiu vs mês anterior (melhorou); <span style="color:#f87171">vermelho</span> = subiu (piorou).</span></span></span></span>
+                                <span>Evolução da Eficiência — <span id="comp-ano-label"></span><span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Evolução da Eficiência.</strong> Como o msgs/atendimento variou mês a mês no ano.<span class="info-pop-note">Ponto <span style="color:#34d399">verde</span> = caiu vs mês anterior (melhorou); <span style="color:#f87171">vermelho</span> = subiu (piorou). Linhas pontilhadas: tendência (laranja) e média (roxa) do ano.</span></span></span></span>
                                 <span class="comp-legend" id="comp-resumo"></span>
                             </div>
                             <div class="chart-body" style="height:220px;">
@@ -216,18 +230,67 @@
                     </div>
                 </div>
 
+                <!-- ================= PROJEÇÃO FINANCEIRA ================= -->
+                <div class="chart-grid">
+                    <div class="chart-card chart-card-wide">
+                        <div class="chart-title">
+                            <span>Projeção Financeira<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Projeção Financeira.</strong> Faturamento x meta e projeção de custo com a API oficial da Meta (WhatsApp Business).<span class="info-pop-note">Clique em qualquer um dos 2 gráficos pra ver o detalhe completo, com métricas, tendência e média.</span></span></span></span>
+                        </div>
+
+                        <div class="chart-grid">
+
+                            <!-- Card A: Faturamento x Meta -->
+                            <div class="chart-card proj-fin-card proj-fin-card-fat" onclick="abrirAuditFaturamento()" title="Clique para ver o detalhe completo">
+                                <div class="chart-title">
+                                    <span>Faturamento x Meta<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Faturamento x Meta.</strong> Faturamento lançado mês a mês contra a meta configurada.<span class="info-pop-note">A meta pode ser um valor fixo ou % de crescimento sobre o mês anterior (ou mesmo mês do ano passado). Ao bater, pode subir sozinha um % configurado.</span></span></span></span>
+                                    <div class="proj-fin-actions" onclick="event.stopPropagation()">
+                                        <button class="proj-fin-btn" onclick="abrirValorModal('faturamento')">＋ Faturamento</button>
+                                        <button class="proj-fin-btn" onclick="abrirMetaModal()"><svg viewBox="0 0 24 24" fill="none" width="12" height="12" style="vertical-align:-1px;margin-right:2px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg> Metas</button>
+                                    </div>
+                                </div>
+                                <div class="proj-fin-status" id="fat-status-badge">—</div>
+                                <div class="chart-body" style="height:240px;">
+                                    <canvas id="chart-faturamento"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Card B: Projeção de Custo API -->
+                            <div class="chart-card proj-fin-card proj-fin-card-api" onclick="abrirAuditApiCost()" title="Clique para ver o detalhe completo">
+                                <div class="chart-title">
+                                    <span>Projeção de Custo — API Oficial (Meta)<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Projeção de Custo API.</strong> A partir de 01/10/2026 a Meta passa a cobrar também pelas mensagens de atendimento (Service Messages) enviadas pela empresa, cobrança por mensagem entregue (confirmado na documentação oficial). O valor definitivo por mensagem só é publicado pela Meta até 01/09/2026 — R$0,035 é o valor preliminar informado.<span class="info-pop-note">Modelo antigo: só cobra template (você lança o gasto mensal em US$, convertido em R$). Modelo novo (estimado): total de mensagens do período × % estimado enviado pela empresa (50% padrão) × R$/mensagem — ambos ficam sempre visíveis juntos pra já ter uma base de comparação e planejar a redução de custo.</span></span></span></span>
+                                    <div class="proj-fin-actions" onclick="event.stopPropagation()">
+                                        <button class="proj-fin-btn" onclick="abrirValorApiModal()">＋ Gasto US$</button>
+                                        <button class="proj-fin-btn" onclick="abrirMetaModal()"><svg viewBox="0 0 24 24" fill="none" width="12" height="12" style="vertical-align:-1px;margin-right:2px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg> Metas</button>
+                                    </div>
+                                </div>
+                                <div class="api-modo-switch" onclick="event.stopPropagation()">
+                                    <button class="api-modo-btn active" id="api-modo-antigo" onclick="setApiModo('antigo')">Cobrança Antiga</button>
+                                    <button class="api-modo-btn" id="api-modo-novo" onclick="setApiModo('novo')">Cobrança Nova (out/2026)</button>
+                                </div>
+                                <div class="chart-body" style="height:240px;">
+                                    <canvas id="chart-apicost"></canvas>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ================= 3) POR QUE BUSCAM (PIZZA) + 4) DIAS DA SEMANA ================= -->
                 <div class="chart-grid">
                     <div class="chart-card">
-                        <div class="chart-title"><span>Por Que Buscam o LAMIC<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Por Que Buscam.</strong> O motivo do contato, distribuído por categoria (coluna <em>Fila</em>).<span class="info-pop-note">Use as setas para alternar o canal (Todos / WhatsApp / Instagram). "Sem fila (paciente)" = atendimento sem fila, encerrado pelo paciente. Filas com <strong>BOT</strong> são descartadas.</span></span></span></span>
+                        <div class="chart-title"><span>Por Que Buscam o LAMIC<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Por Que Buscam.</strong> O motivo do contato, distribuído por categoria (coluna <em>Fila</em>).<span class="info-pop-note">Use as setas para alternar o canal (Todos / WhatsApp / Instagram). "Sem fila (paciente)" = atendimento sem fila, encerrado pelo paciente. Filas com <strong>BOT</strong> são descartadas. Embaixo, o crescimento de atendimento por canal (coluna <em>Conexão</em> da planilha) em barras mês a mês no ano, acompanhando o mesmo seletor, com uma linha de média por canal.</span></span></span></span>
                             <div class="canal-switch">
                                 <button class="canal-arrow" type="button" onclick="ciclarBuscamCanal(-1)" title="Canal anterior">‹</button>
                                 <span class="canal-switch-lbl" id="buscam-canal-label">Todos os canais</span>
                                 <button class="canal-arrow" type="button" onclick="ciclarBuscamCanal(1)" title="Próximo canal">›</button>
                             </div>
                         </div>
-                        <div class="chart-body" style="height:280px;">
+                        <div class="chart-body" style="height:220px;">
                             <canvas id="chart-buscam"></canvas>
+                        </div>
+                        <div class="chart-body" style="height:150px;margin-top:8px;">
+                            <canvas id="chart-buscam-growth"></canvas>
                         </div>
                     </div>
 
@@ -258,12 +321,12 @@
                 <!-- ================= 6) RANKING + RESPOSTA ÀS AVALIAÇÕES + STATUS (3 lado a lado) ================= -->
                 <div class="chart-grid grid-3">
                     <div class="chart-card">
-                        <div class="chart-title"><span>Avaliação por Atendente — Ranking pela Média<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Qualidade por Atendente.</strong> Ranking que combina nota e volume de atendimento.<span class="info-pop-note">Score = média bayesiana da nota × volume (log). Poucas avaliações ou 1 nota ruim isolada não derrubam quem atende muito. Badge = nota média. Clique num atendente para ver a resposta às avaliações dele ao lado.</span></span></span></span></div>
+                        <div class="chart-title"><span>Avaliação por Atendente — Ranking pela Média<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Qualidade por Atendente.</strong> Ranking que combina nota e volume de atendimento.<span class="info-pop-note">Score = média bayesiana da nota × volume (log). Poucas avaliações ou 1 nota ruim isolada não derrubam quem atende muito. Badge = nota média. Clique num atendente para abrir o dashboard mensal dele (avaliações enviadas/respondidas/não respondidas, mês a mês).</span></span></span></span></div>
                         <div class="ranking-embed ranking-aval" id="rank-avaliacao"></div>
                     </div>
 
                     <div class="chart-card">
-                        <div class="chart-title"><span>Resposta às Avaliações<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Resposta às Avaliações.</strong> Quantas avaliações foram enviadas e quantas o cliente respondeu.<span class="info-pop-note"><strong>Enviadas</strong> = todos com status de avaliação. <strong>Respondida</strong> = status de avaliação com resposta, ou que recebeu nota. <strong>Avaliação não respondida</strong> = com status de avaliação, sem resposta. O anel mostra a % respondida. Clique num atendente no ranking para ver só os dados dele.</span></span></span></span></div>
+                        <div class="chart-title"><span>Resposta às Avaliações<span class="info-wrap"><button class="info-btn" type="button" onclick="toggleInfo(event,this)">i</button><span class="info-pop"><strong>Resposta às Avaliações.</strong> Métrica geral — quantas avaliações foram enviadas e quantas o cliente respondeu, somando todos os atendentes.<span class="info-pop-note"><strong>Enviadas</strong> = todos com status de avaliação. <strong>Respondida</strong> = status de avaliação com resposta, ou que recebeu nota. <strong>Avaliação não respondida</strong> = com status de avaliação, sem resposta. O anel mostra a % respondida do período filtrado; a linha embaixo mostra a evolução mês a mês no ano, com a média.</span></span></span></span></div>
                         <div class="aval-resumo-titulo" id="aval-resumo-titulo">Geral · todos os atendentes</div>
                         <div class="aval-gauge-wrap">
                             <canvas id="chart-aval-gauge"></canvas>
@@ -273,6 +336,9 @@
                             </div>
                         </div>
                         <div class="aval-resumo" id="aval-resumo"></div>
+                        <div class="chart-body" style="height:110px;margin-top:8px;">
+                            <canvas id="chart-aval-evolucao"></canvas>
+                        </div>
                     </div>
 
                     <div class="chart-card">
@@ -307,7 +373,11 @@
                                 <input type="file" id="import-xlsx-cc" accept=".xlsx,.xls" style="display:none;" onchange="importarXLSXTipo(event,'cc')">
                             </div>
                         </div>
-                        <div class="spreadsheet-wrap">
+                        <div class="entrada-view-switch">
+                            <button class="entrada-view-btn active" id="ev-cc-dados" onclick="setEntradaView('cc','dados')">Dados</button>
+                            <button class="entrada-view-btn" id="ev-cc-metas" onclick="setEntradaView('cc','metas')">Metas</button>
+                        </div>
+                        <div class="spreadsheet-wrap" id="entrada-dados-cc">
                             <table class="spreadsheet" id="tabela-cc">
                                 <thead><tr>
                                     <th>Nome</th><th>Tipo</th><th>Período</th><th>Atend.</th>
@@ -322,6 +392,13 @@
                                     </div></td></tr>
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="metas-entrada-panel" id="entrada-metas-cc" style="display:none;">
+                            <div class="metas-entrada-toolbar">
+                                <span class="card-title" style="margin:0;">Metas cadastradas — CC</span>
+                                <button class="btn-add" onclick="abrirMetaModalEntrada('cc')">＋ Nova Meta</button>
+                            </div>
+                            <div id="metas-lista-cc"></div>
                         </div>
                     </div><!-- /card CC -->
 
@@ -339,7 +416,11 @@
                                 <input type="file" id="import-xlsx-ia" accept=".xlsx,.xls" style="display:none;" onchange="importarXLSXTipo(event,'ia')">
                             </div>
                         </div>
-                        <div class="spreadsheet-wrap">
+                        <div class="entrada-view-switch">
+                            <button class="entrada-view-btn active" id="ev-ia-dados" onclick="setEntradaView('ia','dados')">Dados</button>
+                            <button class="entrada-view-btn" id="ev-ia-metas" onclick="setEntradaView('ia','metas')">Metas</button>
+                        </div>
+                        <div class="spreadsheet-wrap" id="entrada-dados-ia">
                             <table class="spreadsheet" id="tabela-ia">
                                 <thead><tr>
                                     <th>Nome</th><th>Tipo</th><th>Período</th><th>Atend.</th>
@@ -355,6 +436,13 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div class="metas-entrada-panel" id="entrada-metas-ia" style="display:none;">
+                            <div class="metas-entrada-toolbar">
+                                <span class="card-title" style="margin:0;">Metas cadastradas — IA</span>
+                                <button class="btn-add" onclick="abrirMetaModalEntrada('ia')">＋ Nova Meta</button>
+                            </div>
+                            <div id="metas-lista-ia"></div>
+                        </div>
                     </div><!-- /card IA -->
 
                 </div><!-- /entry-tipo-grid -->
@@ -366,20 +454,30 @@
             =================================================== -->
             <section id="config" class="section">
                 <div class="config-wrap">
-                    <div class="chart-card">
-                        <div class="chart-title"><span>Backup dos Dados</span></div>
-                        <p class="config-desc">Baixe um arquivo de backup com todos os dados (CC, IA e as planilhas base salvas). Guarde-o em local seguro — se algo for perdido, é só restaurar.</p>
-                        <div class="config-actions">
-                            <button class="btn-primary" onclick="baixarBackup()">⬇ Baixar backup (.json)</button>
-                            <button class="btn-secondary" onclick="document.getElementById('restore-backup-file').click()">⬆ Restaurar backup</button>
-                            <input type="file" id="restore-backup-file" accept=".json" style="display:none;" onchange="restaurarBackup(event)">
+                    <div class="rel-cfg-card">
+                        <div class="rel-cfg-card-head">
+                            <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="5" rx="9" ry="3" stroke="currentColor" stroke-width="2"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" stroke="currentColor" stroke-width="2"/></svg>
+                            <h3>Backup dos Dados</h3>
                         </div>
-                        <p class="config-warn">⚠ Restaurar SUBSTITUI os dados atuais (CC e IA) pelos do arquivo.</p>
+                        <div class="rel-cfg-card-body">
+                            <p class="config-desc">Baixe um arquivo de backup com todos os dados (CC, IA e as planilhas base salvas). Guarde-o em local seguro — se algo for perdido, é só restaurar.</p>
+                            <div class="config-actions">
+                                <button class="btn-primary" onclick="baixarBackup()">⬇ Baixar backup (.json)</button>
+                                <button class="btn-secondary" onclick="document.getElementById('restore-backup-file').click()">⬆ Restaurar backup</button>
+                                <input type="file" id="restore-backup-file" accept=".json" style="display:none;" onchange="restaurarBackup(event)">
+                            </div>
+                            <p class="config-warn">⚠ Restaurar SUBSTITUI os dados atuais (CC e IA) pelos do arquivo.</p>
+                        </div>
                     </div>
 
-                    <div class="chart-card">
-                        <div class="chart-title"><span>Planilha Base (CC)</span></div>
-                        <p class="config-desc">A planilha importada fica guardada no Firebase. Quando o painel ganhar métricas novas, use "Reprocessar base" na aba <strong>Inserir Dados</strong> — recalcula tudo sem re-anexar o arquivo.</p>
+                    <div class="rel-cfg-card">
+                        <div class="rel-cfg-card-head">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M3 3h18v18H3z" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18" stroke="currentColor" stroke-width="2"/></svg>
+                            <h3>Planilha Base (CC)</h3>
+                        </div>
+                        <div class="rel-cfg-card-body">
+                            <p class="config-desc">A planilha importada fica guardada no Firebase. Quando o painel ganhar métricas novas, use "Reprocessar base" na aba <strong>Inserir Dados</strong> — recalcula tudo sem re-anexar o arquivo.</p>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -634,6 +732,424 @@
         </div><!-- /modal-panel -->
     </div><!-- /modal-overlay -->
 
+    <!-- ======================================================
+         MODAL — Nova/Editar Meta
+    ======================================================= -->
+    <div class="modal-overlay" id="meta-modal-fin" style="display:none;" onclick="modalOverlayClickGenerico(event,'meta-modal-fin')">
+        <div class="modal-panel" style="max-width:540px" onclick="event.stopPropagation()">
+            <input type="hidden" id="mf-id">
+            <div class="modal-header">
+                <span class="modal-header-title">Metas</span>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('meta-modal-fin')">✕</button>
+            </div>
+            <div class="modal-body">
+
+                <div class="card" id="mf-lista-card">
+                    <div class="card-title" id="mf-lista-titulo">Metas cadastradas</div>
+                    <div id="mf-lista"></div>
+                    <button class="btn-add" id="mf-nova-meta-btn" onclick="novaMetaForm()">＋ Nova Meta</button>
+                    <p class="field-hint" id="mf-lista-hint" style="display:none;margin-top:8px;">As metas são cadastradas em <strong>Inserir Dados</strong> → aba <strong>Metas</strong> do card CC ou IA. Aqui é só consulta.</p>
+                </div>
+
+                <div class="card" id="mf-form-card" style="display:none;">
+                    <div class="card-title" id="mf-form-titulo">Nova Meta</div>
+                    <div class="form-grid">
+
+                        <div class="form-group">
+                            <label for="mf-tipo">Tipo de Meta</label>
+                            <select id="mf-tipo" onchange="onMetaTipoChange()">
+                                <option value="faturamento">Faturamento</option>
+                                <option value="exames">Exames</option>
+                                <option value="mensagens">Mensagens (reduzir volume trocado)</option>
+                                <option value="__novo__">+ Novo tipo personalizado…</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="mf-tipo-custom-group" style="display:none;">
+                            <label for="mf-tipo-custom">Nome do novo tipo</label>
+                            <input type="text" id="mf-tipo-custom" placeholder="Ex: Novos Pacientes">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mf-nome">Nome da Meta</label>
+                            <input type="text" id="mf-nome" placeholder="Ex: Meta de Faturamento Mensal">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mf-periodicidade">Periodicidade</label>
+                            <select id="mf-periodicidade">
+                                <option value="mensal">Mensal</option>
+                                <option value="anual">Anual</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mf-direcao">Direção da meta</label>
+                            <select id="mf-direcao" onchange="onMetaModoChange()">
+                                <option value="aumentar">Aumentar (crescer)</option>
+                                <option value="diminuir">Diminuir (reduzir)</option>
+                            </select>
+                            <span class="field-hint">"Diminuir" bate a meta quando o valor realizado fica igual ou abaixo do alvo — é o caso de Mensagens: reduzir o volume trocado pra pagar menos na API.</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mf-modo">Como definir o alvo</label>
+                            <select id="mf-modo" onchange="onMetaModoChange()">
+                                <option value="valor">Valor fixo</option>
+                                <option value="percentual">% sobre uma base (crescer ou reduzir)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mf-valor" id="mf-valor-label">Valor alvo (R$)</label>
+                            <input type="number" id="mf-valor" min="0" step="0.01" placeholder="0">
+                        </div>
+
+                        <div class="form-group" id="mf-base-group" style="display:none;">
+                            <label for="mf-base">Base de comparação</label>
+                            <select id="mf-base" onchange="onMetaBaseChange()">
+                                <option value="mes_anterior">Mês anterior</option>
+                                <option value="mesmo_mes_ano_passado">Mesmo mês do ano anterior</option>
+                                <option value="manual">Valor manual</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="mf-base-manual-group" style="display:none;">
+                            <label for="mf-base-manual">Valor base manual</label>
+                            <input type="number" id="mf-base-manual" min="0" step="0.01" placeholder="0">
+                        </div>
+
+                        <div class="form-group full">
+                            <label for="mf-autoinc">Auto-incremento ao bater a meta (%)</label>
+                            <input type="number" id="mf-autoinc" min="0" step="0.1" placeholder="Ex: 5 → sobe 5% sozinha a cada meta batida">
+                            <span class="field-hint">Opcional. Cada vez que o valor realizado bater essa meta, o próximo alvo sobe automaticamente esse percentual.</span>
+                        </div>
+
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end;">
+                        <button class="btn-secondary" onclick="cancelarMetaForm()">Cancelar</button>
+                        <button class="btn-primary" onclick="salvarMetaFin()">Salvar Meta</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================
+         MODAL — Lançar Valor (Faturamento / Exames / outros tipos)
+    ======================================================= -->
+    <div class="modal-overlay" id="valor-modal-fin" style="display:none;" onclick="modalOverlayClickGenerico(event,'valor-modal-fin')">
+        <div class="modal-panel" style="max-width:420px" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-header-title" id="valor-modal-title">Lançar Valor</span>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('valor-modal-fin')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="card">
+                    <div class="form-grid">
+                        <div class="form-group" id="vf-tipo-group">
+                            <label for="vf-tipo">Tipo</label>
+                            <select id="vf-tipo"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="vf-ano">Ano</label>
+                            <input type="number" id="vf-ano" min="2020" max="2099">
+                        </div>
+                        <div class="form-group">
+                            <label for="vf-mes">Mês</label>
+                            <select id="vf-mes">
+                                <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+                                <option value="3">Março</option><option value="4">Abril</option>
+                                <option value="5">Maio</option><option value="6">Junho</option>
+                                <option value="7">Julho</option><option value="8">Agosto</option>
+                                <option value="9">Setembro</option><option value="10">Outubro</option>
+                                <option value="11">Novembro</option><option value="12">Dezembro</option>
+                            </select>
+                        </div>
+                        <div class="form-group full">
+                            <label for="vf-valor" id="vf-valor-label">Valor (R$)</label>
+                            <input type="number" id="vf-valor" min="0" step="0.01" placeholder="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fecharModalGenerico('valor-modal-fin')">Cancelar</button>
+                <button class="btn-primary" onclick="salvarValorFin()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================
+         MODAL — Lançar Gasto com API (modelo antigo — US$)
+    ======================================================= -->
+    <div class="modal-overlay" id="valor-api-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'valor-api-modal')">
+        <div class="modal-panel" style="max-width:760px" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span class="modal-header-title">Gasto com API (modelo antigo)</span>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('valor-api-modal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="va-modal-grid">
+                    <div class="card">
+                        <div class="card-title">Modelo Antigo (real, você lança)</div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="va-ano">Ano</label>
+                                <input type="number" id="va-ano" min="2020" max="2099">
+                            </div>
+                            <div class="form-group">
+                                <label for="va-mes">Mês</label>
+                                <select id="va-mes">
+                                    <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+                                    <option value="3">Março</option><option value="4">Abril</option>
+                                    <option value="5">Maio</option><option value="6">Junho</option>
+                                    <option value="7">Julho</option><option value="8">Agosto</option>
+                                    <option value="9">Setembro</option><option value="10">Outubro</option>
+                                    <option value="11">Novembro</option><option value="12">Dezembro</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="va-usd">Valor gasto (US$)</label>
+                                <input type="number" id="va-usd" min="0" step="0.01" placeholder="0.00">
+                                <span class="field-hint">O valor real já cobrado pela Meta — cobrança por mensagem de template iniciada pela empresa.</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="va-cotacao">Cotação do dólar (R$)</label>
+                                <input type="number" id="va-cotacao" min="0" step="0.01" placeholder="5.40">
+                                <span class="field-hint">Usada pra converter US$ → R$ em todos os meses — ajuste quando quiser.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Estimativa do modelo novo (a partir de out/2026)</div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="va-preco-msg">R$ por mensagem</label>
+                                <input type="number" id="va-preco-msg" min="0" step="0.001" placeholder="0.035">
+                                <span class="field-hint">Valor preliminar divulgado (R$0,035). A Meta só confirma o valor definitivo até 01/09/2026 — ajuste aqui quando ela publicar.</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="va-pct-empresa">% das mensagens enviadas pela empresa</label>
+                                <input type="number" id="va-pct-empresa" min="0" max="100" step="1" placeholder="50">
+                                <span class="field-hint">Confirmado na documentação oficial da Meta: só a mensagem enviada PELA EMPRESA é cobrada, a do cliente nunca é — nem hoje, nem no modelo novo. A planilha não separa quem enviou, então esse % é a estimativa usada sobre o total de mensagens.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="fecharModalGenerico('valor-api-modal')">Cancelar</button>
+                <button class="btn-primary" onclick="salvarValorApi()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================
+         MODAL — Auditoria: Faturamento x Meta (estética "Tintas Compradas")
+    ======================================================= -->
+    <div class="modal-overlay" id="audit-faturamento-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'audit-faturamento-modal')">
+        <div class="modal-panel" style="max-width:1080px" onclick="event.stopPropagation()">
+            <div class="audit-modal-header">
+                <div class="audit-modal-header-left">
+                    <div class="audit-modal-icon">
+                        <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div>
+                        <div class="audit-modal-title">Faturamento x Meta</div>
+                        <div class="audit-modal-sub" id="audit-fat-sub">—</div>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('audit-faturamento-modal')">✕</button>
+            </div>
+            <div class="audit-modal-stripe"></div>
+            <div class="modal-body">
+                <div class="audit-grid">
+                    <div class="audit-side">
+                        <span class="audit-side-tag" id="audit-fat-tag">—</span>
+                        <div class="audit-side-big" id="audit-fat-big">R$ 0</div>
+                        <div class="audit-side-lbl">Faturamento do período</div>
+                        <div class="audit-side-divider"></div>
+                        <div class="audit-side-row"><span>Meta do período</span><strong id="audit-fat-meta">—</strong></div>
+                        <div class="audit-side-row"><span>% da meta atingido</span><strong id="audit-fat-pct">—</strong></div>
+                        <div class="audit-side-row"><span>Mês anterior</span><strong id="audit-fat-ant">—</strong></div>
+                        <div class="audit-side-row"><span>Auto-incremento</span><strong id="audit-fat-autoinc">—</strong></div>
+                        <div class="audit-side-divider"></div>
+                        <div class="audit-side-row"><span>Eficiência (msgs/atend.)</span><strong id="audit-fat-ef">—</strong></div>
+                        <div class="audit-side-row"><span>Eficiência financeira</span><strong id="audit-fat-effin">—</strong></div>
+                    </div>
+                    <div class="audit-main">
+                        <div class="audit-stats-grid">
+                            <div class="audit-stat"><span>Média do ano</span><strong id="audit-fat-media">—</strong></div>
+                            <div class="audit-stat"><span>Tendência</span><strong id="audit-fat-tend">—</strong></div>
+                            <div class="audit-stat"><span>Meses batidos</span><strong id="audit-fat-batidos">—</strong></div>
+                        </div>
+                        <div class="audit-chart-wrap">
+                            <div class="audit-chart-inner"><canvas id="audit-fat-chart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================
+         MODAL — Auditoria: Projeção de Custo API (estética "Tintas Compradas")
+    ======================================================= -->
+    <div class="modal-overlay" id="audit-apicost-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'audit-apicost-modal')">
+        <div class="modal-panel" style="max-width:1080px" onclick="event.stopPropagation()">
+            <div class="audit-modal-header">
+                <div class="audit-modal-header-left">
+                    <div class="audit-modal-icon">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div>
+                        <div class="audit-modal-title">Projeção de Custo — API Oficial (Meta)</div>
+                        <div class="audit-modal-sub" id="audit-api-sub">—</div>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('audit-apicost-modal')">✕</button>
+            </div>
+            <div class="audit-modal-stripe"></div>
+            <div class="modal-body">
+                <div class="audit-grid">
+                    <div class="audit-side">
+                        <span class="audit-side-tag" id="audit-api-tag">MODELO ANTIGO</span>
+                        <div class="audit-side-big" id="audit-api-big">R$ 0</div>
+                        <div class="audit-side-lbl">Gasto no período (modelo selecionado)</div>
+                        <div class="audit-side-divider"></div>
+                        <div class="audit-side-row"><span>Modelo antigo (real)</span><strong id="audit-api-antigo">—</strong></div>
+                        <div class="audit-side-row"><span>Modelo novo (estimado)</span><strong id="audit-api-novo">—</strong></div>
+                        <div class="audit-side-row"><span>Diferença</span><strong id="audit-api-dif">—</strong></div>
+                        <div class="audit-side-divider"></div>
+                        <div class="audit-side-row"><span>R$ por mensagem</span><strong id="audit-api-preco">R$ 0,035</strong></div>
+                        <div class="audit-side-row"><span>% mensagens da empresa (estim.)</span><strong id="audit-api-pct">50%</strong></div>
+                        <div class="audit-side-row"><span>Cotação US$</span><strong id="audit-api-cotacao">—</strong></div>
+                    </div>
+                    <div class="audit-main">
+                        <div class="audit-stats-grid">
+                            <div class="audit-stat"><span>Média (modelo novo)</span><strong id="audit-api-media">—</strong></div>
+                            <div class="audit-stat"><span>Tendência (modelo novo)</span><strong id="audit-api-tend">—</strong></div>
+                            <div class="audit-stat"><span>Vigência</span><strong>a partir de 01/10/2026</strong></div>
+                        </div>
+
+                        <!-- Aba/bloco separado: meta de reduzir o volume de mensagens trocadas
+                             (mesma tela, já que é o jeito mais direto de pagar menos na API) -->
+                        <div class="audit-goal-box" id="audit-api-goal-box" style="display:none;">
+                            <div class="audit-goal-head">
+                                <span class="audit-goal-title" id="audit-api-goal-nome">Meta de Redução de Mensagens</span>
+                                <span class="proj-fin-status" id="audit-api-goal-status" style="margin:0;">—</span>
+                            </div>
+                            <div class="audit-goal-rows">
+                                <div class="audit-goal-row"><span>Mensagens no mês</span><strong id="audit-api-goal-atual">—</strong></div>
+                                <div class="audit-goal-row"><span>Meta (alvo)</span><strong id="audit-api-goal-alvo">—</strong></div>
+                                <div class="audit-goal-row"><span>Progresso da redução</span><strong id="audit-api-goal-pct">—</strong></div>
+                            </div>
+                            <div class="audit-goal-progress"><div class="audit-goal-progress-bar" id="audit-api-goal-bar" style="width:0%"></div></div>
+                        </div>
+
+                        <div class="audit-chart-wrap">
+                            <div class="audit-chart-inner"><canvas id="audit-api-chart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ======================================================
+         MODAL — Auditoria: Dashboard mensal do Atendente (estética "Tintas Compradas")
+    ======================================================= -->
+    <div class="modal-overlay" id="audit-atendente-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'audit-atendente-modal')">
+        <div class="modal-panel" style="max-width:1080px" onclick="event.stopPropagation()">
+            <div class="audit-modal-header">
+                <div class="audit-modal-header-left">
+                    <div class="audit-modal-icon">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div>
+                        <div class="audit-modal-title" id="audit-at-nome">Atendente</div>
+                        <div class="audit-modal-sub" id="audit-at-sub">—</div>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('audit-atendente-modal')">✕</button>
+            </div>
+            <div class="audit-modal-stripe"></div>
+            <div class="modal-body">
+                <div class="audit-grid">
+                    <div class="audit-side">
+                        <span class="audit-side-tag" id="audit-at-tag">—</span>
+                        <div class="audit-side-big" id="audit-at-big">—</div>
+                        <div class="audit-side-lbl">Taxa de resposta (mês filtrado)</div>
+                        <div class="audit-side-divider"></div>
+                        <div class="audit-side-row"><span>Atendimentos</span><strong id="audit-at-atend">—</strong></div>
+                        <div class="audit-side-row"><span>Avaliação média</span><strong id="audit-at-aval">—</strong></div>
+                        <div class="audit-side-row"><span>Avaliações enviadas</span><strong id="audit-at-env">—</strong></div>
+                        <div class="audit-side-row"><span>Respondidas</span><strong id="audit-at-resp">—</strong></div>
+                        <div class="audit-side-row"><span>Não respondidas</span><strong id="audit-at-naoresp">—</strong></div>
+                    </div>
+                    <div class="audit-main">
+                        <div class="audit-stats-grid">
+                            <div class="audit-stat"><span>Média (taxa de resposta)</span><strong id="audit-at-media">—</strong></div>
+                            <div class="audit-stat"><span>Tendência</span><strong id="audit-at-tend">—</strong></div>
+                            <div class="audit-stat"><span>Melhor mês</span><strong id="audit-at-melhor">—</strong></div>
+                        </div>
+                        <div class="audit-chart-wrap">
+                            <div class="audit-chart-inner"><canvas id="audit-at-chart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pop-up: escolher o que entra no relatório em PDF -->
+    <div class="modal-overlay" id="relatorio-opcoes-modal" style="display:none;" onclick="modalOverlayClickGenerico(event,'relatorio-opcoes-modal')">
+        <div class="modal-panel" style="max-width:620px" onclick="event.stopPropagation()">
+            <div class="audit-modal-header">
+                <div class="audit-modal-header-left">
+                    <div class="audit-modal-icon">
+                        <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/></svg>
+                    </div>
+                    <div>
+                        <div class="audit-modal-title">Gerar Relatório em PDF</div>
+                        <div class="audit-modal-sub">Escolha o que entra no documento</div>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="fecharModalGenerico('relatorio-opcoes-modal')">✕</button>
+            </div>
+            <div class="audit-modal-stripe"></div>
+            <div class="modal-body">
+                <label class="rpt-opcao rpt-opcao-master">
+                    <input type="checkbox" id="rpt-opt-graficos" checked>
+                    <span>Incluir os gráficos como imagem (além dos dados em número/porcentagem)</span>
+                </label>
+                <div class="rpt-opcoes-grid">
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-indicadores" checked><span>Indicadores Gerais</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-status" checked><span>Status dos Clientes</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-avaliacoes" checked><span>Resposta às Avaliações</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-canal" checked><span>Volume por Canal</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-buscam" checked><span>Por Que Buscam o LAMIC</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-dias" checked><span>Fluxo por Dia da Semana</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-horario" checked><span>Fluxo por Horário</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-atendentes" checked><span>Desempenho por Atendente</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-eficiencia" checked><span>Evolução da Eficiência</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-fatmeta" checked><span>Faturamento x Meta</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-apicusto" checked><span>Projeção de Custo API</span></label>
+                    <label class="rpt-opcao"><input type="checkbox" id="rpt-opt-metas" checked><span>Metas Cadastradas</span></label>
+                </div>
+                <div class="rpt-opcoes-actions">
+                    <button class="btn-secondary" onclick="fecharModalGenerico('relatorio-opcoes-modal')">Cancelar</button>
+                    <button class="btn-primary" onclick="gerarRelatorioComOpcoes()">
+                        <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+                        Gerar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div><!-- /app -->
 
 <script src="relatorios_script.js?v=5"></script>
@@ -679,7 +1195,27 @@
     var c = document.querySelector('.sidebar-user'); if (c) c.classList.remove('open');
   }
   document.addEventListener('click', function (e) { if (!e.target.closest('.sidebar-account')) closeRelUserMenu(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeRelUserMenu(); });
+
+  // ESC em cascata: passo 1 fecha o pop-up aberto; passo 2 sai da aba atual (volta pro Dashboard);
+  // passo 3, sem pop-up e já no Dashboard, volta para a UniLAMIC TI
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+
+    var userMenu = document.getElementById('sb-user-menu');
+    if (userMenu && !userMenu.classList.contains('hidden')) { closeRelUserMenu(); return; }
+
+    var popoverAberto = document.querySelector('.open');
+    if (popoverAberto) { document.querySelectorAll('.open').forEach(function (el) { el.classList.remove('open'); }); return; }
+
+    var modal = document.getElementById('modal');
+    if (modal && modal.style.display !== 'none') { if (typeof fecharModal === 'function') fecharModal(); return; }
+
+    var painel = document.querySelector('.section.active');
+    if (painel && painel.id !== 'dashboard') { if (typeof showSection === 'function') showSection('dashboard'); return; }
+
+    relBackToMenu();
+  });
+
   function relBackToMenu() { window.location.href = 'index.html'; }
   function relLogout() { try { localStorage.removeItem('tic_adminUser'); } catch (_) {} window.location.href = 'index.html'; }
 </script>

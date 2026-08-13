@@ -283,6 +283,43 @@ body {
 .section { display: none; flex-direction: column; gap: 20px; }
 .section.active { display: flex; animation: fadeUp 0.28s ease; }
 
+/* ── Cabeçalho branco do topo do Dashboard (mesmo padrão usado em cada aba
+   do módulo Financeiro) — estoura o padding de .sections-wrap (24px) pra
+   ficar coladinho nas bordas, título fixo + timer de inatividade + relatório. */
+.dash-topbar-rel {
+    background: var(--white);
+    border-bottom: 1px solid var(--gray-2);
+    box-shadow: 0 2px 10px rgba(6,15,30,0.05);
+    margin: -24px -24px 0;
+    padding: 20px 24px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+}
+.dash-topbar-rel h2 { font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.dash-topbar-rel .tab-subtitle { color: var(--muted); font-size: 0.85rem; }
+.dash-controls-rel { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* Chip do timer de inatividade — reaproveitado em todas as abas que o pedirem */
+.idle-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 13px; border-radius: 100px;
+    background: var(--gray-1); border: 1px solid var(--gray-2);
+    color: var(--muted); font-size: 0.82rem; font-weight: 700;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+    transition: all 0.2s;
+}
+.idle-chip svg { color: var(--gray-4); flex-shrink: 0; }
+.idle-chip.idle-timer-warn { background: #fff0f0; border-color: rgba(220,38,38,0.3); color: var(--red); }
+.idle-chip.idle-timer-warn svg { color: var(--red); }
+
+.btn-dash-print-rel {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 36px; padding: 0 16px; border-radius: 8px;
+    background: var(--blue-v); color: #fff; border: none; cursor: pointer;
+    font-size: 0.84rem; font-weight: 600; font-family: inherit;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+.btn-dash-print-rel:hover { background: #1d4ed8; box-shadow: 0 2px 8px rgba(37,99,235,0.3); }
+
 /* ── Filter Bar ────────────────────────────────────────────── */
 .filtro-bar {
     background: var(--white);
@@ -474,6 +511,29 @@ body {
 .config-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .config-warn { font-size: 0.78rem; color: var(--amber, #b45309); margin-top: 12px; font-weight: 600; }
 
+/* Cartão de Configuração com cabeçalho em degradê — mesma cor do cabeçalho
+   das Configurações do Financeiro/Home/Inventário (hex fixo pra bater igual
+   em todos os módulos, cada um com sua própria paleta de base). */
+.rel-cfg-card {
+    background: var(--white);
+    border-radius: var(--r);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.2s;
+}
+.rel-cfg-card:hover { box-shadow: var(--shadow-m); }
+.rel-cfg-card-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: .875rem 1.25rem;
+    background: linear-gradient(90deg, #1a3050 0%, #254870 100%);
+}
+.rel-cfg-card-head svg { width: 18px; height: 18px; color: rgba(255,255,255,.85); flex-shrink: 0; }
+.rel-cfg-card-head h3 { margin: 0; font-size: 1rem; font-weight: 700; color: #fff; flex: 1; }
+.rel-cfg-card-body { padding: 1.25rem; }
+.rel-cfg-card-body .config-desc { margin-top: 0; }
+
 .chart-title {
     font-size: 0.73rem;
     font-weight: 700;
@@ -609,25 +669,118 @@ body {
 .rank-name { flex: 1; font-size: 0.85rem; font-weight: 500; color: var(--text); }
 .rank-val  { font-size: 0.81rem; font-weight: 600; color: var(--muted); }
 
-/* ── Toggle Comparação ─────────────────────────────────────── */
-.toggle-comp-btn {
-    font-size: 0.73rem;
-    font-weight: 500;
-    padding: 4px 10px;
-    border-radius: 6px;
-    border: 1px solid var(--gray-2);
-    background: var(--white);
-    color: var(--muted);
+/* ── Projeção Financeira ──────────────────────────────────────
+   Faturamento x Meta + Projeção de custo da API oficial (Meta). */
+.proj-fin-card {
     cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.proj-fin-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-m); }
+.proj-fin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.proj-fin-btn {
+    display: inline-flex; align-items: center;
+    font-size: 0.72rem; font-weight: 600; padding: 4px 10px;
+    border-radius: 6px; border: 1px solid var(--gray-2);
+    background: var(--white); color: var(--muted); cursor: pointer;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
-    font-family: inherit;
+    font-family: inherit; white-space: nowrap;
 }
+.proj-fin-btn:hover { background: var(--blue-l); border-color: var(--blue-v); color: var(--blue-v); }
 
-.toggle-comp-btn:hover, .toggle-comp-btn.active {
-    background: var(--blue-l);
-    border-color: var(--blue-v);
-    color: var(--blue-v);
+.proj-fin-status {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 0.8rem; font-weight: 700; padding: 6px 13px;
+    border-radius: 100px; margin: 10px 0 6px; width: fit-content;
 }
+.proj-fin-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.proj-fin-status.st-batida { background: var(--green-l); color: #047857; }
+.proj-fin-status.st-perto  { background: var(--amber-l); color: #b45309; }
+.proj-fin-status.st-falta  { background: var(--red-l);   color: #b91c1c; }
+.proj-fin-status.st-semdado{ background: var(--gray-1);  color: var(--muted); }
+
+/* Toggle Cobrança Antiga / Nova — segmented control */
+.api-modo-switch {
+    display: inline-flex; border: 1px solid var(--gray-2); border-radius: 8px;
+    overflow: hidden; margin: 8px 0 4px;
+}
+.api-modo-btn {
+    padding: 6px 12px; font-size: 0.74rem; font-weight: 600;
+    background: var(--white); color: var(--muted); border: none; cursor: pointer;
+    font-family: inherit; transition: background 0.15s, color 0.15s;
+}
+.api-modo-btn:not(:last-child) { border-right: 1px solid var(--gray-2); }
+.api-modo-btn.active { background: var(--blue-v); color: #fff; }
+
+/* ── Pop-up de auditoria (Faturamento / Projeção API) — mesma estética do
+   pop-up "Tintas Compradas" do módulo Financeiro: cabeçalho escuro com
+   ícone + painel escuro de destaque ao lado das métricas principais.
+   Cores adaptadas à paleta deste arquivo (var(--primary) etc). ── */
+.audit-modal-header {
+    background: linear-gradient(135deg, var(--primary), var(--dark2));
+    color: #fff; display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 22px; border-radius: 12px 12px 0 0; flex-shrink: 0;
+    position: sticky; top: 0; z-index: 2;
+}
+.audit-modal-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.audit-modal-icon {
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.16);
+    display: flex; align-items: center; justify-content: center;
+}
+.audit-modal-icon svg { width: 19px; height: 19px; color: #7dd3fc; }
+.audit-modal-title { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.02em; }
+.audit-modal-sub { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 2px; }
+.audit-modal-stripe { height: 4px; flex-shrink: 0; background: linear-gradient(90deg, #38bdf8, var(--blue-v)); }
+
+/* align-items:stretch (grid já faz por padrão, deixado explícito) garante que
+   o painel escuro sempre acompanha a altura NATURAL da coluna principal —
+   "sincronizado" com o gráfico do lado, sem sobrar pedaço torto de nenhum
+   lado. Sem min-height fixo: cada pop-up fica do tamanho do próprio
+   conteúdo — um min-height grande deixava espaço vazio sobrando embaixo. */
+.audit-grid { display: grid; grid-template-columns: 270px 1fr; gap: 20px; align-items: stretch; }
+@media (max-width: 640px) { .audit-grid { grid-template-columns: 1fr; } }
+.audit-side {
+    background: linear-gradient(160deg, var(--dark2), var(--primary));
+    border-radius: 10px; padding: 24px 20px; color: #fff;
+    display: flex; flex-direction: column;
+    height: 100%; box-sizing: border-box;
+}
+.audit-side-lbl { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.55); }
+.audit-side-big { font-size: 2.15rem; font-weight: 800; margin: 5px 0 9px; line-height: 1.1; }
+.audit-side-tag {
+    align-self: flex-start; font-size: 0.74rem; font-weight: 700; padding: 4px 10px;
+    border-radius: 100px; background: rgba(255,255,255,0.12);
+}
+.audit-side-tag.st-batida { background: rgba(5,150,105,0.3); color: #6ee7b7; }
+.audit-side-tag.st-perto  { background: rgba(217,119,6,0.32); color: #fcd34d; }
+.audit-side-tag.st-falta  { background: rgba(220,38,38,0.3); color: #fca5a5; }
+.audit-side-divider { height: 1px; background: rgba(255,255,255,0.14); margin: 16px 0; }
+.audit-side-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.81rem; padding: 6px 0; color: rgba(255,255,255,0.85); }
+.audit-side-row strong { color: #fff; font-weight: 700; }
+
+.audit-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; height: 100%; box-sizing: border-box; }
+.audit-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 520px) { .audit-stats-grid { grid-template-columns: 1fr 1fr; } }
+.audit-stat {
+    background: var(--gray-1); border: 1px solid var(--gray-2); border-radius: 8px;
+    padding: 11px 13px; display: flex; flex-direction: column; gap: 3px;
+}
+.audit-stat span { font-size: 0.68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.audit-stat strong { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+.audit-chart-wrap { background: var(--gray-1); border: 1px solid var(--gray-2); border-radius: 8px; padding: 12px 14px; height: 280px; box-sizing: border-box; display: flex; flex-direction: column; }
+.audit-chart-inner { position: relative; flex: 1; min-height: 0; }
+.audit-chart-inner canvas { position: absolute; inset: 0; }
+
+/* Bloco separado ("aba") dentro do pop-up de Projeção de Custo API — meta de
+   reduzir o volume de mensagens trocadas (bate menos mensagem = paga menos). */
+.audit-goal-box { background: var(--blue-l); border: 1.5px solid #bfdbfe; border-radius: 10px; padding: 14px 16px; }
+.audit-goal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.audit-goal-title { font-size: 0.84rem; font-weight: 700; color: var(--blue-v); }
+.audit-goal-rows { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.audit-goal-row { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text); }
+.audit-goal-row strong { font-weight: 700; }
+.audit-goal-progress { height: 7px; background: rgba(37,99,235,0.14); border-radius: 4px; overflow: hidden; }
+.audit-goal-progress-bar { height: 100%; background: linear-gradient(90deg, var(--blue-v), #60a5fa); border-radius: 4px; transition: width 0.3s; }
 
 /* ── Modal ─────────────────────────────────────────────────── */
 .modal-overlay {
@@ -741,6 +894,10 @@ body {
     gap: 12px;
 }
 
+/* Modal "Gasto com API" — Modelo Antigo e Estimativa do Novo lado a lado */
+.va-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 620px) { .va-modal-grid { grid-template-columns: 1fr; } }
+
 .form-group { display: flex; flex-direction: column; gap: 5px; }
 .form-group.full { grid-column: 1 / -1; }
 
@@ -845,6 +1002,27 @@ select:focus {
 
 .btn-secondary:hover { background: var(--gray-1); border-color: var(--gray-4); }
 
+/* ── Pop-up: opções do relatório em PDF ───────────────────────── */
+.rpt-opcao {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--gray-2); background: var(--gray-1);
+    cursor: pointer; font-size: 0.85rem; font-weight: 500; color: var(--text);
+    transition: background 0.15s, border-color 0.15s;
+}
+.rpt-opcao:hover { background: #eef2ff; border-color: var(--blue-v); }
+.rpt-opcao input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--blue-v); flex-shrink: 0; }
+.rpt-opcao-master {
+    margin-bottom: 14px; background: #eef4ff; border-color: rgba(37,99,235,0.25); font-weight: 600;
+}
+.rpt-opcoes-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.rpt-opcoes-actions {
+    display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;
+    padding-top: 16px; border-top: 1px solid var(--gray-2);
+}
+
 .btn-add {
     width: 100%;
     padding: 8px;
@@ -922,16 +1100,11 @@ select:focus {
 .dash-tipo-badge.badge-cc { background: rgba(37,99,235,.12); color: var(--blue-v); border: 1.5px solid rgba(37,99,235,.3); }
 .dash-tipo-badge.badge-ia { background: rgba(139,92,246,.12); color: #7c3aed; border: 1.5px solid rgba(139,92,246,.3); }
 
-/* ── Grid dos 2 cards de entrada ──────────────────────────── */
+/* ── Cards de entrada (CC/IA) — 1 abaixo do outro, não lado a lado ── */
 .entry-tipo-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 20px;
-    align-items: start;
-}
-
-@media (max-width: 900px) {
-    .entry-tipo-grid { grid-template-columns: 1fr; }
 }
 
 .entry-tipo-card {
@@ -991,6 +1164,24 @@ select:focus {
     box-shadow: var(--shadow);
     overflow-x: auto;
 }
+
+/* Toggle Dados/Metas — dentro de cada card CC/IA em "Inserir Dados" */
+.entrada-view-switch {
+    display: inline-flex; border: 1px solid var(--gray-2); border-radius: 8px;
+    overflow: hidden; margin-bottom: 12px;
+}
+.entrada-view-btn {
+    padding: 6px 16px; font-size: 0.8rem; font-weight: 600;
+    background: var(--white); color: var(--muted); border: none; cursor: pointer;
+    font-family: inherit; transition: background 0.15s, color 0.15s;
+}
+.entrada-view-btn:not(:last-child) { border-right: 1px solid var(--gray-2); }
+.entrada-view-btn.active { background: var(--blue-v); color: #fff; }
+
+.metas-entrada-panel {
+    background: var(--white); border-radius: var(--r); box-shadow: var(--shadow); padding: 16px;
+}
+.metas-entrada-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 
 .spreadsheet {
     width: 100%;
@@ -1086,6 +1277,17 @@ select:focus {
 .empty-state-icon { font-size: 2.5rem; opacity: 0.35; }
 .empty-state-text { font-size: 0.95rem; font-weight: 500; }
 .empty-state-sub  { font-size: 0.81rem; }
+
+/* ── Lista de Metas (dentro do modal de Metas) ────────────────── */
+.meta-list-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 4px; border-bottom: 1px solid var(--gray-2);
+}
+.meta-list-item:last-child { border-bottom: none; }
+.meta-list-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.meta-list-info strong { font-size: 0.86rem; color: var(--text); }
+.meta-list-info span { font-size: 0.74rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta-list-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
 /* ── Print ─────────────────────────────────────────────────── */
 @media print {
@@ -1292,10 +1494,6 @@ select:focus {
 .aval-res-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text); }
 .aval-res-row strong { margin-left: auto; font-weight: 700; }
 .aval-resumo-titulo { text-align: center; font-size: 0.8rem; font-weight: 700; color: var(--text); margin: 2px 0 8px; min-height: 20px; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
-.aval-res-sel { color: var(--blue-v); }
-.aval-res-clear { border: none; background: none; color: var(--muted); font-size: 0.72rem; font-weight: 600; cursor: pointer; padding: 2px 4px; }
-.aval-res-clear:hover { color: var(--red); }
-/* Item do ranking selecionado */
+/* Item do ranking — clicável, abre o pop-up de auditoria do atendente */
 .rank-aval-item { cursor: pointer; border-radius: 8px; transition: background 0.15s; }
 .rank-aval-item:hover { background: var(--gray-1, #f1f5f9); }
-.rank-aval-item.sel { background: rgba(37,99,235,0.09); box-shadow: inset 0 0 0 1.5px var(--blue-v); }

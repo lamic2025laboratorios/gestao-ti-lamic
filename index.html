@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gestão de TI</title>
+  <title>Gestão TI</title>
   <link rel="stylesheet" href="style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
   <script type="module">
@@ -31,6 +31,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
+
 
 <!-- ══ TELA 1 — HOME ══ -->
 <div id="screen-home" class="screen active">
@@ -61,6 +62,8 @@
       <h1 class="home-title">Bem-vindo ao<br/><em>Portal do TI</em></h1>
       <p class="home-desc">Selecione seu perfil de acesso para continuar</p>
       <div class="home-btns">
+        <!-- Unidades abrem direto o módulo financeiro, onde vivem a escolha
+             de unidade e o formulário de solicitação -->
         <button class="btn-portal units" onclick="App.goTo('screen-units-login')">
           <div class="portal-icon">
             <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 22V12h6v10" stroke="currentColor" stroke-width="2"/></svg>
@@ -131,7 +134,7 @@
   </div>
 </div>
 
-<!-- ══ TELA 3 — LOGIN ADMIN ══ -->
+<!-- ══ TELA 2 — LOGIN ADMINISTRATIVO ══ -->
 <div id="screen-admin-login" class="screen">
   <div class="page-topbar">
     <button class="back-btn" onclick="App.goTo('screen-home')">
@@ -178,104 +181,14 @@
   </div>
 </div>
 
-<!-- ══ TELA 4 — PAINEL SOLICITAÇÃO ══ -->
-<div id="screen-request" class="screen">
-  <div class="req-topbar">
-    <div class="req-topbar-left">
-      <div class="req-brand">
-        <svg viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="8" fill="#1a3a6b"/><rect x="6" y="6" width="10" height="10" rx="2" fill="#4a90d9"/><rect x="20" y="6" width="10" height="10" rx="2" fill="#4a90d9" opacity=".5"/><rect x="6" y="20" width="10" height="10" rx="2" fill="#4a90d9" opacity=".5"/><rect x="20" y="20" width="10" height="10" rx="2" fill="#fff" opacity=".9"/></svg>
-        <div>
-          <div class="req-brand-name">TI Compras</div>
-          <div class="req-brand-unit" id="topbar-unit-name">—</div>
-        </div>
-      </div>
-    </div>
-    <button class="btn-topbar-exit" onclick="App.goTo('screen-home')">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2"/></svg>
-      Sair
-    </button>
-  </div>
-  <div class="request-wrap">
-    <div class="request-card">
-      <div class="request-card-header">
-        <h2>Nova Solicitação</h2>
-        <p>Preencha os dados abaixo para enviar sua solicitação ao TI</p>
-      </div>
-      <div class="form-group">
-        <label class="form-label required">Tipo de Solicitação</label>
-        <div class="type-selector" id="type-selector"></div>
-      </div>
-      <div id="sub-ink" class="sub-panel hidden">
-        <div class="sub-panel-inner">
-          <div class="form-group">
-            <label class="form-label">Numeração da Tinta</label>
-            <div id="ink-numbers" class="check-grid"></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Cores</label>
-            <div id="ink-colors" class="check-grid"></div>
-          </div>
-        </div>
-      </div>
-      <div id="sub-battery" class="sub-panel hidden">
-        <div class="sub-panel-inner">
-          <div class="form-group">
-            <label class="form-label">Modelos <span class="opt-tag">pode selecionar mais de 1</span></label>
-            <div id="battery-models" class="bat-models-list"></div>
-          </div>
-        </div>
-      </div>
-      <div id="sub-other" class="sub-panel hidden">
-        <div class="sub-panel-inner">
-          <div class="form-group">
-            <label class="form-label required">Produto Desejado</label>
-            <input type="text" id="other-product" placeholder="Nome do produto" class="input-field" />
-          </div>
-          <div class="form-group">
-            <label class="form-label required">Motivo / Justificativa</label>
-            <textarea id="other-reason" rows="3" placeholder="Por que você precisa desse produto?" class="input-field"></textarea>
-          </div>
-        </div>
-      </div>
-      <div id="urgency-row" class="urgency-row" style="display:none">
-        <label class="urgency-toggle">
-          <input type="checkbox" id="chk-urgency" />
-          <span class="urgency-track">
-            <span class="urgency-thumb"></span>
-          </span>
-          <span class="urgency-text">
-            <span class="urgency-label">🚨 Marcar como URGENTE</span>
-            <span class="urgency-hint">O administrador será notificado da prioridade</span>
-          </span>
-        </label>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Observação <span class="opt-tag">opcional</span></label>
-        <textarea id="req-obs" rows="2" placeholder="Alguma observação adicional?" class="input-field"></textarea>
-      </div>
-      <div class="req-submit-row">
-        <button class="btn-back-unit" onclick="App.backToUnits()">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" stroke-width="2"/></svg>
-          Trocar Unidade
-        </button>
-        <button class="btn-submit" onclick="App.submitRequest()">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2"/></svg>
-          Enviar Solicitação
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══ TELA 5 — PAINEL ADMIN ══ -->
+<!-- ══ TELA 3 — PAINEL PRINCIPAL ══ -->
 <div id="screen-admin" class="screen">
   <div class="admin-layout">
-    <!-- SIDEBAR -->
     <aside class="sidebar" id="main-sidebar">
       <!-- Hambúrguer: fora do brand, sempre visível mesmo colapsado -->
       <div class="sb-hamburger-row">
         <div class="sb-brand-inline">
-          <img class="sb-logo-svg" src="img/LAMIC BRANCA.png" alt="LAMIC enter" onerror="this.style.display='none'" />
+          <img class="sb-logo-svg" src="img/LAMIC BRANCA.png" alt="LAMIC" onerror="this.style.display='none'" />
         </div>
         <button class="sidebar-hamburger" onclick="App.toggleSidebar()" title="Recolher/expandir menu">
           <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -284,35 +197,31 @@
       <!-- sidebar-brand mantido vazio para não quebrar seletores CSS existentes -->
       <div class="sidebar-brand" style="display:none"></div>
       <nav class="sidebar-nav">
-        <div class="nav-section-label sb-txt">Estoque</div>
-        <button class="nav-item active" data-tab="tab-dashboard" onclick="App.adminTab(this)" data-tip="Dashboard">
-          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>
+        <div class="nav-section-label sb-txt">Home</div>
+        <button class="nav-item" data-tab="tab-home-dashboard" onclick="App.abrirSecao(this)" data-tip="Dashboard">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="9" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="5" rx="1" stroke="currentColor" stroke-width="2"/><rect x="14" y="12" width="7" height="9" rx="1" stroke="currentColor" stroke-width="2"/><rect x="3" y="16" width="7" height="5" rx="1" stroke="currentColor" stroke-width="2"/></svg>
           <span class="ni-txt">Dashboard</span>
           <span class="ni-tip">Dashboard</span>
         </button>
-        <button class="nav-item" data-tab="tab-calendar" onclick="App.adminTab(this)" data-tip="Calendário">
-          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>
-          <span class="ni-txt">Calendário</span>
-          <span class="ni-tip">Calendário</span>
+        <button class="nav-item active" data-tab="tab-unilamic" onclick="App.abrirSecao(this)" data-tip="UniLAMIC TI">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span class="ni-txt">UniLAMIC TI</span>
+          <span class="ni-tip">UniLAMIC TI</span>
         </button>
-        <button class="nav-item" data-tab="tab-requests" onclick="App.adminTab(this)" data-tip="Solicitações">
-          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg>
-          <span class="ni-txt">Solicitações</span>
-          <span class="nav-badge" id="nav-badge-pending">0</span>
-          <span class="ni-tip">Solicitações <span class="ni-tip-badge" id="ni-tip-badge">0</span></span>
-        </button>
-        <button class="nav-item" data-tab="tab-estoque" onclick="App.adminTab(this)" data-tip="Estoque">
-          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
-          <span class="ni-txt">Estoque</span>
-          <span class="ni-tip">Estoque</span>
-        </button>
-        <button class="nav-item" data-tab="tab-settings" onclick="App.adminTab(this)" data-tip="Configurações">
+        <button class="nav-item" data-tab="tab-home-config" onclick="App.abrirSecao(this)" data-tip="Configurações">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/></svg>
           <span class="ni-txt">Configurações</span>
           <span class="ni-tip">Configurações</span>
         </button>
+
         <div class="nav-section-label sb-txt">Gestão</div>
-        <button class="nav-item" data-tab="tab-inventario" onclick="App.adminTab(this)" data-tip="Inventário TI">
+        <button class="nav-item" data-tab="tab-financeiro" onclick="App.abrirSecao(this)" data-tip="Financeiro">
+          <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="ni-txt">Financeiro</span>
+          <span class="nav-badge" id="nav-badge-pending" style="display:none">0</span>
+          <span class="ni-tip">Financeiro</span>
+        </button>
+        <button class="nav-item" data-tab="tab-inventario" onclick="App.abrirSecao(this)" data-tip="Inventário TI">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/><polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="currentColor" stroke-width="2"/><line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2"/></svg>
           <span class="ni-txt">Inventário TI</span>
           <span class="ni-tip">Inventário TI</span>
@@ -322,7 +231,7 @@
           <span class="ni-txt">Relatórios</span>
           <span class="ni-tip">Relatórios</span>
         </button>
-        <button class="nav-item" data-tab="tab-gerador-pdf" onclick="App.adminTab(this)" data-tip="Gerador de PDFs">
+        <button class="nav-item" data-tab="tab-gerador-pdf" onclick="App.abrirSecao(this)" data-tip="Gerador de PDFs">
           <svg class="ni-ico" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2"/></svg>
           <span class="ni-txt">Gerador de PDFs</span>
           <span class="ni-tip">Gerador de PDFs</span>
@@ -347,2250 +256,684 @@
       </div>
     </aside>
 
-    <!-- MAIN -->
     <main class="admin-main">
+      <!-- ===== #tab-home-dashboard ===== -->
+      <div id="tab-home-dashboard" class="tab-panel">
+        <div class="tab-header dash-topbar">
+          <div><h2>Dashboard</h2></div>
+        </div>
+        <div style="padding:60px 20px;text-align:center;color:var(--ink-400);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="42" height="42" style="opacity:.5;margin-bottom:10px;"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          <div style="font-weight:700;color:var(--ink-900);margin-bottom:4px;">Dashboard em construção</div>
+          <div style="font-size:.85rem;">Estrutura criada — o conteúdo entra nas próximas rodadas.</div>
+        </div>
+      </div>
 
-      <!-- ── DASHBOARD ── -->
-      <div id="tab-dashboard" class="tab-panel active">
+      <!-- ===== #tab-unilamic ===== -->
+      <div id="tab-unilamic" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
-            <h2>Dashboard</h2>
-            <p class="tab-subtitle">Visão geral das solicitações e gastos</p>
+            <h2>Home</h2>
           </div>
-          <div class="dash-controls">
+          <div style="display:flex;gap:8px;align-items:center">
             <div class="idle-chip" id="idle-chip" title="Tempo restante até o logout automático por inatividade">
               <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5M9 2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               <span id="idle-timer">60:00</span>
             </div>
-            <button class="btn-dash-print" onclick="App.printDashboard()" title="Baixar relatório em PDF">
-              <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M12 18v-6M9 15l3 3 3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Relatório
-            </button>
           </div>
         </div>
 
-        <!-- KPI Row -->
-        <div class="kpi-row">
-          <div class="kpi-card k-blue kpi-clickable" onclick="App.showTotalKpi()" title="Clique para ver por unidade">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-total">0</div><div class="kpi-lbl">Total Solicitado ↗</div></div>
-          </div>
-          <div class="kpi-card k-red kpi-clickable" onclick="App.showKpiList('Negado')" title="Clique para ver pedidos negados">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-negado">0</div><div class="kpi-lbl">Negados ↗</div></div>
-          </div>
-          <div class="kpi-card k-teal kpi-clickable" onclick="App.showKpiList('Comprado')" title="Clique para ver pedidos comprados">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><polyline points="20 12 20 22 4 22 4 12" stroke="currentColor" stroke-width="2"/><rect x="2" y="7" width="20" height="5" stroke="currentColor" stroke-width="2"/><path d="M12 22V7" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-bought">0</div><div class="kpi-lbl">Comprados ↗</div></div>
-          </div>
-          <div class="kpi-card k-orange">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2"/><line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body"><div class="kpi-val" id="kpi-urgent">0</div><div class="kpi-lbl">Urgentes</div></div>
-          </div>
-          <div class="kpi-card k-purple kpi-clickable" onclick="App.showExtrato()" title="Clique para ver o extrato de compras">
-            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg></div>
-            <div class="kpi-body">
-              <div class="kpi-val" id="kpi-month-spent">R$ 0</div>
-              <div class="kpi-lbl">Gasto do Período <span id="kpi-period-sub" class="kpi-period-sub-hidden"></span></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Modal: Extrato de Compras -->
-        <div id="extrato-modal" class="modal-overlay hidden">
-          <div class="modal-card" style="max-width:820px">
-            <div class="modal-header">
-              <h3>Extrato de Compras</h3>
-              <button class="modal-close" onclick="document.getElementById('extrato-modal').classList.add('hidden')">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-              </button>
-            </div>
-            <div class="modal-body">
-              <div class="extrato-toolbar">
-                <div class="extrato-periodo">
-                  <button class="extrato-per-btn active" data-per="tudo"   onclick="App.setExtratoPeriodo('tudo',this)">Tudo</button>
-                  <button class="extrato-per-btn"        data-per="ano"    onclick="App.setExtratoPeriodo('ano',this)">Ano</button>
-                  <button class="extrato-per-btn"        data-per="mes"    onclick="App.setExtratoPeriodo('mes',this)">Mês</button>
-                  <button class="extrato-per-btn"        data-per="semana" onclick="App.setExtratoPeriodo('semana',this)">Semana</button>
-                </div>
-                <div class="extrato-resumo" id="extrato-resumo"></div>
-              </div>
-              <div class="table-wrap">
-                <table class="data-table extrato-table">
-                  <thead><tr><th>Data</th><th>Compra</th><th>Valor</th><th>Saldo antes</th><th>Saldo depois</th></tr></thead>
-                  <tbody id="extrato-tbody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Date range filter for all charts -->
-        <div class="date-range-bar">
-          <div class="date-range-label">
-            <svg viewBox="0 0 24 24" fill="none" style="width:15px"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>
-            Período de análise
-          </div>
-          <div class="date-range-inputs">
-            <!-- Filtro rápido por ano -->
-            <label class="date-range-field">
-              <span>Ano</span>
-              <select id="dash-year-select" class="input-field" style="width:90px;height:34px;padding:6px 8px;font-size:.82rem" onchange="App.onYearFilterChange(this)">
-                <option value="">Todos</option>
-              </select>
-            </label>
-            <span class="date-range-sep" style="color:#c8d4e8">|</span>
-            <label class="date-range-field">
-              <span>De</span>
-              <input type="date" id="filter-date-from" class="input-field" onchange="App.clearYearSelect();App.renderDashboard()" />
-            </label>
-            <span class="date-range-sep">→</span>
-            <label class="date-range-field">
-              <span>Até</span>
-              <input type="date" id="filter-date-to" class="input-field" onchange="App.clearYearSelect();App.renderDashboard()" />
-            </label>
-            <button class="btn-date-clear" onclick="App.clearDateRange()" title="Limpar datas">✕ Limpar</button>
-          </div>
-          <div class="date-range-actions">
-            <div class="dash-search-wrap">
-              <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
-              <input type="text" id="dash-search" placeholder="Buscar..." oninput="App.dashSearch(this.value)" />
-            </div>
-            <div class="filter-popover-wrap">
-              <button class="btn-filter-toggle" id="btn-dash-filter" onclick="App.toggleDashFilterPopover(event)" title="Filtros">
-                <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
-                <span class="filter-toggle-badge" id="dash-filter-badge" style="display:none">0</span>
-              </button>
-              <div class="filter-popover" id="dash-filter-popover">
-                <div class="filter-popover-row">
-                  <label>UNIDADE</label>
-                  <select id="dash-filter-unit" class="filter-select" onchange="App.renderDashboard(); App.updateDashFilterBadge();">
-                    <option value="">Unidade: Todas</option>
-                  </select>
-                </div>
-                <div class="filter-popover-row">
-                  <label>GRUPO</label>
-                  <select id="dash-filter-group" class="filter-select" onchange="App.renderDashboard(); App.updateDashFilterBadge();">
-                    <option value="">Grupo: Todos</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- KPI Detail Modal -->
-        <div id="kpi-list-modal" class="modal-overlay hidden">
-          <div class="modal-card" style="max-width:1200px">
-            <div class="modal-header">
-              <h3 id="kpi-list-title">Pedidos</h3>
-              <button class="modal-close" onclick="document.getElementById('kpi-list-modal').classList.add('hidden')">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-              </button>
-            </div>
-            <div class="modal-body">
-              <div class="table-wrap"><table class="data-table">
-                <thead id="kpi-list-thead"><tr><th>Data</th><th>Unidade</th><th>Grupo</th><th>Subgrupo</th><th>Resumo</th><th>Fornecedor</th><th>Status</th><th>Valor</th></tr></thead>
-                <tbody id="kpi-list-tbody"></tbody>
-              </table></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Dashboard Grid -->
-        <div class="dash-grid">
-          <!-- Row 1 Col 1: 3 mini charts side by side -->
-          <div class="charts-trio">
-            <div class="chart-card">
-              <div class="chart-card-header">
-                <span>Por Unidade</span>
-                <span class="chart-badge" id="chart-units-top"></span>
-              </div>
-              <canvas id="chart-units"></canvas>
-            </div>
-            <div class="chart-card">
-              <div class="chart-card-header"><span>Grupo</span></div>
-              <canvas id="chart-groups"></canvas>
-            </div>
-            <div class="chart-card">
-              <div class="chart-card-header">
-                <span>Sub-opções</span>
-                <span class="chart-badge" id="subopts-total"></span>
-              </div>
-              <canvas id="chart-subopts"></canvas>
-              <div id="subopts-more-line"></div>
-            </div>
-          </div>
-          <!-- Row 1+2 Col 2: Status card spans both rows -->
-          <div class="dash-col-right">
-            <!-- Central de Tratamento de Novas Solicitações -->
-            <div class="chart-card mgmt-card mgmt-card-right">
-              <div class="chart-card-header">
-                <span>Central de Tratamento — Novas Solicitações</span>
-                <span class="chart-badge" id="novas-sol-count"></span>
-              </div>
-              <div id="novas-sol-feed" class="mgmt-feed"></div>
-            </div>
-
-            <div class="chart-card status-big-card">
-              <div class="chart-card-header">
-                <span id="status-card-title">Status das Solicitações</span>
-              </div>
-              <canvas id="chart-status" height="220" style="max-height:220px"></canvas>
-              <div id="status-legend" class="status-legend-list"></div>
-            </div>
-
-            <!-- Card Comparativo Anual -->
-            <div class="chart-card compare-year-card">
-              <div class="chart-card-header">
-                <span>Comparativo Anual de Gastos</span>
-                <div style="display:flex;align-items:center;gap:8px">
-                  <span id="compare-trend-badge" class="compare-trend-badge"></span>
-                  <button class="btn-meta-config" onclick="App.openMetaModal()" title="Definir meta de gastos do ano">
-                    <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.66 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2.5a2 2 0 010-4h.09A1.65 1.65 0 004.6 8.66a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5"/></svg>
-                    Meta
-                  </button>
-                </div>
-              </div>
-              <!-- Velocímetro central: % consumido da meta (ou do ano anterior, sem meta) -->
-              <div class="cmp-gauge-section">
-                <div class="cmp-gauge-wrap">
-                  <canvas id="chart-cmp-gauge"></canvas>
-                  <div class="cmp-gauge-center">
-                    <div class="cmp-gauge-pct" id="cmp-gauge-pct">—</div>
-                    <div class="cmp-gauge-lbl" id="cmp-gauge-lbl">da meta</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Ano atual x Ano anterior, lado a lado -->
-              <div class="cmp-years-row">
-                <div class="cmp-year-card cmp-year-card--cur">
-                  <div class="cmp-year-top">
-                    <span class="cmp-year-num" id="cmp-cur-year">—</span>
-                    <span class="cmp-year-tag">Atual</span>
-                  </div>
-                  <div class="cmp-year-val" id="cmp-cur-val">R$ 0</div>
-                  <div class="compare-bar-wrap"><div class="compare-bar compare-bar-cur" id="cmp-cur-bar" style="width:0%"></div></div>
-                </div>
-                <div class="cmp-year-card cmp-year-card--prev">
-                  <div class="cmp-year-top">
-                    <span class="cmp-year-num" id="cmp-prev-year">—</span>
-                    <span class="cmp-year-tag cmp-year-tag--prev">Anterior</span>
-                  </div>
-                  <div class="cmp-year-val" id="cmp-prev-val">R$ 0</div>
-                  <div class="compare-bar-wrap"><div class="compare-bar compare-bar-prev" id="cmp-prev-bar" style="width:0%"></div></div>
-                </div>
-              </div>
-
-              <!-- Indicador de meta -->
-              <div class="compare-status-row" id="cmp-status-row">
-                <span class="cmp-status-tag" id="cmp-status-tag">
-                  <span id="cmp-status-icon"></span>
-                  <span id="cmp-status-tag-txt">Aguardando dados</span>
-                </span>
-                <div class="cmp-status-metrics" id="cmp-status-metrics"></div>
-              </div>
-            </div>
-
-          </div>
-          <!-- Row 2 Col 1: Gastos por mês -->
-          <div class="chart-card spending-card">
-            <div class="chart-card-header">
-              <span>Gastos por Período</span>
-            </div>
-            <canvas id="chart-monthly" height="160" style="max-height:160px"></canvas>
-            <div id="unit-spending-list" class="unit-spending-list"></div>
-          </div>
-
-          <!-- ── Parcelas + Log de Atividades (dentro da coluna esquerda) ── -->
-          <div class="dash-mgmt-grid">
-
-          <!-- Card 1: Métrica de Compras Parceladas -->
-          <div class="chart-card mgmt-card parcelas-card" onclick="App.openParcelasModal()" title="Clique para ver as compras parceladas e o status das parcelas">
-            <div class="chart-card-header">
-              <span>Compras Parceladas</span>
-              <span class="chart-badge" id="parcelas-count"></span>
-            </div>
-            <div class="parcelas-body">
-              <div class="parcelas-chart-wrap">
-                <canvas id="chart-parcelas"></canvas>
-              </div>
-              <div class="parcelas-legend" id="parcelas-legend"></div>
-            </div>
-          </div>
-
-          <!-- Card 2: Log de Atividades Recentes (auditoria multiusuário) -->
-          <div class="chart-card mgmt-card">
-            <div class="chart-card-header">
-              <span>Log de Atividades Recentes</span>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span class="chart-badge" id="activity-log-count"></span>
-                <div class="filter-popover-wrap">
-                  <button class="btn-filter-toggle" id="btn-activity-filter" onclick="App.toggleActivityFilterPopover(event)" title="Filtrar log de atividades">
-                    <svg viewBox="0 0 24 24" fill="none" width="13" height="13"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
-                    <span class="filter-toggle-badge" id="activity-filter-badge" style="display:none">0</span>
-                  </button>
-                  <div class="filter-popover" id="activity-filter-popover" style="left:auto;right:0">
-                    <div class="filter-popover-row">
-                      <div class="req-search-wrap" style="width:100%;max-width:none">
-                        <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
-                        <input type="text" id="activity-search" class="req-search-input" placeholder="Buscar por quem, ação, detalhe..." oninput="App.renderActivityLog()">
-                      </div>
-                    </div>
-                    <div class="filter-popover-row">
-                      <label>TIPO</label>
-                      <select id="activity-filter-modulo" class="filter-select" onchange="App.renderActivityLog()">
-                        <option value="">Todos</option>
-                        <option value="Solicitações">Solicitações</option>
-                        <option value="Estoque">Estoque</option>
-                        <option value="Configurações">Configurações</option>
-                        <option value="Calendário">Calendário</option>
-                      </select>
-                    </div>
-                    <div class="filter-popover-row">
-                      <label>ANO</label>
-                      <select id="activity-filter-year" class="filter-select" onchange="App.renderActivityLog()">
-                        <option value="">Todos</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div id="activity-log-feed" class="mgmt-feed"></div>
-          </div>
-
-          </div>
-        </div>
-
-        <!-- Modal: detalhe de uma atividade do log -->
-        <div id="activity-detail-modal" class="modal-overlay hidden">
-          <div class="modal-card" style="max-width:480px">
-            <div class="modal-header">
-              <h3>Detalhe da Atividade</h3>
-              <button class="modal-close" onclick="document.getElementById('activity-detail-modal').classList.add('hidden')">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-              </button>
-            </div>
-            <div class="modal-body" id="activity-detail-body"></div>
-          </div>
-        </div>
-
-        <!-- Modal: detalhe das compras parceladas -->
-        <div id="parcelas-modal" class="modal-overlay hidden">
-          <div class="modal-card" style="max-width:760px">
-            <div class="modal-header">
-              <h3>Compras Parceladas — status das parcelas</h3>
-              <button class="modal-close" onclick="document.getElementById('parcelas-modal').classList.add('hidden')">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-              </button>
-            </div>
-            <div class="modal-body" id="parcelas-modal-body"></div>
-          </div>
-        </div>
-
-        <!-- Modal: configuração de meta anual -->
-        <div id="meta-modal" class="modal-overlay hidden">
-          <div class="modal-card" style="max-width:560px">
-            <div class="modal-header">
-              <h3>Meta de Gastos Anual</h3>
-              <button class="modal-close" onclick="document.getElementById('meta-modal').classList.add('hidden')">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-              </button>
-            </div>
-            <div class="modal-body">
-              <div class="meta-form">
-                <label class="meta-field">
-                  <span>Ano da meta</span>
-                  <select id="meta-year" class="input-field" onchange="App.onMetaYearChange()"></select>
-                </label>
-
-                <div class="meta-field">
-                  <span>Gasto do ano anterior (<b id="meta-prev-year-lbl">—</b>)</span>
-                  <div class="meta-prev-wrap">
-                    <input type="text" id="meta-prev-val" class="input-field" placeholder="R$ 0,00" oninput="App.recalcMetaPreview()">
-                    <span class="meta-prev-src" id="meta-prev-src"></span>
-                  </div>
-                  <small id="meta-prev-hint" class="meta-hint"></small>
-                </div>
-
-                <label class="meta-field">
-                  <span>Meta de redução para o ano atual (%)</span>
-                  <input type="number" id="meta-reduction" class="input-field" min="0" max="100" step="1" placeholder="Ex: 10" oninput="App.recalcMetaPreview()">
-                </label>
-
-                <div class="meta-preview" id="meta-preview">
-                  <div class="meta-preview-row">
-                    <span>Gasto atual (<b id="meta-cur-year-lbl">—</b>, automático)</span>
-                    <strong id="meta-cur-val">R$ 0,00</strong>
-                  </div>
-                  <div class="meta-preview-row meta-preview-target">
-                    <span>Meta calculada</span>
-                    <strong id="meta-target-val">R$ 0,00</strong>
-                  </div>
-                  <div class="meta-preview-row">
-                    <span>Pode gastar por mês</span>
-                    <strong id="meta-permonth-val">R$ 0,00</strong>
-                  </div>
-                  <div class="meta-status-box" id="meta-status-box"></div>
-                </div>
-
-                <!-- Histórico de metas por ano — bateu / não bateu -->
-                <div class="meta-hist-section">
-                  <div class="meta-hist-title">Histórico de Metas</div>
-                  <div class="meta-hist-list" id="meta-hist-list"></div>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:14px 20px">
-              <button class="btn-ghost" id="meta-clear-btn" onclick="App.clearMeta()">Remover meta</button>
-              <button class="btn-primary" onclick="App.saveMeta()">Salvar meta</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Cards de Consumo: Tintas e Pilhas/Baterias ── -->
-        <div class="consumo-grid">
-
-          <!-- Card Tintas -->
-          <div class="chart-card consumo-card">
-            <div class="consumo-card-head">
-              <div class="consumo-card-title">
-                <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                <span>Tintas Compradas</span>
-              </div>
-              <div class="consumo-head-controls">
-                <select id="ink-year"  class="cons-year-sel"  onchange="App.setConsYear('ink',this.value)"></select>
-                <select id="ink-month" class="cons-month-sel hidden" onchange="App.setConsMonth('ink',this.value)"></select>
-                <div class="consumo-period-toggle">
-                  <button class="cons-per-btn"        data-kind="ink" data-period="week"  onclick="App.setConsPeriod('ink','week',this)">Semana</button>
-                  <button class="cons-per-btn"        data-kind="ink" data-period="month" onclick="App.setConsPeriod('ink','month',this)">Mês</button>
-                  <button class="cons-per-btn active" data-kind="ink" data-period="year"  onclick="App.setConsPeriod('ink','year',this)">Ano</button>
-                </div>
-              </div>
-            </div>
-            <div class="consumo-body">
-              <div class="consumo-main">
-                <div class="consumo-big" id="ink-count">0</div>
-                <div class="consumo-big-lbl">tintas no período</div>
-                <span class="consumo-trend" id="ink-trend">—</span>
-              </div>
-              <div class="consumo-stats">
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Gasto total</span>
-                  <span class="consumo-stat-val" id="ink-spent">R$ 0,00</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Cor mais comprada</span>
-                  <span class="consumo-stat-val" id="ink-top-color">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Unidade que mais comprou</span>
-                  <span class="consumo-stat-val" id="ink-top-unit">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="ink-top-solicitante">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl" id="ink-prev-lbl">Período anterior</span>
-                  <span class="consumo-stat-val consumo-stat-muted" id="ink-prev">0 · R$ 0,00</span>
-                </div>
-              </div>
-            </div>
-            <div class="consumo-breakdown" id="ink-breakdown"></div>
-          </div>
-
-          <!-- Card Pilhas/Baterias -->
-          <div class="chart-card consumo-card">
-            <div class="consumo-card-head">
-              <div class="consumo-card-title">
-                <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><rect x="2" y="7" width="18" height="10" rx="2" stroke="currentColor" stroke-width="2"/><line x1="22" y1="10" x2="22" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="10" x2="6" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
-                <span>Pilhas &amp; Baterias</span>
-              </div>
-              <div class="consumo-head-controls">
-                <select id="bat-year"  class="cons-year-sel"  onchange="App.setConsYear('bat',this.value)"></select>
-                <select id="bat-month" class="cons-month-sel hidden" onchange="App.setConsMonth('bat',this.value)"></select>
-                <div class="consumo-period-toggle">
-                  <button class="cons-per-btn"        data-kind="bat" data-period="week"  onclick="App.setConsPeriod('bat','week',this)">Semana</button>
-                  <button class="cons-per-btn"        data-kind="bat" data-period="month" onclick="App.setConsPeriod('bat','month',this)">Mês</button>
-                  <button class="cons-per-btn active" data-kind="bat" data-period="year"  onclick="App.setConsPeriod('bat','year',this)">Ano</button>
-                </div>
-              </div>
-            </div>
-            <div class="consumo-body">
-              <div class="consumo-main">
-                <div class="consumo-big" id="bat-count">0</div>
-                <div class="consumo-big-lbl">unidades no período</div>
-                <span class="consumo-trend" id="bat-trend">—</span>
-              </div>
-              <div class="consumo-stats">
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Gasto total</span>
-                  <span class="consumo-stat-val" id="bat-spent">R$ 0,00</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Modelo mais comprado</span>
-                  <span class="consumo-stat-val" id="bat-top-model">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Unidade que mais comprou</span>
-                  <span class="consumo-stat-val" id="bat-top-unit">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="bat-top-solicitante">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl" id="bat-prev-lbl">Período anterior</span>
-                  <span class="consumo-stat-val consumo-stat-muted" id="bat-prev">0 · R$ 0,00</span>
-                </div>
-              </div>
-            </div>
-            <div class="consumo-breakdown" id="bat-breakdown"></div>
-          </div>
-
-          <!-- Card Outros -->
-          <div class="chart-card consumo-card">
-            <div class="consumo-card-head">
-              <div class="consumo-card-title">
-                <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/><polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="currentColor" stroke-width="2"/><line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2"/></svg></span>
-                <span>Outros</span>
-              </div>
-              <div class="consumo-head-controls">
-                <select id="outros-year"  class="cons-year-sel"  onchange="App.setConsYear('outros',this.value)"></select>
-                <select id="outros-month" class="cons-month-sel hidden" onchange="App.setConsMonth('outros',this.value)"></select>
-                <div class="consumo-period-toggle">
-                  <button class="cons-per-btn"        data-kind="outros" data-period="week"  onclick="App.setConsPeriod('outros','week',this)">Semana</button>
-                  <button class="cons-per-btn"        data-kind="outros" data-period="month" onclick="App.setConsPeriod('outros','month',this)">Mês</button>
-                  <button class="cons-per-btn active" data-kind="outros" data-period="year"  onclick="App.setConsPeriod('outros','year',this)">Ano</button>
-                </div>
-              </div>
-            </div>
-            <div class="consumo-body">
-              <div class="consumo-main">
-                <div class="consumo-big" id="outros-count">0</div>
-                <div class="consumo-big-lbl">itens no período</div>
-                <span class="consumo-trend" id="outros-trend">—</span>
-              </div>
-              <div class="consumo-stats">
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Gasto total</span>
-                  <span class="consumo-stat-val" id="outros-spent">R$ 0,00</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Subgrupo mais comprado</span>
-                  <span class="consumo-stat-val" id="outros-top-subgrupo">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Unidade que mais comprou</span>
-                  <span class="consumo-stat-val" id="outros-top-unit">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="outros-top-solicitante">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl" id="outros-prev-lbl">Período anterior</span>
-                  <span class="consumo-stat-val consumo-stat-muted" id="outros-prev">0 · R$ 0,00</span>
-                </div>
-              </div>
-            </div>
-            <div class="consumo-breakdown" id="outros-breakdown"></div>
-          </div>
-
-          <!-- Card Concerto -->
-          <div class="chart-card consumo-card">
-            <div class="consumo-card-head">
-              <div class="consumo-card-title">
-                <span class="consumo-ico"><svg viewBox="0 0 24 24" fill="none" width="15" height="15"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke="currentColor" stroke-width="2"/></svg></span>
-                <span>Concerto</span>
-              </div>
-              <div class="consumo-head-controls">
-                <select id="concerto-year"  class="cons-year-sel"  onchange="App.setConsYear('concerto',this.value)"></select>
-                <select id="concerto-month" class="cons-month-sel hidden" onchange="App.setConsMonth('concerto',this.value)"></select>
-                <div class="consumo-period-toggle">
-                  <button class="cons-per-btn"        data-kind="concerto" data-period="week"  onclick="App.setConsPeriod('concerto','week',this)">Semana</button>
-                  <button class="cons-per-btn"        data-kind="concerto" data-period="month" onclick="App.setConsPeriod('concerto','month',this)">Mês</button>
-                  <button class="cons-per-btn active" data-kind="concerto" data-period="year"  onclick="App.setConsPeriod('concerto','year',this)">Ano</button>
-                </div>
-              </div>
-            </div>
-            <div class="consumo-body">
-              <div class="consumo-main">
-                <div class="consumo-big" id="concerto-count">0</div>
-                <div class="consumo-big-lbl">consertos no período</div>
-                <span class="consumo-trend" id="concerto-trend">—</span>
-              </div>
-              <div class="consumo-stats">
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Gasto total</span>
-                  <span class="consumo-stat-val" id="concerto-spent">R$ 0,00</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Modelo que mais deu problema</span>
-                  <span class="consumo-stat-val" id="concerto-top-model">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Unidade que mais deu problema</span>
-                  <span class="consumo-stat-val" id="concerto-top-unit">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl">Maior solicitante</span>
-                  <span class="consumo-stat-val" id="concerto-top-solicitante">—</span>
-                </div>
-                <div class="consumo-stat">
-                  <span class="consumo-stat-lbl" id="concerto-prev-lbl">Período anterior</span>
-                  <span class="consumo-stat-val consumo-stat-muted" id="concerto-prev">0 · R$ 0,00</span>
-                </div>
-              </div>
-            </div>
-            <div class="consumo-breakdown" id="concerto-breakdown"></div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- ── ESTOQUE ── -->
-      <div id="tab-estoque" class="tab-panel">
-        <div class="tab-header dash-topbar">
-          <div>
-            <h2>Gestão de Estoque</h2>
-            <p class="tab-subtitle">Controle itens disponíveis para retirada nas solicitações</p>
-          </div>
-          <div style="display:flex;gap:8px">
-            <button class="btn-primary" onclick="App.escolherTipoEstoque()">
-              <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:4px"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-              Novo Item
-            </button>
-          </div>
-        </div>
-
-        <!-- Toolbar: busca + conf + filtros -->
-        <div class="estoque-toolbar-card">
-          <div class="req-search-wrap">
-            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
-            <input type="text" id="estoque-search" class="req-search-input" placeholder="Buscar produto..." oninput="App.estoquePagina=1;App.renderEstoque()" />
-          </div>
-          <div class="filter-popover-wrap">
-            <button class="btn-filter-toggle labeled" id="btn-estoque-conf-toggle" onclick="App.toggleEstoqueConfPopover(event)" title="Configurações">
-              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.66 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2.5a2 2 0 010-4h.09A1.65 1.65 0 004.6 8.66a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5"/></svg>
-              <span>Conf</span>
-            </button>
-            <div class="filter-popover" id="estoque-conf-popover">
-              <div class="filter-popover-row">
-                <button class="btn-ghost" id="btn-limpar-mov" onclick="App.limparMovimentacoes()" title="Apaga entradas/saídas geradas por compras (preserva itens e movimentos manuais)" style="color:#d94040;border-color:#fca5a5;width:100%">
-                  <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:4px"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke="currentColor" stroke-width="2"/></svg>
-                  Limpar Entr./Saí.
-                </button>
-              </div>
-              <div class="filter-popover-row">
-                <button class="btn-ghost" id="btn-importar-compras" onclick="App.backfillEstoqueCompras()" title="Importa todas as compras já registradas para o estoque (entrada/saída)" style="width:100%">
-                  <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:4px"><path d="M21 12a9 9 0 11-9-9c2.5 0 4.8 1 6.5 2.7L21 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M21 3v5h-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                  Importar Compras
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="filter-popover-wrap">
-            <button class="btn-filter-toggle" id="btn-estoque-filter-toggle" onclick="App.toggleEstoqueFilterPopover(event)" title="Filtros">
-              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
-            </button>
-            <div class="filter-popover" id="estoque-filter-popover">
-              <div class="filter-popover-row">
-                <label>GRUPO</label>
-                <select id="estoque-filter-grupo" class="filter-select" onchange="App.estoquePagina=1;App.renderEstoque()">
-                  <option value="">Todos os grupos</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Estado vazio geral -->
-        <div id="estoque-empty-all" class="estoque-empty-all hidden">
-          <svg viewBox="0 0 24 24" fill="none" style="width:38px;opacity:.4"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
-          <p>Nenhum item em estoque. Clique em <strong>Novo Item</strong> para adicionar.</p>
-        </div>
-
-        <!-- Card resumo de movimentação -->
-        <div id="estoque-resumo-card" class="estoque-resumo-card hidden">
-          <div class="resumo-box resumo-ent">
-            <div class="resumo-ico">↓</div>
-            <div><div class="resumo-val" id="resumo-entradas">0</div><div class="resumo-lbl">Entradas</div></div>
-          </div>
-          <div class="resumo-box resumo-sai">
-            <div class="resumo-ico">↑</div>
-            <div><div class="resumo-val" id="resumo-saidas">0</div><div class="resumo-lbl">Saídas</div></div>
-          </div>
-          <div class="resumo-box resumo-sld">
-            <div class="resumo-ico">∑</div>
-            <div><div class="resumo-val" id="resumo-saldo">0</div><div class="resumo-lbl">Saldo Total</div></div>
-          </div>
-          <div class="resumo-box resumo-zer">
-            <div class="resumo-ico">⚠</div>
-            <div><div class="resumo-val" id="resumo-zerados">0</div><div class="resumo-lbl">Zerados</div></div>
-          </div>
-        </div>
-
-        <!-- Tabela de itens -->
-        <div id="estoque-inv-section" class="hidden">
-          <div class="estoque-sec-title">
-            Itens em Estoque
-            <button id="btn-ver-zerados" class="btn-ver-zerados hidden" onclick="App.toggleVerZerados(this)">Ver zerados</button>
-          </div>
-          <div class="table-wrap" style="margin-top:8px">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Lote</th>
-                  <th>Produto</th>
-                  <th>Grupo</th>
-                  <th>Subgrupo</th>
-                  <th>Quantidade</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody id="estoque-tbody"></tbody>
-            </table>
-          </div>
-          <div id="estoque-pager" class="estoque-pager hidden">
-            <button id="estoque-prev" class="estoque-pager-btn" onclick="App.estoquePage('prev')">‹ Anterior</button>
-            <span id="estoque-pager-info" class="estoque-pager-info">1 / 1</span>
-            <button id="estoque-next" class="estoque-pager-btn" onclick="App.estoquePage('next')">Próximo ›</button>
-          </div>
-        </div>
-
-        <!-- Cards Entrada / Saída (preview 5 itens + scroll) -->
-        <div id="estoque-cards-grid" class="estoque-cards-grid hidden">
-
-          <!-- Card Entradas -->
-          <div class="estoque-mov-card">
-            <div class="estoque-mov-card-head">
-              <div class="emc-title"><span class="sec-dot dot-ent"></span> Entradas
-                <span id="estoque-entradas-count" class="estoque-sec-badge" style="background:#1db87a">0</span>
-              </div>
-              <div class="emc-actions">
-                <div class="emc-sort">
-                  <button class="emc-sort-btn active" id="sort-ent-desc" onclick="App.setMovSort('entrada','desc',this)" title="Mais recente">↓</button>
-                  <button class="emc-sort-btn" id="sort-ent-asc" onclick="App.setMovSort('entrada','asc',this)" title="Mais antiga">↑</button>
-                </div>
-                <button class="emc-ver-btn" onclick="App.openMovHist('entrada')">Histórico</button>
-              </div>
-            </div>
-            <div class="emc-search-wrap">
-              <input type="text" id="estoque-entradas-search" class="emc-search" placeholder="Buscar produto, lote, origem..." oninput="App.setMovSearch('entrada', this.value)">
-              <button type="button" class="emc-search-clear" onclick="App.clearMovSearch('entrada')" title="Limpar busca">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-              </button>
-            </div>
-            <div id="estoque-entradas-list" class="estoque-mov-list"></div>
-          </div>
-
-          <!-- Card Saídas -->
-          <div class="estoque-mov-card">
-            <div class="estoque-mov-card-head">
-              <div class="emc-title"><span class="sec-dot dot-sai"></span> Saídas
-                <span id="estoque-saidas-count" class="estoque-sec-badge" style="background:#e8830a">0</span>
-              </div>
-              <div class="emc-actions">
-                <div class="emc-sort">
-                  <button class="emc-sort-btn active" id="sort-sai-desc" onclick="App.setMovSort('saida','desc',this)" title="Mais recente">↓</button>
-                  <button class="emc-sort-btn" id="sort-sai-asc" onclick="App.setMovSort('saida','asc',this)" title="Mais antiga">↑</button>
-                </div>
-                <button class="emc-ver-btn" onclick="App.openMovHist('saida')">Histórico</button>
-              </div>
-            </div>
-            <div class="emc-search-wrap">
-              <input type="text" id="estoque-saidas-search" class="emc-search" placeholder="Buscar produto, destino, origem..." oninput="App.setMovSearch('saida', this.value)">
-              <button type="button" class="emc-search-clear" onclick="App.clearMovSearch('saida')" title="Limpar busca">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-              </button>
-            </div>
-            <div id="estoque-saidas-list" class="estoque-mov-list"></div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Modal: Histórico completo de movimentações -->
-      <div id="mov-hist-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:880px">
-          <div class="modal-header">
-            <h3 id="mov-hist-title">Histórico</h3>
-            <button class="modal-close" onclick="App.closeMovHist()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <div class="modal-body">
-            <input type="text" id="mov-hist-search" class="req-search-input" placeholder="Buscar..." oninput="App.setMovHistSearch(this.value)" style="max-width:100%;margin-bottom:10px">
-            <div class="table-wrap">
-              <table class="data-table">
-                <thead id="mov-hist-thead"></thead>
-                <tbody id="mov-hist-tbody"></tbody>
-              </table>
-            </div>
-            <div class="estoque-pager" style="margin-top:14px">
-              <button id="mov-hist-prev" class="estoque-pager-btn" onclick="App.movHistPage('prev')">‹ Anterior</button>
-              <span id="mov-hist-pager-info" class="estoque-pager-info">1 / 1</span>
-              <button id="mov-hist-next" class="estoque-pager-btn" onclick="App.movHistPage('next')">Próximo ›</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Modal: Detalhe de uma movimentação -->
-      <div id="mov-detail-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:520px">
-          <div class="modal-header">
-            <h3 id="mov-detail-title">Detalhe da Movimentação</h3>
-            <button class="modal-close" onclick="App.closeMovDetail()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <div class="modal-body" id="mov-detail-body"></div>
-          <div class="modal-footer">
-            <button class="btn-ghost" onclick="App.closeMovDetail()">Fechar</button>
-            <button class="btn-delete" id="mov-detail-del-btn" onclick="App.deleteMovimento()">Apagar movimento</button>
-            <button class="btn-primary" id="mov-detail-date-btn" onclick="App.movDetailEditDate()">Alterar Data</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Modal: Editar data da movimentação -->
-      <div id="mov-date-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:400px">
-          <div class="modal-header">
-            <h3>Alterar Data da Movimentação</h3>
-            <button class="modal-close" onclick="App.closeMovDate()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="mov-date-id">
-            <div class="form-group">
-              <label class="form-label">Data</label>
-              <input type="date" id="mov-date-input" class="input-field">
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn-ghost" onclick="App.closeMovDate()">Cancelar</button>
-            <button class="btn-primary" onclick="App.saveMovDate()">Salvar</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Modal: Novo/Editar Item de Estoque -->
-      <!-- ── MODAL: escolher tipo (Nova compra x Nova entrada) ── -->
-      <div id="estoque-tipo-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:460px">
-          <div class="modal-header">
-            <h3>Adicionar ao Estoque</h3>
-            <button class="modal-close" onclick="document.getElementById('estoque-tipo-modal').classList.add('hidden')">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <div class="modal-body">
-            <p style="color:var(--ink-500);margin-bottom:14px">O que você está adicionando?</p>
-            <div style="display:flex;flex-direction:column;gap:12px">
-              <button type="button" class="estoque-tipo-opt" onclick="App.openEstoqueForm(null,'compra')">
-                <span class="estoque-tipo-ico" style="background:#dbeafe;color:#1d4ed8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
-                <span class="estoque-tipo-txt"><strong>Nova compra</strong><small>Produto comprado — entra no total gasto do dashboard.</small></span>
-              </button>
-              <button type="button" class="estoque-tipo-opt" onclick="App.openEstoqueForm(null,'entrada')">
-                <span class="estoque-tipo-ico" style="background:#dcfce7;color:#059669"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg></span>
-                <span class="estoque-tipo-txt"><strong>Nova entrada</strong><small>Item que já existe fisicamente (não foi comprado) — NÃO conta como gasto.</small></span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div id="estoque-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:620px">
-          <div class="modal-header">
-            <h3 id="estoque-form-title">Novo Item em Estoque</h3>
-            <button class="modal-close" onclick="App.closeEstoqueForm()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <div class="modal-body">
-            <input type="hidden" id="estoque-edit-id">
-            <div class="form-row-2">
-              <div class="form-group">
-                <label class="form-label">Grupo *</label>
-                <select id="estoque-grupo" class="input-field select-styled" onchange="App.onEstoqueGrupoChange()">
-                  <option value="">— Selecione —</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Subgrupo</label>
-                <select id="estoque-subgrupo" class="input-field select-styled">
-                  <option value="">— Selecione —</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-group" style="margin-top:10px">
-              <label class="form-label">Produto / Descrição *</label>
-              <select id="estoque-produto-select" class="input-field select-styled hidden">
-                <option value="">— Selecione —</option>
-              </select>
-              <input type="text" id="estoque-produto" class="input-field" list="estoque-produto-list" placeholder="Ex: Tinta Ciano HP 122">
-              <datalist id="estoque-produto-list"></datalist>
-            </div>
-            <div class="form-row-2" style="margin-top:10px">
-              <div class="form-group estoque-money">
-                <label class="form-label">Fornecedor</label>
-                <select id="estoque-fornecedor" class="input-field select-styled">
-                  <option value="">— Selecione —</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Quantidade *</label>
-                <input type="number" id="estoque-qtd" class="input-field" min="0" placeholder="0" oninput="App.calcEstoqueValorTotal()">
-              </div>
-            </div>
-            <div id="estoque-compra-fields">
-              <div class="form-row-2" style="margin-top:10px">
-                <div class="form-group">
-                  <label class="form-label">Unidade de destino *</label>
-                  <select id="estoque-unidade-destino" class="input-field select-styled">
-                    <option value="">— Selecione —</option>
-                  </select>
-                </div>
-                <div class="form-group estoque-money">
-                  <label class="form-label">Valor unitário (R$) *</label>
-                  <input type="number" id="estoque-valor" class="input-field" min="0" step="0.01" placeholder="0,00" oninput="App.calcEstoqueValorTotal()">
-                </div>
-              </div>
-              <div class="form-row-2" style="margin-top:10px">
-                <div class="form-group">
-                  <label class="form-label">Nome do solicitante</label>
-                  <input type="text" id="estoque-solicitante" class="input-field" placeholder="Nome de quem solicitou">
-                </div>
-                <div class="form-group estoque-money">
-                  <label class="form-label">Valor total</label>
-                  <input type="text" id="estoque-valor-total" class="input-field" readonly style="background:#f8fafc;font-weight:600;color:#1a7a4a">
-                </div>
-              </div>
-              <div class="form-row-2 estoque-money" style="margin-top:10px;align-items:flex-end">
-                <div class="form-group">
-                  <label class="form-label">Forma de Pagamento</label>
-                  <select id="estoque-forma-pagamento" class="input-field select-styled">
-                    <option value="dinheiro">Dinheiro</option>
-                    <option value="boleto">Boleto</option>
-                    <option value="cartao">Cartão</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label class="toggle-label">
-                    <input type="checkbox" id="chk-estoque-parcelas" onchange="App.toggleEstoqueParcelas()">
-                    <span class="toggle-switch"></span>
-                    Parcelar
-                  </label>
-                </div>
-              </div>
-              <div class="form-group" id="estoque-parcelas-wrap" style="display:none;margin-top:10px">
-                <label class="form-label">Nº de Parcelas</label>
-                <input type="number" id="estoque-parcelas-n" class="input-field" min="2" placeholder="Ex.: 3" oninput="App.calcEstoqueValorTotal()" style="max-width:130px">
-              </div>
-            </div>
-            <div class="form-group" style="margin-top:10px">
-              <label class="form-label" id="estoque-data-label">Data da compra</label>
-              <input type="date" id="estoque-data" class="input-field">
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn-ghost" onclick="App.closeEstoqueForm()">Cancelar</button>
-            <button class="btn-primary" onclick="App.saveEstoqueItem()">
-              <svg viewBox="0 0 24 24" fill="none" style="width:14px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8" stroke="currentColor" stroke-width="2"/></svg>
-              Salvar
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── MODAL: COMPRA COMBINADA ── -->
-      <div id="compra-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:720px">
-          <div class="modal-header">
-            <h3 id="compra-modal-title">Compra Combinada — Seleção</h3>
-            <button class="modal-close" onclick="App.closeCompraModal()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-
-          <!-- PASSO 1: Seleção -->
-          <div id="compra-step-1">
-            <div class="modal-body">
-              <div class="compra-step1-header">
-                <span style="font-size:.85rem;font-weight:600;color:#1a3a6b">Selecione as solicitações para esta compra</span>
-                <select id="compra-sort" class="input-field select-styled" onchange="App.renderCompraReqList()" style="max-width:170px;font-size:.78rem;padding:4px 8px">
-                  <option value="recente">Mais recente</option>
-                  <option value="antiga">Mais antiga</option>
-                  <option value="sl">Código SL</option>
-                </select>
-              </div>
-              <input type="text" id="compra-search" class="req-search-input" placeholder="Buscar por SL, unidade, grupo..." oninput="App.renderCompraReqList()" style="max-width:100%;margin-bottom:8px">
-              <div id="compra-req-list" class="compra-req-list"></div>
-              <div id="compra-sel-count" style="font-size:.76rem;color:#6680a0;margin-top:6px;text-align:right"></div>
-            </div>
-            <div class="modal-footer">
-              <button class="btn-ghost" onclick="App.closeCompraModal()">Cancelar</button>
-              <button class="btn-primary" id="btn-compra-prosseguir" onclick="App.compraStep2()" title="Prosseguir" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
-            </div>
-          </div>
-
-          <!-- PASSO 2: Dados da compra -->
-          <div id="compra-step-2" class="hidden">
-            <div class="modal-body" style="max-height:72vh;overflow-y:auto;padding-right:6px">
-              <div id="compra-autz-info"></div>
-              <div class="form-row-2">
-                <div class="form-group">
-                  <label class="form-label">Fornecedor</label>
-                  <select id="compra-fornecedor" class="input-field select-styled"></select>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Data da Compra</label>
-                  <input type="date" id="compra-data" class="input-field">
-                </div>
-              </div>
-              <div class="form-group" style="margin-top:10px">
-                <label class="form-label">Forma de Pagamento</label>
-                <select id="compra-forma-pagamento" class="input-field select-styled">
-                  <option value="dinheiro">Dinheiro</option>
-                  <option value="boleto">Boleto</option>
-                  <option value="cartao">Cartão</option>
-                </select>
-              </div>
-              <div class="form-row-2" style="margin-top:10px;align-items:flex-end">
-                <div class="form-group">
-                  <label class="toggle-label">
-                    <input type="checkbox" id="chk-compra-parcelas" onchange="App.toggleCompraParcelas()">
-                    <span class="toggle-switch"></span>
-                    Parcelar
-                  </label>
-                </div>
-                <div class="form-group" id="compra-parcelas-wrap" style="display:none">
-                  <label class="form-label">Nº de Parcelas</label>
-                  <input type="number" id="compra-parcelas-n" class="input-field" min="2" placeholder="Ex.: 3" oninput="App.calcCompraStep2Total()" style="max-width:130px">
-                </div>
-              </div>
-              <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <span style="font-size:.82rem;color:#6680a0;font-weight:500">Rastreabilidade do Envio:</span>
-                <span id="compra-envio-display" style="font-size:.82rem;font-weight:600;color:#1a3a6b">—</span>
-                <button class="btn-ghost" onclick="App.toggleEnvioEdit()" style="font-size:.72rem;padding:2px 8px" title="Editar data de envio">⚙</button>
-              </div>
-              <div id="compra-envio-edit-wrap" style="display:none;margin-top:6px">
-                <input type="date" id="compra-envio-data" class="input-field" style="max-width:180px;display:inline-block">
-                <button class="btn-secondary" onclick="App.applyEnvioEdit()" style="font-size:.78rem;padding:5px 12px;margin-left:8px">Confirmar</button>
-              </div>
-              <hr style="margin:14px 0;border:none;border-top:1px solid #e2e8f0">
-              <div id="compra-items-wrap"></div>
-              <div id="compra-step2-resumo" class="compra-resumo" style="margin-top:12px;display:none"></div>
-            </div>
-            <div class="modal-footer">
-              <button class="btn-ghost" id="btn-compra-voltar" onclick="App.compraBackStep1()">← Voltar</button>
-              <button class="btn-ghost" id="btn-compra-descombinar" onclick="App.descombinarCompra()" style="display:none;color:#dc2626;border-color:#fecaca">Descombinar</button>
-              <button class="btn-primary" id="btn-salvar-compra" onclick="App.saveCompraCombinada()">Registrar Compra</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── CALENDÁRIO ── -->
-      <div id="tab-calendar" class="tab-panel">
-        <div class="tab-header dash-topbar">
-          <div>
-            <h2>Calendário de Compras</h2>
-            <p class="tab-subtitle">Visualize gastos por dia, parcelas e compras diretas</p>
-          </div>
-          <div class="cal-nav">
-            <button class="btn-cal-nav" onclick="App.calPrev()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-            <span id="cal-month-label" class="cal-month-label"></span>
-            <button class="btn-cal-nav" onclick="App.calNext()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="cal-legend-row">
-          <span class="cal-leg parcela"><span></span>Parcela</span>
-          <span class="cal-leg direta"><span></span>Compra Direta</span>
-        </div>
-        <div class="calendar-wrap">
-          <div class="cal-header-row">
-            <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
-          </div>
-          <div id="calendar-grid" class="calendar-grid"></div>
-        </div>
-        <div id="cal-day-detail" class="cal-day-detail hidden"></div>
-      </div>
-
-       <!-- ── geradorpdf ── -->
-
-
-      <!-- ── INVENTÁRIO ── -->
-<div id="tab-inventario" class="tab-panel">
-  <iframe src="inventario.html" class="iframe-container"></iframe>
-</div>
-
-<div id="tab-gerador-pdf" class="tab-panel">
-  <iframe src="Geradorpdf.html" class="iframe-container"></iframe>
-</div>
-
-      <!-- ── SOLICITAÇÕES ── -->
-      <div id="tab-requests" class="tab-panel">
-        <div class="tab-header dash-topbar">
-          <div>
-            <h2>Gestão de Solicitações</h2>
-            <p class="tab-subtitle">Gerencie e atualize o status de cada pedido</p>
-          </div>
-          <div class="filter-row" style="flex-wrap:wrap;gap:8px;align-items:center">
-            <!-- Selects ocultos (usados pelo renderRequests) -->
-            <select id="filter-status" style="display:none" onchange="App.renderRequests()">
-              <option value="">Todos os status</option>
-              <option value="Solicitado">Solicitado</option>
-              <option value="Aguardando">Aguardando</option>
-              <option value="Comprado">Comprado</option>
-              <option value="Estoque">Estoque</option>
-              <option value="Negado">Negado</option>
-            </select>
-            <select id="filter-unit-req" style="display:none" onchange="App.renderRequests()"></select>
-            <select id="filter-group-req" style="display:none" onchange="App.renderRequests()"></select>
-          </div>
-
-        </div>
-
-        <!-- ── Mini-KPIs (5 cards) ── -->
-        <div class="rk-grid">
-
-          <!-- Card 1: Unidade — mais/menos solicitou -->
-          <div class="rk-card rk-blue">
-            <div class="rk-card-header">
-              <div class="rk-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" width="16"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <span class="rk-card-label">Solicitações por Unidade</span>
-            </div>
-            <div class="rk-duo">
-              <div class="rk-half">
-                <div class="rk-pill rk-pill-green">↑ Mais</div>
-                <div class="rk-name" id="rk-sol-max">—</div>
-                <div class="rk-count" id="rk-sol-max-n"></div>
-              </div>
-              <div class="rk-vsep"></div>
-              <div class="rk-half">
-                <div class="rk-pill rk-pill-red">↓ Menos</div>
-                <div class="rk-name" id="rk-sol-min">—</div>
-                <div class="rk-count" id="rk-sol-min-n"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Card 2: Unidade — mais/menos comprou -->
-          <div class="rk-card rk-blue">
-            <div class="rk-card-header">
-              <div class="rk-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" width="16"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <span class="rk-card-label">Compras por Unidade</span>
-            </div>
-            <div class="rk-duo">
-              <div class="rk-half">
-                <div class="rk-pill rk-pill-green">↑ Mais</div>
-                <div class="rk-name" id="rk-buy-max">—</div>
-                <div class="rk-count" id="rk-buy-max-n"></div>
-              </div>
-              <div class="rk-vsep"></div>
-              <div class="rk-half">
-                <div class="rk-pill rk-pill-red">↓ Menos</div>
-                <div class="rk-name" id="rk-buy-min">—</div>
-                <div class="rk-count" id="rk-buy-min-n"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Card 3: Grupo mais solicitado -->
-          <div class="rk-card rk-blue">
-            <div class="rk-card-header">
-              <div class="rk-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" width="16"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <span class="rk-card-label">Grupo Mais Solicitado</span>
-            </div>
-            <div class="rk-single">
-              <div class="rk-pill rk-pill-gold"><svg viewBox="0 0 24 24" fill="none" width="11" height="11"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4zM7 4H4a2 2 0 002 2v0a1 1 0 001-1V4zM17 4h3a2 2 0 01-2 2v0a1 1 0 01-1-1V4z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> Top</div>
-              <div class="rk-name rk-name-lg" id="rk-grp-top">—</div>
-              <div class="rk-count" id="rk-grp-top-n"></div>
-            </div>
-          </div>
-
-          <!-- Card 4: Fornecedor com mais compras -->
-          <div class="rk-card rk-blue">
-            <div class="rk-card-header">
-              <div class="rk-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" width="16"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <span class="rk-card-label">Fornecedor com Mais Compras</span>
-            </div>
-            <div class="rk-single">
-              <div class="rk-pill rk-pill-blue"><svg viewBox="0 0 24 24" fill="none" width="11" height="11"><path d="M12 2l2.9 6.5 7.1.6-5.4 4.7 1.7 6.9L12 17.3 5.7 20.7l1.7-6.9L2 9.1l7.1-.6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg> Destaque</div>
-              <div class="rk-name rk-name-lg" id="rk-sup-top">—</div>
-              <div class="rk-count" id="rk-sup-top-n"></div>
-            </div>
-          </div>
-
-          <!-- Card 5: Forma de pagamento mais/menos usada -->
-          <div class="rk-card rk-blue">
-            <div class="rk-card-header">
-              <div class="rk-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" width="16"><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M2 10h20" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <span class="rk-card-label">Forma de Pagamento</span>
-            </div>
-            <div class="rk-duo">
-              <div class="rk-half">
-                <div class="rk-pill rk-pill-green">↑ Mais usada</div>
-                <div class="rk-name" id="rk-pag-max">—</div>
-                <div class="rk-count" id="rk-pag-max-n"></div>
-              </div>
-              <div class="rk-vsep"></div>
-              <div class="rk-half">
-                <div class="rk-pill rk-pill-red">↓ Menos usada</div>
-                <div class="rk-name" id="rk-pag-min">—</div>
-                <div class="rk-count" id="rk-pag-min-n"></div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-        <!-- fim mini-KPIs -->
-
-        <!-- Busca + Conf + Toggle filtro -->
-        <div class="req-toolbar-row">
-          <div class="req-search-wrap">
-            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
-            <input type="text" id="req-live-search" class="req-search-input" placeholder="Buscar por unidade, grupo, status, fornecedor, resumo..." oninput="App.renderRequests()" />
-          </div>
-          <div class="filter-popover-wrap">
-            <button class="btn-filter-toggle" id="btn-req-conf-toggle" onclick="App.toggleReqConfPopover(event)" title="Configurações">
-              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.66 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2.5a2 2 0 010-4h.09A1.65 1.65 0 004.6 8.66a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5"/></svg>
-            </button>
-            <div class="filter-popover" id="req-conf-popover">
-              <div class="filter-popover-row">
-                <button id="btn-numerar-seq" class="btn-secondary" onclick="App.backfillSeq()" title="Atribui número (#) às solicitações que ainda não têm">Numerar</button>
-              </div>
-              <div class="filter-popover-row">
-                <button id="btn-compra-combinada" class="btn-secondary" onclick="App.openCompraModal()" title="Comprar vários pedidos juntos (parcelado ou à vista)">Compra combinada</button>
-              </div>
-              <div class="filter-popover-row">
-                <button id="btn-autorizar-compra" class="btn-secondary" onclick="App.abrirAutorizarCompra()" title="Pedir autorização de várias solicitações de uma vez">Autorizar compra</button>
-              </div>
-            </div>
-          </div>
-          <div class="filter-popover-wrap">
-            <button class="btn-filter-toggle" id="btn-req-filter-toggle" onclick="App.toggleReqFilterPanel(event)" title="Filtros">
-              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="6" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg>
-            </button>
-            <!-- ── Filtro completo ── -->
-            <div id="req-filter-panel" class="req-filter-panel">
-              <div class="req-filter-panel-inner">
-            <!-- Status chips -->
-            <div class="req-filter-group">
-              <span class="req-filter-label">Status</span>
-              <button class="btn-toggle-all-status" id="btn-toggle-all-status" onclick="App.toggleAllStatus(this)">Todos ✓</button>
-              <button class="req-status-chip chip-sol active" data-status="Solicitado" onclick="App.toggleStatusFilter(this)">Solicitado</button>
-              <button class="req-status-chip chip-agu active" data-status="Aguardando" onclick="App.toggleStatusFilter(this)">Aguardando</button>
-              <button class="req-status-chip chip-com active" data-status="Comprado"   onclick="App.toggleStatusFilter(this)">Comprado</button>
-              <button class="req-status-chip chip-est active" data-status="Estoque"    onclick="App.toggleStatusFilter(this)">Estoque</button>
-              <button class="req-status-chip chip-neg active" data-status="Negado"     onclick="App.toggleStatusFilter(this)">Negado</button>
-              <select id="filter-parcelado" class="req-filter-select" onchange="App.renderRequests()" title="Filtrar por parcelamento/forma de pagamento" style="margin-left:8px">
-                <option value="">Pagamento: todos</option>
-                <option value="parcelado">Parcelada</option>
-                <option value="combinada">Combinada</option>
-                <option value="boleto">Boleto</option>
-                <option value="dinheiro">Dinheiro</option>
-                <option value="cartao">Cartão</option>
-              </select>
-            </div>
-            <!-- Unidade + Grupo -->
-            <div class="req-filter-group">
-              <span class="req-filter-label">Unidade</span>
-              <select id="req-filter-unit-vis" class="req-filter-select" onchange="document.getElementById('filter-unit-req').value=this.value; App.renderRequests()">
-                <option value="">Todas</option>
-              </select>
-              <span class="req-filter-label" style="margin-left:12px">Grupo</span>
-              <select id="req-filter-group-vis" class="req-filter-select" onchange="document.getElementById('filter-group-req').value=this.value; App.renderRequests()">
-                <option value="">Todos</option>
-              </select>
-            </div>
-            <!-- Ordenação por data de solicitação -->
-            <div class="req-filter-group">
-              <span class="req-filter-label">Ord. Solicitação</span>
-              <button class="req-sort-btn" id="sort-req-desc" onclick="App.setReqSort('createdAt','desc',this)">
-                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Mais recente
-              </button>
-              <button class="req-sort-btn" id="sort-req-asc" onclick="App.setReqSort('createdAt','asc',this)">
-                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Mais antiga
-              </button>
-              <span class="req-filter-label" style="margin-left:12px">Ord. Envio</span>
-              <button class="req-sort-btn" id="sort-sent-desc" onclick="App.setReqSort('shippedAt','desc',this)">
-                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Mais recente
-              </button>
-              <button class="req-sort-btn" id="sort-sent-asc" onclick="App.setReqSort('shippedAt','asc',this)">
-                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Mais antiga
-              </button>
-            </div>
-            <!-- Data solicitação -->
-            <div class="req-filter-group">
-              <span class="req-filter-label">Data solicitação</span>
-              <input type="date" id="req-date-from" class="req-filter-date" onchange="App.renderRequests()">
-              <span style="color:#8898b8">→</span>
-              <input type="date" id="req-date-to" class="req-filter-date" onchange="App.renderRequests()">
-            </div>
-            <!-- Data envio -->
-            <div class="req-filter-group">
-              <span class="req-filter-label">Data envio</span>
-              <input type="date" id="req-sent-from" class="req-filter-date" onchange="App.renderRequests()">
-              <span style="color:#8898b8">→</span>
-              <input type="date" id="req-sent-to" class="req-filter-date" onchange="App.renderRequests()">
-            </div>
-            <!-- Limpar -->
-            <div class="req-filter-group" style="justify-content:flex-end">
-              <button class="btn-req-clear-all" onclick="App.clearAllReqFilters()">
-                <svg viewBox="0 0 24 24" fill="none" width="12"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                Limpar
-              </button>
-            </div>
-              </div>
-            </div>
-          </div>
-          <button class="btn-nova-solic" onclick="App.openNovaSolic()" title="Nova solicitação">
-            <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <!-- Duas seções: problemas recorrentes e guias de instalação -->
+        <div class="kb-secoes">
+          <button class="kb-secao active" data-sec="problema" onclick="App.kbSecao('problema',this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="19" height="19"><path d="M10.3 3.6L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.6a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+            <span class="kb-secao-txt">Problemas<small>Falhas recorrentes e suas soluções</small></span>
+            <span class="kb-secao-n" id="kb-n-problema">0</span>
+          </button>
+          <button class="kb-secao" data-sec="instalacao" onclick="App.kbSecao('instalacao',this)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="19" height="19"><path d="M14.7 6.3a4 4 0 01-5 5L4 17v3h3l5.7-5.7a4 4 0 015-5l2.3-2.3-2-2-2.3 2.3z"/></svg>
+            <span class="kb-secao-txt">Instalação<small>Tutoriais de instalação de equipamentos</small></span>
+            <span class="kb-secao-n" id="kb-n-instalacao">0</span>
           </button>
         </div>
 
-        <div id="dash-stats-bar" class="req-stats-bar"></div>
-        <div id="dash-negados-bar" class="req-negados-bar" style="display:none"></div>
+        <!-- Status geral + atalho de cadastro -->
+        <div class="kb-topo">
+          <div class="kb-status-box">
+            <div class="kb-status-item kb-st-aberto" onclick="App.kbSetStatus('aberto')">
+              <div class="kb-status-num" id="kb-num-aberto">0</div>
+              <div class="kb-status-lbl">Aberto</div>
+              <div class="kb-status-sub">sem solução registrada</div>
+            </div>
+            <div class="kb-status-sep"></div>
+            <div class="kb-status-item kb-st-fechado" onclick="App.kbSetStatus('fechado')">
+              <div class="kb-status-num" id="kb-num-fechado">0</div>
+              <div class="kb-status-lbl">Fechado</div>
+              <div class="kb-status-sub">com solução registrada</div>
+            </div>
+          </div>
+          <button class="kb-add-card" onclick="App.kbNovo()" title="Adicionar WIKI">
+            <svg viewBox="0 0 24 24" fill="none" width="34" height="34"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            <span>Adicionar<br>WIKI</span>
+          </button>
+        </div>
 
-        <div class="table-wrap">
-          <table class="data-table">
+        <!-- Busca + filtros -->
+        <div class="kb-toolbar">
+          <div class="req-search-wrap kb-busca">
+            <svg viewBox="0 0 24 24" fill="none" width="15" height="15"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/></svg>
+            <input type="text" id="kb-search" class="req-search-input" placeholder="Buscar por código, nome, grupo..." oninput="App.kbRender()" />
+          </div>
+          <div class="filter-popover-wrap">
+            <button class="btn-filter-toggle" id="kb-btn-filtro" onclick="App.kbToggleFiltro(event)" title="Filtros">
+              <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="nav-badge" id="kb-filtro-badge" style="display:none">0</span>
+            </button>
+            <div class="filter-popover" id="kb-filtro-popover">
+              <div class="filter-popover-row">
+                <label class="form-label">Status</label>
+                <select id="kb-filter-status" class="filter-select" onchange="App.kbRender()">
+                  <option value="">Todos</option>
+                  <option value="aberto">Aberto</option>
+                  <option value="fechado">Fechado</option>
+                </select>
+              </div>
+              <div class="filter-popover-row">
+                <label class="form-label">Prioridade</label>
+                <select id="kb-filter-grav" class="filter-select" onchange="App.kbRender()">
+                  <option value="">Todas</option>
+                  <option value="simples">Simples</option>
+                  <option value="medio">Médio</option>
+                  <option value="grave">Grave</option>
+                  <option value="critico">Crítico</option>
+                </select>
+              </div>
+              <div class="filter-popover-row">
+                <label class="form-label">Grupo</label>
+                <select id="kb-filter-grupo" class="filter-select" onchange="App.kbRender()">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div class="filter-popover-row">
+                <label class="form-label">Subgrupo</label>
+                <select id="kb-filter-sub" class="filter-select" onchange="App.kbRender()">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div class="filter-popover-row">
+                <button class="btn-ghost" style="width:100%" onclick="App.kbLimparFiltros()">Limpar filtros</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="kb-table-wrap">
+          <table class="kb-table">
             <thead>
               <tr>
-                <th>Data</th>
-                <th>Unidade</th>
-                <th>Grupo</th>
-                <th>Subgrupo</th>
-                <th>Resumo</th>
-                <th>Urgência</th>
-                <th>Envio</th>
-                <th>Status</th>
-                <th>Ações</th>
+                <th style="width:96px">ID</th>
+                <th id="kb-th-nome">Nome do problema</th>
+                <th style="width:110px">Prioridade</th>
+                <th style="width:150px">Grupo</th>
+                <th style="width:150px">Subgrupo</th>
+                <th style="width:110px">Status</th>
+                <th style="width:88px;text-align:right">Ações</th>
               </tr>
             </thead>
-            <tbody id="requests-tbody"></tbody>
+            <tbody id="kb-tbody"></tbody>
           </table>
         </div>
       </div>
 
-      <!-- ── CONFIGURAÇÕES ── -->
-      <div id="tab-settings" class="tab-panel">
+<!-- ===== #tab-kb-detalhe ===== -->
+      <div id="tab-kb-detalhe" class="tab-panel">
+        <div class="kbd-layout">
+          <!-- Coluna lateral -->
+          <aside class="kbd-side">
+            <div class="kbd-side-top">
+              <div class="kbd-side-head">
+                <button class="kbd-voltar" onclick="App.kbdVoltar()" title="Voltar (ESC)">
+                  <svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button class="btn-ico" id="kbd-btn-editar" title="Editar dados do problema">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+                </button>
+              </div>
+              <div class="kbd-user">
+                <div class="kbd-avatar" id="kbd-avatar">A</div>
+                <div>
+                  <div class="kbd-user-nome" id="kbd-user-nome">—</div>
+                  <div class="kbd-user-cargo" id="kbd-user-cargo">Administrador</div>
+                </div>
+              </div>
+              <div class="kbd-badges" id="kbd-badges"></div>
+            </div>
+            <div class="kbd-side-bottom" id="kbd-side-bottom"></div>
+          </aside>
+
+          <!-- Área principal -->
+          <section class="kbd-main">
+            <div class="kbd-topbar">
+              <div class="kbd-tabs">
+                <button class="kbd-tab active" data-aba="info"  onclick="App.kbdAba('info',this)">Informação <span class="kbd-badge" id="kbd-b-info">0</span></button>
+                <button class="kbd-tab" data-aba="resol" onclick="App.kbdAba('resol',this)">Resolução <span class="kbd-badge" id="kbd-b-resol">0</span></button>
+                <button class="kbd-tab" data-aba="coment" onclick="App.kbdAba('coment',this)">Comentários <span class="kbd-badge" id="kbd-b-coment">0</span></button>
+                <button class="kbd-tab" data-aba="links" onclick="App.kbdAba('links',this)">Links <span class="kbd-badge" id="kbd-b-links">0</span></button>
+              </div>
+            </div>
+            <div class="kbd-conteudo" id="kbd-conteudo"></div>
+          </section>
+
+        </div>
+      </div>
+
+<!-- ===== #tab-perfil ===== -->
+      <div id="tab-perfil" class="tab-panel">
+        <div class="tab-header dash-topbar">
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="kbd-voltar" onclick="App.perfilVoltar()" title="Voltar">
+              <svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <h2 id="perfil-titulo">Perfil</h2>
+          </div>
+        </div>
+        <div class="perfil-layout">
+          <aside class="perfil-side">
+            <div class="perfil-card">
+              <div class="perfil-avatar" id="perfil-avatar">A</div>
+              <div class="perfil-nome" id="perfil-nome">—</div>
+              <div class="perfil-user" id="perfil-user">@—</div>
+              <div class="perfil-stats" id="perfil-stats"></div>
+            </div>
+            <nav class="perfil-nav">
+              <button class="perfil-nav-item active" data-aba="sobre" onclick="App.perfilAba('sobre',this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M14 9h4M14 13h4M5 16c.8-1.5 2-2 3-2s2.2.5 3 2"/></svg>
+                Sobre
+              </button>
+              <button class="perfil-nav-item" data-aba="contrib" onclick="App.perfilAba('contrib',this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="8" y="2" width="13" height="17" rx="2"/><path d="M16 22H5a2 2 0 01-2-2V6"/></svg>
+                Contribuições
+              </button>
+              <button class="perfil-nav-item" data-aba="ativ" onclick="App.perfilAba('ativ',this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                Atividade
+              </button>
+            </nav>
+          </aside>
+          <section class="perfil-main" id="perfil-conteudo"></section>
+        </div>
+      </div>
+
+<!-- ===== #tab-home-config ===== -->
+      <div id="tab-home-config" class="tab-panel">
         <div class="tab-header dash-topbar">
           <div>
-            <h2>Configurações do Sistema</h2>
-            <p class="tab-subtitle">Gerencie unidades, grupos, subgrupos e usuários</p>
-          </div>
-        </div>
-        <div class="settings-grid">
-
-          <!-- Gestores (autorização de solicitações) -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <div class="settings-card-icon" style="background:#dcfce7;color:#059669">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <div>
-                <h3>Gestores (Autorização)</h3>
-                <p>Números que recebem solicitações para autorizar. Cadastre um nome para identificar.</p>
-              </div>
-            </div>
-            <div class="settings-list-box">
-              <div id="list-gestores" class="settings-list"></div>
-            </div>
-            <div class="add-row" style="flex-wrap:wrap;gap:8px">
-              <input type="text" id="gestor-nome-input" placeholder="Nome (ex: Diretor)" class="input-field" style="flex:1 1 130px" />
-              <input type="text" id="gestor-whats-input" placeholder="Ex: 88 9 8176-5537" class="input-field" style="flex:1 1 150px" oninput="App._formatGestorInput()" onkeydown="if(event.key==='Enter') App.salvarGestor()" />
-              <button class="btn-add" onclick="App.salvarGestor()">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
-                Adicionar
-              </button>
-            </div>
-            <p style="font-size:.78rem;color:var(--gray-500);margin-top:8px">Formata sozinho pro padrão <strong>+55 (DD) 9 número</strong>.</p>
-          </div>
-
-          <!-- Unidades -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <div class="settings-card-icon blue">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <div>
-                <h3>Unidades</h3>
-                <p>Gerencie as unidades solicitantes</p>
-              </div>
-            </div>
-            <div class="settings-list-box">
-              <div id="list-units-admin" class="settings-list"></div>
-            </div>
-            <div class="add-row">
-              <input type="text" id="inp-unit" placeholder="Nome da unidade" class="input-field" onkeydown="if(event.key==='Enter') App.addUnit()" />
-              <button class="btn-add" onclick="App.addUnit()">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
-                Adicionar
-              </button>
-            </div>
-          </div>
-
-          <!-- Fornecedores -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <div class="settings-card-icon teal">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2"/><path d="M9 22V12h6v10" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <div>
-                <h3>Fornecedores</h3>
-                <p>Pré-cadastre fornecedores para uso nas compras</p>
-              </div>
-            </div>
-            <div class="settings-list-box">
-              <div id="list-suppliers-admin" class="settings-list"></div>
-            </div>
-            <div class="add-row">
-              <input type="text" id="inp-supplier" placeholder="Nome do fornecedor" class="input-field" onkeydown="if(event.key==='Enter') App.addSupplier()" />
-              <button class="btn-add" onclick="App.addSupplier()">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
-                Adicionar
-              </button>
-            </div>
-          </div>
-
-          <!-- Grupos de Produto & Mapeamento -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <div class="settings-card-icon purple">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <div>
-                <h3>Grupos de Produto &amp; Mapeamento</h3>
-                <p>Clique num grupo para editar suas sub-opções e subgrupos</p>
-              </div>
-            </div>
-
-            <!-- selects ocultos, lidos pelas funções existentes -->
-            <select id="sel-group-sub" onchange="App.loadSubOpts()" style="display:none"><option value="">—</option></select>
-            <select id="sel-subgroup-filter" onchange="App.filterSubgroupsView()" style="display:none"><option value="">Todos os grupos</option></select>
-            <select id="sel-subgroup-group" style="display:none"><option value="">Grupo pai</option></select>
-
-            <div class="settings-list-box">
-              <div id="list-groups-admin" class="settings-list"></div>
-            </div>
-            <div class="add-row">
-              <input type="text" id="inp-group" placeholder="Novo grupo" class="input-field" onkeydown="if(event.key==='Enter') App.addGroup()" />
-              <button class="btn-add" onclick="App.addGroup()">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
-                Adicionar
-              </button>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- ── REGISTRO DE CÓDIGOS ── -->
-        <div class="codigos-section">
-          <h3 class="codigos-section-title">Registro de Códigos</h3>
-          <div class="codigos-grid">
-
-            <!-- Lotes de Entrada -->
-            <div class="codigos-panel">
-              <div class="codigos-panel-header">
-                <span class="codigos-panel-icon" style="background:#fff7ed;color:#b45309"><svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg></span>
-                <div>
-                  <strong class="codigos-panel-title">Registro de lotes</strong>
-                  <span class="codigos-panel-nom" title="Prefixo do grupo · dia da solicitação + dia do envio · nº da solicitação">PREFIXO-DiaSolDiaEnv-NºSL</span>
-                </div>
-                <span class="codigos-count" id="codigos-lotes-count">0</span>
-              </div>
-              <div class="codigos-toolbar">
-                <input type="text" id="codigos-lotes-search" class="codigos-search" placeholder="Buscar lote, produto..." oninput="App.renderCodigosTab()">
-                <button class="btn-add codigos-add" onclick="App.escolherTipoEstoque()" title="Cadastrar entrada de estoque">+ Entrada</button>
-              </div>
-              <div id="codigos-lotes-list" class="codigos-list"></div>
-            </div>
-
-            <!-- Solicitações -->
-            <div class="codigos-panel">
-              <div class="codigos-panel-header">
-                <span class="codigos-panel-icon" style="background:#eef4ff;color:#3a7ee8">SL</span>
-                <div>
-                  <strong class="codigos-panel-title">Registro de solicitações</strong>
-                  <span class="codigos-panel-nom">SL-000</span>
-                </div>
-                <span class="codigos-count" id="codigos-seq-count">0</span>
-              </div>
-              <div class="codigos-toolbar">
-                <input type="text" id="codigos-seq-search" class="codigos-search" placeholder="Buscar SL, unidade, grupo..." oninput="App.renderCodigosTab()">
-                <button class="btn-add codigos-add" onclick="App.backToUnits()" title="Nova solicitação">+ Solicitação</button>
-              </div>
-              <div id="codigos-seq-list" class="codigos-list"></div>
-            </div>
-
-            <!-- Parceladas / Combinadas -->
-            <div class="codigos-panel">
-              <div class="codigos-panel-header">
-                <span class="codigos-panel-icon" style="background:#f5f1fe;color:#7c52d4">CMP</span>
-                <div>
-                  <strong class="codigos-panel-title">Registro de CMP / P</strong>
-                  <span class="codigos-panel-nom">CMP-0000</span>
-                </div>
-                <span class="codigos-count" id="codigos-cmp-count">0</span>
-              </div>
-              <div class="codigos-toolbar">
-                <input type="text" id="codigos-cmp-search" class="codigos-search" placeholder="Buscar código, unidade..." oninput="App.renderCodigosTab()">
-                <button class="btn-add codigos-add" onclick="App.openAddCompraChooser()" title="Adicionar compra">+ Adicionar</button>
-              </div>
-              <div id="codigos-cmp-list" class="codigos-list"></div>
-            </div>
-
+            <h2>Configurações</h2>
           </div>
         </div>
 
-        <!-- ── FERRAMENTAS & BACKUP (2 cards) ── -->
-        <div class="config-tools-section">
-          <h3 class="codigos-section-title" style="margin-top:22px">Ferramentas & Backup</h3>
-          <div class="config-tools-grid config-tools-2">
-
-            <!-- Card 1: Backup -->
-            <div class="settings-card">
-              <div class="settings-card-header">
-                <div class="settings-card-icon" style="background:#eef4ff;color:#3a7ee8">
-                  <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <div><h3>Backup do Sistema</h3><p>Exporte ou restaure todos os dados</p></div>
-              </div>
-              <p class="config-tools-desc">Baixe um arquivo com <strong>todos os dados</strong> (solicitações, estoque, compras, configurações, metas e logs). Guarde-o para não perder nada.</p>
-              <div class="config-tools-actions">
-                <button class="btn-primary" onclick="App.exportBackupSistema()">⬇ Baixar backup</button>
-                <button class="btn-secondary" onclick="document.getElementById('restore-sys-file').click()">⬆ Restaurar</button>
-                <input type="file" id="restore-sys-file" accept=".json" style="display:none" onchange="App.importBackupSistema(event)">
-              </div>
-              <p class="config-tools-warn">⚠ Restaurar substitui os dados atuais pelos do arquivo.</p>
-            </div>
-
-            <!-- Card 2: Logs completos -->
-            <div class="settings-card">
-              <div class="settings-card-header">
-                <div class="settings-card-icon" style="background:#f5f1fe;color:#7c52d4">
-                  <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2"/></svg>
-                </div>
-                <div><h3>Logs de Atividade</h3><p>Histórico completo por dia</p></div>
-              </div>
-              <p class="config-tools-desc">Veja <strong>todos os registros</strong> de quem fez o quê e quando, dia a dia. Clique num registro para o detalhamento completo.</p>
-              <div class="config-tools-actions">
-                <button class="btn-primary" onclick="App.showLogsCompletos()">📋 Ver logs</button>
-                <button class="btn-secondary" onclick="App.baixarLogs()">⬇ Baixar logs</button>
-              </div>
-              <p class="config-tools-desc" id="config-logs-count" style="margin-top:8px"></p>
-            </div>
-
+        <!-- Grupos + Subgrupos da Home (um card só, ocupando a tela inteira) -->
+        <div class="cfg-card">
+          <div class="cfg-card-head">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" stroke="currentColor" stroke-width="2"/></svg>
+            <h3>Grupos e Subgrupos da Home</h3>
           </div>
-
-          <!-- Administradores (largo, fixo, abaixo) -->
-          <div class="settings-card admin-section-card" style="margin-top:18px">
-            <div class="settings-card-header">
-              <div class="settings-card-icon green">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <div><h3>Administradores do Sistema</h3><p>Usuários com acesso administrativo</p></div>
-            </div>
-            <div id="admin-cards-grid" class="admin-cards-grid admin-cards-fixed"></div>
-            <div class="add-admin-bar">
-              <div class="input-icon-wrap">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/></svg>
-                <input type="text" id="inp-admin-nome" placeholder="Nome completo" class="input-field with-icon" />
-              </div>
-              <div class="input-icon-wrap">
-                <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="2"/></svg>
-                <input type="text" id="inp-admin-user" placeholder="Nome de usuário (login)" class="input-field with-icon" />
-              </div>
-              <div class="input-icon-wrap">
-                <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2"/></svg>
-                <input type="password" id="inp-admin-pass" placeholder="Senha" class="input-field with-icon" />
-              </div>
-              <button class="btn-add" onclick="App.addAdmin()">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
-                Adicionar
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Modal: Logs completos por dia -->
-        <div id="logs-full-modal" class="modal-overlay hidden">
-          <div class="modal-card" style="max-width:760px">
-            <div class="modal-header">
-              <h3>Logs de Atividade — Histórico Completo</h3>
-              <button class="modal-close" onclick="document.getElementById('logs-full-modal').classList.add('hidden')">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-              </button>
-            </div>
-            <div class="modal-body" id="logs-full-body"></div>
-            <div class="modal-footer" id="logs-full-footer" style="display:none">
-              <button class="btn-delete" onclick="App.apagarLogs()">🗑 Apagar todos os logs</button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- ── MODAL: EDITAR GRUPO (sub-opções + subgrupos) ── -->
-      <div id="modal-grupo-edit" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:560px">
-          <div class="modal-header">
-            <h3 id="cfg-detail-title">Grupo</h3>
-            <button class="modal-close" onclick="App.closeGroupEdit()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <div class="modal-body">
-            <div class="cfg-block">
-              <div class="cfg-block-head">
-                <span class="cfg-col-title">Sub-opções por Grupo</span>
-                <select id="sel-subopt-key" class="filter-select" style="display:none" onchange="App.loadSubOpts()">
-                  <option value="numeracoes">Numerações</option>
-                  <option value="cores">Cores</option>
-                  <option value="modelos">Modelos</option>
-                </select>
-              </div>
-              <div class="settings-list-box">
-                <div id="list-subopts-admin" class="settings-list"></div>
-              </div>
-              <div class="add-row" id="add-subopt-row" style="display:none">
-                <input type="text" id="inp-subopt" placeholder="Nova sub-opção" class="input-field" onkeydown="if(event.key==='Enter') App.addSubOpt()" />
-                <button class="btn-add" onclick="App.addSubOpt()" title="Adicionar sub-opção">
+          <div class="cfg-card-body">
+          <div class="hc-2col">
+            <div class="hc-2col-item">
+              <h4 class="hc-2col-title">Grupos</h4>
+              <p class="config-tools-desc">Cadastre aqui os grupos. Clique num grupo para ver e editar os subgrupos dele.</p>
+              <div class="settings-list-box"><div id="hc-list-grupos" class="settings-list"></div></div>
+              <div class="add-row" style="display:flex;gap:8px;margin-top:10px">
+                <input type="text" id="hc-novo-grupo" class="input-field" placeholder="Ex: Impressoras" style="flex:1"
+                       onkeydown="if(event.key==='Enter') App.hcAddGrupo()">
+                <button class="btn-add" onclick="App.hcAddGrupo()">
                   <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+                  Adicionar
                 </button>
               </div>
             </div>
-
-            <div class="cfg-block">
-              <div class="cfg-block-head">
-                <span class="cfg-col-title">Subgrupos — Mapeamento Interno</span>
-              </div>
-              <div class="settings-list-box">
-                <div id="list-subgroups-admin" class="settings-list"></div>
-              </div>
-              <div class="add-row">
-                <input type="text" id="inp-subgroup" placeholder="Novo subgrupo" class="input-field" onkeydown="if(event.key==='Enter') App.addSubgroup()" />
-                <button class="btn-add" onclick="App.addSubgroup()" title="Adicionar subgrupo">
+            <div class="hc-2col-item">
+              <h4 class="hc-2col-title">Subgrupos</h4>
+              <p class="config-tools-desc" id="hc-sub-desc">Selecione um grupo ao lado para gerenciar os subgrupos dele.</p>
+              <div class="settings-list-box"><div id="hc-list-subs" class="settings-list"></div></div>
+              <div class="add-row" id="hc-add-sub-row" style="display:none;gap:8px;margin-top:10px">
+                <input type="text" id="hc-novo-sub" class="input-field" placeholder="Ex: Epson L3250" style="flex:1"
+                       onkeydown="if(event.key==='Enter') App.hcAddSub()">
+                <button class="btn-add" onclick="App.hcAddSub()">
                   <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+                  Adicionar
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- ── MODAL: NOVA SOLICITAÇÃO (ADMIN) ── -->
-      <div id="modal-nova-solic" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:560px">
-          <div class="modal-header">
-            <h3>Nova Solicitação</h3>
-            <button class="modal-close" onclick="App.closeNovaSolic()">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
           </div>
-          <div class="modal-body">
-            <div class="form-group">
-              <label class="form-label required">Unidade</label>
-              <select id="nsol-unit" class="input-field"></select>
-            </div>
-            <div class="form-group">
-              <label class="form-label required">Tipo / Grupo</label>
-              <div class="type-selector" id="nsol-groups"></div>
-            </div>
+        </div>
 
-            <div id="nsol-sub-ink" class="sub-panel hidden">
-              <div class="sub-panel-inner">
-                <div class="form-group">
-                  <label class="form-label">Numeração da Tinta</label>
-                  <div id="nsol-ink-numbers" class="check-grid"></div>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Cores</label>
-                  <div id="nsol-ink-colors" class="check-grid"></div>
-                </div>
+        <!-- Unidades + Setores (mesmo padrão, um card só ocupando a tela inteira) -->
+        <div class="cfg-card" style="margin-top:18px">
+          <div class="cfg-card-head">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2"/><path d="M9 22V12h6v10" stroke="currentColor" stroke-width="2"/></svg>
+            <h3>Unidades e Setores</h3>
+          </div>
+          <div class="cfg-card-body">
+          <div class="hc-2col">
+            <div class="hc-2col-item">
+              <h4 class="hc-2col-title">Unidades</h4>
+              <p class="config-tools-desc">Cadastre aqui as unidades. Clique numa unidade para ver e editar os setores dela.</p>
+              <div class="settings-list-box"><div id="hc-list-unidades" class="settings-list"></div></div>
+              <div class="add-row" style="display:flex;gap:8px;margin-top:10px">
+                <input type="text" id="hc-nova-unidade" class="input-field" placeholder="Ex: Filial Norte" style="flex:1"
+                       onkeydown="if(event.key==='Enter') App.hcAddUnidade()">
+                <button class="btn-add" onclick="App.hcAddUnidade()">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+                  Adicionar
+                </button>
               </div>
             </div>
-
-            <div id="nsol-sub-battery" class="sub-panel hidden">
-              <div class="sub-panel-inner">
-                <div class="form-group">
-                  <label class="form-label">Modelos <span class="opt-tag">pode selecionar mais de 1</span></label>
-                  <div id="nsol-battery-models" class="bat-models-list"></div>
-                </div>
+            <div class="hc-2col-item">
+              <h4 class="hc-2col-title">Setores</h4>
+              <p class="config-tools-desc" id="hc-setor-desc">Selecione uma unidade ao lado para gerenciar os setores dela.</p>
+              <div class="settings-list-box"><div id="hc-list-setores" class="settings-list"></div></div>
+              <div class="add-row" id="hc-add-setor-row" style="display:none;gap:8px;margin-top:10px">
+                <input type="text" id="hc-novo-setor" class="input-field" placeholder="Ex: Recepção" style="flex:1"
+                       onkeydown="if(event.key==='Enter') App.hcAddSetor()">
+                <button class="btn-add" onclick="App.hcAddSetor()">
+                  <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2"/></svg>
+                  Adicionar
+                </button>
               </div>
             </div>
-
-            <div id="nsol-sub-other" class="sub-panel hidden">
-              <div class="sub-panel-inner">
-                <div class="form-group">
-                  <label class="form-label required">Produto Desejado</label>
-                  <input type="text" id="nsol-product" placeholder="Nome do produto" class="input-field" />
-                </div>
-                <div class="form-group">
-                  <label class="form-label required">Motivo / Justificativa</label>
-                  <textarea id="nsol-reason" rows="3" placeholder="Por que precisa desse produto?" class="input-field"></textarea>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="check-item"><input type="checkbox" id="nsol-urgency" /> 🚨 Marcar como URGENTE</label>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Observação <span class="opt-tag">opcional</span></label>
-              <textarea id="nsol-obs" rows="2" placeholder="Alguma observação adicional?" class="input-field"></textarea>
-            </div>
           </div>
-          <div class="modal-footer">
-            <button class="btn-secondary" onclick="App.closeNovaSolic()">Cancelar</button>
-            <button class="btn-primary" onclick="App.nsolSubmit()">Criar Solicitação</button>
           </div>
         </div>
-      </div>
 
-      <!-- ── MODAL: DETALHE COMPRA COMBINADA ── -->
-      <div id="compra-detalhe-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:600px">
-          <div class="modal-header">
-            <h3 id="compra-detalhe-titulo">Compra CMP-0000</h3>
-            <button class="modal-close" onclick="document.getElementById('compra-detalhe-modal').classList.add('hidden')">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
+        <!-- Administradores -->
+        <div class="cfg-card" style="margin-top:18px">
+          <div class="cfg-card-head">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2"/></svg>
+            <h3>Administradores do Sistema</h3>
           </div>
-          <div class="modal-body" id="compra-detalhe-body" style="max-height:65vh;overflow-y:auto"></div>
-          <div class="modal-footer">
-            <button class="btn-ghost" onclick="document.getElementById('compra-detalhe-modal').classList.add('hidden')">Fechar</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── MODAL: INFO DO LOTE (ESTOQUE) ── -->
-      <div id="lote-info-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:560px">
-          <div class="modal-header">
-            <h3 id="lote-info-titulo">Lote</h3>
-            <button class="modal-close" onclick="document.getElementById('lote-info-modal').classList.add('hidden')">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <div class="modal-body" id="lote-info-body" style="max-height:65vh;overflow-y:auto"></div>
-          <div class="modal-footer">
-            <button class="btn-ghost" onclick="document.getElementById('lote-info-modal').classList.add('hidden')">Fechar</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── MODAL: VER SOLICITAÇÃO (somente leitura) ── -->
-      <div id="sol-view-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:540px">
-          <div class="modal-header">
-            <h3 id="sol-view-titulo">Solicitação</h3>
-            <button class="modal-close" onclick="document.getElementById('sol-view-modal').classList.add('hidden')">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <div class="modal-body" id="sol-view-body" style="max-height:65vh;overflow-y:auto"></div>
-          <div class="modal-footer">
-            <button class="btn-ghost" onclick="document.getElementById('sol-view-modal').classList.add('hidden')">Fechar</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── MODAL: TODAS AS SUB-OPÇÕES ── -->
-      <div id="subopts-all-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:560px">
-          <div class="modal-header">
-            <h3 id="subopts-all-titulo">Sub-opções — Todas</h3>
-            <button class="modal-close" onclick="document.getElementById('subopts-all-modal').classList.add('hidden')">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <div class="modal-body" id="subopts-all-body" style="max-height:68vh;overflow-y:auto"></div>
-          <div class="modal-footer">
-            <button class="btn-ghost" onclick="document.getElementById('subopts-all-modal').classList.add('hidden')">Fechar</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── MODAL: ESCOLHER TIPO DE COMPRA ── -->
-      <div id="add-compra-chooser" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:440px">
-          <div class="modal-header">
-            <h3>Adicionar Compra</h3>
-            <button class="modal-close" onclick="document.getElementById('add-compra-chooser').classList.add('hidden')">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <div class="modal-body">
-            <p class="tab-subtitle" style="margin:0 0 14px">O que você quer adicionar?</p>
-            <div class="chooser-grid">
-              <button class="chooser-opt" onclick="App.escolherCombinada()">
-                <span class="chooser-opt-ico" style="background:#f5f1fe;color:#7c52d4">CMP</span>
-                <strong>Compra Combinada</strong>
-                <span>Vários pedidos num só pagamento</span>
-              </button>
-              <button class="chooser-opt" onclick="App.escolherParcelada()">
-                <span class="chooser-opt-ico" style="background:#fff7ed;color:#b45309"><svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg></span>
-                <strong>Parcelada (item único)</strong>
-                <span>Entrada de estoque parcelada</span>
+          <div class="cfg-card-body">
+            <div id="admin-cards-grid-home" class="admin-cards-grid admin-cards-fixed"></div>
+            <div class="add-admin-bar" style="justify-content:flex-end">
+              <button class="btn-primary" onclick="App.abrirNovoUsuario()">
+                <svg viewBox="0 0 24 24" fill="none" style="width:15px;margin-right:5px"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/><path d="M19 8v6M22 11h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                Cadastrar novo usuário
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- ── MODAL: ADICIONAR ITEM PARCELADO ── -->
-      <div id="parcelada-add-modal" class="modal-overlay hidden">
-        <div class="modal-card" style="max-width:600px">
-          <div class="modal-header">
-            <h3>Entrada Parcelada</h3>
-            <button class="modal-close" onclick="document.getElementById('parcelada-add-modal').classList.add('hidden')">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-          </div>
-          <div class="modal-body">
-            <div class="form-row-2">
-              <div class="form-group">
-                <label class="form-label">Grupo *</label>
-                <select id="parc-grupo" class="input-field select-styled" onchange="App.onParcGrupoChange()"><option value="">— Selecione —</option></select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Subgrupo</label>
-                <select id="parc-subgrupo" class="input-field select-styled"><option value="">— Selecione —</option></select>
-              </div>
-            </div>
-            <div class="form-group" style="margin-top:10px">
-              <label class="form-label">Produto / Descrição *</label>
-              <input type="text" id="parc-produto" class="input-field" placeholder="Ex: Tinta Ciano HP 122">
-            </div>
-            <div class="form-row-2" style="margin-top:10px">
-              <div class="form-group">
-                <label class="form-label">Fornecedor</label>
-                <select id="parc-fornecedor" class="input-field select-styled"><option value="">— Selecione —</option></select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Quantidade *</label>
-                <input type="number" id="parc-qtd" class="input-field" min="0" placeholder="0" oninput="App.calcParcResumo()">
-              </div>
-            </div>
-            <div class="form-row-2" style="margin-top:10px">
-              <div class="form-group">
-                <label class="form-label">Valor Total (R$) *</label>
-                <input type="number" id="parc-valor" class="input-field" min="0" step="0.01" placeholder="0,00" oninput="App.calcParcResumo()">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Nº de Parcelas *</label>
-                <input type="number" id="parc-n" class="input-field" min="2" placeholder="Ex.: 3" oninput="App.calcParcResumo()">
-              </div>
-            </div>
-            <div class="form-row-2" style="margin-top:10px">
-              <div class="form-group">
-                <label class="form-label">Data da Compra</label>
-                <input type="date" id="parc-data" class="input-field">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Data do Envio</label>
-                <input type="date" id="parc-envio" class="input-field">
-              </div>
-            </div>
-            <div class="form-group" style="margin-top:10px">
-              <label class="form-label">Forma de Pagamento</label>
-              <select id="parc-forma-pagamento" class="input-field select-styled">
-                <option value="boleto">Boleto</option>
-                <option value="cartao">Cartão</option>
-                <option value="dinheiro">Dinheiro</option>
-              </select>
-            </div>
-            <div id="parc-resumo" class="compra-resumo" style="margin-top:12px;display:none"></div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn-ghost" onclick="document.getElementById('parcelada-add-modal').classList.add('hidden')">Cancelar</button>
-            <button class="btn-primary" onclick="App.saveParceladaItem()">Registrar Parcelada</button>
-          </div>
-        </div>
+      <!-- Modulos carregados em iframe -->
+      <div id="tab-financeiro" class="tab-panel">
+        <iframe data-src="financeiro.html" class="iframe-container" id="if-financeiro"></iframe>
       </div>
-
+      <div id="tab-inventario" class="tab-panel">
+        <iframe data-src="inventario.html" class="iframe-container" id="if-inventario"></iframe>
+      </div>
+      <div id="tab-gerador-pdf" class="tab-panel">
+        <iframe data-src="Geradorpdf.html" class="iframe-container" id="if-gerador"></iframe>
+      </div>
     </main>
   </div>
 </div>
 
-<!-- ══ MODAL: enviar para autorização (escolher gestor + valor) ══ -->
-<div id="autz-send-modal" class="modal-overlay hidden">
-  <div class="modal-card" style="max-width:480px">
+<!-- ===== #kb-form-modal ===== -->
+<div id="kb-form-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:640px">
     <div class="modal-header">
-      <h3>Enviar para autorização</h3>
-      <button class="modal-close" onclick="document.getElementById('autz-send-modal').classList.add('hidden')">✕</button>
+      <h3 id="kb-form-title">Adicionar WIKI</h3>
+      <button class="modal-close" onclick="App.kbFecharForm()">X</button>
     </div>
-    <div class="modal-body">
-      <p id="autz-send-resumo" style="font-weight:600;color:var(--ink-900);background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:14px"></p>
-      <div class="form-row-2" style="margin-bottom:14px">
+    <div class="modal-body" style="max-height:74vh;overflow-y:auto">
+      <input type="hidden" id="kb-id">
+      <div class="form-group">
+        <label class="form-label">Seção *</label>
+        <div class="kb-grav-pick" id="kb-tipo-pick">
+          <button type="button" class="kb-chip kb-tipo-chip active" data-t="problema"   onclick="App.kbPickTipo('problema')">Problema</button>
+          <button type="button" class="kb-chip kb-tipo-chip"        data-t="instalacao" onclick="App.kbPickTipo('instalacao')">Instalação</button>
+        </div>
+        <input type="hidden" id="kb-tipo" value="problema">
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label" id="kb-lbl-titulo">Nome do problema *</label>
+        <input type="text" id="kb-titulo" class="input-field" placeholder="Ex: Spooler de impressao travado" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="form-row-2" style="margin-top:12px">
         <div class="form-group">
-          <label class="form-label">Quantidade pedida</label>
-          <input type="text" id="autz-send-qtd" class="input-field" readonly style="background:#f1f5f9">
+          <label class="form-label">Grupo *</label>
+          <select id="kb-grupo" class="input-field select-styled" onchange="App.kbSyncSubList()">
+            <option value="">- Selecione -</option>
+          </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Valor da solicitação</label>
-          <input type="text" id="autz-send-valor" class="input-field" placeholder="Ex: R$ 250,00">
+          <label class="form-label">Subgrupo</label>
+          <select id="kb-subgrupo" class="input-field select-styled">
+            <option value="">- Selecione -</option>
+          </select>
         </div>
       </div>
-      <label class="form-label">Abrir WhatsApp no</label>
-      <div class="autz-mode-row" style="display:flex;gap:8px;margin-bottom:14px">
-        <button id="autz-mode-app" class="autz-mode-btn" onclick="App._autzSetMode('app')" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> App</button>
-        <button id="autz-mode-web" class="autz-mode-btn" onclick="App._autzSetMode('web')" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Web</button>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Prioridade *</label>
+        <div class="kb-grav-pick" id="kb-grav-pick">
+          <button type="button" class="kb-chip kb-g-simples" data-g="simples" onclick="App.kbPickGravidade('simples')">Simples</button>
+          <button type="button" class="kb-chip kb-g-medio"   data-g="medio"   onclick="App.kbPickGravidade('medio')">Medio</button>
+          <button type="button" class="kb-chip kb-g-grave"   data-g="grave"   onclick="App.kbPickGravidade('grave')">Grave</button>
+          <button type="button" class="kb-chip kb-g-critico" data-g="critico" onclick="App.kbPickGravidade('critico')">Critico</button>
+        </div>
+        <input type="hidden" id="kb-gravidade" value="simples">
       </div>
-      <label class="form-label">Escolha o gestor</label>
-      <div id="autz-send-gestores" class="autz-gestores-box"></div>
-      <a id="autz-enviar-btn" class="btn-primary autz-enviar-btn is-disabled" href="#">Escolha um gestor</a>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Status</label>
+        <select id="kb-status" class="input-field select-styled">
+          <option value="aberto">Aberto</option>
+          <option value="fechado">Fechado</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Introdução</label>
+        <div id="kb-intro-wrap"></div>
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Imagem</label>
+        <div class="kb-img-row">
+          <input type="text" id="kb-link" class="input-field" placeholder="Cole o link da imagem (ou envie um arquivo)" oninput="App.kbPreviewImg()">
+          <button type="button" class="btn-ghost" onclick="document.getElementById('kb-file').click()">Enviar foto</button>
+          <input type="file" id="kb-file" accept="image/*" style="display:none" onchange="App.kbiUpload(this,'wiki')">
+        </div>
+        <div id="kb-preview" class="kb-img-prev"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-delete" id="kb-btn-excluir" onclick="App.kbExcluir()" style="display:none">Excluir</button>
+      <button class="btn-ghost" onclick="App.kbFecharForm()">Cancelar</button>
+      <button class="btn-primary" onclick="App.kbSalvar()">Salvar</button>
     </div>
   </div>
 </div>
 
-<!-- ══ MODAL: autorizar compra em LOTE (várias solicitações) ══ -->
-<div id="autz-lote-modal" class="modal-overlay hidden">
+
+<!-- ===== #usr-modal ===== -->
+<div id="usr-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:620px">
+    <div class="modal-header">
+      <h3 id="usr-modal-title">Cadastrar novo usuário</h3>
+      <button class="modal-close" onclick="document.getElementById('usr-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="max-height:72vh;overflow-y:auto">
+      <input type="hidden" id="usr-edit-login">
+      <div class="form-group">
+        <label class="form-label">Nome completo *</label>
+        <input type="text" id="usr-nome" class="input-field" placeholder="Ex: Felipe Souza">
+      </div>
+      <div class="form-row-2" style="margin-top:12px">
+        <div class="form-group">
+          <label class="form-label">Telefone</label>
+          <input type="text" id="usr-tel" class="input-field" placeholder="(xx) x xxxx-xxxx" maxlength="16" oninput="App.mascaraTel(this)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input type="text" id="usr-email" class="input-field" placeholder="nome@empresa.com">
+        </div>
+      </div>
+      <div class="form-row-2" style="margin-top:12px">
+        <div class="form-group">
+          <label class="form-label">Usuário (login) *</label>
+          <input type="text" id="usr-login" class="input-field" placeholder="felipe">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha *</label>
+          <div class="campo-senha">
+            <input type="password" id="usr-pass" class="input-field" placeholder="Senha de acesso">
+            <button type="button" class="btn-olho" id="usr-pass-olho" onclick="App.verSenha('usr-pass', this)" title="Mostrar senha">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Sobre</label>
+        <textarea id="usr-sobre" class="input-field" rows="3" placeholder="Cargo, área, o que essa pessoa faz..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn-ghost" onclick="document.getElementById('usr-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-delete" id="usr-btn-excluir" onclick="App.excluirUsuario()" style="display:none">Excluir usuário</button>
+      <button class="btn-primary" onclick="App.salvarUsuario()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== #kbd-bloco-modal ===== -->
+<div id="kbd-bloco-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:860px">
+    <div class="modal-header">
+      <h3 id="kbd-bloco-title">Novo bloco</h3>
+      <button class="modal-close" onclick="document.getElementById('kbd-bloco-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="max-height:74vh;overflow-y:auto">
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Título do passo (opcional)</label>
+        <input type="text" id="kbd-bloco-titulo" class="input-field" placeholder="Ex: Remover a tampa">
+      </div>
+      <p style="font-size:.78rem;color:var(--ink-500);margin:0 0 14px">
+        Cada item vira uma imagem na galeria com a explicação ao lado.
+      </p>
+      <div id="kbd-itens"></div>
+      <button type="button" class="kbd-add-bloco" style="margin-top:6px" onclick="App.kbdAddItem()">+ Adicionar item (imagem + texto)</button>
+      <input type="file" id="kbd-bloco-file" accept="image/*" style="display:none" onchange="App.kbdUploadImg(this)">
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="document.getElementById('kbd-bloco-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-primary" onclick="App.kbdSalvarBloco()">Salvar bloco</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== #kbd-link-modal ===== -->
+<div id="kbd-link-modal" class="modal-overlay hidden">
   <div class="modal-card" style="max-width:560px">
     <div class="modal-header">
-      <h3 id="autz-lote-title">Autorizar compra — Solicitações</h3>
-      <button class="modal-close" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')">✕</button>
-    </div>
-
-    <!-- PASSO 1: escolher solicitações -->
-    <div id="autz-lote-step1">
-      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
-        <p style="color:var(--ink-500);margin-bottom:8px">Escolha as solicitações (status Solicitado) que vão pedir autorização juntas.</p>
-        <input type="text" id="autz-lote-search" class="req-search-input" placeholder="Buscar por SL, unidade, grupo..." oninput="App._autzLoteRenderList()" style="max-width:100%;margin-bottom:8px">
-        <div id="autz-lote-list" class="compra-req-list"></div>
-        <div id="autz-lote-sel-count" style="font-size:.76rem;color:#6680a0;margin-top:6px;text-align:right"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-ghost" onclick="document.getElementById('autz-lote-modal').classList.add('hidden')">Cancelar</button>
-        <button class="btn-primary" id="autz-lote-next1" onclick="App._autzLoteStep2()" title="Próximo" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
-      </div>
-    </div>
-
-    <!-- PASSO 2: valor + quantidade por item -->
-    <div id="autz-lote-step2" class="hidden">
-      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
-        <p style="color:var(--ink-500);margin-bottom:10px">Informe o valor de cada item. A quantidade vem do sistema — clique no cadeado para editar.</p>
-        <div id="autz-lote-itens"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-ghost" onclick="App._autzLoteBackStep1()">← Voltar</button>
-        <button class="btn-primary" onclick="App._autzLoteStep3()" title="Próximo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M5 12h14M13 5l7 7-7 7"/></svg></button>
-      </div>
-    </div>
-
-    <!-- PASSO 3: gestor + envio -->
-    <div id="autz-lote-step3" class="hidden">
-      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
-        <label class="form-label">Abrir WhatsApp no</label>
-        <div class="autz-mode-row" style="display:flex;gap:8px;margin-bottom:12px">
-          <button id="autz-lote-mode-app" class="autz-mode-btn" onclick="App._autzLoteSetMode('app')" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> App</button>
-          <button id="autz-lote-mode-web" class="autz-mode-btn" onclick="App._autzLoteSetMode('web')" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Web</button>
-        </div>
-        <label class="form-label">Escolha o gestor</label>
-        <div id="autz-lote-gestores" class="autz-gestores-box"></div>
-        <a id="autz-lote-enviar" class="btn-primary autz-enviar-btn is-disabled" href="#">Escolha o gestor</a>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-ghost" onclick="App._autzLoteBackStep2()">← Voltar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL: decisão de autorização (gestor respondeu) ══ -->
-<div id="autorizacao-modal" class="modal-overlay hidden">
-  <div class="modal-card" style="max-width:460px">
-    <div class="modal-header">
-      <h3>Decisão de Autorização</h3>
-      <button class="modal-close" onclick="document.getElementById('autorizacao-modal').classList.add('hidden')">✕</button>
+      <h3 id="kbd-link-title">Novo link</h3>
+      <button class="modal-close" onclick="document.getElementById('kbd-link-modal').classList.add('hidden')">X</button>
     </div>
     <div class="modal-body">
-      <p style="color:var(--ink-500);margin-bottom:6px">O que o gestor decidiu?</p>
-      <p id="autz-resumo" style="font-weight:600;color:var(--ink-900);background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:16px"></p>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <button id="autz-autorizado" class="btn-primary" style="background:#059669">Autorizado</button>
-        <button id="autz-negado" class="btn-primary" style="background:#dc2626">Negado</button>
-      </div>
-      <p style="font-size:.78rem;color:var(--ink-500);margin-top:10px">Autorizado abre a compra (Comprado ou Estoque). Negado marca a solicitação como negada.</p>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL SOLICITAÇÃO ══ -->
-<div id="modal-request" class="modal-overlay hidden">
-  <div class="modal-card">
-    <div class="modal-header">
-      <div class="modal-header-info">
-        <h3 id="modal-title">Solicitação</h3>
-        <span id="modal-header-badge"></span>
-      </div>
-      <button class="modal-close" onclick="App.closeModal()">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div id="modal-info" class="modal-info-block"></div>
-      <div class="form-group" style="margin-bottom:16px">
-        <label class="form-label">
-          <svg viewBox="0 0 24 24" fill="none" style="width:13px;vertical-align:middle;margin-right:4px"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>
-          Data da Solicitação
-        </label>
-        <input type="date" id="modal-created-date" class="input-field" style="max-width:200px" />
-      </div>
-      <div id="modal-subgroup-always" class="form-group" style="margin-bottom:16px">
-        <label class="form-label">Subgrupo</label>
-        <select id="modal-subgroup-always-sel" class="input-field select-styled"></select>
-      </div>
       <div class="form-group">
-        <label class="form-label">Status da Solicitação</label>
-        <div class="status-btn-row">
-          <button class="status-btn sol" data-s="Solicitado"  onclick="App.setModalStatus(this)">Solicitado</button>
-          <button class="status-btn agu" data-s="Aguardando"  onclick="App.setModalStatus(this)">Aguardando</button>
-          <button class="status-btn com" data-s="Comprado"    onclick="App.setModalStatus(this)">Comprado</button>
-          <button class="status-btn est" data-s="Estoque"     onclick="App.setModalStatus(this)">Estoque</button>
-          <button class="status-btn neg" data-s="Negado"      onclick="App.setModalStatus(this)">Negado</button>
-        </div>
+        <label class="form-label">Titulo *</label>
+        <input type="text" id="kbd-link-titulo" class="input-field" placeholder="Ex: Manual da Epson L3250">
       </div>
-      <div id="modal-bought-fields" class="modal-section hidden">
-        <div class="modal-section-title">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" stroke="currentColor" stroke-width="2"/></svg>
-          Dados da Compra
-        </div>
-        <div class="form-row-2">
-          <div class="form-group">
-            <label class="form-label">Data da Compra</label>
-            <input type="date" id="modal-buy-date" class="input-field" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Fornecedor</label>
-            <select id="modal-supplier-sel" class="input-field select-styled" onchange="App.onSupplierSelChange()">
-              <option value="">— Selecione —</option>
-            </select>
-            <input type="text" id="modal-supplier" class="input-field" placeholder="Ou digite o nome" style="margin-top:6px;display:none" />
-          </div>
-        </div>
-        <div class="form-row-2">
-          <div class="form-group">
-            <label class="form-label">Solicitante</label>
-            <input type="text" id="modal-requester" class="input-field" placeholder="Nome do solicitante" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Forma de Pagamento</label>
-            <select id="modal-forma-pagamento" class="input-field select-styled">
-              <option value="dinheiro">Dinheiro</option>
-              <option value="boleto">Boleto</option>
-              <option value="cartao">Cartão</option>
-            </select>
-          </div>
-        </div>
-        <select id="modal-subgroup" style="display:none"></select>
-        <div class="form-row-2">
-          <div class="form-group">
-            <label class="form-label">Quantidade</label>
-            <input type="number" id="modal-qty" class="input-field" placeholder="0" oninput="App.calcTotal()" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Valor Unitário (R$)</label>
-            <input type="number" id="modal-val" class="input-field" placeholder="0,00" oninput="App.calcTotal()" />
-          </div>
-        </div>
-        <div class="form-row-2">
-          <div class="form-group">
-            <label class="form-label">Valor Total</label>
-            <input type="text" id="modal-total" class="input-field total-field" readonly placeholder="Calculado automaticamente" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Descrição do Produto</label>
-            <input type="text" id="modal-desc" class="input-field" placeholder="Descrição" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Descrição Técnica</label>
-          <textarea id="modal-tech-desc" rows="2" class="input-field" placeholder="Especificações técnicas"></textarea>
-        </div>
-        <div class="form-group">
-          <label class="toggle-label">
-            <input type="checkbox" id="chk-parcelas" onchange="App.toggleParcelas()" />
-            <span class="toggle-switch"></span>
-            Compra Parcelada
-          </label>
-        </div>
-        <div id="parcelas-wrap" class="hidden parcelas-box">
-          <div class="form-row-2">
-            <div class="form-group">
-              <label class="form-label">Nº de Parcelas</label>
-              <input type="number" id="modal-parcelas-n" class="input-field" min="2" placeholder="Ex.: 3" onchange="App.calcTotal()" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Valor por Parcela (R$)</label>
-              <input type="text" id="modal-parcela-val" class="input-field total-field" readonly />
-            </div>
-          </div>
-        </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Descricao</label>
+        <textarea id="kbd-link-desc" class="input-field" rows="2" placeholder="Para que serve"></textarea>
       </div>
-      <!-- Painel Estoque — aparece só quando status = Estoque -->
-      <div id="modal-estoque-panel" class="modal-section hidden">
-        <div class="modal-section-title">
-          <svg viewBox="0 0 24 24" fill="none" style="width:16px"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>
-          Retirada do Estoque
-        </div>
-        <!-- Já processada: mostra só o que foi retirado + opção de cancelar (evita reduzir de novo) -->
-        <div id="modal-estoque-ja-retirado" class="hidden" style="background:var(--surf-2,#eef3fb);border:1px solid var(--surf-border,#c8d4e8);border-radius:var(--r-md,10px);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-          <div>
-            <div style="font-size:.78rem;color:#6680a0;font-weight:600">Já retirado do estoque</div>
-            <div id="modal-estoque-ja-retirado-info" style="font-size:.88rem;font-weight:700;color:#1a3a6b;margin-top:2px">—</div>
-          </div>
-          <button type="button" class="btn-ghost" onclick="App.cancelarRetiradaEstoque()" title="Devolve a quantidade ao estoque e permite escolher outro item">Cancelar retirada</button>
-        </div>
-        <div id="modal-estoque-selecao-wrap">
-          <div id="modal-estoque-lista" class="estoque-modal-lista">
-            <div class="estoque-modal-empty">Nenhum item em estoque para este grupo/subgrupo.</div>
-          </div>
-          <div class="form-group" style="margin-top:8px">
-            <label class="form-label">Item selecionado</label>
-            <select id="modal-estoque-sel" class="input-field select-styled" onchange="App.onEstoqueSelChange()">
-              <option value="">— Selecione o item —</option>
-            </select>
-          </div>
-          <div class="form-row-2" style="margin-top:8px">
-            <div class="form-group">
-              <label class="form-label">Disponível em estoque</label>
-              <input type="text" id="modal-estoque-disp" class="input-field" readonly style="background:var(--surface-2)">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Quantidade a retirar</label>
-              <input type="number" id="modal-estoque-qty" class="input-field" min="1" placeholder="1" oninput="App.validateRetiradaQty()">
-            </div>
-          </div>
-          <div id="estoque-retirada-warn" class="hidden" style="margin-top:6px;font-size:.78rem;font-weight:700;color:#d94040"></div>
-        </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">URL *</label>
+        <input type="text" id="kbd-link-url" class="input-field" placeholder="https://...">
       </div>
-
-      <div id="modal-shipping-fields" class="modal-section hidden">
-        <div class="modal-section-title">
-          <svg viewBox="0 0 24 24" fill="none"><rect x="1" y="3" width="15" height="13" stroke="currentColor" stroke-width="2"/><path d="M16 8h4l3 3v5h-7V8zM5.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" stroke="currentColor" stroke-width="2"/></svg>
-          Rastreabilidade de Envio
-        </div>
-        <div class="form-row-2">
-          <div class="form-group">
-            <label class="form-label">Status do Envio</label>
-            <select id="modal-shipped" class="input-field select-styled" onchange="App.toggleShipDate()">
-              <option value="Não">Não enviado</option>
-              <option value="Sim">Enviado</option>
-            </select>
-          </div>
-          <div class="form-group" id="ship-date-wrap">
-            <label class="form-label">Data do Envio</label>
-            <input type="date" id="modal-ship-date" class="input-field" />
-          </div>
-        </div>
-        <!-- Quantidade enviada vs. comprada (só Comprado) -->
-        <div id="modal-qty-enviada-wrap" class="form-row-2 hidden" style="margin-top:8px">
-          <div class="form-group">
-            <label class="form-label">Quantidade Enviada</label>
-            <input type="number" id="modal-qty-enviada" class="input-field" min="0" placeholder="0" oninput="App.calcRestoEstoque()" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Vai p/ Estoque</label>
-            <input type="text" id="modal-qty-resto" class="input-field" readonly style="background:var(--surface-2)" />
-          </div>
-        </div>
-        <!-- Combo: também enviar itens do estoque (só Comprado) -->
-        <div id="modal-combo-estoque-wrap" class="hidden" style="margin-top:10px">
-          <label class="toggle-label">
-            <input type="checkbox" id="chk-combo-estoque" onchange="App.toggleComboEstoque()" />
-            <span class="toggle-switch"></span>
-            Também enviar itens do estoque
-          </label>
-          <div id="combo-estoque-fields" class="hidden" style="margin-top:8px">
-            <div class="form-group">
-              <label class="form-label">Item do estoque</label>
-              <select id="modal-combo-estoque-sel" class="input-field select-styled" onchange="App.onComboEstoqueSelChange()">
-                <option value="">— Selecione —</option>
-              </select>
-            </div>
-            <div class="form-row-2" style="margin-top:8px">
-              <div class="form-group">
-                <label class="form-label">Disponível em estoque</label>
-                <input type="text" id="modal-combo-estoque-disp" class="input-field" readonly style="background:var(--surface-2)" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Qtd retirada do estoque</label>
-                <input type="number" id="modal-combo-estoque-qty" class="input-field" min="0" placeholder="0" oninput="App.validateComboQty()" />
-              </div>
-            </div>
-            <div id="combo-estoque-warn" class="hidden" style="margin-top:6px;font-size:.78rem;font-weight:700;color:#d94040"></div>
-          </div>
-        </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Tipo</label>
+        <select id="kbd-link-tipo" class="input-field select-styled">
+          <option value="Tutorial">Tutorial</option>
+          <option value="Download">Download</option>
+          <option value="Documentacao">Documentacao</option>
+          <option value="Video">Video</option>
+          <option value="Outro">Outro</option>
+        </select>
       </div>
     </div>
     <div class="modal-footer">
-      <div class="modal-footer-left">
-        <button class="btn-delete" id="modal-btn-delete" onclick="App.deleteRequest()">
-          <svg viewBox="0 0 24 24" fill="none" style="width:15px;vertical-align:middle;margin-right:5px"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke="currentColor" stroke-width="2"/></svg>
-          Apagar Solicitação
-        </button>
-      </div>
-      <div class="modal-footer-right">
-        <button class="btn-ghost" onclick="App.closeModal()">Cancelar</button>
-        <button class="btn-primary" onclick="App.saveModalRequest()">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2"/><polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" stroke-width="2"/><polyline points="7 3 7 8 15 8" stroke="currentColor" stroke-width="2"/></svg>
-          Salvar Alterações
-        </button>
-      </div>
+      <button class="btn-ghost" onclick="document.getElementById('kbd-link-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-primary" onclick="App.kbdSalvarLink()">Salvar link</button>
     </div>
   </div>
 </div>
 
-<!-- MODAL EDITAR SUBGRUPO / SUBOPT -->
-<div id="modal-edit-item" class="modal-overlay hidden">
-  <div class="modal-card small-modal">
+<!-- ===== #kbi-modal ===== -->
+<div id="kbi-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:760px">
     <div class="modal-header">
-      <h3 id="edit-modal-title">Editar</h3>
-      <button class="modal-close" onclick="App.closeEditModal()">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2"/></svg>
+      <h3 id="kbi-modal-title">Informação</h3>
+      <button class="modal-close" onclick="document.getElementById('kbi-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="max-height:74vh;overflow-y:auto">
+      <div class="form-group">
+        <label class="form-label" id="kbi-lbl-titulo">Título</label>
+        <input type="text" id="kbi-campo-titulo" class="input-field" placeholder="Ex: Especificações">
+      </div>
+      <div class="form-group" id="kbi-img-row" style="margin-top:12px">
+        <label class="form-label">Imagem</label>
+        <input type="text" id="kbi-link" class="input-field" placeholder="Link (Drive ou .jpg/.png)" oninput="App.kbiPreview()">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('kbi-file').click()">Enviar arquivo</button>
+          <span style="font-size:.76rem;color:var(--ink-500)">Comprime automaticamente antes de salvar.</span>
+        </div>
+        <input type="file" id="kbi-file" accept="image/*" style="display:none" onchange="App.kbiUpload(this,'info')">
+        <div id="kbi-preview" class="kbd-pv"></div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Texto</label>
+        <div id="kbi-editor-wrap"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="document.getElementById('kbi-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-primary" onclick="App.kbdSalvarInfo()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== #kbf-modal ===== -->
+<div id="kbf-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:520px">
+    <div class="modal-header">
+      <h3 id="kbf-modal-title">Nova ferramenta</h3>
+      <button class="modal-close" onclick="document.getElementById('kbf-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">Novo nome</label>
-        <input type="text" id="edit-item-value" class="input-field" />
+        <label class="form-label">Nome da ferramenta *</label>
+        <input type="text" id="kbf-nome" class="input-field" placeholder="Ex: Kit de chaves de precisão">
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Link (opcional)</label>
+        <input type="text" id="kbf-url" class="input-field" placeholder="https://... (botão Visualizar)">
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Foto da ferramenta</label>
+        <input type="text" id="kbf-link" class="input-field" placeholder="Link da imagem (Drive ou .jpg/.png)" oninput="App.kbfPreview()">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('kbf-file').click()">Enviar arquivo</button>
+        </div>
+        <input type="file" id="kbf-file" accept="image/*" style="display:none" onchange="App.kbiUpload(this,'ferr')">
+        <div id="kbf-preview" class="kbd-pv"></div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn-ghost" onclick="App.closeEditModal()">Cancelar</button>
-      <button class="btn-primary" onclick="App.confirmEditItem()">Salvar</button>
+      <button class="btn-ghost" onclick="document.getElementById('kbf-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-primary" onclick="App.kbdSalvarFerramenta()">Salvar</button>
     </div>
   </div>
+</div>
+
+<!-- ===== #kbg-modal ===== -->
+<div id="kbg-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:720px">
+    <div class="modal-header">
+      <h3 id="kbg-modal-title">Novo guia</h3>
+      <button class="modal-close" onclick="document.getElementById('kbg-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="max-height:74vh;overflow-y:auto">
+      <div class="form-row-2">
+        <div class="form-group">
+          <label class="form-label">Nome do guia *</label>
+          <input type="text" id="kbg-nome" class="input-field" placeholder="Ex: Trocar o cartucho">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tempo médio</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="kbg-tempo" class="input-field" placeholder="Ex: 10 - 15" style="flex:1;min-width:0">
+            <select id="kbg-tempo-un" class="input-field select-styled" style="max-width:120px">
+              <option value="minutos">minutos</option>
+              <option value="horas">horas</option>
+              <option value="dias">dias</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Foto do guia</label>
+        <input type="text" id="kbg-link" class="input-field" placeholder="Link (Drive ou .jpg/.png)" oninput="App.kbgPreview()">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button type="button" class="btn-secondary" onclick="document.getElementById('kbg-file').click()">Enviar arquivo</button>
+        </div>
+        <input type="file" id="kbg-file" accept="image/*" style="display:none" onchange="App.kbiUpload(this,'guia')">
+        <div id="kbg-preview" class="kbd-pv"></div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">Introdução</label>
+        <div id="kbg-editor-wrap"></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn-ghost" onclick="document.getElementById('kbg-modal').classList.add('hidden')">Cancelar</button>
+      <button class="btn-delete" id="kbg-btn-excluir" onclick="App.kbdExcluirGuiaAtual()" style="display:none">Excluir guia</button>
+      <button class="btn-primary" onclick="App.kbdSalvarGuia()">Salvar guia</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== #kbgm-modal ===== -->
+<div id="kbgm-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:620px">
+    <div class="modal-header">
+      <h3>Gerenciar guias</h3>
+      <button class="modal-close" onclick="document.getElementById('kbgm-modal').classList.add('hidden')">
+        <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="max-height:66vh;overflow-y:auto">
+      <p style="font-size:.8rem;color:var(--ink-500);margin-bottom:12px">
+        Cada guia é um caminho de solução do problema.
+      </p>
+      <div id="kbgm-lista"></div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn-ghost" onclick="document.getElementById('kbgm-modal').classList.add('hidden')">Fechar</button>
+      <button class="btn-primary" onclick="App.kbdNovoGuia(true)">+ Novo guia</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== #kbd-zoom ===== -->
+<div id="kbd-zoom" class="kbd-zoom hidden" onclick="App.kbdFecharZoom(event)">
+  <div class="kbd-zoom-bar">
+    <button class="kbd-zoom-btn" onclick="event.stopPropagation();App.kbdZoom(-0.25)" title="Diminuir">
+      <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <span class="kbd-zoom-pct" id="kbd-zoom-pct">100%</span>
+    <button class="kbd-zoom-btn" onclick="event.stopPropagation();App.kbdZoom(0.25)" title="Aumentar">
+      <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <button class="kbd-zoom-btn" onclick="event.stopPropagation();App.kbdZoomReset()" title="Tamanho original">
+      <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="kbd-zoom-btn" onclick="App.kbdFecharZoom()" title="Fechar">
+      <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <img id="kbd-zoom-img" src="" alt="">
 </div>
 
 <div id="toast" class="toast hidden"></div>

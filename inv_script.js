@@ -39,6 +39,45 @@ const parseArray = data => {
   return Object.values(data);
 };
 
+/* Normaliza os arrays de dentro de itSettings.
+   O Firebase NÃO guarda array esparso como array: apagar um item do meio
+   (splice) faz o nó voltar como objeto {0:…, 2:…}. Aí compPresets deixa de
+   ter .forEach/.map/.sort, o render do Estoque estoura no meio e os
+   Templates somem DA TELA — mesmo com os dados intactos no banco.
+   itInventory/itAccesses/itLogs já passavam por parseArray(); os arrays
+   dentro de itSettings não passavam. Isto é leitura: não reescreve nada
+   no Firebase, só devolve o formato certo pra memória. */
+function _normalizarModelSettings() {
+  if (!modelSettings || typeof modelSettings !== 'object') return;
+  // Listas de modelos + presets + licenças do estoque
+  ['printer','label','thermal','webcam','tv','mobile','ac','compPresets','stockLicenses']
+    .forEach(k => { if (modelSettings[k] !== undefined) modelSettings[k] = parseArray(modelSettings[k]); });
+
+  // Peças avulsas: modelSettings.parts.{model,cpu,mobo,ram,disk,gpu,monitor}
+  if (modelSettings.parts && typeof modelSettings.parts === 'object') {
+    Object.keys(modelSettings.parts).forEach(t => {
+      modelSettings.parts[t] = parseArray(modelSettings.parts[t]);
+    });
+  }
+
+  // Depósito do Estoque (itens sem unidade ainda): mesma corrida — .splice()
+  // em qualquer um desses (ex.: _consolidarTipo reaproveitando item avulso,
+  // desvincular periférico) esparsa o array no Firebase.
+  if (modelSettings.stockEquip && typeof modelSettings.stockEquip === 'object') {
+    Object.keys(modelSettings.stockEquip).forEach(k => {
+      modelSettings.stockEquip[k] = parseArray(modelSettings.stockEquip[k]);
+    });
+  }
+
+  // partIds.ram / partIds.disk são arrays dentro de cada Template
+  (modelSettings.compPresets || []).forEach(p => {
+    if (p && p.partIds) {
+      if (p.partIds.ram  !== undefined) p.partIds.ram  = parseArray(p.partIds.ram);
+      if (p.partIds.disk !== undefined) p.partIds.disk = parseArray(p.partIds.disk);
+    }
+  });
+}
+
 /* ══════════════════════════════════════════════
    LISTENERS DE SINCRONIZAÇÃO EM TEMPO REAL
    ══════════════════════════════════════════════ */
@@ -50,6 +89,12 @@ function iniciarConexaoFirebase() {
     updateDashboard();
     if (currentUnitId !== null) {
       renderComputers();
+    }
+    // Reconstrói Templates sumidos assim que o inventário chega (ver comentário
+    // da função). Guardado por modelSettings já carregado.
+    if (typeof recuperarTemplatesDosGuiches === 'function' && modelSettings && Object.keys(modelSettings).length
+        && recuperarTemplatesDosGuiches()) {
+      if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
     }
     // Puxa Acessos & Senhas já cadastrados nos computadores pros Modelos deles em Estoque
     if (typeof puxarAcessosCadastradosParaEstoque === 'function' && puxarAcessosCadastradosParaEstoque()) {
@@ -63,10 +108,16 @@ function iniciarConexaoFirebase() {
     if (typeof migrarStockCodeAcs === 'function' && migrarStockCodeAcs()) equipConsolidado = true;
     // Licenças já cadastradas nas unidades entram no depósito de licenças (Em Uso)
     if (typeof migrarLicencasParaEstoque === 'function' && modelSettings && Object.keys(modelSettings).length && migrarLicencasParaEstoque()) equipConsolidado = true;
-    // Modelos de AC já cadastrados sobem pros pré-definidos das Configurações
-    if (typeof migrarModelosAc === 'function' && migrarModelosAc()) {
-      if (typeof renderSettingsList === 'function') renderSettingsList();
-    }
+    // Guichê marcado como "genuíno" (comp.license) sem registro nenhum de
+    // licença — vira licença de verdade no depósito do Estoque.
+    if (typeof puxarLicencasGenuinasDosGuiches === 'function' && modelSettings && Object.keys(modelSettings).length && puxarLicencasGenuinasDosGuiches()) equipConsolidado = true;
+    // Modelos de AC/Impressora/Etiquetadora/Térmica/Webcam/TV já cadastrados
+    // sobem pros pré-definidos das Configurações (Modelos e Templates)
+    let modelosSubiram = false;
+    if (typeof migrarModelosAc === 'function' && migrarModelosAc()) modelosSubiram = true;
+    if (typeof migrarModelosPerifericos === 'function' && migrarModelosPerifericos()) modelosSubiram = true;
+    if (typeof migrarModelosMobile === 'function' && migrarModelosMobile()) modelosSubiram = true;
+    if (modelosSubiram && typeof renderSettingsList === 'function') renderSettingsList();
     // Repara licenças Em Uso órfãs (sem template nem unidade usando)
     if (typeof repararLicencasEstoque === 'function' && modelSettings && Object.keys(modelSettings).length && repararLicencasEstoque()) equipConsolidado = true;
     // Conserta buracos na numeração de códigos (sequência sempre contínua)
@@ -83,6 +134,16 @@ function iniciarConexaoFirebase() {
     if (typeof repararReferenciasQuebradas === 'function' && modelSettings && Object.keys(modelSettings).length && repararReferenciasQuebradas()) equipConsolidado = true;
     // Guichê com 2+ Modelos vinculados (exigia desvincular 2x) — solta os extras
     if (typeof repararTemplatesDuplicadosGuiche === 'function' && modelSettings && Object.keys(modelSettings).length && repararTemplatesDuplicadosGuiche()) equipConsolidado = true;
+    // DESATIVADO — limparTemplatesOrfaosDaRecuperacao() apagava Template de
+    // verdade. O critério (recuperado:true + solto + sem peça + sem licença)
+    // batia também em Template legítimo que veio de recuperação antiga, tinha
+    // sido desvinculado de propósito e ainda não tinha peça montada — e apagar
+    // dado automaticamente no boot, sem o usuário pedir, é errado de qualquer
+    // forma. A função continua no arquivo mas NÃO roda mais sozinha.
+    // Licença sobrando em guichê que ficou vazio (fantasma) — não apaga
+    // Template nem equipamento, só o registro de licença de um guichê
+    // comprovadamente vazio que ninguém reivindica.
+    if (typeof limparLicencasFantasmaDeGuicheVazio === 'function' && modelSettings && Object.keys(modelSettings).length && limparLicencasFantasmaDeGuicheVazio()) equipConsolidado = true;
     if (equipConsolidado) {
       saveToStorage();
       if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
@@ -93,10 +154,17 @@ function iniciarConexaoFirebase() {
   DB.listen('itSettings', data => {
     if (data) {
       modelSettings = data;
+      _normalizarModelSettings();   // Firebase devolve array esparso como objeto — ver função
       if (!modelSettings.mobile) modelSettings.mobile = [];
       if (!modelSettings.compPresets) modelSettings.compPresets = [];
     } else {
       modelSettings = JSON.parse(JSON.stringify(defaultModels));
+    }
+    // Reconstrói Templates que sumiram, a partir do hardware que ficou no guichê.
+    // Roda aqui e no listener de itInventory porque depende dos dois nós, e a
+    // ordem de chegada não é garantida — é idempotente, então rodar 2x não duplica.
+    if (typeof recuperarTemplatesDosGuiches === 'function' && recuperarTemplatesDosGuiches()) {
+      if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
     }
     // Migra Templates de PC já cadastrados (manuais ou gerados antes desta
     // mudança) pra terem também o Código do Produto de 10 dígitos.
@@ -124,6 +192,18 @@ function iniciarConexaoFirebase() {
   // Escuta a Base de Acessos Corporativos
   DB.listen('itAccesses', data => {
     globalAccessData = parseArray(data);
+    // Categoria usada por um acesso mas ainda sem cadastro entra automaticamente
+    if (typeof semearCategoriasAcesso === 'function') semearCategoriasAcesso();
+    renderAccesses();
+    if (typeof renderCategoriasAcesso === 'function') renderCategoriasAcesso();
+  });
+
+  // Escuta os Setores / Categorias de Acessos (nome + cor de cada pasta)
+  DB.listen('itCategoriasAcesso', data => {
+    categoriasAcesso = parseArray(data);
+    _catAcessoCarregado = true;   // a partir daqui, lista vazia = nada cadastrado mesmo
+    if (typeof semearCategoriasAcesso === 'function') semearCategoriasAcesso();
+    if (typeof renderCategoriasAcesso === 'function') renderCategoriasAcesso();
     renderAccesses();
   });
 
@@ -336,6 +416,22 @@ function updateDashboard() { renderDashboardCards(); }
 // SETTINGS
 // =============================================
 
+// Status do Template de PC (Bloco 1) — 3 botões no lugar do select;
+// inl-pc-status continua um input (agora hidden) com o mesmo valor de
+// sempre ('ativo'/'inativo'/'manutencao'), então savePcPresetModal() não
+// precisou mudar (ainda lê .value igual).
+function setPcPresetStatus(val) {
+    const inp = document.getElementById('inl-pc-status');
+    if (inp) inp.value = val;
+    _syncPcPresetStatusBtns();
+}
+function _syncPcPresetStatusBtns() {
+    const val = document.getElementById('inl-pc-status')?.value || 'ativo';
+    document.querySelectorAll('#pc-preset-status-btns .equip-status-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === val);
+    });
+}
+
 function openInlineForm(type, index = null) {
     const isEdit = index !== null;
 
@@ -410,6 +506,7 @@ function openInlineForm(type, index = null) {
             const unitObj = inventoryData.find(u => u.id === t.unitId);
             const compObj = unitObj && (unitObj.computers || []).find(c => c.id === t.compId);
             document.getElementById('inl-pc-status').value = (compObj && compObj.status) || 'ativo';
+            _syncPcPresetStatusBtns();
         }
 
         document.getElementById('pc-preset-modal').classList.remove('hidden');
@@ -532,12 +629,12 @@ function savePcPresetModal() {
                 }
                 ocupante.unitId = ''; ocupante.compId = ''; ocupante.unitName = ''; ocupante.compName = '';
                 _removerLicencaDaUnidade(ocupante, newUnitObj); // licença do ocupante sai junto
-                if (typeof registrarLog === 'function') registrarLog(ocupante.serial || ocupante.name, 'pc', 'Desvinculado (troca de guichê)', `Saiu de ${newCompObj?.name || ''} (${newUnitObj?.name || ''}) — substituído por ${saved.serial || saved.name}`);
+                if (typeof registrarLog === 'function') registrarLog(ocupante.serial || ocupante.name, 'pc', 'Desvinculado (troca de guichê)', `Saiu de ${newCompObj?.name || ''} (${newUnitObj?.name || ''}) — substituído por ${saved.serial || saved.name}`, newUnitObj?.id);
             }
             const origem = `${old.compName} (${old.unitName})`;
             const destino = `${newCompObj?.name || ''} (${newUnitObj?.name || ''})`;
             _moverPresetParaGuiche(saved, old.unitId, old.compId, newUnitId, newCompId);
-            if (typeof registrarLog === 'function') registrarLog(saved.serial || saved.name, 'pc', 'Movido de guichê', `${origem} → ${destino}`);
+            if (typeof registrarLog === 'function') registrarLog(saved.serial || saved.name, 'pc', 'Movido de guichê', `${origem} → ${destino}`, newUnitObj?.id);
             alert(`${saved.serial || saved.name} movido:\n\nSaindo de: ${origem}\nIndo para: ${destino}`);
         }
         // Status vive no computador de verdade (comp.status) — grava direto nele.
@@ -642,12 +739,16 @@ function deleteMobileModel(index) {
     }
 }
 
+// Apagar um Template NÃO apaga peça nenhuma — significa "desmontei esse PC
+// fisicamente": as peças (Modelo, CPU, Placa Mãe, RAM, Disco, Vídeo, Monitor)
+// voltam sozinhas pro Estoque → Lista como Disponível, prontas pra montar um
+// Template novo. Só o "molde" (o Template em si, o vínculo entre elas) some.
 function deleteCompPreset(index) {
     const p = modelSettings.compPresets[index];
     const linked = p && p.unitId && p.compId;
     const msg = linked
-        ? `Excluir o Modelo "${p.name}"?\n\nEle está em uso no guichê "${p.compName}" (${p.unitName}) — o guichê continua existindo, só fica sem Hardware.\n\nEssa ação não pode ser desfeita.`
-        : 'Excluir definitivamente este Template de PC da lista?';
+        ? `Desmontar o Template "${p.name}"?\n\nIsso representa desmontar o PC fisicamente. Ele está no guichê "${p.compName}" (${p.unitName}) — o guichê continua existindo, só fica sem Hardware.\n\nAs peças (Modelo, CPU, Placa Mãe, RAM, Disco, Vídeo, Monitor) voltam pro Estoque → Lista como Disponível, prontas pra montar um Template novo.`
+        : `Desmontar o Template "${p.name || p.serial}"?\n\nAs peças voltam pro Estoque → Lista como Disponível, prontas pra montar um Template novo.`;
     if (!confirm(msg)) return;
 
     // Apagar o Modelo no Estoque NÃO apaga o guichê — só limpa o Hardware/
@@ -665,7 +766,7 @@ function deleteCompPreset(index) {
         }
     }
     if (typeof registrarLog === 'function' && p) {
-        registrarLog(p.serial || p.name, 'pc', 'Modelo excluído do Estoque', linked ? `Estava no guichê ${p.compName} (${p.unitName})` : 'Estava disponível');
+        registrarLog(p.serial || p.name, 'pc', 'Template desmontado — peças voltaram pro Estoque', linked ? `Estava no guichê ${p.compName} (${p.unitName})` : 'Estava disponível');
     }
 
     // Libera as peças e a licença que este Template usava — voltam pra
@@ -934,7 +1035,7 @@ function saveComputer() {
     renderComputers();
     renderUnits();
 
-    if (typeof registrarLog === 'function') registrarLog('', 'guiche', id ? 'Guichê editado' : 'Guichê criado', `${d.name} (${u.name}) · status ${d.status}`);
+    if (typeof registrarLog === 'function') registrarLog('', 'guiche', id ? 'Guichê editado' : 'Guichê criado', `${d.name} (${u.name}) · status ${d.status}`, u.id);
 
     // Vincula/desvincula o Hardware e os Periféricos escolhidos no seletor do
     // Estoque a este Guichê — é isso que "mapeia automaticamente lá no estoque".
@@ -1008,7 +1109,7 @@ function abrirSeletorHardware() {
     if (!itens.length) {
         list.innerHTML = _hwPickerMode === 'uso'
             ? '<div class="estoque-empty">Nenhum Hardware em uso em outros guichês.</div>'
-            : '<div class="estoque-empty">Nenhum Hardware disponível em estoque. Cadastre um em Estoque → Adicionar Equipamento.</div>';
+            : '<div class="estoque-empty">Nenhum Hardware disponível em estoque. Cadastre um em Estoque → Adicionar Novo Template.</div>';
     } else {
         list.innerHTML = itens.map(({ p, idx }) => {
             const specs = [p.hw_model, p.hw_cpu, p.hw_ram].filter(Boolean).join(' · ') || 'Sem dados de hardware';
@@ -1034,7 +1135,15 @@ function _escolherHardware(idx) {
     // Transferência: hardware já em uso em outro guichê exige confirmação
     if (p.unitId && p.compId) {
         const compIdAtual = document.getElementById('comp-id')?.value;
-        if (p.compId !== compIdAtual && !confirm(`"${p.serial || p.name}" já está em uso em ${p.unitName} · ${p.compName}.\n\nTransferir pra este Guichê? (o guichê antigo fica sem hardware)`)) return;
+        // O aviso precisa dizer TUDO que _limparGuicheCompleto() faz no guichê de
+        // origem — antes falava só "fica sem hardware", mas ele também solta os
+        // periféricos de volta pro estoque e zera acessos e autorizações.
+        if (p.compId !== compIdAtual && !confirm(
+            `"${p.serial || p.name}" já está em uso em ${p.unitName} · ${p.compName}.\n\n` +
+            `Transferir pra este Guichê?\n\nO guichê de origem (${p.compName}) será ESVAZIADO:\n` +
+            `• hardware e acessos/senhas apagados\n` +
+            `• periféricos desvinculados (voltam pro estoque)\n` +
+            `• autorizações do guichê zeradas`)) return;
     }
     const r = (i, v = '') => { const e = document.getElementById(i); if (e) e.value = v; };
     r('hw-preset-idx', String(idx));
@@ -1188,6 +1297,16 @@ function _vincularHardwareDoGuiche(u, d) {
         const old = modelSettings.compPresets[previousHwIdx];
         old.unitId = ''; old.compId = ''; old.unitName = ''; old.compName = '';
         _removerLicencaDaUnidade(old, u); // licença acompanha o Modelo
+        // O Template saiu, mas o guichê ficava com o hardware/acessos que
+        // vieram do formulário (saveComputer grava os campos do form antes de
+        // chegar aqui). Resultado: guichê "Sem modelo" mostrando Modelo/CPU/
+        // RAM preenchidos e botão Adicionar Modelo ao mesmo tempo — exatamente
+        // o card bugado. Se NENHUM Template novo vai entrar no lugar, o guichê
+        // precisa ficar vazio de verdade.
+        if (hwIdx === -1) {
+            const compReal = (u.computers || []).find(c => c.id === d.id) || d;
+            _limparGuicheCompleto(u, compReal);
+        }
     }
     if (hwIdx > -1 && modelSettings.compPresets[hwIdx]) {
         const novo = modelSettings.compPresets[hwIdx];
@@ -1219,7 +1338,7 @@ function _vincularHardwareDoGuiche(u, d) {
         const comp = (u.computers || []).find(c => c.id === d.id);
         if (comp) comp.license = novo.lic_status || 'pirata';
         _criarLicencaDoTemplate(novo, u, d);
-        if (typeof registrarLog === 'function') registrarLog(novo.serial || novo.name, 'pc', 'Hardware vinculado ao guichê', `${d.name} (${u.name})`);
+        if (typeof registrarLog === 'function') registrarLog(novo.serial || novo.name, 'pc', 'Hardware vinculado ao guichê', `${d.name} (${u.name})`, u.id);
         if (typeof _recalcularStatusTemplate === 'function') _recalcularStatusTemplate(novo);
     }
     saveSettings();
@@ -1443,7 +1562,7 @@ function _vincularPerifericosDoGuiche(u, d) {
                 prevLoc.arr.splice(prevLoc.idx, 1);
                 _stockStore()[arrKey].push(previous);
             }
-            if (typeof registrarLog === 'function') registrarLog(previous.serial, type, `${TIPO_LABEL[type]} desvinculado(a)`, `Saiu de ${d.name} (${u.name}) — voltou pro estoque`);
+            if (typeof registrarLog === 'function') registrarLog(previous.serial, type, `${TIPO_LABEL[type]} desvinculado(a)`, `Saiu de ${d.name} (${u.name}) — voltou pro estoque`, u.id);
             changed = true;
         }
         if (pickedId) {
@@ -1463,7 +1582,7 @@ function _vincularPerifericosDoGuiche(u, d) {
                 found.reg.connType = document.getElementById(`per-${type}-type`)?.value || 'usb';
                 found.reg.ip = document.getElementById(`ip-${type}`)?.value || '';
                 delete found.reg.manual;
-                if (typeof registrarLog === 'function') registrarLog(found.reg.serial, type, `${TIPO_LABEL[type]} vinculado(a)`, `${d.name} (${u.name}) · ${found.reg.connType}${found.reg.ip ? ' · ' + found.reg.ip : ''}`);
+                if (typeof registrarLog === 'function') registrarLog(found.reg.serial, type, `${TIPO_LABEL[type]} vinculado(a)`, `${d.name} (${u.name}) · ${found.reg.connType}${found.reg.ip ? ' · ' + found.reg.ip : ''}`, u.id);
                 changed = true;
             }
         }
@@ -1487,7 +1606,7 @@ function abrirSeletorModeloParaGuiche(unitId, compId) {
     document.getElementById('periph-picker-title').innerHTML = `<i class="ph ph-desktop-tower"></i> Adicionar Modelo — disponíveis no estoque`;
     const list = document.getElementById('periph-picker-list');
     if (!disponiveis.length) {
-        list.innerHTML = '<div class="estoque-empty">Nenhum Modelo disponível em estoque. Monte um em Estoque → Gráfico → Adicionar Equipamento.</div>';
+        list.innerHTML = '<div class="estoque-empty">Nenhum Modelo disponível em estoque. Monte um em Estoque → Templates → Adicionar Novo Template.</div>';
     } else {
         list.innerHTML = disponiveis.map(({ p, idx }) => {
             const specs = [p.hw_model, p.hw_cpu, p.hw_ram].filter(Boolean).join(' · ') || 'Sem dados de hardware';
@@ -1516,7 +1635,7 @@ function _anexarModeloAoGuiche(idx) {
     comp.license = p.lic_status || 'pirata';
     if (typeof _syncPresetToComputer === 'function') _syncPresetToComputer(p);
     _criarLicencaDoTemplate(p, unit, comp);
-    if (typeof registrarLog === 'function') registrarLog(p.serial || p.name, 'pc', 'Hardware vinculado ao guichê', `${comp.name} (${unit.name}) — pelo card do Estoque`);
+    if (typeof registrarLog === 'function') registrarLog(p.serial || p.name, 'pc', 'Hardware vinculado ao guichê', `${comp.name} (${unit.name}) — pelo card do Estoque`, unit.id);
     if (typeof _recalcularStatusTemplate === 'function') _recalcularStatusTemplate(p);
     saveSettings(); saveToStorage();
     if (typeof updateCompPresetSelect === 'function') updateCompPresetSelect();
@@ -1527,11 +1646,19 @@ function _anexarModeloAoGuiche(idx) {
     _modeloParaGuiche = null;
 }
 
+// Janela curta pós-desvincular/transferência — ver comentário em
+// recuperarTemplatesDosGuiches(). 8s cobre folgado o vai-e-volta dos 2 nós
+// (itSettings/itInventory) numa conexão normal.
+const _guichesLimposEm = {}; // compId -> timestamp
+function _marcarGuicheRecemLimpo(compId) { if (compId) _guichesLimposEm[compId] = Date.now(); }
+function _guicheRecemLimpo(compId) { return !!_guichesLimposEm[compId] && (Date.now() - _guichesLimposEm[compId] < 8000); }
+
 // Zera TUDO que estava atribuído a um guichê que perdeu o equipamento
 // (mesma limpeza do Desvincular): periféricos voltam pro depósito como
 // Disponíveis, e campos de hardware/acessos/autorizações são limpos.
 function _limparGuicheCompleto(unit, comp) {
     if (!unit || !comp) return;
+    _marcarGuicheRecemLimpo(comp.id);
     PERIF_TYPES.forEach(type => {
         const arrKey = PERIF_ARRAY_KEY[type];
         const reg = _acharPerifericoVinculado(arrKey, comp.id);
@@ -1540,7 +1667,7 @@ function _limparGuicheCompleto(unit, comp) {
         reg.status = 'disponivel'; reg.connType = ''; reg.ip = ''; reg.unitName = '';
         const loc = _acharRegistroGlobal(arrKey, reg.id);
         if (loc && loc.unit) { loc.arr.splice(loc.idx, 1); _stockStore()[arrKey].push(reg); }
-        if (typeof registrarLog === 'function') registrarLog(reg.serial, type, `${TIPO_LABEL[type]} desvinculado(a)`, `Guichê ${comp.name} (${unit.name}) foi esvaziado`);
+        if (typeof registrarLog === 'function') registrarLog(reg.serial, type, `${TIPO_LABEL[type]} desvinculado(a)`, `Guichê ${comp.name} (${unit.name}) foi esvaziado`, unit.id);
     });
     ['hw_model', 'hw_cpu', 'hw_mobo', 'hw_ram', 'hw_disk', 'hw_gpu', 'hw_monitor', 'os', 'os_arch',
      'access_pc_pass', 'access_any_id', 'access_any_pass', 'access_rdp_user', 'access_rdp_pass',
@@ -1585,7 +1712,7 @@ function deleteGuicheDoModal() {
         if (typeof registrarLog === 'function') registrarLog(reg.serial, type, `${TIPO_LABEL[type]} apagado(a) junto com o guichê`, `${comp.name} (${u.name})`);
     });
 
-    if (typeof registrarLog === 'function') registrarLog('', 'guiche', 'Guichê APAGADO (com os dados dentro)', `${comp.name} (${u.name})`);
+    if (typeof registrarLog === 'function') registrarLog('', 'guiche', 'Guichê APAGADO (com os dados dentro)', `${comp.name} (${u.name})`, u.id);
     u.computers = u.computers.filter(c => c.id !== id);
 
     if (typeof reindexarCodigos === 'function') reindexarCodigos();
@@ -1664,7 +1791,7 @@ function deleteComputer(id) {
     });
     if (typeof registrarLog === 'function') {
         const comp = u.computers.find(c => c.id === id);
-        registrarLog('', 'guiche', 'Guichê removido', `${comp ? comp.name : id} (${u.name}) — equipamentos desvinculados de volta pro estoque`);
+        registrarLog('', 'guiche', 'Guichê removido', `${comp ? comp.name : id} (${u.name}) — equipamentos desvinculados de volta pro estoque`, u.id);
     }
 
     u.computers = u.computers.filter(c => c.id !== id);
@@ -2234,6 +2361,59 @@ function migrarModelosAc() {
     return changed || mudouAc;
 }
 
+// Backfill: mesma ideia do migrarModelosAc(), só que pros 5 tipos de
+// periférico (Impressora/Etiquetadora/Térmica/Webcam/TV) — sobe o Modelo já
+// cadastrado em cada guichê (unit[arrKey]) e no depósito (_stockStore())
+// pra lista de Modelos pré-definidos das Configurações, um por tipo.
+function migrarModelosPerifericos() {
+    if (!modelSettings || !Object.keys(modelSettings).length) return false;
+    let changed = false;
+    let mudouEstoque = false;
+    PERIF_TYPES.forEach(type => {
+        const arrKey = PERIF_ARRAY_KEY[type];
+        if (!modelSettings[type]) modelSettings[type] = [];
+        // Carimbo modeloMigrado: cada item sobe o modelo dele UMA vez só — sem
+        // isso, apagar o modelo nas Configurações ressuscitava a cada load
+        // enquanto existisse equipamento daquele modelo (mesmo bug do AC).
+        const adiciona = (r) => {
+            if (r.modeloMigrado) return;
+            const nome = (r.model || '').trim();
+            if (nome && !modelSettings[type].includes(nome)) { modelSettings[type].push(nome); changed = true; }
+            r.modeloMigrado = true;
+            mudouEstoque = true;
+        };
+        inventoryData.forEach(u => (u[arrKey] || []).forEach(adiciona));
+        (_stockStore()[arrKey] || []).forEach(adiciona);
+    });
+    if (changed) saveSettings();
+    if (mudouEstoque) saveToStorage();
+    return changed || mudouEstoque;
+}
+
+// Backfill do Celular: modelSettings.mobile é lista de {name,rom,ram,cpu} —
+// não string simples como os outros tipos — mas a ideia é a mesma.
+function migrarModelosMobile() {
+    if (!modelSettings || !Object.keys(modelSettings).length) return false;
+    if (!modelSettings.mobile) modelSettings.mobile = [];
+    let changed = false;
+    let mudouEstoque = false;
+    const adiciona = (r) => {
+        if (r.modeloMigrado) return;
+        const nome = (r.model || '').trim();
+        if (nome && !modelSettings.mobile.some(t => t.name === nome)) {
+            modelSettings.mobile.push({ name: nome, rom: r.rom || '', ram: r.ram || '', cpu: r.cpu || '' });
+            changed = true;
+        }
+        r.modeloMigrado = true;
+        mudouEstoque = true;
+    };
+    inventoryData.forEach(u => (u.mobiles || []).forEach(adiciona));
+    (_stockStore().mobiles || []).forEach(adiciona);
+    if (changed) saveSettings();
+    if (mudouEstoque) saveToStorage();
+    return changed || mudouEstoque;
+}
+
 // Preenche o AC a partir de um modelo pré-definido (Configurações) —
 // nomes salvos como "Marca Modelo": a 1ª palavra vira a Marca, o resto o Modelo.
 function fillAcFromPreset() {
@@ -2294,7 +2474,7 @@ function saveAc() {
             found.arr.splice(found.idx, 1);
             if (!u.acs) u.acs = [];
             u.acs.push(existing);
-            if (typeof registrarLog === 'function') registrarLog(existing.stockCode, 'ac', 'Ar-Condicionado atribuído', `${u.name} · ${existing.location || '—'}`);
+            if (typeof registrarLog === 'function') registrarLog(existing.stockCode, 'ac', 'Ar-Condicionado atribuído', `${u.name} · ${existing.location || '—'}`, u.id);
         }
         saveToStorage(); saveSettings(); closeModals(); renderAcs(); renderUnits();
         if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
@@ -2342,7 +2522,7 @@ function saveAc() {
         const iDx = found.arr.indexOf(d);
         if (iDx > -1) found.arr.splice(iDx, 1);
         _stockStore().acs.push(d);
-        if (typeof registrarLog === 'function') registrarLog(d.stockCode, 'ac', 'Ar-Condicionado desvinculado (status Disponível)', `Saiu de ${found.unit.name} — voltou pro estoque`);
+        if (typeof registrarLog === 'function') registrarLog(d.stockCode, 'ac', 'Ar-Condicionado desvinculado (status Disponível)', `Saiu de ${found.unit.name} — voltou pro estoque`, found.unit.id);
     }
     if (typeof registrarLog === 'function') {
         if (statusAntigoAc && statusAntigoAc !== novoStatusAc) {
@@ -2383,7 +2563,7 @@ function desvincularAc(id) {
     if (found.unit) {
         found.arr.splice(found.idx, 1);
         _stockStore().acs.push(reg);
-        if (typeof registrarLog === 'function') registrarLog(reg.stockCode, 'ac', 'Ar-Condicionado desvinculado', `Saiu de ${found.unit.name} — voltou pro estoque`);
+        if (typeof registrarLog === 'function') registrarLog(reg.stockCode, 'ac', 'Ar-Condicionado desvinculado', `Saiu de ${found.unit.name} — voltou pro estoque`, found.unit.id);
     }
     saveToStorage(); saveSettings(); renderAcs(); renderUnits();
     if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
@@ -2555,7 +2735,8 @@ function renderUnits() {
         if (licCount > 0) subInfo += `<div class="unit-sub-info unit-sub-lic"><i class="ph ph-certificate"></i> ${licCount} licença(s)</div>`;
         if (inativoCount > 0) subInfo += `<div class="unit-sub-info unit-sub-alert"><i class="ph ph-warning"></i> ${inativoCount} fora de operação</div>`;
         card.innerHTML = `
-            <div style="position:absolute;top:10px;right:10px;display:flex;gap:5px;z-index:2;">
+            <div class="unit-card-acts">
+                <button class="btn-icon" onclick="abrirLogsUnidade('${unit.id}')" title="Histórico desta unidade"><i class="ph ph-clock-counter-clockwise"></i></button>
                 <button class="btn-icon" onclick="editUnit('${unit.id}')"><i class="ph ph-pencil-simple"></i></button>
                 <button class="btn-icon btn-delete" onclick="deleteUnit('${unit.id}')"><i class="ph ph-trash"></i></button>
             </div>
@@ -2759,7 +2940,7 @@ function saveMobile() {
             const iDx = found.arr.indexOf(d);
             if (iDx > -1) found.arr.splice(iDx, 1);
             _stockStore().mobiles.push(d);
-            if (typeof registrarLog === 'function') registrarLog(d.serial, 'mobile', 'Celular desvinculado (status Disponível)', `Saiu de ${found.unit.name} — voltou pro estoque`);
+            if (typeof registrarLog === 'function') registrarLog(d.serial, 'mobile', 'Celular desvinculado (status Disponível)', `Saiu de ${found.unit.name} — voltou pro estoque`, found.unit.id);
         }
         if (typeof registrarLog === 'function') {
             if (statusAntigoMob && statusAntigoMob !== novoStatusMob) {
@@ -2783,7 +2964,7 @@ function saveMobile() {
             found.arr.splice(found.idx, 1);
             if (!u.mobiles) u.mobiles = [];
             u.mobiles.push(existing);
-            if (typeof registrarLog === 'function') registrarLog(existing.serial, 'mobile', 'Celular atribuído', `${u.name} · usuário ${existing.user || '—'}`);
+            if (typeof registrarLog === 'function') registrarLog(existing.serial, 'mobile', 'Celular atribuído', `${u.name} · usuário ${existing.user || '—'}`, u.id);
         }
     }
     saveToStorage(); saveSettings(); closeModals(); renderComputers(); renderUnits();
@@ -2816,7 +2997,7 @@ function desvincularMobile(id) {
     if (found.unit) {
         found.arr.splice(found.idx, 1);
         _stockStore().mobiles.push(reg);
-        if (typeof registrarLog === 'function') registrarLog(reg.serial, 'mobile', 'Celular desvinculado', `Saiu de ${found.unit.name} — voltou pro estoque`);
+        if (typeof registrarLog === 'function') registrarLog(reg.serial, 'mobile', 'Celular desvinculado', `Saiu de ${found.unit.name} — voltou pro estoque`, found.unit.id);
     }
     saveToStorage(); saveSettings(); renderComputers();
     if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
@@ -3477,16 +3658,216 @@ function filterUnitItems() {
 globalAccessData = [];
 accessToggleStates = {};
 
+/* ══════════════════════════════════════════════════════════════
+   SETORES / CATEGORIAS DE ACESSOS
+   As pastas da Gestão de Acessos eram uma lista fixa no código, sem
+   como criar, renomear, excluir ou trocar cor. Agora vivem em
+   itCategoriasAcesso ({id, nome, cor}) e o render dos Acessos lê daqui.
+   ══════════════════════════════════════════════════════════════ */
+let categoriasAcesso = [];
+// Vira true quando o nó itCategoriasAcesso responde — antes disso, lista vazia
+// significa "ainda não carregou", não "não existe nada cadastrado".
+let _catAcessoCarregado = false;
+
+// Cores prontas oferecidas no modal (a paleta livre fica no input color)
+const CORES_CATEGORIA_ACESSO = [
+    '#0b1a33', '#0369a1', '#0e7490', '#0f766e', '#15803d',
+    '#a16207', '#b45309', '#b91c1c', '#9333ea', '#be185d', '#334155'
+];
+
+// Pastas que já existiam fixas no código — viram o cadastro inicial
+const CATEGORIAS_ACESSO_PADRAO = [
+    { nome: 'Administrativo',             cor: '#0b1a33' },
+    { nome: 'Biomedicos',                 cor: '#0369a1' },
+    { nome: 'Diretoria',                  cor: '#0f766e' },
+    { nome: 'Lamic viva+',                cor: '#15803d' },
+    { nome: 'Triagem coletas e vacinas',  cor: '#a16207' },
+    { nome: 'Unidade externas',           cor: '#b45309' },
+    { nome: 'Links',                      cor: '#9333ea' },
+    { nome: 'Atendimento UNILAB',         cor: '#be185d' },
+    { nome: 'Outros',                     cor: '#334155' }
+];
+
+function _novoIdCatAcesso() {
+    return 'ca_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+// Semeia o cadastro: as pastas padrão + qualquer categoria que já apareça
+// nos acessos cadastrados (assim nada que existe hoje fica de fora).
+// Idempotente — só adiciona o que falta.
+function semearCategoriasAcesso() {
+    // TRAVA: só semeia depois que itCategoriasAcesso realmente respondeu.
+    // Sem isto, o listener de itAccesses (registrado antes) rodava primeiro com
+    // categoriasAcesso ainda vazio, concluía "não tem nada cadastrado", gravava
+    // os padrões por cima — e as cores editadas eram perdidas a cada carga.
+    if (!_catAcessoCarregado) return false;
+
+    let changed = false;
+    const temNome = n => categoriasAcesso.some(c => (c.nome || '').toLowerCase() === (n || '').toLowerCase());
+
+    if (!categoriasAcesso.length) {
+        categoriasAcesso = CATEGORIAS_ACESSO_PADRAO.map(c => ({ id: _novoIdCatAcesso(), nome: c.nome, cor: c.cor }));
+        changed = true;
+    }
+    // Categoria usada por algum acesso mas sem cadastro: entra com cor neutra
+    (globalAccessData || []).forEach(acc => {
+        const nome = acc.categoria;
+        if (!nome || temNome(nome)) return;
+        categoriasAcesso.push({ id: _novoIdCatAcesso(), nome, cor: '#334155' });
+        changed = true;
+    });
+    if (changed) DB.set('itCategoriasAcesso', categoriasAcesso);
+    return changed;
+}
+
+function _corDaCategoriaAcesso(nome) {
+    const c = categoriasAcesso.find(x => (x.nome || '').toLowerCase() === (nome || '').toLowerCase());
+    return (c && c.cor) || '#334155';
+}
+
+// Clareia um hex — usado pra montar o degradê do cabeçalho a partir de 1 cor só
+function _clarearCor(hex, pct) {
+    const h = (hex || '').replace('#', '');
+    if (h.length !== 6) return hex;
+    const sobe = v => Math.min(255, Math.round(v + (255 - v) * (pct / 100)));
+    const r = sobe(parseInt(h.slice(0, 2), 16));
+    const g = sobe(parseInt(h.slice(2, 4), 16));
+    const b = sobe(parseInt(h.slice(4, 6), 16));
+    return `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+// Lista no card de Configurações
+function renderCategoriasAcesso() {
+    const ul = document.getElementById('list-categorias-acesso');
+    if (!ul) return;
+    if (!categoriasAcesso.length) {
+        ul.innerHTML = '<li class="ecl-empty">Nenhum setor cadastrado ainda.</li>';
+        return;
+    }
+    ul.innerHTML = categoriasAcesso.map(c => {
+        const usados = (globalAccessData || []).filter(a => (a.categoria || '') === c.nome).length;
+        return `
+        <li class="cat-acesso-item">
+            <span class="cat-acesso-cor-dot" style="background:${c.cor || '#334155'}"></span>
+            <span class="cat-acesso-nome">${c.nome}</span>
+            <span class="cat-acesso-count">${usados} acesso${usados !== 1 ? 's' : ''}</span>
+            <span class="cat-acesso-acts">
+                <button class="btn-icon" onclick="abrirCategoriaAcesso('${c.id}')" title="Editar setor"><i class="ph ph-pencil-simple"></i></button>
+                <button class="btn-icon btn-delete" onclick="excluirCategoriaAcesso('${c.id}')" title="Excluir setor"><i class="ph ph-trash"></i></button>
+            </span>
+        </li>`;
+    }).join('');
+}
+
+function abrirCategoriaAcesso(id) {
+    const c = id ? categoriasAcesso.find(x => x.id === id) : null;
+    document.getElementById('cat-acesso-title').textContent = c ? 'Editar Setor / Categoria' : 'Novo Setor / Categoria';
+    document.getElementById('cat-acesso-id').value = c ? c.id : '';
+    document.getElementById('cat-acesso-nome').value = c ? c.nome : '';
+    const cor = c ? (c.cor || '#334155') : CORES_CATEGORIA_ACESSO[0];
+    document.getElementById('cat-acesso-cor').value = cor;
+    _renderSwatchesCatAcesso(cor);
+    document.getElementById('cat-acesso-modal').classList.remove('hidden');
+}
+
+function fecharCategoriaAcesso() {
+    document.getElementById('cat-acesso-modal').classList.add('hidden');
+}
+
+// Cores prontas; clicar numa delas joga o valor no input color
+function _renderSwatchesCatAcesso(corAtual) {
+    const box = document.getElementById('cat-acesso-swatches');
+    if (!box) return;
+    box.innerHTML = CORES_CATEGORIA_ACESSO.map(cor => `
+        <button type="button" class="cat-swatch${cor.toLowerCase() === (corAtual || '').toLowerCase() ? ' active' : ''}"
+                style="background:${cor}" title="${cor}"
+                onclick="_escolherCorCatAcesso('${cor}')"></button>`).join('');
+}
+
+function _escolherCorCatAcesso(cor) {
+    document.getElementById('cat-acesso-cor').value = cor;
+    _renderSwatchesCatAcesso(cor);
+}
+
+function salvarCategoriaAcesso() {
+    const id   = document.getElementById('cat-acesso-id').value;
+    const nome = document.getElementById('cat-acesso-nome').value.trim();
+    const cor  = document.getElementById('cat-acesso-cor').value || '#334155';
+    if (!nome) return alert('Informe o nome do setor / categoria.');
+
+    // Nome repetido (ignorando o próprio registro em edição)
+    const repetido = categoriasAcesso.some(c => c.id !== id && (c.nome || '').toLowerCase() === nome.toLowerCase());
+    if (repetido) return alert(`Já existe um setor chamado "${nome}".`);
+
+    if (id) {
+        const c = categoriasAcesso.find(x => x.id === id);
+        if (!c) return;
+        const nomeAntigo = c.nome;
+        c.nome = nome; c.cor = cor;
+        // Renomear precisa levar junto os acessos: cada acesso guarda o NOME da
+        // categoria (acc.categoria), não o id — sem isto eles ficariam órfãos e
+        // cairiam em "Outros".
+        if (nomeAntigo !== nome) {
+            let mexeu = 0;
+            (globalAccessData || []).forEach(a => { if (a.categoria === nomeAntigo) { a.categoria = nome; mexeu++; } });
+            if (mexeu) DB.set('itAccesses', globalAccessData);
+            // Preserva o estado aberto/fechado da pasta renomeada
+            if (accessToggleStates[nomeAntigo] !== undefined) {
+                accessToggleStates[nome] = accessToggleStates[nomeAntigo];
+                delete accessToggleStates[nomeAntigo];
+            }
+        }
+    } else {
+        categoriasAcesso.push({ id: _novoIdCatAcesso(), nome, cor });
+        accessToggleStates[nome] = true;   // nasce fechada, como as demais
+    }
+
+    DB.set('itCategoriasAcesso', categoriasAcesso);
+    fecharCategoriaAcesso();
+    renderCategoriasAcesso();
+    renderAccesses();
+}
+
+function excluirCategoriaAcesso(id) {
+    const c = categoriasAcesso.find(x => x.id === id);
+    if (!c) return;
+    const usados = (globalAccessData || []).filter(a => (a.categoria || '') === c.nome).length;
+    if ((c.nome || '').toLowerCase() === 'outros') {
+        return alert('"Outros" não pode ser excluído — é onde os acessos sem setor ficam guardados.');
+    }
+    const msg = usados
+        ? `Excluir o setor "${c.nome}"?\n\n${usados} acesso(s) estão nele e serão movidos para "Outros" — nenhum acesso é apagado.`
+        : `Excluir o setor "${c.nome}"?`;
+    if (!confirm(msg)) return;
+
+    if (usados) {
+        (globalAccessData || []).forEach(a => { if (a.categoria === c.nome) a.categoria = 'Outros'; });
+        DB.set('itAccesses', globalAccessData);
+    }
+    categoriasAcesso = categoriasAcesso.filter(x => x.id !== id);
+    DB.set('itCategoriasAcesso', categoriasAcesso);
+    renderCategoriasAcesso();
+    renderAccesses();
+}
+
+// Selo COM/SEM de um recurso do acesso (assinatura, 2FA) — ícone Phosphor,
+// nunca emoji, seguindo o padrão do resto do sistema.
+function _tagAcesso(ativo, rotulo) {
+    const cor = ativo ? '#28a745' : '#6c757d';
+    const ico = ativo ? 'ph-check-circle' : 'ph-x-circle';
+    return `<span style="background:${cor}; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold; display:inline-flex; align-items:center; gap:4px;"><i class="ph ${ico}"></i> ${ativo ? 'COM' : 'SEM'} ${rotulo}</span>`;
+}
+
 function renderAccesses() {
     const container = document.getElementById('access-categories-container');
     if (!container) return;
     container.innerHTML = '';
 
-    const grouped = {
-        'Administrativo': [], 'Biomedicos': [], 'Diretoria': [],
-        'Lamic viva+': [], 'Triagem coletas e vacinas': [],
-        'Unidade externas': [], 'Links': [], 'Atendimento UNILAB': [], 'Outros': []
-    };
+    // Pastas vêm do cadastro de Setores (Configurações), na ordem cadastrada —
+    // não mais de uma lista fixa aqui dentro.
+    const grouped = {};
+    categoriasAcesso.forEach(c => { grouped[c.nome] = []; });
+    if (!grouped['Outros']) grouped['Outros'] = [];   // destino dos acessos sem setor
 
     globalAccessData.forEach(acc => {
         if (!_accessPassesFilters(acc)) return; // aplica filtros ativos
@@ -3519,6 +3900,9 @@ function renderAccesses() {
         
         const header = document.createElement('div');
         header.className = 'collapsible-header';
+        // Cor definida no cadastro do setor (Configurações), degradê a partir dela
+        const corCat = _corDaCategoriaAcesso(cat);
+        header.style.background = `linear-gradient(90deg, ${corCat} 0%, ${_clarearCor(corCat, 22)} 100%)`;
         header.onclick = () => {
             const el = document.getElementById(sectionId);
             el.classList.toggle('hidden');
@@ -3621,8 +4005,8 @@ function renderAccesses() {
                                 </td>
                                 <td style="padding: 10px; border-bottom: 1px solid #eee; font-size: 0.85rem; vertical-align: middle; word-break: break-word;">
                                     <div style="display:flex; gap:5px; margin-bottom: 8px; flex-wrap: wrap;">
-                                        ${acc.assinatura ? '<span style="background:#28a745; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">✅ COM ASSINATURA</span>' : '<span style="background:#6c757d; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">❌ SEM ASSINATURA</span>'}
-                                        ${acc.twoFA ? '<span style="background:#28a745; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">✅ COM 2FA</span>' : '<span style="background:#6c757d; color:white; padding:4px 8px; border-radius:12px; font-size:0.7rem; font-weight:bold;">❌ SEM 2FA</span>'}
+                                        ${_tagAcesso(acc.assinatura, 'ASSINATURA')}
+                                        ${_tagAcesso(acc.twoFA, '2FA')}
                                     </div>
                                     <div>
                                         ${acc.linkDrive ? `<a href="${acc.linkDrive}" target="_blank" style="background:#e8f0fe; color:#0b4a99; padding:4px 8px; border-radius:4px; text-decoration:none; font-weight:bold; border:1px solid #0b4a99; display:inline-block;"><i class="ph ph-link"></i> Ver Senha no Drive</a>` : '<span style="color:#999; font-style:italic;">Sem link do Drive</span>'}
@@ -3735,16 +4119,11 @@ function showAccessesView() {
     const b = document.getElementById('btn-nav-accesses'); if(b) { document.querySelectorAll('.sidebar-nav .nav-item').forEach(x=>x.classList.remove('active')); b.classList.add('active'); }
     closeModals();
 
-    const categorias = [
-        'Administrativo', 'Biomedicos', 'Diretoria', 
-        'Lamic viva+', 'Triagem coletas e vacinas', 
-        'Unidade externas', 'Links', 'Atendimento UNILAB', 'Outros'
-    ];
-    
+    // Toda pasta começa FECHADA ao abrir a seção — a lista vem do cadastro de
+    // Setores (antes era fixa aqui, então setor novo nascia aberto).
     accessToggleStates = {};
-    categorias.forEach(cat => {
-        accessToggleStates[cat] = true;
-    });
+    categoriasAcesso.forEach(c => { accessToggleStates[c.nome] = true; });
+    accessToggleStates['Outros'] = true;
 
     document.getElementById('accesses-view').classList.remove('hidden');
     document.getElementById('accesses-view').classList.add('active');
@@ -4624,6 +5003,19 @@ function _initEquipCarousel(imgs) {
     wrap._imgs = imgs;
 }
 
+// Zoom da imagem do equipamento (aba Informações) — clica na imagem do
+// carrossel, abre ela grande em tela cheia. Mesma imagem (base64/bitmap),
+// só maior — não precisa converter nada, o <img src> já é o bitmap inteiro.
+function abrirZoomImagem(src) {
+    if (!src) return;
+    document.getElementById('img-zoom-el').src = src;
+    document.getElementById('img-zoom-modal').classList.remove('hidden');
+}
+function fecharZoomImagem() {
+    document.getElementById('img-zoom-modal').classList.add('hidden');
+    document.getElementById('img-zoom-el').src = '';
+}
+
 function equipCarNav(dir) {
     const wrap = document.getElementById('eqd-car-wrap');
     if (!wrap || !wrap._imgs) return;
@@ -4679,6 +5071,29 @@ function clearEquipFilters() {
     renderEquipGrid();
 }
 
+// Painel flutuante (popover) do filtro de Equipamentos — mesmo padrão do
+// filtro de Estoque (toggleEstoqueFilterPanel): não empurra o layout, some
+// ao clicar fora. Os dados filtrados continuam os de Equipamentos
+// (Categoria/Status próprios) — só a moldura mudou.
+function toggleEquipFilterPanel() {
+    const pop = document.getElementById('equip-filter-panel');
+    const btn = document.getElementById('btn-equip-filter');
+    if (!pop) return;
+    const wasOpen = pop.classList.contains('open');
+    pop.classList.toggle('open', !wasOpen);
+    btn?.classList.toggle('active', !wasOpen);
+    if (!wasOpen) {
+        const closeOnOutside = (e) => {
+            if (!pop.contains(e.target) && e.target !== btn && !btn?.contains(e.target)) {
+                pop.classList.remove('open');
+                btn?.classList.remove('active');
+                document.removeEventListener('click', closeOnOutside);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
+    }
+}
+
 // ── Filtros de Acessos ───────────────────────────────────────
 function toggleAccessFilterChip(btn) {
     const key = btn.dataset.key;
@@ -4720,8 +5135,28 @@ function showEquipamentosView() {
     const ev = document.getElementById('equip-view');
     ev.classList.remove('hidden');
     ev.classList.add('active');
-    renderEquipGrid();
+    setEquipMode('ativos'); // sempre entra pelos Ativos, mesmo se saiu no Dashboard da última vez
     _populateEquipUnidades();
+}
+
+// Alterna entre "Ativos" (grade dos equipamentos cadastrados — comportamento
+// de sempre) e "Dashboard" (por enquanto só a estrutura; o conteúdo vem
+// depois). Busca/Adicionar/Lixeira/filtro só fazem sentido nos Ativos.
+let _equipMode = 'ativos';
+function setEquipMode(mode) {
+    _equipMode = mode;
+    document.getElementById('equip-mode-btn-ativos')?.classList.toggle('active', mode === 'ativos');
+    document.getElementById('equip-mode-btn-dashboard')?.classList.toggle('active', mode === 'dashboard');
+    document.getElementById('btn-equip-filter')?.classList.toggle('hidden', mode !== 'ativos');
+    document.getElementById('equip-ativos-subbar')?.classList.toggle('hidden', mode !== 'ativos');
+    document.getElementById('equip-grid')?.classList.toggle('hidden', mode !== 'ativos');
+    document.getElementById('equip-dashboard-view')?.classList.toggle('hidden', mode !== 'dashboard');
+    if (mode !== 'ativos') {
+        document.getElementById('equip-filter-panel')?.classList.remove('open');
+        document.getElementById('btn-equip-filter')?.classList.remove('active');
+    } else {
+        renderEquipGrid();
+    }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -4781,7 +5216,7 @@ function setEstoqueCatalogView(view) {
     const addBtn = document.getElementById('estoque-add-equip-btn');
     if (addBtn) addBtn.innerHTML = view === 'lista'
         ? '<i class="ph ph-plus"></i> Entrada de Novo Item'
-        : '<i class="ph ph-plus"></i> Adicionar Equipamento';
+        : '<i class="ph ph-plus"></i> Adicionar Novo Template';
     // A busca fica FORA (na subbar) pras duas views; só troca o valor/placeholder
     const buscaInput = document.getElementById('estoque-catalog-search-input');
     if (buscaInput) {
@@ -4961,6 +5396,11 @@ function _moverPresetParaGuiche(preset, oldUnitId, oldCompId, newUnitId, newComp
     preset.compName = newComp ? newComp.name : '';
     if (newComp) newComp.license = preset.lic_status || 'pirata';
     _criarLicencaDoTemplate(preset, newUnit, newComp);
+    // Espelha o hardware no guichê novo ANTES de salvar — salvar antes disso
+    // gravava o vínculo (itSettings) com o guichê ainda de hardware vazio
+    // (itInventory só pegava o hw_* umas gravações depois), e nessa janela o
+    // guichê novo aparecia "Sem modelo" mesmo já com o Template linkado.
+    if (typeof _syncPresetToComputer === 'function') _syncPresetToComputer(preset);
 
     // PERSISTE o vínculo novo do Template (vive em itSettings) — sem isso,
     // ao recarregar o Template "voltava" pro guichê antigo com os dados dele.
@@ -4968,7 +5408,6 @@ function _moverPresetParaGuiche(preset, oldUnitId, oldCompId, newUnitId, newComp
     saveToStorage();
     renderUnits();
     if (currentUnitId === oldUnitId || currentUnitId === newUnitId) renderComputers();
-    if (typeof _syncPresetToComputer === 'function') _syncPresetToComputer(preset);
 
     // Se a tela de Estoque estava olhando a unidade antiga, acompanha até a nova
     if (typeof _estoqueUnitId !== 'undefined' && _estoqueUnitId === oldUnitId && oldUnitId !== newUnitId) {
@@ -5031,7 +5470,7 @@ function renderEstoqueComps() {
                 ${gerado ? `<button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${serial}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>` : ''}
                 ${gerado ? `<button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); deleteCompPreset(${idx})" title="Excluir Modelo"><i class="ph ph-trash"></i></button>` : ''}
                 <div class="estoque-comp-head">
-                    <i class="ph ph-desktop-tower"></i>
+                    <div class="estoque-comp-icon-box"><i class="ph ph-desktop-tower"></i></div>
                     <strong>${gerado ? serial : comp.name}</strong>
                     ${gerado ? '' : '<span class="estoque-badge-pend">Sem modelo</span>'}
                 </div>
@@ -5086,6 +5525,88 @@ function _nextSerial() {
 // gerado antes desta mudança) também tenha um Código do Produto válido de
 // 10 dígitos. Quem já tem código válido não é mexido (não sobrescreve
 // código editado manualmente). Roda automaticamente ao carregar os dados.
+/* RECUPERAÇÃO — Templates de PC que existiam e sumiram do Estoque.
+   O hardware nunca se perdeu: _syncPresetToComputer() sempre espelhou tudo no
+   próprio guichê (hw_model/cpu/mobo/ram/disk/gpu/monitor, SO e os Acessos &
+   Senhas). Quando o registro do Template some de compPresets, o guichê continua
+   com os dados e passa a aparecer como "Sem modelo" — e o Gráfico do Estoque
+   fica vazio, porque ele lista Templates, não guichês.
+   Esta rotina reconstrói o Template a partir do que está no guichê. É
+   idempotente: só cria pra guichê que TEM hardware e NÃO tem Template ligado,
+   então rodar de novo não duplica nada. Depois dela o
+   migrarPecasDosTemplates() recria as peças a partir dos mesmos campos.
+   Ressalva: licença de SO não era espelhada no guichê — Template recuperado
+   volta sem licença, e ela precisa ser reatribuída à mão.
+
+   RODA UMA VEZ SÓ POR SESSÃO (_recuperacaoTemplatesFeita). Antes rodava a
+   cada snapshot dos 2 listeners, e ERA ISSO que duplicava Template ao
+   anexar: anexar grava em 2 nós separados (itSettings = vínculo do
+   Template, itInventory = hardware espelhado no guichê). Entre uma
+   gravação e outra existe um instante em que o guichê JÁ tem hardware e o
+   Template AINDA não consta vinculado — e nesse instante esta função
+   "recuperava" um Template novo do hardware do guichê. Como Template
+   recuperado nasce sem partIds, ele aparecia Inativo; e como o reparo de
+   duplicatas depois soltava ele do guichê, sobrava um Template órfão
+   Inativo a cada anexação (3 testes = 3 órfãos, exatamente o relatado).
+   Recuperação é rotina de conserto de dado corrompido — só faz sentido na
+   carga inicial, nunca no meio de uma ação do usuário. */
+let _recuperacaoTemplatesFeita = false;
+function recuperarTemplatesDosGuiches() {
+    if (_recuperacaoTemplatesFeita) return false;
+    if (!Array.isArray(inventoryData) || !inventoryData.length) return false;
+    if (!modelSettings.compPresets) modelSettings.compPresets = [];
+    // Os 2 nós já carregaram — a partir daqui a foto está completa e a
+    // recuperação pode decidir com segurança. Não roda de novo nesta sessão.
+    _recuperacaoTemplatesFeita = true;
+    let changed = false;
+
+    inventoryData.forEach(unit => {
+        (unit.computers || []).forEach(comp => {
+            if (!_compHasHw(comp)) return;                          // guichê sem hardware: nada a recuperar
+            // Guichê acabou de ser desvinculado/transferido POR ESTE cliente
+            // (desvincular, transferência): itSettings (Template solto) e
+            // itInventory (hardware do guichê zerado) são 2 nós que sincronizam
+            // em momentos diferentes — se este listener rodar com o Template já
+            // solto mas o hardware do guichê AINDA não confirmado zerado (eco
+            // atrasado), recriava um Template duplicado do hardware "fantasma"
+            // que já ia sumir. Essa janela evita recriar enquanto o eco não chega.
+            if (_guicheRecemLimpo(comp.id)) return;
+            if (_presetIndexForComp(unit.id, comp.id) > -1) return; // já tem Template ligado
+            // Trava anti-loop: repararTemplatesDuplicadosGuiche() casa só por
+            // compId, enquanto _presetIndexForComp casa por unitId+compId. Um
+            // Template com compId certo e unitId vazio/errado passaria batido
+            // ali em cima; eu criaria outro, o reparo soltaria o novo por ser
+            // duplicata do mesmo compId, e a cada carga nasceria mais um.
+            // Checando por compId sozinho, uso a mesma chave do reparo.
+            if ((modelSettings.compPresets || []).some(p => p && p.compId === comp.id)) return;
+            const code = _nextSerial();
+            modelSettings.compPresets.push({
+                name: code, serial: code,
+                unitId: unit.id, compId: comp.id,
+                unitName: unit.name, compName: comp.name,
+                hw_model: comp.hw_model || '', hw_cpu: comp.hw_cpu || '', hw_mobo: comp.hw_mobo || '',
+                hw_ram: comp.hw_ram || '', hw_disk: comp.hw_disk || '', hw_gpu: comp.hw_gpu || '',
+                hw_monitor: comp.hw_monitor || '',
+                os: comp.os || 'Windows 11', os_arch: comp.os_arch || 'x64',
+                access_pc_pass:  comp.access_pc_pass  || '', access_any_id:   comp.access_any_id   || '',
+                access_any_pass: comp.access_any_pass || '', access_rdp_user: comp.access_rdp_user || '',
+                access_rdp_pass: comp.access_rdp_pass || '',
+                lic_status: 'pirata', licenseStockId: null, license: null,
+                dataEntrada: new Date().toISOString(),
+                recuperado: true   // marca de auditoria: veio da reconstrução, não de cadastro manual
+            });
+            changed = true;
+            if (typeof registrarLog === 'function') {
+                registrarLog(code, 'pc', 'Template recuperado a partir do guichê',
+                             `${comp.name} (${unit.name}) — hardware restaurado do proprio guiche`);
+            }
+        });
+    });
+
+    if (changed) saveSettings();
+    return changed;
+}
+
 function migrarCodigosProduto() {
     const presets = modelSettings.compPresets || [];
     if (!presets.length) return false;
@@ -5625,29 +6146,89 @@ function purgarLixeira() {
     return false;
 }
 
-function abrirLixeira() {
+// categoria (opcional): sem ela mostra a lixeira toda (uso de Estoque, como
+// sempre foi); com ela ('equip-analitico') filtra só aquele tipo — é o que a
+// Lixeira de Equipamentos usa, pra não misturar peça/licença/mobile/AC do
+// Estoque com o que foi apagado em Equipamentos. Guarda o filtro pra
+// restaurar/apagar de vez reabrirem já filtrados do mesmo jeito.
+let _trashModalFiltro = null;
+const _TRASH_TITULOS = { 'equip-analitico': 'Lixeira — Equipamentos' };
+function abrirLixeira(categoria) {
+    _trashModalFiltro = categoria || null;
+    const titleEl = document.getElementById('trash-modal-title');
+    if (titleEl) {
+        titleEl.innerHTML = `<i class="ph ph-trash"></i> ${_TRASH_TITULOS[categoria] || 'Lixeira'} <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(itens ficam 30 dias antes de sumir de vez)</span>`;
+    }
     const body = document.getElementById('trash-modal-body');
-    const lista = _trashStore();
+    // Sem categoria (botão de Estoque) mostra tudo, MENOS equipamentos — essa
+    // lixeira tem botão e lista próprios lá em Equipamentos, pra não misturar.
+    const lista = categoria
+        ? _trashStore().filter(t => t.categoria === categoria)
+        : _trashStore().filter(t => t.categoria !== 'equip-analitico');
+    const barra = document.getElementById('trash-modal-bar');
     if (!lista.length) {
         body.innerHTML = '<div class="estoque-empty">Lixeira vazia.</div>';
+        if (barra) barra.classList.add('hidden');
     } else {
+        if (barra) barra.classList.remove('hidden');
         body.innerHTML = [...lista].reverse().map(t => {
             const dias = TRASH_DIAS - Math.floor((Date.now() - new Date(t.deletedAt).getTime()) / 86400000);
             return `
-            <div class="log-entry">
-                <div class="log-entry-head">
-                    <strong>${t.rotulo || 'Item'}</strong>
-                    <span class="log-entry-when">apaga em ${Math.max(dias, 0)} dia(s)</span>
-                </div>
-                ${t.codigo ? `<div class="log-entry-code">${t.codigo}</div>` : ''}
-                <div class="log-entry-user" style="gap:8px;">
-                    <button class="btn-small" onclick="restaurarDaLixeira('${t.id}')"><i class="ph ph-arrow-counter-clockwise"></i> Restaurar</button>
-                    <button class="btn-small" onclick="excluirDaLixeira('${t.id}')" style="color:var(--red);"><i class="ph ph-trash"></i> Apagar de vez</button>
+            <div class="log-entry trash-entry">
+                <label class="trash-check">
+                    <input type="checkbox" class="trash-item-check" value="${t.id}" onchange="_syncTrashSelecao()">
+                </label>
+                <div class="trash-entry-body">
+                    <div class="log-entry-head">
+                        <strong>${t.rotulo || 'Item'}</strong>
+                        <span class="log-entry-when">apaga em ${Math.max(dias, 0)} dia(s)</span>
+                    </div>
+                    ${t.codigo ? `<div class="log-entry-code">${t.codigo}</div>` : ''}
+                    <div class="log-entry-user" style="gap:8px;">
+                        <button class="btn-small" onclick="restaurarDaLixeira('${t.id}')"><i class="ph ph-arrow-counter-clockwise"></i> Restaurar</button>
+                        <button class="btn-small" onclick="excluirDaLixeira('${t.id}')" style="color:var(--red);"><i class="ph ph-trash"></i> Apagar de vez</button>
+                    </div>
                 </div>
             </div>`;
         }).join('');
     }
+    _syncTrashSelecao();
     document.getElementById('trash-modal').classList.remove('hidden');
+}
+
+// ── Seleção múltipla da lixeira ─────────────────────────────────────────
+function _trashChecks() { return [...document.querySelectorAll('.trash-item-check')]; }
+function _trashSelecionados() { return _trashChecks().filter(c => c.checked).map(c => c.value); }
+
+// Mantém "selecionar todos" e o contador do botão em dia com os checkboxes
+function _syncTrashSelecao() {
+    const total = _trashChecks().length;
+    const n = _trashSelecionados().length;
+    const todos = document.getElementById('trash-check-all');
+    if (todos) {
+        todos.checked = total > 0 && n === total;
+        todos.indeterminate = n > 0 && n < total;
+    }
+    const btn = document.getElementById('trash-del-sel-btn');
+    if (btn) {
+        btn.disabled = n === 0;
+        btn.innerHTML = `<i class="ph ph-trash"></i> Apagar selecionados${n ? ` (${n})` : ''}`;
+    }
+}
+
+function _trashMarcarTodos(marcar) {
+    _trashChecks().forEach(c => { c.checked = marcar; });
+    _syncTrashSelecao();
+}
+
+// Apaga de vez SÓ os marcados (a lixeira já é o "definitivo" — daqui não volta)
+function excluirSelecionadosDaLixeira() {
+    const ids = _trashSelecionados();
+    if (!ids.length) return;
+    if (!confirm(`Apagar definitivamente ${ids.length} item(ns) selecionado(s)?\n\nNão dá pra restaurar depois.`)) return;
+    modelSettings.trash = _trashStore().filter(t => !ids.includes(t.id));
+    saveSettings();
+    abrirLixeira(_trashModalFiltro);
 }
 
 function restaurarDaLixeira(trashId) {
@@ -5744,6 +6325,12 @@ function restaurarDaLixeira(trashId) {
             item.status = 'disponivel'; item.manual = true; item.sourceCompId = null; item.sourceCompName = ''; item.unitName = ''; item.connType = ''; item.ip = '';
             _stockStore()[arrKey].push(item);
         }
+    } else if (t.categoria === 'equip-analitico') {
+        // Sem unidade/guichê pra devolver — o único lugar de um equipamento
+        // analítico é o cadastro em Equipamentos mesmo.
+        equipData.push(item);
+        DB.set('itEquipamentos/' + item.id, item);
+        voltouProLugar = true;
     }
 
     lista.splice(idx, 1);
@@ -5751,7 +6338,8 @@ function restaurarDaLixeira(trashId) {
     if (typeof reindexarCodigos === 'function') reindexarCodigos();
     saveSettings(); saveToStorage();
     renderComputers(); renderUnits();
-    abrirLixeira();
+    if (typeof renderEquipGrid === 'function') renderEquipGrid();
+    abrirLixeira(_trashModalFiltro);
     if (typeof _refreshEstoquePanel === 'function') _refreshEstoquePanel();
 }
 
@@ -5759,8 +6347,11 @@ function excluirDaLixeira(trashId) {
     if (!confirm('Apagar definitivamente? Não dá pra restaurar depois.')) return;
     modelSettings.trash = _trashStore().filter(t => t.id !== trashId);
     saveSettings();
-    abrirLixeira();
+    abrirLixeira(_trashModalFiltro);
 }
+
+// Atalho do botão de lixeira em Equipamentos — mesma lixeira, só filtrada.
+function abrirLixeiraEquip() { abrirLixeira('equip-analitico'); }
 
 // ══════════════════════════════════════════════════════════════
 // REINDEXAÇÃO DE CÓDIGOS — os códigos de cada família são sempre
@@ -5833,7 +6424,10 @@ function _usuarioAtual() {
     return nome && nome.trim() ? { nome: nome.trim(), admin: true } : { nome: '(não identificado)', admin: false };
 }
 
-function registrarLog(equipCode, tipo, acao, detalhe) {
+// unitId (5º parâmetro, opcional): amarra o log à unidade — é o que permite
+// o histórico "por card" no Dashboard. Parâmetro novo com default undefined,
+// então as chamadas antigas (sem ele) continuam funcionando exatamente igual.
+function registrarLog(equipCode, tipo, acao, detalhe, unitId) {
     const u = _usuarioAtual();
     invLogs.unshift({
         ts: new Date().toISOString(),
@@ -5842,21 +6436,91 @@ function registrarLog(equipCode, tipo, acao, detalhe) {
         equipCode: equipCode || '',
         tipo: tipo || '',
         acao: acao || '',
-        detalhe: detalhe || ''
+        detalhe: detalhe || '',
+        unitId: unitId || null
     });
     if (invLogs.length > 2000) invLogs.length = 2000; // não cresce pra sempre
     DB.set('itLogs', invLogs);
 }
 
+/* ── Seção de origem de cada log ─────────────────────────────────────────
+   Os 3 cards de Logs (Dashboard / Equipamentos / Estoque) filtram por aqui.
+   registrarLog() guarda o TIPO do equipamento, não a seção — então a seção é
+   derivada: tipo fixo quando não há dúvida e, nos tipos que aparecem nas duas
+   pontas (PC, celular, AC, periférico), quem decide é a ação envolver ou não
+   um guichê/unidade. Derivar na leitura (em vez de gravar um campo novo) faz
+   valer também pros logs que já existem. */
+const LOG_SECAO_FIXA  = { guiche: 'dashboard', peca: 'estoque', licenca: 'estoque', lixeira: 'estoque', 'equip-analitico': 'equip' };
+const _LOG_RE_UNIDADE = /guich|atribu[ií]|vinculad|desvinculad|movido/i;
+
+function _secaoDoLog(l) {
+    if (l.secao) return l.secao;                    // marcação explícita, se algum dia houver
+    const fixa = LOG_SECAO_FIXA[l.tipo];
+    if (fixa) return fixa;
+    if (_LOG_RE_UNIDADE.test(l.acao || '')) return 'dashboard';   // entrou/saiu de um guichê
+    // Todo o resto é movimento DENTRO do Estoque: Templates de PC, celulares,
+    // ACs, periféricos, licenças — cada equipamento de lá, como pedido.
+    return 'estoque';
+}
+
+/* ── Logs de Manutenção (4º card) ────────────────────────────────────────
+   Não é uma seção nova pro _secaoDoLog acima — aqueles 3 cards continuam
+   classificando os MESMOS logs em dashboard/equip/estoque exatamente como
+   antes (Estoque continua sendo "qualquer movimento relacionado a estoque,
+   ou seja tudo"). Manutenção é uma 2ª lente, em paralelo: pega só os
+   eventos que mexem na SAÚDE ou POSIÇÃO de um Template de PC já montado —
+   peça com problema/consertada, desmontagem e transferência — reaproveitando
+   o texto da ação já gravada por registrarLog, sem precisar mexer em nenhuma
+   das chamadas existentes (zero risco de desalinhar o parâmetro unitId). */
+const _LOG_MANUT_PREFIXOS = [
+    'Peça trocada', 'Desvinculado (troca de guichê)', 'Movido de guichê',
+    'Template desmontado', 'Hardware desvinculado do guichê',
+    'Template desvinculado do guichê', 'Template religado ao guichê',
+    'Peça removida da montagem', 'Peça descartada',
+    'Peça voltou pro último Template', 'Peça retirada (voltou pro estoque)'
+];
+function _ehLogManutencao(l) {
+    if (l.tipo !== 'pc' && l.tipo !== 'peca') return false;
+    const a = l.acao || '';
+    if (a.startsWith('Status alterado')) return true;   // saúde do Template/peça (Ativo/Manutenção/Inativo, Danificado/Consertado...)
+    return _LOG_MANUT_PREFIXOS.some(pref => a.startsWith(pref));
+}
+function _logsManutencao() {
+    return invLogs.filter(_ehLogManutencao);
+}
+
+const LOG_SECAO_TITULO = { dashboard: 'Logs do Dashboard', equip: 'Logs de Equipamentos', estoque: 'Logs do Estoque', manutencao: 'Logs de Manutenção' };
+
+// Linhas de log de uma seção (sem seção = tudo). Usada pelo modal e pelo download.
+// 'manutencao' não é uma seção do _secaoDoLog (é a 2ª lente, ver acima).
+function _logsDaSecao(secao) {
+    if (secao === 'manutencao') return _logsManutencao();
+    return secao ? invLogs.filter(l => _secaoDoLog(l) === secao) : invLogs;
+}
+
 // Abre o modal de logs — com equipCode mostra só o histórico daquele
-// equipamento; sem código mostra TODOS os movimentos do inventário.
-function abrirLogsEquipamento(equipCode) {
+// equipamento; sem código mostra os movimentos da seção pedida (ou todos).
+// Botão relógio do card de unidade no Dashboard
+function abrirLogsUnidade(unitId) {
+    const unit = inventoryData.find(u => u.id === unitId);
+    abrirLogsEquipamento(null, null, unitId, unit ? unit.name : '');
+}
+
+// unitId (3º parâmetro, opcional): histórico "por card" do Dashboard — mostra
+// só as ações amarradas àquela unidade (ver registrarLog/unitId).
+let _logsModalFiltro = null;   // { equipCode, secao, unitId, nome } — o que o botão Baixar do modal usa
+function abrirLogsEquipamento(equipCode, secao, unitId, unitName) {
     const modal = document.getElementById('logs-modal');
     if (!modal) return;
-    document.getElementById('logs-modal-title').innerHTML = equipCode
+    document.getElementById('logs-modal-title').innerHTML = unitId
+        ? `<i class="ph ph-clock-counter-clockwise"></i> Histórico — ${unitName || 'Unidade'}`
+        : equipCode
         ? `<i class="ph ph-clock-counter-clockwise"></i> Histórico — ${equipCode}`
-        : `<i class="ph ph-clock-counter-clockwise"></i> Logs do Inventário`;
-    const linhas = equipCode ? invLogs.filter(l => l.equipCode === equipCode) : invLogs;
+        : `<i class="ph ph-clock-counter-clockwise"></i> ${LOG_SECAO_TITULO[secao] || 'Logs do Inventário'}`;
+    const linhas = unitId ? invLogs.filter(l => l.unitId === unitId)
+                 : equipCode ? invLogs.filter(l => l.equipCode === equipCode)
+                 : _logsDaSecao(secao);
+    _logsModalFiltro = { equipCode, secao, unitId, nome: unitId ? (unitName || 'unidade') : (equipCode || secao || 'inventario') };
     const body = document.getElementById('logs-modal-body');
     if (!linhas.length) {
         body.innerHTML = '<div class="estoque-empty">Nenhuma modificação registrada ainda.</div>';
@@ -5873,6 +6537,43 @@ function abrirLogsEquipamento(equipCode) {
             </div>`).join('');
     }
     modal.classList.remove('hidden');
+}
+
+// Baixa os logs do inventário em CSV (mesmo formato usado no Financeiro:
+// separador ';' e BOM, pro Excel abrir com acento correto).
+// Exportador genérico — usado tanto pelos botões de Configurações (baixa a
+// seção inteira) quanto pelo botão dentro do modal de histórico (baixa
+// exatamente o que está sendo mostrado ali: por unidade, por equipamento ou
+// por seção).
+function _exportarLogsCSV(dados, nomeArquivo) {
+    if (!dados.length) { alert('Nenhum log para baixar aqui.'); return; }
+    const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const linhas = [['Data/Hora', 'Quem', 'Perfil', 'Código', 'Ação', 'Detalhe'].join(';')];
+    dados.slice().sort((a, b) => String(a.ts || '').localeCompare(String(b.ts || ''))).forEach(l => {
+        const dh = l.ts ? new Date(l.ts).toLocaleString('pt-BR') : '';
+        linhas.push([dh, l.user || '', l.admin ? 'Administrador' : 'Usuário',
+                     l.equipCode || '', l.acao || '', l.detalhe || ''].map(esc).join(';'));
+    });
+    const blob = new Blob(['﻿' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${nomeArquivo}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+function baixarLogsInventario(secao) {
+    _exportarLogsCSV(_logsDaSecao(secao), `logs-${secao || 'inventario'}`);
+}
+
+// Baixa exatamente o que o modal de histórico está mostrando agora (unidade,
+// equipamento ou seção — o que tiver sido aberto por último).
+function baixarLogsModalAtual() {
+    if (!_logsModalFiltro) return;
+    const { equipCode, secao, unitId, nome } = _logsModalFiltro;
+    const dados = unitId ? invLogs.filter(l => l.unitId === unitId)
+                : equipCode ? invLogs.filter(l => l.equipCode === equipCode)
+                : _logsDaSecao(secao);
+    _exportarLogsCSV(dados, `logs-${nome}`);
 }
 
 // Depósito de Licenças de Software do estoque — licença nova só entra por
@@ -5918,11 +6619,77 @@ function migrarLicencasParaEstoque() {
     return changed;
 }
 
+/* Puxa pro depósito as licenças genuínas que só existiam como MARCA no guichê.
+   O dashboard conta "genuínas" por comp.license === 'original' — uma flag no
+   computador. O Estoque lista modelSettings.stockLicenses — registros de
+   verdade. migrarLicencasParaEstoque() só olhava unit.licenses, então guichê
+   marcado como original sem registro nenhum nunca virava licença no Estoque:
+   dava 8 no dashboard e 0 no depósito.
+   Cria 1 registro por guichê marcado, com o software vindo do SO do próprio
+   guichê. A CHAVE não existe em lugar nenhum (a flag não guarda isso), então
+   entra vazia pra ser preenchida à mão — por isso a licença nasce marcada com
+   semChave. Idempotente: comp.licStockId trava a re-criação. */
+function puxarLicencasGenuinasDosGuiches() {
+    if (!inventoryData.length) return false;
+    const stock = _stockLicenses();
+    let changed = false;
+    let n = 0;
+    const novoId = (p) => `${p}_${Date.now().toString(36)}${(n++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+    inventoryData.forEach(unit => {
+        (unit.computers || []).forEach(comp => {
+            if (comp.license !== 'original') return;
+            // Já puxada antes (e o item ainda existe no depósito)
+            if (comp.licStockId && stock.some(l => l.id === comp.licStockId)) return;
+            // Já existe licença desta unidade amarrada a este guichê: não duplica
+            if ((unit.licenses || []).some(l => l.stockId && l.computer === comp.name)) return;
+            // Guichê cujo Template já carrega uma licença: nada a puxar
+            const pi = _presetIndexForComp(unit.id, comp.id);
+            const preset = pi > -1 ? modelSettings.compPresets[pi] : null;
+            if (preset && preset.licenseStockId) return;
+
+            const software = comp.os || 'Windows';
+            const nota = 'Puxada do guichê (marcado como genuíno) — informe a chave';
+            const item = {
+                id: novoId('lc'), serial: _nextSerialFor('LIC', stock),
+                software, type: 'oem', key: '', seats: 1, expiry: '', notes: nota,
+                status: 'em_uso', usedBy: `${comp.name} (${unit.name})`,
+                dataEntrada: new Date().toISOString(), semChave: true
+            };
+            stock.push(item);
+            comp.licStockId = item.id;
+
+            // Espelha no registro de Licenças da unidade — é o que mantém o item
+            // como "Em uso" (repararLicencasEstoque solta o que ninguém usa).
+            if (!unit.licenses) unit.licenses = [];
+            const licUnidade = {
+                id: novoId('lu'), software, type: 'oem', key: '', seats: 1,
+                expiry: '', computer: comp.name, notes: nota, stockId: item.id
+            };
+            unit.licenses.push(licUnidade);
+
+            // Se o guichê tem Template, amarra os dois pra não divergirem
+            if (preset) {
+                preset.licenseStockId = item.id;
+                preset.lic_status = 'original';
+                preset.license = { key: '', type: 'oem', seats: 1, expiry: '', notes: nota };
+                preset.licenseId = licUnidade.id;
+            }
+            changed = true;
+            if (typeof registrarLog === 'function') {
+                registrarLog(item.serial, 'licenca', 'Licença puxada do guichê', `${comp.name} (${unit.name}) · ${software} — chave a preencher`, unit.id);
+            }
+        });
+    });
+    if (changed) { saveSettings(); saveToStorage(); }
+    return changed;
+}
+
 function abrirEntradaLicenca(licId = null, editavel = false, soLeitura = false) {
     const lic = licId ? _stockLicenses().find(l => l.id === licId) : null;
     const isView = lic && !editavel;
     document.getElementById('add-equip-chooser-modal')?.classList.add('hidden');
-    document.getElementById('lic-entry-title').innerHTML = `<i class="ph ph-certificate"></i> ${lic ? (isView ? 'Licença de Software' : 'Editar Licença') : 'Entrada de Licença de Software'}`;
+    document.getElementById('lic-entry-title').textContent = lic ? (isView ? 'Licença de Software' : 'Editar Licença') : 'Entrada de Licença de Software';
     document.getElementById('lic-entry-id').value = lic ? lic.id : '';
     document.getElementById('lic-entry-serial').value = lic ? lic.serial : _nextSerialFor('LIC', _stockLicenses());
     document.getElementById('lic-entry-software').value = lic ? (lic.software || '') : '';
@@ -6238,12 +7005,12 @@ function _renderEquipCard(reg, type, unit, soLeitura = false) {
     else if (type === 'ac') { clickAction = `_openAcFromEstoque('${unitId}','${reg.id}',${soLeitura})`; delAction = `_deleteAcFromEstoque('${unitId}','${reg.id}')`; }
     else { clickAction = `openEquipPresetModal('${type}','${unitId}','${reg.id}',false,${soLeitura})`; delAction = `_deleteEquipRegistro('${type}','${unitId}','${reg.id}')`; }
     return `
-    <div class="estoque-modelo-card" onclick="${clickAction}" title="${soLeitura ? 'Visualização (somente leitura — editar é pela Lista)' : 'Clique para ver / editar'}">
+    <div class="estoque-modelo-card${soLeitura ? ' card-grafico' : ''}" onclick="${clickAction}" title="${soLeitura ? 'Visualização (somente leitura — editar é pela Lista)' : 'Clique para ver / editar'}">
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
-        ${soLeitura ? '' : `<button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); ${delAction}" title="Excluir"><i class="ph ph-trash"></i></button>`}
+        ${!soLeitura ? `<button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); ${delAction}" title="Excluir (vai pra lixeira, 30 dias pra restaurar)"><i class="ph ph-trash"></i></button>` : ''}
         <div class="estoque-comp-head">
-            <i class="ph ${TIPO_ICON[type]}"></i>
+            <div class="estoque-comp-icon-box"><i class="ph ${TIPO_ICON[type]}"></i></div>
             <strong>${serial || titulo || '—'}</strong>
         </div>
         <ul class="estoque-modelo-specs">
@@ -6294,8 +7061,9 @@ function _renderPcPresetCard(p, idx) {
         <div class="equip-status-dot ${dotClass}"></div>
         <button class="btn-icon estoque-modelo-info" onclick="event.stopPropagation(); abrirInfoTemplate(${idx})" title="Informações (peças, licença, danos)"><i class="ph ph-info"></i></button>
         <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${p.serial || p.name}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
+        <button class="btn-icon btn-delete estoque-modelo-del" onclick="event.stopPropagation(); deleteCompPreset(${idx})" title="Desmontar Template — peças voltam pro Estoque"><i class="ph ph-trash"></i></button>
         <div class="estoque-comp-head">
-            <i class="ph ph-cube"></i>
+            <div class="estoque-comp-icon-box"><i class="ph ph-cube"></i></div>
             <strong>${p.serial || p.name}</strong>
         </div>
         <ul class="estoque-modelo-specs">
@@ -6368,7 +7136,10 @@ function abrirInfoTemplate(idx) {
 // verdade (comp.status), não existe status próprio no Modelo.
 function _coletarPcsFiltrados(statusFiltro) {
     const presets = modelSettings.compPresets || [];
-    const sorted = presets.map((p, idx) => ({ p, idx })).sort((a, b) => a.p.name.localeCompare(b.p.name, undefined, { numeric: true, sensitivity: 'base' }));
+    // String(...) obrigatório: um único preset sem `name` fazia o sort estourar
+    // e derrubava o render inteiro do Estoque (todos os Templates sumiam da tela).
+    const sorted = presets.map((p, idx) => ({ p, idx }))
+        .sort((a, b) => String(a.p.name || a.p.serial || '').localeCompare(String(b.p.name || b.p.serial || ''), undefined, { numeric: true, sensitivity: 'base' }));
     if (statusFiltro === 'todos') return sorted;
     return sorted.filter(({ p }) => {
         // Mesma regra da bolinha do card (defeito→amarelo, falta principal→vermelho)
@@ -6401,6 +7172,34 @@ function _coletarPerifericosMobileAc(tipoFiltro, statusFiltro) {
 }
 
 let _graficoBusca = '';
+/* Conta por cor do semáforo respeitando o TIPO filtrado no Gráfico, usando as
+   mesmas fontes que montam os cards — Templates de PC, periféricos/celulares/
+   ACs e licenças. Sempre ignora o filtro de status: os números mostram a
+   composição completa daquele tipo, que é o que o usuário clica pra filtrar. */
+function _contarPorLedGrafico(tipoFiltro) {
+    const c = { azul: 0, verde: 0, amarelo: 0, vermelho: 0 };
+    const add = led => { if (c[led] !== undefined) c[led]++; };
+
+    if (tipoFiltro === 'todos' || tipoFiltro === 'pc') {
+        (modelSettings.compPresets || []).forEach(p => add(_dotLedTemplate(p)));
+    }
+    if (tipoFiltro !== 'pc' && tipoFiltro !== 'licenca') {
+        _coletarPerifericosMobileAc(tipoFiltro, 'todos').forEach(({ reg }) => add(_statusToLed(reg.status)));
+    }
+    if (tipoFiltro === 'todos' || tipoFiltro === 'licenca') {
+        _stockLicenses().forEach(l => add(_statusToLed(l.status)));
+    }
+    return c;
+}
+
+// Clique nos contadores do Gráfico: filtra por status e mantém os chips do
+// popover em sincronia. Clicar no que já está ativo volta pra "todos".
+function setFiltroStatusGrafico(val) {
+    _filtrosGrafico.status = (_filtrosGrafico.status === val && val !== 'todos') ? 'todos' : val;
+    if (typeof _aplicarChipsDoFiltro === 'function') _aplicarChipsDoFiltro();
+    renderEstoqueCatalogo();
+}
+
 function renderEstoqueCatalogo() {
     const panel = document.getElementById('estoque-comps-panel');
     if (!panel) return;
@@ -6438,19 +7237,24 @@ function renderEstoqueCatalogo() {
         });
     }
 
-    // Contadores de Templates de PC montados (não é por peça — cada Template
-    // equivale a 1 PC montado): disponíveis, em uso, manutenção e inativos.
-    const tCounts = { azul: 0, verde: 0, amarelo: 0, vermelho: 0 };
-    (modelSettings.compPresets || []).forEach(p => {
-        const led = _dotLedTemplate(p);
-        if (tCounts[led] !== undefined) tCounts[led]++;
-    });
+    // Contadores do Gráfico — contam exatamente o TIPO que está filtrado
+    // (antes contavam só Templates de PC, então escolher "Impressoras" mantinha
+    // os números dos PCs na tela). Cada um é clicável e filtra por status;
+    // clicar no que já está ativo volta pra "todos".
+    const tCounts = _contarPorLedGrafico(tipoFiltro);
+    const totalG = tCounts.azul + tCounts.verde + tCounts.amarelo + tCounts.vermelho;
+    const chipCont = (val, dotCls, rotulo, n) =>
+        `<button type="button" class="lista-counter lista-counter-btn${statusFiltro === val ? ' active' : ''}"
+                 onclick="setFiltroStatusGrafico('${val}')" title="${val === 'todos' ? 'Mostrar todos os status' : 'Filtrar por ' + rotulo}">
+            ${dotCls ? `<span class="equip-status-dot equip-status-dot-inline ${dotCls}"></span>` : ''} ${n} ${rotulo}
+         </button>`;
     const contadores = `
     <div class="estoque-lista-counters" style="margin-bottom:12px; justify-content:flex-end;">
-        <span class="lista-counter"><span class="equip-status-dot equip-status-dot-inline dot-disp"></span> ${tCounts.azul} disponíveis</span>
-        <span class="lista-counter"><span class="equip-status-dot equip-status-dot-inline dot-uso"></span> ${tCounts.verde} em uso</span>
-        <span class="lista-counter"><span class="equip-status-dot equip-status-dot-inline dot-manut"></span> ${tCounts.amarelo} manutenção</span>
-        <span class="lista-counter"><span class="equip-status-dot equip-status-dot-inline dot-inativo"></span> ${tCounts.vermelho} inativos</span>
+        ${chipCont('todos', '', 'todos', totalG)}
+        ${chipCont('azul', 'dot-disp', 'disponíveis', tCounts.azul)}
+        ${chipCont('verde', 'dot-uso', 'em uso', tCounts.verde)}
+        ${chipCont('amarelo', 'dot-manut', 'manutenção', tCounts.amarelo)}
+        ${chipCont('vermelho', 'dot-inativo', 'inativos', tCounts.vermelho)}
     </div>`;
 
     if (!cards.length) {
@@ -6486,10 +7290,11 @@ function _renderLicencaCard(l) {
     const preset = l.status === 'em_uso' ? (modelSettings.compPresets || []).find(p => p.licenseStockId === l.id) : null;
     const local = preset ? `${preset.serial || preset.name}${preset.compName ? ' · ' + preset.compName + ' (' + preset.unitName + ')' : ''}` : 'Estoque';
     return `
-    <div class="estoque-modelo-card" onclick="abrirEntradaLicenca('${l.id}', false, true)" title="Visualização (somente leitura — editar é pela Lista)">
+    <div class="estoque-modelo-card card-grafico" onclick="abrirEntradaLicenca('${l.id}', false, true)" title="Visualização (somente leitura — editar é pela Lista)">
         <div class="equip-status-dot ${dotClass}"></div>
+        <button class="btn-icon estoque-modelo-log" onclick="event.stopPropagation(); abrirLogsEquipamento('${l.serial || ''}')" title="Histórico de modificações"><i class="ph ph-clock-counter-clockwise"></i></button>
         <div class="estoque-comp-head">
-            <i class="ph ph-certificate"></i>
+            <div class="estoque-comp-icon-box"><i class="ph ph-certificate"></i></div>
             <strong>${l.serial || '—'}</strong>
         </div>
         <ul class="estoque-modelo-specs">
@@ -6803,6 +7608,80 @@ function repararReferenciasQuebradas() {
     return changed;
 }
 
+/* Limpa os Templates órfãos que o bug de recuperação criava a cada anexação
+   (ver comentário em recuperarTemplatesDosGuiches). A assinatura é bem
+   específica pra não pegar Template legítimo:
+     - recuperado: true      → veio da rotina de recuperação, não de cadastro
+     - sem unitId/compId     → não está em guichê nenhum (recuperação SEMPRE
+                               cria vinculado; se está solto, é porque o
+                               reparo de duplicatas soltou ele)
+     - sem peça montada      → nunca foi montado por ninguém
+     - sem licença atrelada  → não tem nada de valor pendurado
+   Um Template recuperado de verdade continua no guichê dele, então não entra
+   aqui. Um Template montado à mão não tem recuperado:true. */
+function limparTemplatesOrfaosDaRecuperacao() {
+    const presets = modelSettings.compPresets || [];
+    if (!presets.length) return false;
+    const temPeca = (p) => Object.keys(PART_TIPOS).some(t => {
+        const v = p.partIds && p.partIds[t];
+        return PART_TIPOS[t].multi ? (v && v.length) : !!v;
+    });
+    const orfaos = presets.filter(p =>
+        p && p.recuperado === true && !p.unitId && !p.compId &&
+        !p.licenseStockId && !temPeca(p)
+    );
+    if (!orfaos.length) return false;
+    orfaos.forEach(p => {
+        if (typeof registrarLog === 'function') {
+            registrarLog(p.serial || p.name, 'pc', 'Template órfão removido (limpeza)',
+                         'Sobra do bug de recuperação — sem guichê, sem peça e sem licença');
+        }
+    });
+    modelSettings.compPresets = presets.filter(p => !orfaos.includes(p));
+    saveSettings();
+    return true;
+}
+
+/* Licença "fantasma": o guichê está VAZIO (sem hardware nenhum) mas continua
+   aparecendo com 1 licença nas Licenças da unidade. Acontecia quando o
+   Template que trouxe a licença foi desvinculado/removido numa das corridas
+   do bug acima e o registro da unidade ficou pra trás.
+   Critério bem apertado, pra não apagar licença legítima:
+     - a licença aponta pra um guichê (campo computer) que existe NESTA unidade
+     - esse guichê está sem hardware nenhum (guichê vazio)
+     - nenhum Template reivindica ela (nem por licenseId nem por licenseStockId)
+     - nenhum guichê da unidade reivindica ela por licStockId
+   Licença digitada à mão na aba Licenças não tem computer apontando pra guichê
+   vazio (ou tem computer em branco), então não entra aqui. */
+function limparLicencasFantasmaDeGuicheVazio() {
+    let changed = false;
+    const presets = modelSettings.compPresets || [];
+    inventoryData.forEach(u => {
+        if (!u.licenses || !u.licenses.length) return;
+        const antes = u.licenses.length;
+        u.licenses = u.licenses.filter(l => {
+            if (!l.computer) return true;                                  // sem guichê apontado: não é este caso
+            const comp = (u.computers || []).find(c => c.name === l.computer);
+            if (!comp) return true;                                        // guichê nem existe mais: outro reparo cuida
+            if (_compHasHw(comp)) return true;                             // guichê tem hardware: licença é legítima
+            const reivindicadaPorTemplate = presets.some(p =>
+                (p.licenseId && p.licenseId === l.id) ||
+                (l.stockId && p.licenseStockId === l.stockId));
+            if (reivindicadaPorTemplate) return true;
+            const reivindicadaPorGuiche = (u.computers || []).some(c => c.licStockId && c.licStockId === l.stockId);
+            if (reivindicadaPorGuiche) return true;
+            if (typeof registrarLog === 'function') {
+                registrarLog('', 'licenca', 'Licença fantasma removida da unidade',
+                             `${l.software || 'Licença'} apontava pro guichê vazio ${l.computer} (${u.name})`, u.id);
+            }
+            return false;
+        });
+        if (u.licenses.length !== antes) changed = true;
+    });
+    if (changed) saveToStorage();
+    return changed;
+}
+
 // Repara guichês com MAIS de um Modelo vinculado (bug antigo que exigia
 // desvincular 2x): mantém o 1º, solta os demais e tira as licenças deles.
 function repararTemplatesDuplicadosGuiche() {
@@ -6920,7 +7799,10 @@ function openEquipPresetModal(type, unitId, regId, editavel = false, soLeitura =
     };
     roCampos(isView);
 
-    document.getElementById('equip-preset-title').innerHTML = `<i class="ph ${TIPO_ICON[type]}"></i> ${isNew ? 'Novo(a) ' + TIPO_LABEL[type] : TIPO_LABEL[type]}`;
+    // Ícone do cabeçalho (caixinha) muda por tipo de periférico; o texto é só o nome.
+    const eqPresetTitleIcon = document.getElementById('equip-preset-title-icon');
+    if (eqPresetTitleIcon) eqPresetTitleIcon.className = `ph ${TIPO_ICON[type]}`;
+    document.getElementById('equip-preset-title').textContent = isNew ? 'Novo(a) ' + TIPO_LABEL[type] : TIPO_LABEL[type];
     document.getElementById('eq-preset-type').value = type;
     document.getElementById('eq-preset-id').value = isNew ? '' : regId;
     document.getElementById('eq-preset-serial').value = isNew ? _nextSerialFor(EQUIP_SERIAL_PREFIX[type], _flattenUnitArray(arrKey)) : (reg.serial || '');
@@ -7130,7 +8012,7 @@ function _saveEquipModal() {
         const snapshot = afetados.map(c => ({ compId: c.id, model: c[fModelD] || '', connType: c[fTypeD] || 'usb', ip: c[fIpD] || '', host: c[fHostD] || '' }));
         const guicheAntigo = { unitId: found.unit.id, ownerCompId: reg.sourceCompId, comps: snapshot };
         afetados.forEach(c => { c[fModelD] = ''; c[fTypeD] = 'usb'; c[fIpD] = ''; c[fHostD] = ''; });
-        if (typeof registrarLog === 'function') registrarLog(reg.serial, type, `${TIPO_LABEL[type]} desvinculado(a) do guichê (${_LABEL_STATUS(novoStatusEq)})`, `Saiu de ${afetados.length} guichê(s) em ${found.unit.name}`);
+        if (typeof registrarLog === 'function') registrarLog(reg.serial, type, `${TIPO_LABEL[type]} desvinculado(a) do guichê (${_LABEL_STATUS(novoStatusEq)})`, `Saiu de ${afetados.length} guichê(s) em ${found.unit.name}`, found.unit.id);
         reg.sourceCompId = null; reg.sourceCompName = ''; reg.connType = ''; reg.ip = ''; reg.sharedBy = [];
         if (novoStatusEq === 'disponivel') {
             // vai pro depósito global (fica livre)
@@ -7180,7 +8062,7 @@ function _saveEquipModal() {
                     ocupante.status = 'disponivel'; ocupante.connType = ''; ocupante.ip = ''; ocupante.unitName = '';
                     const locOc = _acharRegistroGlobal(arrKey, ocupante.id);
                     if (locOc && locOc.unit) { locOc.arr.splice(locOc.idx, 1); _stockStore()[arrKey].push(ocupante); }
-                    if (typeof registrarLog === 'function') registrarLog(ocupante.serial, type, `${TIPO_LABEL[type]} desvinculado(a) (troca)`, `Saiu de ${novoComp.name} (${novaUnit.name}) — substituído por ${reg.serial}`);
+                    if (typeof registrarLog === 'function') registrarLog(ocupante.serial, type, `${TIPO_LABEL[type]} desvinculado(a) (troca)`, `Saiu de ${novoComp.name} (${novaUnit.name}) — substituído por ${reg.serial}`, novaUnit.id);
                 }
                 // Limpa o guichê antigo e grava no novo
                 const antigoComp = (found.unit.computers || []).find(c => c.id === reg.sourceCompId);
@@ -7200,7 +8082,7 @@ function _saveEquipModal() {
                 reg.sourceCompName = novoComp.name;
                 reg.unitName = novaUnit.name;
                 reg.sharedBy = [];
-                if (typeof registrarLog === 'function') registrarLog(reg.serial, type, 'Movido de guichê', `${origem} → ${novoComp.name} (${novaUnit.name})`);
+                if (typeof registrarLog === 'function') registrarLog(reg.serial, type, 'Movido de guichê', `${origem} → ${novoComp.name} (${novaUnit.name})`, novaUnit.id);
                 alert(`${reg.serial} movido:\n\nSaindo de: ${origem}\nIndo para: ${novoComp.name} (${novaUnit.name})`);
             }
         }
@@ -7321,6 +8203,17 @@ function _novoEquipamentoVoltar() {
 // "Modelo da Máquina" é especial: escolhe DESKTOP/ALL IN ONE/NOTEBOOK e
 // digita a marca — fica salvo como "MODELO - MARCA" (a contagem por tipo do
 // dashboard sai daqui).
+// Bolinha de cor ao lado do Status, no popup de Entrada de Peça — Disponível
+// azul, Em Uso verde, Manutenção amarela, Danificada vermelha, Descartada
+// preta (dot-descartado é só dessa tela; os outros 4 já existiam em
+// .equip-status-dot pro resto do app).
+const PART_STATUS_DOT = { disponivel: 'dot-disp', em_uso: 'dot-uso', manutencao: 'dot-manut', danificado: 'dot-inativo', descartado: 'dot-descartado' };
+function _syncPartEntryStatusDot() {
+    const val = document.getElementById('part-entry-status')?.value || 'disponivel';
+    const dot = document.getElementById('part-entry-status-dot');
+    if (dot) dot.className = 'equip-status-dot equip-status-dot-inline ' + (PART_STATUS_DOT[val] || 'dot-disp');
+}
+
 // Popup de peça: peça existente abre em modo VISUALIZAÇÃO (código, spec,
 // status e em qual Template está) com o lápis liberando a edição; entrada
 // nova abre direto editável.
@@ -7330,7 +8223,10 @@ function abrirEntradaPeca(tipo, pecaId = null, editavel = null) {
     const peca = pecaId ? _acharPeca(tipo, pecaId) : null;
     const isView = peca && editavel !== true;
     document.getElementById('add-equip-chooser-modal')?.classList.add('hidden');
-    document.getElementById('part-entry-title').innerHTML = `<i class="ph ${cfg.icon}"></i> ${peca ? (isView ? '' : 'Editar ') + cfg.label : 'Entrada de ' + cfg.label}`;
+    // Ícone do cabeçalho (caixinha) muda por tipo de peça; o texto é só o nome.
+    const partTitleIcon = document.getElementById('part-entry-title-icon');
+    if (partTitleIcon) partTitleIcon.className = `ph ${cfg.icon}`;
+    document.getElementById('part-entry-title').textContent = peca ? (isView ? '' : 'Editar ') + cfg.label : 'Entrada de ' + cfg.label;
     document.getElementById('part-entry-tipo').value = tipo;
     document.getElementById('part-entry-id').value = peca ? peca.id : '';
     document.getElementById('part-entry-serial').value = peca ? peca.serial : _nextPartSerial(tipo);
@@ -7351,6 +8247,7 @@ function abrirEntradaPeca(tipo, pecaId = null, editavel = null) {
         ? ((peca.status === 'danificado' || peca.status === 'manutencao' || peca.status === 'descartado') ? peca.status : (peca.usedBy ? 'em_uso' : 'disponivel'))
         : 'disponivel';
     document.getElementById('part-entry-status').value = statusVal;
+    _syncPartEntryStatusDot();
     document.getElementById('part-entry-motivo-group').classList.toggle('hidden', !['danificado', 'manutencao', 'descartado'].includes(statusVal));
     document.getElementById('part-entry-motivo').value = peca ? (peca.motivoDano || '') : '';
 
@@ -7608,24 +8505,28 @@ function renderEquipGrid() {
 
     grid.innerHTML = '';
     lista.forEach(e => {
-        // Todas as linhas pedidas pelo usuário
+        // Todas as linhas pedidas pelo usuário — mesmos ícones do popup de detalhe
         const fields = [
-            { lbl: 'CÓDIGO / PATRIMÔNIO', val: e.codigo     },
-            { lbl: 'MARCA',               val: e.fabricante },
-            { lbl: 'MODELO',              val: e.modelo     },
-            { lbl: 'Nº SÉRIE',            val: e.serie      },
-            { lbl: 'FORNECEDOR',          val: e.fornecedor },
-            { lbl: 'LOCALIZAÇÃO',         val: e.unidade    }
+            { lbl: 'CÓDIGO / PATRIMÔNIO', val: e.codigo,     icon: 'ph-barcode'   },
+            { lbl: 'MARCA',               val: e.fabricante, icon: 'ph-buildings' },
+            { lbl: 'MODELO',              val: e.modelo,     icon: 'ph-package'   },
+            { lbl: 'Nº SÉRIE',            val: e.serie,      icon: 'ph-hash'      },
+            { lbl: 'FORNECEDOR',          val: e.fornecedor, icon: 'ph-storefront'},
+            { lbl: 'LOCALIZAÇÃO',         val: e.unidade,    icon: 'ph-map-pin'   }
         ];
 
         const rows = fields.map(f => `
             <div class="equip-row">
-                <span class="equip-row-lbl">${f.lbl}</span>
+                <span class="equip-row-lbl"><i class="ph ${f.icon}"></i> ${f.lbl}</span>
                 <span class="equip-row-val">${f.val || '—'}</span>
             </div>`).join('');
 
-        const tags = [e.categoria, e.tipo].filter(Boolean)
-            .map(t => `<span class="equip-tag">${t}</span>`).join('');
+        // Setor (categoria) em azul, Tipo/Subtipo em roxo — cores diferentes
+        // pra distinguir os dois de relance
+        const tags = [
+            e.categoria ? `<span class="equip-tag equip-tag-categoria">${e.categoria}</span>` : '',
+            e.tipo      ? `<span class="equip-tag equip-tag-tipo">${e.tipo}</span>`            : ''
+        ].join('');
 
         const dotClass = e.status === 'Em Manutenção' ? 'dot-manut'
                        : e.status === 'Inativo'       ? 'dot-inativo' : 'dot-uso';
@@ -7637,11 +8538,13 @@ function renderEquipGrid() {
         card.innerHTML = `
             <div class="equip-status-dot ${dotClass}"></div>
             <div class="card-actions">
+                <button class="btn-icon" title="Histórico" onclick="event.stopPropagation();abrirLogsEquipamento('${e.codigo || e.serie || ''}')"><i class="ph ph-clock-counter-clockwise"></i></button>
                 <button class="btn-icon" title="Editar" onclick="event.stopPropagation();openEquipModal('${e.id}')"><i class="ph ph-pencil-simple"></i></button>
                 <button class="btn-icon btn-delete" title="Excluir" onclick="event.stopPropagation();deleteEquip('${e.id}')"><i class="ph ph-trash"></i></button>
             </div>
             <div class="equip-card-body">
                 <div class="equip-card-top">
+                    <div class="equip-card-icon-box"><i class="ph ph-monitor"></i></div>
                     <div class="equip-card-name" style="text-transform:uppercase;">${e.nome || '—'}</div>
                 </div>
                 <div class="equip-card-rows">${rows}</div>
@@ -7660,12 +8563,29 @@ function _equipPassesFilters(e) {
     return true;
 }
 
+// Status do Equipamento — 3 botões no lugar do select; equip-status continua
+// um input (agora hidden) com o mesmo valor de sempre, então tudo que já lia
+// document.getElementById('equip-status').value (salvar, filtro, detecção de
+// mudança) não precisou mudar.
+function setEquipStatus(val) {
+    const inp = document.getElementById('equip-status');
+    if (inp) inp.value = val;
+    _syncEquipStatusBtns();
+    if (typeof _checkEquipChanges === 'function') _checkEquipChanges();
+}
+function _syncEquipStatusBtns() {
+    const val = document.getElementById('equip-status')?.value || 'Em Uso';
+    document.querySelectorAll('#equip-status-btns .equip-status-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.val === val);
+    });
+}
+
 // ── Abrir modal criar/editar ──────────────────────────────────
 function openEquipModal(id) {
     _populateEquipUnidades();
     const e      = id ? equipData.find(x => x.id === id) : null;
     const titleEl = document.getElementById('equip-modal-title');
-    if (titleEl) titleEl.innerHTML = (e ? '<i class="ph ph-pencil-simple"></i> Editar' : '<i class="ph ph-desktop-tower"></i> Novo') + ' Equipamento';
+    if (titleEl) titleEl.textContent = (e ? 'Editar' : 'Novo') + ' Equipamento';
 
     document.getElementById('equip-id').value         = e?.id         || '';
     document.getElementById('equip-nome').value       = (e?.nome || '').toUpperCase();
@@ -7674,6 +8594,8 @@ function openEquipModal(id) {
     document.getElementById('equip-serie').value      = e?.serie  || '';
     document.getElementById('equip-unidade').value    = e?.unidade || '';
     document.getElementById('equip-status').value     = e?.status  || 'Em Uso';
+    _syncEquipStatusBtns();
+    document.getElementById('equip-observacoes').value = e?.observacoes || '';
 
     // Categoria: select
     document.getElementById('equip-categoria').value = e?.categoria || '';
@@ -7737,6 +8659,7 @@ function saveEquipamento() {
         tipo       : document.getElementById('equip-tipo').value.trim(),
         unidade    : document.getElementById('equip-unidade').value,
         status     : document.getElementById('equip-status').value,
+        observacoes: document.getElementById('equip-observacoes').value.trim(),
         imagens    : [..._equipImagens],
         // Preserva os anexos existentes — DB.set substitui o objeto inteiro
         // sem isso, salvar o equipamento apagaria todos os anexos
@@ -7747,8 +8670,18 @@ function saveEquipamento() {
 
     // Atualiza o array local imediatamente (não espera o Firebase)
     const idx = equipData.findIndex(e => e.id === id);
-    if (idx !== -1) equipData[idx] = { ...equipData[idx], ...data };
-    else            equipData.push(data);
+    const isEdit = idx !== -1;
+    if (isEdit) equipData[idx] = { ...equipData[idx], ...data };
+    else        equipData.push(data);
+
+    // Log: só agora existe. saveEquipamento/deleteEquip nunca chamavam
+    // registrarLog, então o card "Logs de Equipamentos" das Configurações
+    // sempre esteve vazio, sem fonte nenhuma.
+    if (typeof registrarLog === 'function') {
+        registrarLog(data.codigo || data.serie, 'equip-analitico',
+            isEdit ? 'Equipamento editado' : 'Equipamento cadastrado',
+            `${data.nome}${data.unidade ? ' · ' + data.unidade : ''}`);
+    }
 
     // Fecha o modal
     document.getElementById('equip-modal').classList.add('hidden');
@@ -7778,10 +8711,23 @@ function saveEquipamento() {
 // ── Excluir direto pelo card ──────────────────────────────────
 function deleteEquip(id) {
     const e = equipData.find(x => x.id === id);
-    if (!e || !confirm(`Excluir permanentemente "${e.nome}"?`)) return;
+    if (!e || !confirm(`Mandar "${e.nome}" pra lixeira?\n\nFica ${TRASH_DIAS} dias disponível pra restaurar.`)) return;
     equipData = equipData.filter(x => x.id !== id); // eco local ignorado — atualiza aqui
     renderEquipGrid();
     DB.remove('itEquipamentos/' + id);
+    _enviarParaLixeira('equip-analitico', e, e.nome || 'Equipamento', e.codigo || e.serie || '');
+    saveSettings();
+    if (typeof registrarLog === 'function') {
+        registrarLog(e.codigo || e.serie, 'equip-analitico', 'Equipamento enviado pra lixeira', `${e.nome}${e.unidade ? ' · ' + e.unidade : ''}`);
+    }
+}
+
+// Abas do popup de detalhe (Informações/Documentos/Atividades) — Atividades
+// por enquanto é só a estrutura (placeholder), o checklist de manutenção
+// entra depois.
+function setEqdTab(tab) {
+    document.querySelectorAll('#eqd-tabs .eqd-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    document.querySelectorAll('.eqd-tab-panel').forEach(p => p.classList.toggle('active', p.id === 'eqd-panel-' + tab));
 }
 
 // ── Detalhe ao clicar no card ─────────────────────────────────
@@ -7790,6 +8736,7 @@ function openEquipDetail(id, equipSnap) {
     const e = equipSnap || equipData.find(x => x.id === id);
     if (!e) { console.warn('[openEquipDetail] Equipamento não encontrado:', id); return; }
     equipDetailId = id;
+    setEqdTab('info'); // sempre abre em Informações, mesmo se saiu em outra aba da última vez
 
     try {
         const _set = (elId, val) => { const el = document.getElementById(elId); if (el) el.textContent = val; };
@@ -7830,6 +8777,12 @@ function openEquipDetail(id, equipSnap) {
         _set('eqd-fornecedor', e.fornecedor || '—');
         _set('eqd-unidade',    e.unidade    || '—');
 
+        // Observações — campo novo; card só aparece pra quem já tem preenchido
+        // (equipamento antigo, cadastrado antes desse campo existir, fica sem)
+        _set('eqd-observacoes', e.observacoes || '');
+        const obsCard = document.getElementById('eqd-observacoes-card');
+        if (obsCard) obsCard.style.display = e.observacoes ? '' : 'none';
+
         // Documentos
         renderEquipDocs(e.anexos || {});
 
@@ -7853,10 +8806,15 @@ function editEquipFromDetail() {
 function deleteEquipFromDetail() {
     if (!equipDetailId) return;
     const e = equipData.find(x => x.id === equipDetailId);
-    if (!e || !confirm(`Excluir permanentemente "${e.nome}"?`)) return;
+    if (!e || !confirm(`Mandar "${e.nome}" pra lixeira?\n\nFica ${TRASH_DIAS} dias disponível pra restaurar.`)) return;
     equipData = equipData.filter(x => x.id !== equipDetailId); // eco local ignorado — atualiza aqui
     renderEquipGrid();
     DB.remove('itEquipamentos/' + equipDetailId);
+    _enviarParaLixeira('equip-analitico', e, e.nome || 'Equipamento', e.codigo || e.serie || '');
+    saveSettings();
+    if (typeof registrarLog === 'function') {
+        registrarLog(e.codigo || e.serie, 'equip-analitico', 'Equipamento enviado pra lixeira', `${e.nome}${e.unidade ? ' · ' + e.unidade : ''}`);
+    }
     closeModals();
 }
 
@@ -7875,14 +8833,14 @@ let _equipFormSnapshot = '';
 function _captureEquipSnapshot() {
     const ids = ['equip-nome','equip-codigo','equip-status','equip-fabricante',
                  'equip-modelo','equip-fornecedor','equip-serie','equip-categoria',
-                 'equip-tipo','equip-unidade'];
+                 'equip-tipo','equip-unidade','equip-observacoes'];
     _equipFormSnapshot = ids.map(id => document.getElementById(id)?.value || '').join('|');
     _setEquipSaveBtn(false);
 }
 function _checkEquipChanges() {
     const ids = ['equip-nome','equip-codigo','equip-status','equip-fabricante',
                  'equip-modelo','equip-fornecedor','equip-serie','equip-categoria',
-                 'equip-tipo','equip-unidade'];
+                 'equip-tipo','equip-unidade','equip-observacoes'];
     const current = ids.map(id => document.getElementById(id)?.value || '').join('|');
     _setEquipSaveBtn(current !== _equipFormSnapshot || _equipImagens.length > 0);
 }

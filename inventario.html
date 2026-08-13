@@ -351,45 +351,67 @@
                 <h2>Equipamentos</h2>
             </div>
             <div class="header-controls">
-                <div class="search-wrap">
-                    <i class="ph ph-magnifying-glass search-icon"></i>
-                    <input type="text" id="equip-search-input" placeholder="Buscar equipamento..." class="search-input" oninput="filterEquipamentos()">
+                <div class="filter-popover-wrap">
+                    <button class="btn-filter-toggle" id="btn-equip-filter" onclick="toggleEquipFilterPanel()" title="Filtros">
+                        <i class="ph ph-funnel"></i>
+                    </button>
+                    <div class="filter-popover" id="equip-filter-panel">
+                        <div class="filter-popover-row">
+                            <span class="filter-chip-label">Categoria</span>
+                            <div class="filter-chip-group">
+                                <button class="filter-chip active" data-filter="equip" data-key="categoria" data-val="" onclick="toggleEquipFilterChip(this)">Todas</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Bioquímica" onclick="toggleEquipFilterChip(this)">Bioquímica</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Citologia" onclick="toggleEquipFilterChip(this)">Citologia</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Hematologia" onclick="toggleEquipFilterChip(this)">Hematologia</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Imuno-Hormônios" onclick="toggleEquipFilterChip(this)">Imuno-Hormônios</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Microbiologia" onclick="toggleEquipFilterChip(this)">Microbiologia</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Parasitologia" onclick="toggleEquipFilterChip(this)">Parasitologia</button>
+                                <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Urianálise" onclick="toggleEquipFilterChip(this)">Urianálise</button>
+                            </div>
+                        </div>
+                        <div class="filter-popover-row">
+                            <span class="filter-chip-label">Status</span>
+                            <div class="filter-chip-group">
+                                <button class="filter-chip active" data-filter="equip" data-key="status" data-val="" onclick="toggleEquipFilterChip(this)">Todos</button>
+                                <button class="filter-chip" data-filter="equip" data-key="status" data-val="Em Uso" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-uso"></span> Em Uso</button>
+                                <button class="filter-chip" data-filter="equip" data-key="status" data-val="Em Manutenção" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-manut"></span> Em Manutenção</button>
+                                <button class="filter-chip" data-filter="equip" data-key="status" data-val="Inativo" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-inativo"></span> Inativo</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <button class="btn-filter-toggle" id="btn-equip-filter" onclick="toggleFilterPanel('equip-filter-panel', this)" title="Filtros">
-                    <i class="ph ph-faders"></i>
-                </button>
-                <button class="btn-primary" onclick="openEquipModal()">
-                    <i class="ph ph-plus"></i> Novo Equipamento
-                </button>
+                <div class="estoque-mode-toggle">
+                    <button class="estoque-mode-btn active" id="equip-mode-btn-ativos" onclick="setEquipMode('ativos')">
+                        <i class="ph ph-desktop-tower"></i> Ativos
+                    </button>
+                    <button class="estoque-mode-btn" id="equip-mode-btn-dashboard" onclick="setEquipMode('dashboard')">
+                        <i class="ph ph-gauge"></i> Dashboard
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- Painel de filtros — Equipamentos -->
-        <div id="equip-filter-panel" class="filter-panel hidden">
-            <div class="filter-panel-inner">
-                <div class="filter-chip-group">
-                    <span class="filter-chip-label">Categoria</span>
-                    <button class="filter-chip active" data-filter="equip" data-key="categoria" data-val="" onclick="toggleEquipFilterChip(this)">Todas</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Bioquímica" onclick="toggleEquipFilterChip(this)">Bioquímica</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Citologia" onclick="toggleEquipFilterChip(this)">Citologia</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Hematologia" onclick="toggleEquipFilterChip(this)">Hematologia</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Imuno-Hormônios" onclick="toggleEquipFilterChip(this)">Imuno-Hormônios</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Microbiologia" onclick="toggleEquipFilterChip(this)">Microbiologia</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Parasitologia" onclick="toggleEquipFilterChip(this)">Parasitologia</button>
-                    <button class="filter-chip" data-filter="equip" data-key="categoria" data-val="Urianálise" onclick="toggleEquipFilterChip(this)">Urianálise</button>
-                </div>
-                <div class="filter-chip-group">
-                    <span class="filter-chip-label">Status</span>
-                    <button class="filter-chip active" data-filter="equip" data-key="status" data-val="" onclick="toggleEquipFilterChip(this)">Todos</button>
-                    <button class="filter-chip" data-filter="equip" data-key="status" data-val="Em Uso" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-uso"></span> Em Uso</button>
-                    <button class="filter-chip" data-filter="equip" data-key="status" data-val="Em Manutenção" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-manut"></span> Em Manutenção</button>
-                    <button class="filter-chip" data-filter="equip" data-key="status" data-val="Inativo" onclick="toggleEquipFilterChip(this)"><span class="status-dot-mini dot-inativo"></span> Inativo</button>
-                </div>
-                <button class="filter-clear-btn" onclick="clearEquipFilters()"><i class="ph ph-arrow-counter-clockwise"></i> Limpar filtros</button>
+        <div class="estoque-catalog-subbar" id="equip-ativos-subbar">
+            <div class="search-wrap">
+                <i class="ph ph-magnifying-glass search-icon"></i>
+                <input type="text" id="equip-search-input" placeholder="Buscar equipamento..." class="search-input" oninput="filterEquipamentos()">
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn-primary" onclick="openEquipModal()">
+                    <i class="ph ph-plus"></i> Adicionar Equipamento
+                </button>
+                <button class="btn-icon" id="equip-trash-btn" onclick="abrirLixeiraEquip()" title="Lixeira — equipamentos apagados ficam 30 dias aqui antes de sumir de vez">
+                    <i class="ph ph-trash"></i>
+                </button>
             </div>
         </div>
 
         <div id="equip-grid" class="equip-grid"></div>
+
+        <!-- Dashboard de Equipamentos — estrutura por enquanto, conteúdo vem depois -->
+        <div id="equip-dashboard-view" class="hidden">
+            <div class="estoque-empty"><i class="ph ph-gauge"></i> Dashboard de Equipamentos — em construção.</div>
+        </div>
     </section>
 
     <!-- ===== ESTOQUE VIEW ===== -->
@@ -430,21 +452,21 @@
                         <div class="filter-popover-row">
                             <span class="filter-chip-label">Status</span>
                             <div class="filter-chip-group">
-                                <button class="filter-chip active" data-key="status" data-val="todos" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-list"></i> Todos</button>
-                                <button class="filter-chip" data-key="status" data-val="azul" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-package"></i> Disponíveis</button>
-                                <button class="filter-chip" data-key="status" data-val="verde" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-check-circle"></i> Em uso</button>
-                                <button class="filter-chip" data-key="status" data-val="amarelo" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-wrench"></i> Manutenção</button>
-                                <button class="filter-chip" data-key="status" data-val="vermelho" onclick="toggleEstoqueFilterChip(this)"><i class="ph ph-warning-octagon"></i> Danificados</button>
+                                <button class="filter-chip active" data-key="status" data-val="todos" onclick="toggleEstoqueFilterChip(this)">Todos</button>
+                                <button class="filter-chip" data-key="status" data-val="azul" onclick="toggleEstoqueFilterChip(this)"><span class="status-dot-mini dot-disp"></span> Disponíveis</button>
+                                <button class="filter-chip" data-key="status" data-val="verde" onclick="toggleEstoqueFilterChip(this)"><span class="status-dot-mini dot-uso"></span> Em uso</button>
+                                <button class="filter-chip" data-key="status" data-val="amarelo" onclick="toggleEstoqueFilterChip(this)"><span class="status-dot-mini dot-manut"></span> Manutenção</button>
+                                <button class="filter-chip" data-key="status" data-val="vermelho" onclick="toggleEstoqueFilterChip(this)"><span class="status-dot-mini dot-inativo"></span> Danificados</button>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="estoque-mode-toggle">
                     <button class="estoque-mode-btn" id="estoque-mode-btn-catalogo" onclick="setEstoqueMode('catalogo')">
-                        <i class="ph ph-cube"></i> Estoque
+                        <i class="ph ph-cube"></i> Ativos
                     </button>
                     <button class="estoque-mode-btn active" id="estoque-mode-btn-unidades" onclick="setEstoqueMode('unidades')">
-                        <i class="ph ph-buildings"></i> Unidades
+                        <i class="ph ph-buildings"></i> Dashboard
                     </button>
                 </div>
             </div>
@@ -452,7 +474,7 @@
         <div class="estoque-catalog-subbar hidden" id="estoque-catalog-view-toggle">
             <div class="estoque-mode-toggle estoque-mode-toggle-sm">
                 <button class="estoque-mode-btn active" id="estoque-catalog-view-btn-grafico" onclick="setEstoqueCatalogView('grafico')">
-                    <i class="ph ph-squares-four"></i> Gráfico
+                    <i class="ph ph-squares-four"></i> Templates
                 </button>
                 <button class="estoque-mode-btn" id="estoque-catalog-view-btn-lista" onclick="setEstoqueCatalogView('lista')">
                     <i class="ph ph-table"></i> Lista
@@ -526,9 +548,9 @@
                 <div class="form-group"><label>Nome / Guichê</label><input type="text" id="comp-name"></div>
                 <div class="form-group"><label>Status do Equipamento</label>
                     <select id="comp-status">
-                        <option value="ativo">✅ Ativo</option>
-                        <option value="inativo">❌ Inativo</option>
-                        <option value="manutencao">🔧 Em Manutenção</option>
+                        <option value="ativo">Ativo</option>
+                        <option value="inativo">Inativo</option>
+                        <option value="manutencao">Em Manutenção</option>
                     </select>
                 </div>
             </div>
@@ -628,14 +650,19 @@
 
 <!-- Mobile Modal -->
 <div id="mobile-modal" class="modal hidden">
-    <div class="modal-content medium-modal">
-        <div class="modal-header-row">
-            <h3 id="mob-modal-title">Novo Celular</h3>
-            <div style="display:flex;gap:8px;">
-                <button class="btn-icon hidden" id="mob-edit-btn" onclick="_editarMobileModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
-                <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+    <div class="modal-content medium-modal form-modal">
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-device-mobile"></i></div>
+                <div class="eqd-header-name" id="mob-modal-title">Novo Celular</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn hidden" id="mob-edit-btn" onclick="_editarMobileModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="eqd-icon-btn" onclick="closeModals()" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
+        <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="mob-id">
         <div class="form-group preset-bar" id="mob-preset-bar">
             <label>Modelo Pré-Cadastrado <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerenciados em Configurações)</span></label>
@@ -659,16 +686,17 @@
             </div>
             <div class="form-group" id="mob-status-group"><label>Status</label>
                 <select id="mob-status" onchange="_toggleMotivoMobile()">
-                    <option value="disponivel">🔵 Disponível</option>
-                    <option value="em_uso">🟢 Em Uso</option>
-                    <option value="manutencao">🟡 Manutenção</option>
-                    <option value="danificado">🔴 Danificado</option>
+                    <option value="disponivel">Disponível</option>
+                    <option value="em_uso">Em Uso</option>
+                    <option value="manutencao">Manutenção</option>
+                    <option value="danificado">Danificado</option>
                 </select>
             </div>
         </div>
         <div class="form-group hidden" id="mob-motivo-group"><label>Motivo (dano / manutenção)</label><textarea id="mob-motivo" rows="2" placeholder="Descreva o que aconteceu com o aparelho..." style="width:100%;font-family:inherit;font-size:.85rem;padding:8px;border:1px solid var(--border);border-radius:var(--r);"></textarea></div>
         <button type="button" class="btn-consertado hidden" id="mob-consertado-btn" onclick="_consertarMobile()" style="margin-bottom:10px;"><i class="ph ph-wrench"></i> Consertado — volta pra Em Uso / Disponível</button>
         <p class="tpl-link-box" id="mob-loc-info" style="display:none;"></p>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions"><button class="btn-secondary" onclick="closeModals()">Cancelar</button><button class="btn-primary" id="mob-save-btn" onclick="saveMobile()">Salvar</button></div>
     </div>
 </div>
@@ -743,14 +771,19 @@
 
 <!-- AC Modal -->
 <div id="ac-modal" class="modal hidden">
-    <div class="modal-content medium-modal">
-        <div class="modal-header-row">
-            <h3 id="ac-modal-title">Novo Ar-Condicionado</h3>
-            <div style="display:flex;gap:8px;">
-                <button class="btn-icon hidden" id="ac-edit-btn" onclick="_editarAcModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
-                <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+    <div class="modal-content medium-modal form-modal">
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-snowflake"></i></div>
+                <div class="eqd-header-name" id="ac-modal-title">Novo Ar-Condicionado</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn hidden" id="ac-edit-btn" onclick="_editarAcModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="eqd-icon-btn" onclick="closeModals()" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
+        <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="ac-id">
         <div class="form-group preset-bar" id="ac-preset-bar">
             <label>Modelo Pré-Cadastrado <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerenciados em Configurações)</span></label>
@@ -771,10 +804,10 @@
             <div class="form-group"><label>Nº de Série</label><input type="text" id="ac-serial" placeholder="Número de série"></div>
             <div class="form-group"><label>Status</label>
                 <select id="ac-status" onchange="_acToggleLocation(); _toggleMotivoAc()">
-                    <option value="disponivel">🔵 Disponível</option>
-                    <option value="ativo">🟢 Em Uso</option>
-                    <option value="manutencao">🟡 Manutenção</option>
-                    <option value="danificado">🔴 Danificado</option>
+                    <option value="disponivel">Disponível</option>
+                    <option value="ativo">Em Uso</option>
+                    <option value="manutencao">Manutenção</option>
+                    <option value="danificado">Danificado</option>
                 </select>
             </div>
         </div>
@@ -784,6 +817,7 @@
         <div class="form-group"><label>Observações</label><input type="text" id="ac-notes" placeholder="Ex: Filtro higienizado jun/2024..."></div>
         <input type="hidden" id="ac-install-date"><input type="hidden" id="ac-last-maint">
         <p class="tpl-link-box" id="ac-loc-info" style="display:none;"></p>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions"><button class="btn-secondary" onclick="closeModals()">Cancelar</button><button class="btn-primary" id="ac-save-btn" onclick="saveAc()">Salvar</button></div>
     </div>
 </div>
@@ -867,8 +901,24 @@
                 <ul id="list-categorias-equip" class="equip-config-list"></ul>
             </div>
         </div>
+        <!-- Setores / Categorias de Acessos (3ª coluna) -->
+        <div class="config-section">
+            <div class="config-section-header">
+                <i class="ph ph-shield-check"></i>
+                <h4>Setores / Categorias de Acessos</h4>
+                <button class="cfg-md-fab-header" onclick="abrirCategoriaAcesso(null)" title="Novo setor / categoria">
+                    <i class="ph ph-plus"></i>
+                </button>
+            </div>
+            <div class="cfg-eq-single">
+                <p class="cfg-eq-hint">Crie os setores dos Acessos Corporativos e escolha a cor de identificação de cada um.</p>
+                <ul id="list-categorias-acesso" class="equip-config-list"></ul>
+            </div>
+        </div>
         </div><!-- /cfg-two-col -->
 
+        <!-- Backup + Logs lado a lado -->
+        <div class="cfg-cols-2">
         <!-- Backup e Restauração -->
         <div class="config-section">
             <div class="config-section-header">
@@ -897,19 +947,91 @@
                     </button>
                 </div>
                 <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(this)">
-                <div class="backup-card">
-                    <div class="backup-card-icon"><i class="ph ph-clock-counter-clockwise"></i></div>
-                    <div class="backup-card-info">
-                        <strong>Logs do Inventário</strong>
-                        <span>Rastreabilidade: veja todas as modificações, quem fez e quando</span>
-                    </div>
-                    <button class="btn-secondary" onclick="abrirLogsEquipamento(null)">
-                        <i class="ph ph-clock-counter-clockwise"></i> Ver Logs
-                    </button>
-                </div>
             </div>
         </div>
 
+        <!-- Logs do Inventário (card próprio) -->
+        <div class="config-section">
+            <div class="config-section-header">
+                <i class="ph ph-clock-counter-clockwise"></i>
+                <h4>Logs do Inventário</h4>
+            </div>
+            <div class="backup-restore-area cfg-log-grid">
+                <div class="backup-card">
+                    <div class="backup-card-icon"><i class="ph ph-gauge"></i></div>
+                    <div class="backup-card-info">
+                        <strong>Logs do Dashboard</strong>
+                        <span>O que foi adicionado, editado ou retirado nas unidades: guichês, templates e acessos</span>
+                    </div>
+                    <div class="cfg-log-btns">
+                        <button class="btn-icon-only" onclick="abrirLogsEquipamento(null,'dashboard')" title="Ver logs"><i class="ph ph-eye"></i></button>
+                        <button class="btn-icon-only" onclick="baixarLogsInventario('dashboard')" title="Baixar logs"><i class="ph ph-download-simple"></i></button>
+                    </div>
+                </div>
+                <div class="backup-card">
+                    <div class="backup-card-icon"><i class="ph ph-desktop-tower"></i></div>
+                    <div class="backup-card-info">
+                        <strong>Logs de Equipamentos</strong>
+                        <span>Da seção Equipamentos: cadastro, edição e exclusão dos equipamentos</span>
+                    </div>
+                    <div class="cfg-log-btns">
+                        <button class="btn-icon-only" onclick="abrirLogsEquipamento(null,'equip')" title="Ver logs"><i class="ph ph-eye"></i></button>
+                        <button class="btn-icon-only" onclick="baixarLogsInventario('equip')" title="Baixar logs"><i class="ph ph-download-simple"></i></button>
+                    </div>
+                </div>
+                <div class="backup-card">
+                    <div class="backup-card-icon"><i class="ph ph-package"></i></div>
+                    <div class="backup-card-info">
+                        <strong>Logs do Estoque</strong>
+                        <span>Peças, licenças, celulares, ACs, periféricos e a lixeira</span>
+                    </div>
+                    <div class="cfg-log-btns">
+                        <button class="btn-icon-only" onclick="abrirLogsEquipamento(null,'estoque')" title="Ver logs"><i class="ph ph-eye"></i></button>
+                        <button class="btn-icon-only" onclick="baixarLogsInventario('estoque')" title="Baixar logs"><i class="ph ph-download-simple"></i></button>
+                    </div>
+                </div>
+                <div class="backup-card">
+                    <div class="backup-card-icon"><i class="ph ph-wrench"></i></div>
+                    <div class="backup-card-info">
+                        <strong>Logs de Manutenção</strong>
+                        <span>Templates de PC: peça com problema/consertada, desmontagem e transferência</span>
+                    </div>
+                    <div class="cfg-log-btns">
+                        <button class="btn-icon-only" onclick="abrirLogsEquipamento(null,'manutencao')" title="Ver logs"><i class="ph ph-eye"></i></button>
+                        <button class="btn-icon-only" onclick="baixarLogsInventario('manutencao')" title="Baixar logs"><i class="ph ph-download-simple"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div><!-- /cfg-cols-2 -->
+
+    </div>
+</div>
+
+<!-- Modal: novo/editar Setor / Categoria de Acesso (nome + cor) -->
+<div id="cat-acesso-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:420px;">
+        <div class="config-page-header" style="margin:-28px -32px 18px;height:auto;padding:18px 32px;">
+            <div class="view-title"><i class="ph ph-shield-check"></i><h2 id="cat-acesso-title">Novo Setor / Categoria</h2></div>
+            <button class="btn-icon" onclick="fecharCategoriaAcesso()"><i class="ph ph-x"></i></button>
+        </div>
+        <input type="hidden" id="cat-acesso-id">
+        <div class="form-group">
+            <label>Nome do setor / categoria</label>
+            <input type="text" id="cat-acesso-nome" placeholder="Ex: Financeiro">
+        </div>
+        <div class="form-group">
+            <label>Cor de identificação</label>
+            <div class="cat-acesso-swatches" id="cat-acesso-swatches"></div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+                <input type="color" id="cat-acesso-cor" value="#1e3a8a" style="width:56px;height:38px;padding:2px;cursor:pointer;">
+                <span style="font-size:.78rem;color:var(--text-muted);">Escolha uma cor pronta ou personalize aqui.</span>
+            </div>
+        </div>
+        <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
+            <button class="btn-secondary" onclick="fecharCategoriaAcesso()">Cancelar</button>
+            <button class="btn-primary" onclick="salvarCategoriaAcesso()"><i class="ph ph-check"></i> Salvar</button>
+        </div>
     </div>
 </div>
 
@@ -1061,26 +1183,48 @@
 
 <!-- Modal: Criar / Editar Template de PC -->
 <div id="pc-preset-modal" class="modal hidden">
-    <div class="modal-content large-modal">
-        <div class="modal-header-row">
-            <h3 id="pc-preset-title"><i class="ph ph-desktop"></i> Novo Template de PC</h3>
-            <button class="btn-icon" onclick="document.getElementById('pc-preset-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+    <div class="modal-content large-modal form-modal">
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-desktop"></i></div>
+                <div class="eqd-header-name" id="pc-preset-title">Novo Template de PC</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="document.getElementById('pc-preset-modal').classList.add('hidden')" title="Fechar"><i class="ph ph-x"></i></button>
+            </div>
         </div>
+        <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
+
         <input type="hidden" id="inl-pc-index">
         <input type="hidden" id="inl-pc-orig-unitid">
         <input type="hidden" id="inl-pc-orig-compid">
-        <div class="grid-2-col">
-            <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="inl-pc-name" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
-            <div class="form-group" id="pc-preset-status-group" style="display:none;"><label>Status</label>
-                <select id="inl-pc-status">
-                    <option value="ativo">✅ Ativo</option>
-                    <option value="inativo">❌ Inativo</option>
-                    <option value="manutencao">🔧 Em Manutenção</option>
-                </select>
+
+        <!-- BLOCO 1 · INFORMAÇÃO -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-identification-badge"></i> Informação
+            </div>
+            <div class="grid-2-col">
+                <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="inl-pc-name" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
+                <div class="form-group" id="pc-preset-status-group" style="display:none;">
+                    <label>Status</label>
+                    <input type="hidden" id="inl-pc-status" value="ativo">
+                    <div class="equip-status-btns" id="pc-preset-status-btns">
+                        <button type="button" class="equip-status-btn st-uso" data-val="ativo" onclick="setPcPresetStatus('ativo')"><i class="ph ph-check-circle"></i> Ativo</button>
+                        <button type="button" class="equip-status-btn st-manut" data-val="manutencao" onclick="setPcPresetStatus('manutencao')"><i class="ph ph-wrench"></i> Manutenção</button>
+                        <button type="button" class="equip-status-btn st-inativo" data-val="inativo" onclick="setPcPresetStatus('inativo')"><i class="ph ph-prohibit"></i> Inativo</button>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="form-section pc-preset-loc-highlight" id="pc-preset-location-section" style="display:none;">
-            <h4><i class="ph ph-map-pin"></i> Localização <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(pra qual Guichê já cadastrado este Hardware vai)</span></h4>
+
+        <!-- BLOCO 2 · LOCALIZAÇÃO -->
+        <div class="equip-form-block pc-preset-loc-highlight" id="pc-preset-location-section" style="display:none;">
+            <div class="equip-section-divider">
+                <i class="ph ph-map-pin"></i> Localização
+                <span class="equip-block-hint">pra qual Guichê já cadastrado este Hardware vai</span>
+            </div>
             <p class="cfg-eq-hint" id="inl-pc-local-atual" style="margin-bottom:8px;"></p>
             <div class="grid-2-col">
                 <div class="form-group"><label>Unidade</label><select id="inl-pc-unit" onchange="_atualizarSelectGuiche()"></select></div>
@@ -1088,8 +1232,13 @@
             </div>
             <p class="cfg-eq-hint" id="inl-pc-compname-warning" style="display:none;color:var(--red);"></p>
         </div>
-        <div class="form-section">
-            <h4><i class="ph ph-cpu"></i> Peças <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(escolhidas do que está Disponível na Lista do Estoque)</span></h4>
+
+        <!-- BLOCO 3 · PEÇAS -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-cpu"></i> Peças
+                <span class="equip-block-hint">escolhidas do que está Disponível na Lista do Estoque</span>
+            </div>
             <div class="grid-2-col">
                 <div class="periph-preview-item"><label>Modelo da Máquina</label><div class="periph-preview-box" id="part-preview-model"><span class="hw-preview-empty">Nenhuma</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('model')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
                 <div class="periph-preview-item"><label>Processador</label><div class="periph-preview-box" id="part-preview-cpu"><span class="hw-preview-empty">Nenhuma</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('cpu')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
@@ -1100,8 +1249,12 @@
                 <div class="periph-preview-item"><label>Monitor</label><div class="periph-preview-box" id="part-preview-monitor"><span class="hw-preview-empty">Nenhum</span></div><button type="button" class="btn-secondary" onclick="abrirSeletorPeca('monitor')"><i class="ph ph-list-magnifying-glass"></i> Selecionar</button></div>
             </div>
         </div>
-        <div class="form-section">
-            <h4><i class="ph ph-windows-logo"></i> Software</h4>
+
+        <!-- BLOCO 4 · SOFTWARE E LICENÇA -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-windows-logo"></i> Software e Licença
+            </div>
             <div class="grid-3-col">
                 <div class="form-group"><label>Sistema Operacional</label>
                     <select id="inl-pc-os">
@@ -1132,8 +1285,13 @@
                 <div id="inl-pc-license-preview" class="hw-preview-box"><span class="hw-preview-empty">Nenhuma licença selecionada.</span></div>
             </div>
         </div>
-        <div class="form-section pc-preset-acessos-highlight">
-            <h4><i class="ph ph-key"></i> Acessos &amp; Senhas <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(deste computador — vai junto com o Hardware)</span></h4>
+
+        <!-- BLOCO 5 · ACESSOS E SENHAS -->
+        <div class="equip-form-block pc-preset-acessos-highlight">
+            <div class="equip-section-divider">
+                <i class="ph ph-key"></i> Acessos e Senhas
+                <span class="equip-block-hint">deste computador — vai junto com o Hardware</span>
+            </div>
             <div class="grid-3-col">
                 <div class="form-group"><label>Senha Guichê</label><input type="text" id="inl-pc-pcpass"></div>
                 <div class="form-group"><label>AnyDesk ID</label><input type="text" id="inl-pc-anyid"></div>
@@ -1142,11 +1300,13 @@
                 <div class="form-group"><label>Senha RDP</label><input type="text" id="inl-pc-rdppass"></div>
             </div>
         </div>
+
         <!-- Campos-espelho ocultos: strings hw_* derivadas das peças (o resto do app lê daqui) -->
         <div class="hidden">
             <input type="text" id="inl-pc-model"><input type="text" id="inl-pc-cpu"><input type="text" id="inl-pc-mobo">
             <input type="text" id="inl-pc-ram"><input type="text" id="inl-pc-disk"><input type="text" id="inl-pc-gpu"><input type="text" id="inl-pc-monitor">
         </div>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions">
             <button class="btn-secondary" onclick="document.getElementById('pc-preset-modal').classList.add('hidden')">Cancelar</button>
             <button class="btn-primary" onclick="savePcPresetModal()"><i class="ph ph-floppy-disk"></i> Salvar Template</button>
@@ -1168,14 +1328,19 @@
 
 <!-- Modal: Entrada de novo item (peça) no almoxarifado -->
 <div id="part-entry-modal" class="modal hidden">
-    <div class="modal-content small-modal">
-        <div class="modal-header-row">
-            <h3 id="part-entry-title"><i class="ph ph-cpu"></i> Entrada de Peça</h3>
-            <div style="display:flex;gap:8px;">
-                <button class="btn-icon hidden" id="part-entry-edit-btn" onclick="_editarPecaModal()" title="Editar especificação e status"><i class="ph ph-pencil-simple"></i></button>
-                <button class="btn-icon" onclick="document.getElementById('part-entry-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+    <div class="modal-content small-modal form-modal">
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-cpu" id="part-entry-title-icon"></i></div>
+                <div class="eqd-header-name" id="part-entry-title">Entrada de Peça</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn hidden" id="part-entry-edit-btn" onclick="_editarPecaModal()" title="Editar especificação e status"><i class="ph ph-pencil-simple"></i></button>
+                <button class="eqd-icon-btn" onclick="document.getElementById('part-entry-modal').classList.add('hidden')" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
+        <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="part-entry-tipo">
         <input type="hidden" id="part-entry-id">
         <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(não pode ser alterado)</span></label><input type="text" id="part-entry-serial" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
@@ -1191,13 +1356,16 @@
         </div>
         <div class="form-group" id="part-entry-spec-group"><label>Especificação</label><input type="text" id="part-entry-spec" placeholder="Ex: 8GB DDR4 2666MHz"></div>
         <div class="form-group hidden" id="part-entry-status-group"><label>Status</label>
-            <select id="part-entry-status" onchange="document.getElementById('part-entry-motivo-group').classList.toggle('hidden', !['danificado','manutencao','descartado'].includes(this.value))">
-                <option value="disponivel">🔵 Disponível</option>
-                <option value="em_uso">🟢 Em Uso</option>
-                <option value="manutencao">🟡 Manutenção</option>
-                <option value="danificado">🔴 Danificada</option>
-                <option value="descartado">⚫ Descartada</option>
-            </select>
+            <div class="status-select-wrap">
+                <span class="equip-status-dot equip-status-dot-inline" id="part-entry-status-dot"></span>
+                <select id="part-entry-status" onchange="_syncPartEntryStatusDot(); document.getElementById('part-entry-motivo-group').classList.toggle('hidden', !['danificado','manutencao','descartado'].includes(this.value))">
+                    <option value="disponivel">Disponível</option>
+                    <option value="em_uso">Em Uso</option>
+                    <option value="manutencao">Manutenção</option>
+                    <option value="danificado">Danificada</option>
+                    <option value="descartado">Descartada</option>
+                </select>
+            </div>
         </div>
         <div class="form-group hidden" id="part-entry-motivo-group"><label>Motivo (dano / manutenção)</label><textarea id="part-entry-motivo" rows="2" placeholder="Descreva o que aconteceu com a peça..." style="width:100%;font-family:inherit;font-size:.85rem;padding:8px;border:1px solid var(--border);border-radius:var(--r);"></textarea></div>
         <div style="display:flex;gap:8px;margin-bottom:10px;">
@@ -1206,6 +1374,7 @@
         </div>
         <p class="tpl-link-box" id="part-entry-template-info" style="display:none;"></p>
         <p class="cfg-eq-hint" id="part-entry-nova-hint">O item entra no estoque com status <strong>Disponível</strong>.</p>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions" id="part-entry-actions">
             <button class="btn-secondary" onclick="document.getElementById('part-entry-modal').classList.add('hidden')">Cancelar</button>
             <button class="btn-primary" id="part-entry-save-btn" onclick="_salvarEntradaPeca()"><i class="ph ph-floppy-disk"></i> Registrar Entrada</button>
@@ -1217,8 +1386,17 @@
 <div id="trash-modal" class="modal hidden">
     <div class="modal-content medium-modal">
         <div class="modal-header-row">
-            <h3><i class="ph ph-trash"></i> Lixeira <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(itens ficam 30 dias antes de sumir de vez)</span></h3>
+            <h3 id="trash-modal-title"><i class="ph ph-trash"></i> Lixeira <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(itens ficam 30 dias antes de sumir de vez)</span></h3>
             <button class="btn-icon" onclick="document.getElementById('trash-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+        </div>
+        <div id="trash-modal-bar" class="trash-bar hidden">
+            <label class="trash-check-all">
+                <input type="checkbox" id="trash-check-all" onchange="_trashMarcarTodos(this.checked)">
+                <span>Selecionar todos</span>
+            </label>
+            <button class="btn-small" id="trash-del-sel-btn" onclick="excluirSelecionadosDaLixeira()" style="color:var(--red);" disabled>
+                <i class="ph ph-trash"></i> Apagar selecionados
+            </button>
         </div>
         <div id="trash-modal-body" class="logs-modal-body"></div>
     </div>
@@ -1229,22 +1407,31 @@
     <div class="modal-content medium-modal">
         <div class="modal-header-row">
             <h3 id="logs-modal-title"><i class="ph ph-clock-counter-clockwise"></i> Logs do Inventário</h3>
-            <button class="btn-icon" onclick="document.getElementById('logs-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+            <div style="display:flex;gap:6px;">
+                <button class="btn-icon" onclick="baixarLogsModalAtual()" title="Baixar este histórico"><i class="ph ph-download-simple"></i></button>
+                <button class="btn-icon" onclick="document.getElementById('logs-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+            </div>
         </div>
+        <div id="logs-nav-inv" class="logs-nav-inv"></div>
         <div id="logs-modal-body" class="logs-modal-body"></div>
     </div>
 </div>
 
 <!-- Modal: Entrada de Licença de Software no estoque -->
 <div id="license-entry-modal" class="modal hidden">
-    <div class="modal-content medium-modal">
-        <div class="modal-header-row">
-            <h3 id="lic-entry-title"><i class="ph ph-certificate"></i> Entrada de Licença de Software</h3>
-            <div style="display:flex;gap:8px;">
-                <button class="btn-icon hidden" id="lic-entry-edit-btn" onclick="_editarLicencaModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
-                <button class="btn-icon" onclick="document.getElementById('license-entry-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+    <div class="modal-content medium-modal form-modal">
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-certificate"></i></div>
+                <div class="eqd-header-name" id="lic-entry-title">Entrada de Licença de Software</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn hidden" id="lic-entry-edit-btn" onclick="_editarLicencaModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="eqd-icon-btn" onclick="document.getElementById('license-entry-modal').classList.add('hidden')" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
+        <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="lic-entry-id">
         <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="lic-entry-serial" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
         <div class="grid-2-col">
@@ -1268,6 +1455,7 @@
         <div class="form-group"><label>Observações</label><input type="text" id="lic-entry-notes" placeholder="Ex: Renovar em dezembro..."></div>
         <p class="cfg-eq-hint" id="lic-entry-nova-hint">A licença entra no estoque com status <strong>Disponível</strong> — ela é atrelada a um PC na montagem do Template.</p>
         <p class="tpl-link-box" id="lic-entry-template-info" style="display:none;"></p>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions">
             <button class="btn-secondary" onclick="document.getElementById('license-entry-modal').classList.add('hidden')">Cancelar</button>
             <button class="btn-primary" id="lic-entry-save-btn" onclick="_salvarEntradaLicenca()"><i class="ph ph-floppy-disk"></i> Registrar Entrada</button>
@@ -1277,24 +1465,29 @@
 
 <!-- Equip Preset Modal — Impressora/Etiquetadora/Térmica/Webcam/TV -->
 <div id="equip-preset-modal" class="modal hidden">
-    <div class="modal-content medium-modal">
-        <div class="modal-header-row">
-            <h3 id="equip-preset-title"><i class="ph ph-printer"></i> Equipamento</h3>
-            <div style="display:flex;gap:8px;">
-                <button class="btn-icon hidden" id="eq-preset-edit-btn" onclick="_editarEquipModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
-                <button class="btn-icon" onclick="document.getElementById('equip-preset-modal').classList.add('hidden')"><i class="ph ph-x"></i></button>
+    <div class="modal-content medium-modal form-modal">
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-printer" id="equip-preset-title-icon"></i></div>
+                <div class="eqd-header-name" id="equip-preset-title">Equipamento</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn hidden" id="eq-preset-edit-btn" onclick="_editarEquipModal()" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                <button class="eqd-icon-btn" onclick="document.getElementById('equip-preset-modal').classList.add('hidden')" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
         </div>
+        <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="eq-preset-type">
         <input type="hidden" id="eq-preset-id">
         <div class="grid-2-col">
             <div class="form-group"><label>Código do Produto <span style="font-weight:400;color:#94a3b8;font-size:.72rem;">(gerado automaticamente)</span></label><input type="text" id="eq-preset-serial" readonly style="background:var(--surface-2);cursor:default;font-weight:700;letter-spacing:.03em;"></div>
             <div class="form-group"><label>Status</label>
                 <select id="eq-preset-status" onchange="_toggleMotivoEquip()">
-                    <option value="disponivel">🔵 Disponível</option>
-                    <option value="em_uso">🟢 Em Uso</option>
-                    <option value="manutencao">🟡 Manutenção</option>
-                    <option value="danificado">🔴 Danificado</option>
+                    <option value="disponivel">Disponível</option>
+                    <option value="em_uso">Em Uso</option>
+                    <option value="manutencao">Manutenção</option>
+                    <option value="danificado">Danificado</option>
                 </select>
             </div>
         </div>
@@ -1314,6 +1507,7 @@
             </div>
         </div>
         <div class="form-group"><label>Observações</label><input type="text" id="eq-preset-notes" placeholder="Ex: trocado o toner em..."></div>
+        </div><!-- /form-modal-scroll -->
         <div class="modal-actions">
             <button class="btn-secondary" onclick="document.getElementById('equip-preset-modal').classList.add('hidden')">Cancelar</button>
             <button class="btn-primary" onclick="_saveEquipModal()"><i class="ph ph-floppy-disk"></i> Salvar</button>
@@ -1383,82 +1577,126 @@
 
 <!-- Modal: Cadastrar / Editar Equipamento -->
 <div id="equip-modal" class="modal hidden">
-    <div class="modal-content equip-edit-modal">
-        <div class="modal-header-row">
-            <h3 id="equip-modal-title"><i class="ph ph-desktop-tower"></i> Novo Equipamento</h3>
-            <button class="btn-icon" onclick="closeModals()"><i class="ph ph-x"></i></button>
+    <div class="modal-content equip-edit-modal form-modal">
+        <div class="form-modal-header">
+            <div class="eqd-header-left">
+                <div class="eqd-header-icon-box"><i class="ph ph-monitor"></i></div>
+                <div class="eqd-header-name" id="equip-modal-title">Novo Equipamento</div>
+            </div>
+            <div class="eqd-header-right">
+                <button class="eqd-icon-btn" onclick="closeModals()" title="Fechar"><i class="ph ph-x"></i></button>
+            </div>
         </div>
+        <div class="form-modal-stripe"></div>
+        <div class="form-modal-scroll">
         <input type="hidden" id="equip-id">
 
-        <div class="grid-3-col">
-            <div class="form-group">
-                <label>Categoria</label>
-                <select id="equip-categoria" onchange="onEquipCategoriaChange(this.value)">
-                    <option value="">— Selecione —</option>
-                </select>
+        <!-- ── BLOCO 1 · IDENTIFICAÇÃO ── -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-identification-badge"></i> Identificação
             </div>
-            <div class="form-group">
-                <label>Código / Patrimônio</label>
-                <input type="text" id="equip-codigo" placeholder="Selecione uma categoria" readonly style="background:var(--surface-2);cursor:default;">
-            </div>
-            <div class="form-group"><label>Status</label>
-                <select id="equip-status">
-                    <option value="Em Uso">Em Uso</option>
-                    <option value="Em Manutenção">Em Manutenção</option>
-                    <option value="Inativo">Inativo</option>
-                </select>
-            </div>
-
-            <div class="equip-cfg-notice" style="grid-column:1/-1;">
-                <i class="ph ph-info"></i>
-                <span>Categoria, Fabricante/Marca, Fornecedor e Tipo/Subtipo são cadastrados em <strong>Configurações → Informações dos Equipamentos</strong></span>
-            </div>
-
-            <div class="form-group"><label>Nome do Equipamento *</label><input type="text" id="equip-nome" placeholder="Ex: LABMAX 400"></div>
-            <div class="form-group"><label>Modelo *</label><input type="text" id="equip-modelo" placeholder="Ex: Labmax 400 TS"></div>
-            <div class="form-group"><label>Número de Série *</label><input type="text" id="equip-serie" placeholder="Ex: 2230.131.010"></div>
-
-            <div class="form-group">
-                <label>Fabricante / Marca</label>
-                <select id="equip-fabricante"><option value="">— Selecione —</option></select>
-            </div>
-            <div class="form-group">
-                <label>Fornecedor</label>
-                <select id="equip-fornecedor"><option value="">— Selecione —</option></select>
-            </div>
-            <div class="form-group">
-                <label>Tipo / Subtipo</label>
-                <div class="equip-tipo-wrap">
-                    <select id="equip-tipo" style="flex:1;"><option value="">— Selecione —</option></select>
-                    <button type="button" class="equip-lock-btn" id="equip-tipo-lock" onclick="toggleTipoLock()" title="Travar / Destravar">
-                        <i class="ph ph-lock-simple" id="equip-tipo-lock-icon"></i>
-                    </button>
+            <div class="grid-2-col">
+                <div class="form-group"><label>Nome do Ativo *</label><input type="text" id="equip-nome" placeholder="Ex: LABMAX 400"></div>
+                <div class="form-group">
+                    <label>Código / Patrimônio</label>
+                    <input type="text" id="equip-codigo" placeholder="Selecione um Setor" readonly style="background:var(--surface-2);cursor:default;">
+                </div>
+                <div class="form-group">
+                    <label>Tipo / Subtipo</label>
+                    <div class="equip-tipo-wrap">
+                        <select id="equip-tipo" style="flex:1;"><option value="">— Selecione —</option></select>
+                        <button type="button" class="equip-lock-btn" id="equip-tipo-lock" onclick="toggleTipoLock()" title="Travar / Destravar">
+                            <i class="ph ph-lock-simple" id="equip-tipo-lock-icon"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Setor *</label>
+                    <select id="equip-categoria" onchange="onEquipCategoriaChange(this.value)">
+                        <option value="">— Selecione —</option>
+                    </select>
                 </div>
             </div>
-
-            <div class="form-group" style="grid-column:1/-1;"><label>Localização</label>
-                <select id="equip-unidade"><option value="">— Selecione —</option></select>
+            <div class="equip-cfg-notice">
+                <i class="ph ph-info"></i>
+                <span>Setor, Fabricante/Marca, Fornecedor e Tipo/Subtipo são cadastrados em <strong>Configurações → Informações dos Equipamentos</strong></span>
             </div>
         </div>
-        <!-- ── IMAGENS ── -->
-        <div class="equip-section-divider">
-            <i class="ph ph-images"></i> Imagens do Equipamento
-            <span style="font-weight:400;font-size:.75rem;color:#94a3b8;">máx. 1MB · JPG, PNG, WEBP</span>
-        </div>
-        <div class="equip-thumbs-grid" id="equip-thumbs-grid">
-            <div class="equip-thumb-add" onclick="document.getElementById('equip-img-file').click()">
-                <i class="ph ph-plus"></i><span>Adicionar</span>
+
+        <!-- ── BLOCO 2 · ESPECIFICAÇÕES TÉCNICAS ── -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-wrench"></i> Especificações Técnicas
+            </div>
+            <div class="grid-2-col">
+                <div class="form-group">
+                    <label>Marca</label>
+                    <select id="equip-fabricante"><option value="">— Selecione —</option></select>
+                </div>
+                <div class="form-group"><label>Modelo *</label><input type="text" id="equip-modelo" placeholder="Ex: Labmax 400 TS"></div>
+                <div class="form-group">
+                    <label>Fornecedor</label>
+                    <select id="equip-fornecedor"><option value="">— Selecione —</option></select>
+                </div>
+                <div class="form-group"><label>Número de Série *</label><input type="text" id="equip-serie" placeholder="Ex: 2230.131.010"></div>
             </div>
         </div>
-        <input type="file" id="equip-img-file" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handleEquipImgUpload(this)">
 
-        <!-- ── DOCUMENTOS ── -->
-        <div class="equip-section-divider" style="margin-top:12px;">
-            <i class="ph ph-paperclip"></i> Documentos / Anexos
-            <span style="font-weight:400;font-size:.75rem;color:#94a3b8;">enviados ao Google Drive</span>
+        <!-- ── BLOCO 3 · OBSERVAÇÕES ── -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-clipboard-text"></i> Observações
+            </div>
+            <div class="grid-2-col">
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label>Status</label>
+                    <input type="hidden" id="equip-status" value="Em Uso">
+                    <div class="equip-status-btns" id="equip-status-btns">
+                        <button type="button" class="equip-status-btn st-uso" data-val="Em Uso" onclick="setEquipStatus('Em Uso')">
+                            <i class="ph ph-check-circle"></i> Em Uso
+                        </button>
+                        <button type="button" class="equip-status-btn st-manut" data-val="Em Manutenção" onclick="setEquipStatus('Em Manutenção')">
+                            <i class="ph ph-wrench"></i> Em Manutenção
+                        </button>
+                        <button type="button" class="equip-status-btn st-inativo" data-val="Inativo" onclick="setEquipStatus('Inativo')">
+                            <i class="ph ph-prohibit"></i> Inativo
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label>Localização</label>
+                    <select id="equip-unidade"><option value="">— Selecione —</option></select>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label>Observações</label>
+                    <textarea id="equip-observacoes" rows="3" placeholder="Ex: Registro ANVISA, particularidades do equipamento..."></textarea>
+                </div>
+            </div>
         </div>
-        <!-- Lista de docs já salvos + pendentes -->
-        <div id="equip-docs-edit-list" class="equip-docs-edit-list"></div>
+
+        <!-- ── BLOCO 4 · IMAGENS ── -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-images"></i> Imagens do Equipamento
+                <span class="equip-block-hint">máx. 1MB · JPG, PNG, WEBP</span>
+            </div>
+            <div class="equip-thumbs-grid" id="equip-thumbs-grid">
+                <div class="equip-thumb-add" onclick="document.getElementById('equip-img-file').click()">
+                    <i class="ph ph-plus"></i><span>Adicionar</span>
+                </div>
+            </div>
+            <input type="file" id="equip-img-file" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handleEquipImgUpload(this)">
+        </div>
+
+        <!-- ── BLOCO 5 · DOCUMENTOS E ANEXOS ── -->
+        <div class="equip-form-block">
+            <div class="equip-section-divider">
+                <i class="ph ph-paperclip"></i> Documentos e Anexos
+                <span class="equip-block-hint">enviados ao Google Drive</span>
+            </div>
+            <!-- Lista de docs já salvos + pendentes -->
+            <div id="equip-docs-edit-list" class="equip-docs-edit-list"></div>
 
         <!-- Painel de nome: aparece ao selecionar arquivo -->
         <div id="equip-doc-name-panel" class="equip-doc-name-panel" style="display:none;">
@@ -1479,11 +1717,13 @@
             <span id="equip-docs-progress-label">Enviando...</span>
         </div>
 
-        <!-- Botão selecionar -->
-        <button type="button" class="equip-docs-add-file-btn" id="equip-docs-select-btn" onclick="document.getElementById('equip-docs-file-input').click()">
-            <i class="ph ph-paperclip"></i> Selecionar arquivo
-        </button>
-        <input type="file" id="equip-docs-file-input" accept="*/*" style="display:none;" onchange="selecionarDocParaAnexar(this)">
+            <!-- Botão selecionar -->
+            <button type="button" class="equip-docs-add-file-btn" id="equip-docs-select-btn" onclick="document.getElementById('equip-docs-file-input').click()">
+                <i class="ph ph-paperclip"></i> Selecionar arquivo
+            </button>
+            <input type="file" id="equip-docs-file-input" accept="*/*" style="display:none;" onchange="selecionarDocParaAnexar(this)">
+        </div>
+        </div><!-- /form-modal-scroll -->
 
         <div class="modal-actions">
             <button class="btn-secondary" onclick="closeEquipModal()">Cancelar</button>
@@ -1501,81 +1741,111 @@
         <!-- Cabeçalho escuro -->
         <div class="eqd-header">
             <div class="eqd-header-left">
-                <i class="ph ph-desktop-tower eqd-header-icon"></i>
+                <div class="eqd-header-icon-box"><i class="ph ph-monitor"></i></div>
                 <div>
                     <div class="eqd-header-name" id="eqd-nome">—</div>
                     <div class="eqd-header-sub" id="eqd-sub">—</div>
                 </div>
             </div>
             <div class="eqd-header-right">
-                <button class="eqd-icon-btn" title="Histórico" style="opacity:.5;cursor:default"><i class="ph ph-clock-clockwise"></i></button>
-                <button class="eqd-icon-btn" onclick="closeModals()"><i class="ph ph-x"></i></button>
+                <button class="eqd-icon-btn" onclick="closeModals()" title="Fechar"><i class="ph ph-x"></i></button>
             </div>
+        </div>
+
+        <!-- Listra de destaque entre o cabeçalho e as abas -->
+        <div class="eqd-stripe"></div>
+
+        <!-- Abas -->
+        <div class="eqd-tabs" id="eqd-tabs">
+            <button class="eqd-tab active" data-tab="info" onclick="setEqdTab('info')"><i class="ph ph-info"></i> Informações</button>
+            <button class="eqd-tab" data-tab="docs" onclick="setEqdTab('docs')"><i class="ph ph-folder-open"></i> Documentos</button>
+            <button class="eqd-tab" data-tab="activities" onclick="setEqdTab('activities')"><i class="ph ph-list-checks"></i> Atividades</button>
         </div>
 
         <!-- Conteúdo -->
         <div class="eqd-body">
 
-            <!-- Carrossel de imagens -->
-            <div class="eqd-car-wrap" id="eqd-car-wrap" style="display:none;">
-                <img id="eqd-car-img" class="eqd-car-img-el" src="" alt="">
-                <button class="eqd-car-nav prev" id="eqd-car-prev" onclick="equipCarNav(-1)">&#8249;</button>
-                <button class="eqd-car-nav next" id="eqd-car-next" onclick="equipCarNav(1)">&#8250;</button>
-                <div class="eqd-car-dots" id="eqd-car-dots"></div>
-                <div class="eqd-car-counter" id="eqd-car-counter" style="display:none;"></div>
-            </div>
-
-            <!-- Área rolável: tags + infos + documentos -->
+            <!-- Área rolável: o conteúdo troca conforme a aba escolhida -->
             <div class="eqd-scroll">
 
-            <!-- Tags de status e categoria -->
-            <div class="eqd-tags-row" id="eqd-hero-tags"></div>
+            <!-- Aba Informações -->
+            <div class="eqd-tab-panel active" id="eqd-panel-info">
+                <!-- Carrossel de imagens — só aparece aqui, nas outras abas some -->
+                <div class="eqd-car-wrap" id="eqd-car-wrap" style="display:none;">
+                    <img id="eqd-car-img" class="eqd-car-img-el" src="" alt="" onclick="abrirZoomImagem(this.src)" title="Clique pra dar zoom">
+                    <div class="eqd-car-zoom-hint"><i class="ph ph-magnifying-glass-plus"></i></div>
+                    <button class="eqd-car-nav prev" id="eqd-car-prev" onclick="equipCarNav(-1)">&#8249;</button>
+                    <button class="eqd-car-nav next" id="eqd-car-next" onclick="equipCarNav(1)">&#8250;</button>
+                    <div class="eqd-car-dots" id="eqd-car-dots"></div>
+                    <div class="eqd-car-counter" id="eqd-car-counter" style="display:none;"></div>
+                </div>
 
-            <!-- Grid de informações -->
-            <div class="eqd-info-grid">
-                <div class="eqd-info-card">
-                    <div class="eqd-info-lbl"><i class="ph ph-buildings"></i> MARCA</div>
-                    <div class="eqd-info-val" id="eqd-fabricante">—</div>
+                <!-- Tags de status e categoria -->
+                <div class="eqd-tags-row" id="eqd-hero-tags"></div>
+
+                <!-- Grid de informações -->
+                <div class="eqd-info-grid">
+                    <div class="eqd-info-card">
+                        <div class="eqd-info-lbl"><i class="ph ph-buildings"></i> MARCA</div>
+                        <div class="eqd-info-val" id="eqd-fabricante">—</div>
+                    </div>
+                    <div class="eqd-info-card">
+                        <div class="eqd-info-lbl"><i class="ph ph-package"></i> MODELO</div>
+                        <div class="eqd-info-val" id="eqd-modelo">—</div>
+                    </div>
+                    <div class="eqd-info-card">
+                        <div class="eqd-info-lbl"><i class="ph ph-barcode"></i> Nº DE SÉRIE</div>
+                        <div class="eqd-info-val" id="eqd-serie">—</div>
+                    </div>
+                    <div class="eqd-info-card">
+                        <div class="eqd-info-lbl"><i class="ph ph-storefront"></i> FORNECEDOR</div>
+                        <div class="eqd-info-val" id="eqd-fornecedor">—</div>
+                    </div>
+                    <div class="eqd-info-card" style="grid-column:1/-1;">
+                        <div class="eqd-info-lbl"><i class="ph ph-map-pin"></i> LOCALIZAÇÃO</div>
+                        <div class="eqd-info-val" id="eqd-unidade">—</div>
+                    </div>
+                    <div class="eqd-info-card" id="eqd-observacoes-card" style="grid-column:1/-1;display:none;">
+                        <div class="eqd-info-lbl"><i class="ph ph-clipboard-text"></i> OBSERVAÇÕES</div>
+                        <div class="eqd-info-val" id="eqd-observacoes">—</div>
+                    </div>
                 </div>
-                <div class="eqd-info-card">
-                    <div class="eqd-info-lbl"><i class="ph ph-package"></i> MODELO</div>
-                    <div class="eqd-info-val" id="eqd-modelo">—</div>
+            </div><!-- /eqd-panel-info -->
+
+            <!-- Aba Documentos -->
+            <div class="eqd-tab-panel" id="eqd-panel-docs">
+                <div class="eqd-docs-section" id="eqd-docs-section">
+                    <div class="eqd-docs-header">
+                        <div class="eqd-info-lbl"><i class="ph ph-folder-open"></i> DOCUMENTOS</div>
+                        <span style="font-size:.72rem;color:var(--text-muted);">Adicione documentos no modo Editar</span>
+                    </div>
+                    <div id="eqd-docs-list" class="eqd-docs-list">
+                        <div class="eqd-docs-empty"><i class="ph ph-files"></i><span>Nenhum documento</span></div>
+                    </div>
                 </div>
-                <div class="eqd-info-card">
-                    <div class="eqd-info-lbl"><i class="ph ph-barcode"></i> Nº DE SÉRIE</div>
-                    <div class="eqd-info-val" id="eqd-serie" style="font-family:monospace;">—</div>
-                </div>
-                <div class="eqd-info-card">
-                    <div class="eqd-info-lbl"><i class="ph ph-storefront"></i> FORNECEDOR</div>
-                    <div class="eqd-info-val" id="eqd-fornecedor">—</div>
-                </div>
-                <div class="eqd-info-card" style="grid-column:1/-1;">
-                    <div class="eqd-info-lbl"><i class="ph ph-map-pin"></i> LOCALIZAÇÃO</div>
-                    <div class="eqd-info-val" id="eqd-unidade">—</div>
-                </div>
-            </div>
+            </div><!-- /eqd-panel-docs -->
+
+            <!-- Aba Atividades — só a estrutura por enquanto (checklist de
+                 manutenção e afins vem depois, ainda é teoria) -->
+            <div class="eqd-tab-panel" id="eqd-panel-activities">
+                <div class="estoque-empty"><i class="ph ph-list-checks"></i> Atividades — em construção.</div>
+            </div><!-- /eqd-panel-activities -->
 
             </div><!-- /eqd-scroll -->
-
-            <!-- Documentos — fixo no rodapé do body, sempre visível -->
-            <div class="eqd-docs-section" id="eqd-docs-section">
-                <div class="eqd-docs-header">
-                    <div class="eqd-info-lbl"><i class="ph ph-folder-open"></i> DOCUMENTOS</div>
-                    <span style="font-size:.72rem;color:var(--text-muted);">Adicione documentos no modo Editar</span>
-                </div>
-                <div id="eqd-docs-list" class="eqd-docs-list">
-                    <div class="eqd-docs-empty"><i class="ph ph-files"></i><span>Nenhum documento</span></div>
-                </div>
-            </div><!-- /eqd-docs-section -->
         </div><!-- /eqd-body -->
 
         <!-- Rodapé -->
         <div class="eqd-footer">
             <button class="btn-secondary" onclick="closeModals()">Fechar</button>
-            <button class="eqd-btn-delete" onclick="deleteEquipFromDetail()"><i class="ph ph-trash"></i> Excluir</button>
             <button class="eqd-btn-edit" onclick="editEquipFromDetail()"><i class="ph ph-pencil-simple"></i> Editar</button>
         </div>
     </div>
+</div>
+
+<!-- Modal: Zoom da imagem do equipamento -->
+<div id="img-zoom-modal" class="modal img-zoom-modal hidden" onclick="fecharZoomImagem()">
+    <button class="eqd-icon-btn img-zoom-close" onclick="event.stopPropagation();fecharZoomImagem()" title="Fechar"><i class="ph ph-x"></i></button>
+    <img id="img-zoom-el" class="img-zoom-img" src="" alt="" onclick="event.stopPropagation();">
 </div>
 
 <!-- Modal: Preview de Arquivo -->
@@ -1696,7 +1966,27 @@
     var c = document.querySelector('.sidebar-user'); if (c) c.classList.remove('open');
   }
   document.addEventListener('click', function (e) { if (!e.target.closest('.sidebar-account')) closeInvUserMenu(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeInvUserMenu(); });
+
+  // ESC em cascata: passo 1 fecha o pop-up aberto; passo 2 sai da aba atual (volta pra Unidades);
+  // passo 3, sem pop-up e já em Unidades, volta para a UniLAMIC TI
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+
+    var userMenu = document.getElementById('sb-user-menu');
+    if (userMenu && !userMenu.classList.contains('hidden')) { closeInvUserMenu(); return; }
+
+    var popoverAberto = document.querySelector('.open');
+    if (popoverAberto) { document.querySelectorAll('.open').forEach(function (el) { el.classList.remove('open'); }); return; }
+
+    var modal = document.querySelector('.modal:not(.hidden)');
+    if (modal) { if (typeof closeModals === 'function') closeModals(); else modal.classList.add('hidden'); return; }
+
+    var painel = document.querySelector('.view.active');
+    if (painel && painel.id !== 'units-view') { if (typeof showUnitsView === 'function') showUnitsView(); return; }
+
+    invBackToMenu();
+  });
+
   function invBackToMenu() { try { (window.parent || window).postMessage('fecharInventario', '*'); } catch (_) {} }
   function invLogout() { try { localStorage.removeItem('tic_adminUser'); } catch (_) {} try { (window.top || window).location.href = 'index.html'; } catch (_) { window.location.href = 'index.html'; } }
 </script>

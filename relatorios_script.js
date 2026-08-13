@@ -57,6 +57,941 @@ function _fbListen(tipo) {
 function _fbInitListeners() {
     _fbListen('cc');
     _fbListen('ia');
+    _migrarFinanceiroAntigo();
+    _fbListenFinanceiro('cc');
+    _fbListenFinanceiro('ia');
+}
+
+// Migração única: a Projeção Financeira nasceu com 1 nó só (relatorios_lamic/
+// financeiro) antes de virar CC/IA separados. Se ainda tiver algo salvo lá
+// (ex.: a cotação/modo da API que já foi configurado) e financeiro_cc ainda
+// não existir, copia pra financeiro_cc — não sobrescreve nada, não apaga o
+// nó antigo, só evita perder o que já tinha sido configurado.
+function _migrarFinanceiroAntigo() {
+    if (!window._db || !window._ref || !window._get || !window._set) return;
+    const rOld = window._ref(window._db, FB_PATH + '/financeiro');
+    window._get(rOld).then(snapOld => {
+        const old = snapOld.val();
+        if (!old) return;
+        const rNewCC = window._ref(window._db, FB_PATH + '/financeiro_cc');
+        window._get(rNewCC).then(snapNew => {
+            if (snapNew.val()) return;   // financeiro_cc já tem dado — não mexe
+            window._set(rNewCC, old).catch(e => console.warn('[Firebase] Erro ao migrar financeiro antigo:', e));
+        }).catch(() => {});
+    }).catch(() => {});
+}
+
+// ============================================================
+// PROJEÇÃO FINANCEIRA — Faturamento x Meta + Projeção de Custo API
+// ============================================================
+// Dados SEPARADOS por CC/IA (mesmo padrão de periodos_cc/periodos_ia),
+// guardados em relatorios_lamic/financeiro_cc e /financeiro_ia:
+//   valores: { <tipo>: { 'AAAA-MM': número } }   — faturamento, exames, ou
+//            qualquer tipo personalizado criado junto de uma meta.
+//   metas:   { <id>: {...} }                     — ver novaMetaForm()/salvarMetaFin().
+//   apiCost: { modoAtivo, dolarCotacao, precoPorMsgBRL, antigo: {'AAAA-MM': US$} }
+// financeiroData é um PONTEIRO pro objeto do tipo ativo (troca junto do
+// dashTipo, igual "periodos"); _financeiroTipoAtivo diz pra qual dos dois nós
+// do Firebase as próximas escritas (_fbSet*) vão — normalmente igual a
+// dashTipo, mas o painel de Metas em "Inserir Dados" pode apontar pro outro
+// tipo mesmo com o dashboard mostrando o outro (os dois cards CC/IA de lá
+// ficam visíveis ao mesmo tempo, sem depender de qual dashboard está aberto).
+function _novoFinanceiroVazio() {
+    return { valores: {}, metas: {}, apiCost: { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, pctEmpresa: 50, antigo: {} } };
+}
+let financeiroData_cc  = _novoFinanceiroVazio();
+let financeiroData_ia  = _novoFinanceiroVazio();
+let financeiroData     = financeiroData_cc;   // ponteiro pro tipo ativo do dashboard
+let _financeiroTipoAtivo = 'cc';              // pra onde os _fbSet* miram agora
+
+function _fbListenFinanceiro(tipo) {
+    if (!window._db || !window._ref || !window._onValue) return;
+    const r = window._ref(window._db, FB_PATH + '/financeiro_' + tipo);
+    window._onValue(r, snap => {
+        const val = snap.val() || {};
+        const alvo = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+        alvo.valores = val.valores || {};
+        alvo.metas   = val.metas   || {};
+        alvo.apiCost = Object.assign(
+            { modoAtivo: 'antigo', dolarCotacao: 5.40, precoPorMsgBRL: 0.035, pctEmpresa: 50, antigo: {} },
+            val.apiCost || {}
+        );
+        // Só reflete nos botões/telas se o tipo que chegou é o que está sendo visto agora
+        if (dashTipo === tipo) {
+            const btnAntigo = document.getElementById('api-modo-antigo');
+            const btnNovo   = document.getElementById('api-modo-novo');
+            if (btnAntigo && btnNovo) {
+                btnAntigo.classList.toggle('active', alvo.apiCost.modoAtivo !== 'novo');
+                btnNovo.classList.toggle('active', alvo.apiCost.modoAtivo === 'novo');
+            }
+            const dashSec = document.getElementById('dashboard');
+            if (dashSec && dashSec.classList.contains('active')) renderProjecaoFinanceira();
+        }
+        // Painel de Metas em "Inserir Dados" (os 2 cards ficam visíveis sempre,
+        // independente do dashboard ativo) — atualiza o painel desse tipo se existir.
+        if (typeof renderMetasEntradaTab === 'function') renderMetasEntradaTab(tipo);
+    });
+}
+
+function _anoMesKey(ano, mes) { return `${ano}-${String(mes).padStart(2, '0')}`; }
+
+function _valorNoMes(tipo, ano, mes) {
+    // "mensagens" não é lançado manualmente aqui — vem direto do período
+    // (mesmo campo "Total de Mensagens" já preenchido no CC/IA) - meta de
+    // reduzir volume trocado usa o dado que já existe, sem duplicar entrada.
+    // Lê do array do tipo FINANCEIRO ativo no momento (não necessariamente o
+    // dashTipo do dashboard — pode ser o tipo aberto no painel de Metas).
+    if (tipo === 'mensagens') {
+        const src = (_financeiroTipoAtivo === 'ia') ? periodos_ia : periodos_cc;
+        const p = src.find(pp => pp.tipo === 'mes' && pp.ano === ano && pp.mes === mes);
+        return (p && p.mensagens) ? parseFloat(p.mensagens) : null;
+    }
+    const v = (financeiroData.valores[tipo] || {})[_anoMesKey(ano, mes)];
+    return (v == null) ? null : parseFloat(v);
+}
+
+function _fbSetValor(tipo, ano, mes, valor) {
+    if (!window._db || !window._ref || !window._set) return;
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/valores/${tipo}/${_anoMesKey(ano, mes)}`), valor)
+        .catch(e => console.warn('[Firebase] Erro ao salvar valor:', e));
+}
+
+function _fbSetMeta(meta) {
+    if (!window._db || !window._ref || !window._set) return;
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/metas/${meta.id}`), meta)
+        .catch(e => console.warn('[Firebase] Erro ao salvar meta:', e));
+}
+
+function _fbRemoveMeta(id) {
+    if (!window._db || !window._ref || !window._remove) return;
+    window._remove(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/metas/${id}`))
+        .catch(e => console.warn('[Firebase] Erro ao remover meta:', e));
+}
+
+function _fbSetApiCost(partial) {
+    if (!window._db || !window._ref || !window._set) return;
+    Object.assign(financeiroData.apiCost, partial);
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/apiCost`), financeiroData.apiCost)
+        .catch(e => console.warn('[Firebase] Erro ao salvar apiCost:', e));
+}
+
+function _fbSetApiCostAntigo(ano, mes, valorUSD) {
+    if (!window._db || !window._ref || !window._set) return;
+    window._set(window._ref(window._db, `${FB_PATH}/financeiro_${_financeiroTipoAtivo}/apiCost/antigo/${_anoMesKey(ano, mes)}`), valorUSD)
+        .catch(e => console.warn('[Firebase] Erro ao salvar gasto API:', e));
+}
+
+// Todos os tipos de meta conhecidos (faturamento/exames sempre aparecem, mesmo
+// sem meta cadastrada ainda — pra já poder lançar valor neles).
+function _tiposDeMetaConhecidos() {
+    const set = new Set(['faturamento', 'exames']);
+    Object.values(financeiroData.metas || {}).forEach(m => { if (m.tipo) set.add(m.tipo); });
+    return [...set];
+}
+
+function _labelTipoMeta(tipo) {
+    if (tipo === 'faturamento') return 'Faturamento';
+    if (tipo === 'exames') return 'Exames';
+    if (tipo === 'mensagens') return 'Mensagens';
+    const m = Object.values(financeiroData.metas || {}).find(m => m.tipo === tipo);
+    return m ? (m.tipoLabel || m.nome || tipo) : tipo;
+}
+
+// Meta ATIVA de um tipo (assume 1 meta ativa por tipo — a mais recente cadastrada)
+function _metaAtivaDoTipo(tipo) {
+    const lista = Object.values(financeiroData.metas || {})
+        .filter(m => m.tipo === tipo && m.ativa !== false)
+        .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
+    return lista[0] || null;
+}
+
+// Valor de base (referência) pra meta em % — mês anterior, mesmo mês do ano
+// passado, ou um valor manual fixo.
+function _valorBaseMeta(meta, ano, mes) {
+    if (!meta) return null;
+    if (meta.baseRef === 'manual') return (meta.valorBaseManual != null) ? parseFloat(meta.valorBaseManual) : null;
+    if (meta.baseRef === 'mesmo_mes_ano_passado') return _valorNoMes(meta.tipo, ano - 1, mes);
+    let am = mes - 1, ay = ano;
+    if (am < 1) { am = 12; ay--; }
+    return _valorNoMes(meta.tipo, ay, am);
+}
+
+// Alvo da meta para um mês específico — encadeia o auto-incremento: anda mês a
+// mês desde a criação da meta, e cada vez que o realizado bateu o alvo daquele
+// mês, o próximo alvo fica ainda mais exigente na MESMA direção
+// (aumentar → sobe mais; diminuir → cai mais), autoIncrementoPct% sozinho.
+function _metaAlvoParaMes(meta, ano, mes) {
+    if (!meta) return null;
+    const dir = meta.direcao === 'diminuir' ? 'diminuir' : 'aumentar';
+    const alvoBase = (ay, am) => {
+        if (meta.modoAlvo === 'percentual') {
+            const base = _valorBaseMeta(meta, ay, am);
+            if (base == null) return null;
+            const pct = (parseFloat(meta.valorAlvo) || 0) / 100;
+            return dir === 'diminuir' ? base * (1 - pct) : base * (1 + pct);
+        }
+        return parseFloat(meta.valorAlvo) || 0;
+    };
+    const inc = parseFloat(meta.autoIncrementoPct) || 0;
+    if (!inc) return alvoBase(ano, mes);
+
+    const criado = meta.criadoEm ? new Date(meta.criadoEm) : new Date();
+    let ay = criado.getFullYear(), am = criado.getMonth() + 1;
+    let alvoAtual = alvoBase(ay, am);
+    if (alvoAtual == null) return null;
+    let guard = 0;
+    while ((ay < ano || (ay === ano && am < mes)) && guard < 600) {
+        const realizado = _valorNoMes(meta.tipo, ay, am);
+        const bateu = realizado != null && alvoAtual != null &&
+            (dir === 'diminuir' ? realizado <= alvoAtual : realizado >= alvoAtual);
+        if (bateu) {
+            alvoAtual = dir === 'diminuir' ? alvoAtual * (1 - inc / 100) : alvoAtual * (1 + inc / 100);
+        }
+        am++; if (am > 12) { am = 1; ay++; }
+        guard++;
+    }
+    return alvoAtual;
+}
+
+// Status da meta num mês: 'batida' · 'perto' (>=85% do caminho) · 'falta' · 'sem-dado'.
+// Metas "diminuir" (ex.: reduzir mensagens) invertem a lógica — bate quando o
+// realizado fica IGUAL OU ABAIXO do alvo, e o % mede o quanto da redução
+// necessária (base → alvo) já foi percorrido.
+function _metaStatus(meta, ano, mes) {
+    if (!meta) return { status: 'sem-dado', pct: null, alvo: null, atual: null };
+    const dir   = meta.direcao === 'diminuir' ? 'diminuir' : 'aumentar';
+    const alvo  = _metaAlvoParaMes(meta, ano, mes);
+    const atual = _valorNoMes(meta.tipo, ano, mes);
+    if (alvo == null || atual == null) return { status: 'sem-dado', pct: null, alvo, atual };
+
+    let pct, status;
+    if (dir === 'diminuir') {
+        const base = _valorBaseMeta(meta, ano, mes);
+        if (base != null && base > alvo) {
+            pct = ((base - atual) / (base - alvo)) * 100;
+        } else {
+            pct = atual > 0 ? (alvo / atual) * 100 : (atual <= alvo ? 100 : 0);
+        }
+        status = atual <= alvo ? 'batida' : pct >= 85 ? 'perto' : 'falta';
+    } else {
+        pct = alvo > 0 ? (atual / alvo) * 100 : 0;
+        status = pct >= 100 ? 'batida' : pct >= 85 ? 'perto' : 'falta';
+    }
+    return { status, pct, alvo, atual };
+}
+
+// Eficiência financeira = faturamento ÷ eficiência (msgs/atendimento). Quanto
+// MENOR o msgs/atendimento (mais eficiente no atendimento) e MAIOR o
+// faturamento, MAIOR a eficiência financeira.
+function _eficienciaFinanceira(p, faturamento) {
+    const ef = calcEficiencia(p);
+    if (!ef.hasData || faturamento == null) return null;
+    return faturamento / ef.index;
+}
+
+function fBRL(v) {
+    if (v == null || isNaN(v)) return '—';
+    return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ── Custo com a API oficial (Meta/WhatsApp) ─────────────────────
+function _custoApiAntigo(ano, mes) {
+    const usd = (financeiroData.apiCost.antigo || {})[_anoMesKey(ano, mes)];
+    if (usd == null) return null;
+    return parseFloat(usd) * (financeiroData.apiCost.dolarCotacao || 0);
+}
+
+// Estimativa do modelo novo (vigente a partir de 01/10/2026, confirmado pela
+// documentação oficial da Meta — cobrança POR MENSAGEM, não mais por
+// conversa/template. O valor final por mensagem só é publicado pela Meta até
+// 01/09/2026 — R$0,035 aqui é o valor preliminar informado, editável a
+// qualquer momento).
+// Só é cobrada a mensagem de atendimento ENVIADA PELA EMPRESA (a recebida do
+// cliente nunca é cobrada, nem hoje nem no modelo novo). Como a planilha só
+// tem o total de mensagens trocadas (sem separar quem enviou), usa um %
+// configurável do total como proxy de "mensagens da empresa" — 50% por
+// padrão (conversa tende a ir e voltar), ajustável em "＋ Gasto US$"
+// conforme o padrão real de conversa da equipe.
+function _custoApiNovoEstimado(p) {
+    if (!p || !p.mensagens) return null;
+    const pct = (financeiroData.apiCost.pctEmpresa != null ? financeiroData.apiCost.pctEmpresa : 50) / 100;
+    return p.mensagens * pct * (financeiroData.apiCost.precoPorMsgBRL || 0.035);
+}
+
+// ── Render: os 2 cards da Projeção Financeira ───────────────────
+function renderProjecaoFinanceira() {
+    // Ressincroniza defensivamente com o dashTipo atual — o painel de Metas em
+    // "Inserir Dados" pode ter apontado financeiroData pro OUTRO tipo por
+    // último; o dashboard sempre precisa refletir o tipo que está na tela.
+    financeiroData = (dashTipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+    _financeiroTipoAtivo = dashTipo;
+    chartFaturamento();
+    chartApiCost();
+}
+
+function chartFaturamento() {
+    destroyChart('faturamento');
+    const ctx = getCtx('chart-faturamento');
+    const badge = document.getElementById('fat-status-badge');
+    if (!ctx) return;
+
+    const ano   = filtro.ano || new Date().getFullYear();
+    const meses = getPeriodsForMesComparacao(ano);
+    const meta  = _metaAtivaDoTipo('faturamento');
+
+    const labels   = meses.map(item => MESES_ABR[item.mes - 1]);
+    const fatData  = meses.map(item => _valorNoMes('faturamento', ano, item.mes));
+    const metaData = meses.map(item => meta ? _metaAlvoParaMes(meta, ano, item.mes) : null);
+
+    const barColors = meses.map((item, i) => {
+        const v = fatData[i], m = metaData[i];
+        if (v == null || m == null) return '#94a3b8';
+        if (v >= m) return '#059669';
+        if (v >= m * 0.85) return '#d97706';
+        return '#dc2626';
+    });
+
+    const st = meta ? _metaStatus(meta, filtro.ano, filtro.mes) : { status: 'sem-dado', pct: null };
+    if (badge) {
+        badge.className = 'proj-fin-status st-' + (st.status === 'sem-dado' ? 'semdado' : st.status);
+        badge.textContent = !meta ? 'Nenhuma meta cadastrada'
+            : st.status === 'sem-dado' ? 'Sem dado no período'
+            : st.status === 'batida' ? `Meta batida (${st.pct.toFixed(0)}%)`
+            : st.status === 'perto'  ? `Perto de bater (${st.pct.toFixed(0)}%)`
+            : `Falta bater (${st.pct.toFixed(0)}%)`;
+    }
+
+    charts['faturamento'] = new Chart(ctx, {
+        data: {
+            labels,
+            datasets: [
+                { type: 'bar',  label: 'Faturamento', data: fatData,  backgroundColor: barColors, borderRadius: 6, borderSkipped: false, order: 2 },
+                { type: 'line', label: 'Meta',         data: metaData, borderColor: '#2563eb', borderDash: [6, 4], borderWidth: 2, pointRadius: 0, pointHitRadius: 0, fill: false, spanGaps: true, order: 1 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: true, labels: { color: '#475569', font: { size: 11 }, boxWidth: 14 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => fBRL(v) }, beginAtZero: true },
+                x: { grid: { display: false }, ticks: { color: '#475569' } }
+            }
+        }
+    });
+}
+
+function chartApiCost() {
+    destroyChart('apicost');
+    const ctx = getCtx('chart-apicost');
+    if (!ctx) return;
+
+    const ano   = filtro.ano || new Date().getFullYear();
+    const meses = getPeriodsForMesComparacao(ano);
+    const labels     = meses.map(item => MESES_ABR[item.mes - 1]);
+    const antigoData = meses.map(item => _custoApiAntigo(ano, item.mes));
+    const novoData   = meses.map(item => _custoApiNovoEstimado(item.p));
+
+    charts['apicost'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Modelo Antigo (real)', data: antigoData, backgroundColor: 'rgba(37,99,235,0.75)', borderRadius: 5 },
+                { label: 'Modelo Novo (estimado, a partir de out/2026)', data: novoData, backgroundColor: 'rgba(217,119,6,0.75)', borderRadius: 5 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: true, labels: { color: '#475569', font: { size: 10 }, boxWidth: 12 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => fBRL(v) }, beginAtZero: true },
+                x: { grid: { display: false }, ticks: { color: '#475569' } }
+            }
+        }
+    });
+}
+
+function setApiModo(modo) {
+    _fbSetApiCost({ modoAtivo: modo });
+    const btnA = document.getElementById('api-modo-antigo'), btnN = document.getElementById('api-modo-novo');
+    if (btnA) btnA.classList.toggle('active', modo !== 'novo');
+    if (btnN) btnN.classList.toggle('active', modo === 'novo');
+}
+
+// ── Modal: Metas (lista + formulário de nova/editar) ────────────
+// Aberto a partir do card "Faturamento x Meta" do dashboard — sempre o tipo
+// (CC/IA) que está sendo visto na hora. Cadastro em si fica em "Inserir
+// Dados"; aqui é basicamente "puxar" (ver/editar/excluir) as metas já feitas.
+// Aberto a partir do card "Faturamento x Meta" do dashboard — SÓ CONSULTA
+// (as metas são cadastradas exclusivamente em Inserir Dados). "puxa" as
+// metas do tipo (CC/IA) que está sendo visto agora, sem opção de criar/
+// editar/excluir por aqui.
+function abrirMetaModal() {
+    financeiroData = (dashTipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+    _financeiroTipoAtivo = dashTipo;
+    renderListaMetas(true);
+    document.getElementById('mf-form-card').style.display  = 'none';
+    document.getElementById('mf-lista-card').style.display = '';
+    document.getElementById('meta-modal-fin').style.display = 'flex';
+}
+
+// Aberto a partir da aba "Metas" de um dos cards (CC/IA) em Inserir Dados —
+// aqui sim é onde se cadastra/edita/exclui, tipo explícito, independe de
+// qual dashboard estiver ativo.
+function abrirMetaModalEntrada(tipo) {
+    financeiroData = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+    _financeiroTipoAtivo = tipo;
+    renderListaMetas(false);
+    document.getElementById('mf-form-card').style.display  = 'none';
+    document.getElementById('mf-lista-card').style.display = '';
+    document.getElementById('meta-modal-fin').style.display = 'flex';
+}
+
+// Lista dentro do MODAL (#mf-lista) — sempre reflete o tipo ativo no momento
+// (setado por abrirMetaModal/abrirMetaModalEntrada logo antes de chamar aqui).
+// somenteLeitura: esconde "+ Nova Meta" e os botões Editar/Excluir — usado
+// quando o modal foi aberto a partir do dashboard (só consulta).
+function renderListaMetas(somenteLeitura) {
+    _renderMetasListInto('mf-lista', _financeiroTipoAtivo, !!somenteLeitura);
+    const novaBtn = document.getElementById('mf-nova-meta-btn');
+    const hint    = document.getElementById('mf-lista-hint');
+    const titulo  = document.getElementById('mf-lista-titulo');
+    if (novaBtn) novaBtn.style.display = somenteLeitura ? 'none' : '';
+    if (hint)    hint.style.display    = somenteLeitura ? '' : 'none';
+    if (titulo)  titulo.textContent    = `Metas cadastradas — ${(_financeiroTipoAtivo || 'cc').toUpperCase()}`;
+}
+
+// Painel INLINE de Metas dentro de cada card de Inserir Dados — só troca o
+// ponteiro global pelo tempo da própria renderização (síncrona) e devolve
+// como estava, pra não bagunçar o que o dashboard ou o modal estejam usando.
+// Aqui sempre com CRUD completo (é o lugar de cadastro).
+function renderMetasEntradaTab(tipo) {
+    const container = document.getElementById('metas-lista-' + tipo);
+    if (!container) return;
+    const prevData = financeiroData, prevTipo = _financeiroTipoAtivo;
+    financeiroData = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+    _financeiroTipoAtivo = tipo;
+    _renderMetasListInto('metas-lista-' + tipo, tipo, false);
+    financeiroData = prevData;
+    _financeiroTipoAtivo = prevTipo;
+}
+
+// Renderiza a lista de metas de financeiroData (já apontado pro tipo certo
+// por quem chamou) dentro de containerId; os botões Editar/Excluir carregam
+// o tipo explícito, pra funcionar mesmo clicados fora de uma sessão já aberta
+// (ex.: direto do painel inline, sem passar por abrirMetaModal*).
+function _renderMetasListInto(containerId, tipo, somenteLeitura) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    const metas = Object.values(financeiroData.metas || {}).sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
+    if (!metas.length) {
+        el.innerHTML = '<div class="empty-state" style="padding:14px;"><div class="empty-state-text">Nenhuma meta cadastrada</div></div>';
+        return;
+    }
+    el.innerHTML = metas.map(m => {
+        const st = _metaStatus(m, filtro.ano, filtro.mes);
+        const pctTxt = st.pct != null ? st.pct.toFixed(0) + '%' : '—';
+        const sinal = m.direcao === 'diminuir' ? '-' : '+';
+        const alvoTxt = m.modoAlvo === 'percentual' ? `${sinal}${m.valorAlvo}%` : (m.tipo === 'exames' || m.tipo === 'mensagens' ? fNum(m.valorAlvo) : fBRL(m.valorAlvo));
+        const acoes = somenteLeitura ? '' : `
+            <div class="meta-list-actions">
+                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;" onclick="editarMeta('${m.id}','${tipo}')">Editar</button>
+                <button class="btn-secondary" style="padding:4px 8px;font-size:.72rem;color:#dc2626;" onclick="excluirMeta('${m.id}','${tipo}')">Excluir</button>
+            </div>`;
+        return `<div class="meta-list-item">
+            <div class="meta-list-info">
+                <strong>${escHtml(m.nome)}</strong>
+                <span>${escHtml(_labelTipoMeta(m.tipo))} · ${m.periodicidade === 'anual' ? 'Anual' : 'Mensal'} · alvo ${alvoTxt}${m.autoIncrementoPct ? ' · auto +' + m.autoIncrementoPct + '%' : ''}</span>
+            </div>
+            <span class="proj-fin-status st-${st.status === 'sem-dado' ? 'semdado' : st.status}" style="margin:0;">${pctTxt}</span>
+            ${acoes}
+        </div>`;
+    }).join('');
+}
+
+// Toggle Dados/Metas de um card (CC ou IA) em Inserir Dados.
+function setEntradaView(tipo, view) {
+    document.getElementById('ev-' + tipo + '-dados').classList.toggle('active', view === 'dados');
+    document.getElementById('ev-' + tipo + '-metas').classList.toggle('active', view === 'metas');
+    document.getElementById('entrada-dados-' + tipo).style.display = view === 'dados' ? '' : 'none';
+    document.getElementById('entrada-metas-' + tipo).style.display = view === 'metas' ? '' : 'none';
+    if (view === 'metas') renderMetasEntradaTab(tipo);
+}
+
+function novaMetaForm() {
+    document.getElementById('mf-form-titulo').textContent = 'Nova Meta';
+    document.getElementById('mf-id').value = '';
+    document.getElementById('mf-tipo').value = 'faturamento';
+    document.getElementById('mf-tipo-custom-group').style.display = 'none';
+    document.getElementById('mf-tipo-custom').value = '';
+    document.getElementById('mf-nome').value = 'Meta de Faturamento';
+    document.getElementById('mf-periodicidade').value = 'mensal';
+    document.getElementById('mf-direcao').value = 'aumentar';
+    document.getElementById('mf-modo').value = 'valor';
+    document.getElementById('mf-valor').value = '';
+    document.getElementById('mf-base').value = 'mes_anterior';
+    document.getElementById('mf-base-manual').value = '';
+    document.getElementById('mf-autoinc').value = '';
+    onMetaModoChange();
+    document.getElementById('mf-lista-card').style.display = 'none';
+    document.getElementById('mf-form-card').style.display  = '';
+}
+
+function cancelarMetaForm() {
+    document.getElementById('mf-form-card').style.display  = 'none';
+    document.getElementById('mf-lista-card').style.display = '';
+    renderListaMetas();
+}
+
+// tipo é opcional: só é preciso quando chamado FORA de uma sessão de modal já
+// aberta (ex.: direto do painel inline de Metas em Inserir Dados) — garante
+// que financeiroData aponta pro tipo certo antes de ler a meta, e abre o
+// modal (que nesse caso ainda está fechado).
+function editarMeta(id, tipo) {
+    if (tipo) { financeiroData = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc; _financeiroTipoAtivo = tipo; }
+    const m = financeiroData.metas[id]; if (!m) return;
+    const tipoConhecido = (m.tipo === 'faturamento' || m.tipo === 'exames' || m.tipo === 'mensagens');
+    document.getElementById('mf-form-titulo').textContent = 'Editar Meta';
+    document.getElementById('mf-id').value = id;
+    document.getElementById('mf-tipo').value = tipoConhecido ? m.tipo : '__novo__';
+    document.getElementById('mf-tipo-custom-group').style.display = tipoConhecido ? 'none' : '';
+    document.getElementById('mf-tipo-custom').value = tipoConhecido ? '' : m.tipo;
+    document.getElementById('mf-nome').value = m.nome || '';
+    document.getElementById('mf-periodicidade').value = m.periodicidade || 'mensal';
+    document.getElementById('mf-direcao').value = m.direcao === 'diminuir' ? 'diminuir' : 'aumentar';
+    document.getElementById('mf-modo').value = m.modoAlvo || 'valor';
+    document.getElementById('mf-valor').value = (m.valorAlvo != null) ? m.valorAlvo : '';
+    document.getElementById('mf-base').value = m.baseRef || 'mes_anterior';
+    document.getElementById('mf-base-manual').value = (m.valorBaseManual != null) ? m.valorBaseManual : '';
+    document.getElementById('mf-autoinc').value = (m.autoIncrementoPct != null) ? m.autoIncrementoPct : '';
+    onMetaModoChange();
+    document.getElementById('mf-lista-card').style.display = 'none';
+    document.getElementById('mf-form-card').style.display  = '';
+    document.getElementById('meta-modal-fin').style.display = 'flex';
+}
+
+function excluirMeta(id, tipo) {
+    if (tipo) { financeiroData = (tipo === 'ia') ? financeiroData_ia : financeiroData_cc; _financeiroTipoAtivo = tipo; }
+    if (!confirm('Excluir esta meta? Essa ação não pode ser desfeita.')) return;
+    _fbRemoveMeta(id);
+    setTimeout(() => { renderListaMetas(); if (tipo) renderMetasEntradaTab(tipo); }, 200);
+}
+
+function onMetaTipoChange() {
+    const v = document.getElementById('mf-tipo').value;
+    document.getElementById('mf-tipo-custom-group').style.display = (v === '__novo__') ? '' : 'none';
+    const nomeEl = document.getElementById('mf-nome');
+    if (v === 'faturamento' && !nomeEl.value) nomeEl.value = 'Meta de Faturamento';
+    if (v === 'exames' && !nomeEl.value) nomeEl.value = 'Meta de Exames';
+    if (v === 'mensagens') {
+        if (!nomeEl.value) nomeEl.value = 'Meta de Redução de Mensagens';
+        document.getElementById('mf-direcao').value = 'diminuir';   // mensagens é sempre pra reduzir
+    }
+    onMetaModoChange();
+}
+
+function onMetaModoChange() {
+    const isPct = document.getElementById('mf-modo').value === 'percentual';
+    const isDiminuir = document.getElementById('mf-direcao').value === 'diminuir';
+    const unidade = document.getElementById('mf-tipo').value === 'mensagens' ? 'mensagens' : 'R$ ou nº';
+    document.getElementById('mf-valor-label').textContent = isPct
+        ? `Valor alvo (% de ${isDiminuir ? 'redução' : 'crescimento'})`
+        : `Valor alvo (${unidade})`;
+    document.getElementById('mf-base-group').style.display = isPct ? '' : 'none';
+    onMetaBaseChange();
+}
+
+function onMetaBaseChange() {
+    const isPct = document.getElementById('mf-modo').value === 'percentual';
+    const base  = isPct ? document.getElementById('mf-base').value : null;
+    document.getElementById('mf-base-manual-group').style.display = (base === 'manual') ? '' : 'none';
+}
+
+// Slug simples (sem acento/espaço) pro tipo de meta personalizado
+function _slugTipo(s) {
+    // ̀-ͯ = faixa Unicode dos acentos combinantes (depois do normalize
+    // NFD, "ç"/"ã" viram letra + acento separados; isso tira só o acento).
+    const semAcento = String(s || '').trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return semAcento.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'personalizado';
+}
+
+function salvarMetaFin() {
+    let tipo = document.getElementById('mf-tipo').value;
+    if (tipo === '__novo__') {
+        const custom = document.getElementById('mf-tipo-custom').value;
+        if (!custom || !custom.trim()) { alert('Informe o nome do novo tipo de meta.'); return; }
+        tipo = _slugTipo(custom);
+    }
+    const nome = (document.getElementById('mf-nome').value || '').trim();
+    if (!nome) { alert('Dê um nome para a meta.'); return; }
+    const valor = parseFloat(document.getElementById('mf-valor').value);
+    if (isNaN(valor)) { alert('Informe o valor alvo.'); return; }
+
+    const id = document.getElementById('mf-id').value || gerarId();
+    const existente = financeiroData.metas[id];
+    const autoIncStr = document.getElementById('mf-autoinc').value;
+    const baseManualStr = document.getElementById('mf-base-manual').value;
+
+    const meta = {
+        id, tipo, nome,
+        periodicidade: document.getElementById('mf-periodicidade').value,
+        direcao: document.getElementById('mf-direcao').value === 'diminuir' ? 'diminuir' : 'aumentar',
+        modoAlvo: document.getElementById('mf-modo').value,
+        valorAlvo: valor,
+        baseRef: document.getElementById('mf-base').value,
+        valorBaseManual: baseManualStr ? parseFloat(baseManualStr) : null,
+        autoIncrementoPct: autoIncStr ? parseFloat(autoIncStr) : null,
+        ativa: true,
+        criadoEm: existente ? existente.criadoEm : Date.now(),
+        atualizadoEm: Date.now()
+    };
+    _fbSetMeta(meta);
+    cancelarMetaForm();
+}
+
+// ── Modal: Lançar Valor (faturamento/exames/tipo personalizado) ─
+function abrirValorModal(tipoPreSel) {
+    const sel = document.getElementById('vf-tipo');
+    const tipos = _tiposDeMetaConhecidos();
+    sel.innerHTML = tipos.map(t => `<option value="${escAttr(t)}">${escHtml(_labelTipoMeta(t))}</option>`).join('');
+    sel.value = tipoPreSel && tipos.includes(tipoPreSel) ? tipoPreSel : tipos[0];
+
+    const anoEl = document.getElementById('vf-ano'), mesEl = document.getElementById('vf-mes');
+    anoEl.value = filtro.ano || new Date().getFullYear();
+    mesEl.value = filtro.mes || (new Date().getMonth() + 1);
+
+    const refresh = () => {
+        const t = sel.value, a = parseInt(anoEl.value) || 0, m = parseInt(mesEl.value) || 0;
+        const v = _valorNoMes(t, a, m);
+        document.getElementById('vf-valor').value = (v != null) ? v : '';
+        document.getElementById('vf-valor-label').textContent = (t === 'exames') ? 'Valor (quantidade)' : 'Valor (R$)';
+    };
+    sel.onchange = refresh; anoEl.oninput = refresh; mesEl.onchange = refresh;
+    refresh();
+
+    document.getElementById('valor-modal-title').textContent = 'Lançar Valor';
+    document.getElementById('valor-modal-fin').style.display = 'flex';
+}
+
+function salvarValorFin() {
+    const tipo  = document.getElementById('vf-tipo').value;
+    const ano   = parseInt(document.getElementById('vf-ano').value);
+    const mes   = parseInt(document.getElementById('vf-mes').value);
+    const valor = parseFloat(document.getElementById('vf-valor').value);
+    if (!ano || !mes || isNaN(valor)) { alert('Preencha ano, mês e valor.'); return; }
+    _fbSetValor(tipo, ano, mes, valor);
+    fecharModalGenerico('valor-modal-fin');
+}
+
+// ── Modal: Lançar Gasto com API — modelo antigo (US$) ───────────
+function abrirValorApiModal() {
+    const anoEl = document.getElementById('va-ano'), mesEl = document.getElementById('va-mes');
+    anoEl.value = filtro.ano || new Date().getFullYear();
+    mesEl.value = filtro.mes || (new Date().getMonth() + 1);
+    document.getElementById('va-cotacao').value    = financeiroData.apiCost.dolarCotacao || 5.40;
+    document.getElementById('va-preco-msg').value  = financeiroData.apiCost.precoPorMsgBRL != null ? financeiroData.apiCost.precoPorMsgBRL : 0.035;
+    document.getElementById('va-pct-empresa').value = financeiroData.apiCost.pctEmpresa != null ? financeiroData.apiCost.pctEmpresa : 50;
+
+    const refresh = () => {
+        const a = parseInt(anoEl.value) || 0, m = parseInt(mesEl.value) || 0;
+        const usd = (financeiroData.apiCost.antigo || {})[_anoMesKey(a, m)];
+        document.getElementById('va-usd').value = (usd != null) ? usd : '';
+    };
+    anoEl.oninput = refresh; mesEl.onchange = refresh;
+    refresh();
+
+    document.getElementById('valor-api-modal').style.display = 'flex';
+}
+
+function salvarValorApi() {
+    const ano        = parseInt(document.getElementById('va-ano').value);
+    const mes        = parseInt(document.getElementById('va-mes').value);
+    const usd        = parseFloat(document.getElementById('va-usd').value);
+    const cotacao    = parseFloat(document.getElementById('va-cotacao').value);
+    const precoMsg   = parseFloat(document.getElementById('va-preco-msg').value);
+    const pctEmpresa = parseFloat(document.getElementById('va-pct-empresa').value);
+    if (!ano || !mes || isNaN(usd)) { alert('Preencha ano, mês e valor gasto.'); return; }
+    _fbSetApiCostAntigo(ano, mes, usd);
+    const cfg = {};
+    if (!isNaN(cotacao) && cotacao > 0) cfg.dolarCotacao = cotacao;
+    if (!isNaN(precoMsg) && precoMsg >= 0) cfg.precoPorMsgBRL = precoMsg;
+    if (!isNaN(pctEmpresa) && pctEmpresa >= 0 && pctEmpresa <= 100) cfg.pctEmpresa = pctEmpresa;
+    if (Object.keys(cfg).length) _fbSetApiCost(cfg);
+    fecharModalGenerico('valor-api-modal');
+}
+
+// ── Pop-ups de auditoria (mesma estética do "Tintas Compradas") ─
+function abrirAuditFaturamento() {
+    const p    = getPeriodoAtual();
+    const ano  = filtro.ano, mes = filtro.mes;
+    const meta = _metaAtivaDoTipo('faturamento');
+    const st   = meta ? _metaStatus(meta, ano, mes) : { status: 'sem-dado', pct: null, alvo: null, atual: null };
+    const atual = _valorNoMes('faturamento', ano, mes);
+    let amAnt = mes - 1, ayAnt = ano; if (amAnt < 1) { amAnt = 12; ayAnt--; }
+    const anterior = _valorNoMes('faturamento', ayAnt, amAnt);
+
+    document.getElementById('audit-fat-sub').textContent = meta
+        ? `${meta.nome} · ${MESES_PT[mes - 1]}/${ano}`
+        : `${MESES_PT[mes - 1]}/${ano} · nenhuma meta cadastrada ainda`;
+    const tagEl = document.getElementById('audit-fat-tag');
+    tagEl.textContent = st.status === 'batida' ? 'META BATIDA' : st.status === 'perto' ? 'PERTO DE BATER' : st.status === 'falta' ? 'FALTA BATER' : 'SEM DADO';
+    tagEl.className = 'audit-side-tag st-' + st.status;
+    document.getElementById('audit-fat-big').textContent = fBRL(atual);
+    document.getElementById('audit-fat-meta').textContent = st.alvo != null ? fBRL(st.alvo) : '—';
+    document.getElementById('audit-fat-pct').textContent = st.pct != null ? st.pct.toFixed(1) + '%' : '—';
+    document.getElementById('audit-fat-ant').textContent = anterior != null ? fBRL(anterior) : '—';
+    document.getElementById('audit-fat-autoinc').textContent = (meta && meta.autoIncrementoPct) ? `+${meta.autoIncrementoPct}% ao bater` : 'Não configurado';
+
+    const ef = calcEficiencia(p);
+    document.getElementById('audit-fat-ef').textContent = ef.hasData ? fNum(ef.index, 1) + ' msgs/atend.' : '—';
+    const effin = _eficienciaFinanceira(p, atual);
+    document.getElementById('audit-fat-effin').textContent = (effin != null) ? fBRL(effin) + ' /msg-atend.' : '—';
+
+    const meses = getPeriodsForMesComparacao(ano);
+    const fatSerie = meses.map(item => _valorNoMes('faturamento', ano, item.mes));
+    const validos  = fatSerie.filter(v => v != null);
+    const media    = validos.length ? validos.reduce((a, b) => a + b, 0) / validos.length : null;
+    document.getElementById('audit-fat-media').textContent = media != null ? fBRL(media) : '—';
+    const trend = _calcTrendLine(fatSerie);
+    const trendValidos = trend.filter(v => v != null);
+    document.getElementById('audit-fat-tend').textContent = (trendValidos.length >= 2)
+        ? (trendValidos[trendValidos.length - 1] >= trendValidos[0] ? '▲ Em alta' : '▼ Em queda') : '—';
+    const batidos = meta ? meses.filter(item => _metaStatus(meta, ano, item.mes).status === 'batida').length : null;
+    document.getElementById('audit-fat-batidos').textContent = (batidos != null) ? `${batidos}/${meses.length}` : '—';
+
+    _renderAuditFatChart(ano, meses, fatSerie, meta);
+    document.getElementById('audit-faturamento-modal').style.display = 'flex';
+}
+
+function _renderAuditFatChart(ano, meses, fatSerie, meta) {
+    destroyChart('auditFat');
+    const ctx = getCtx('audit-fat-chart');
+    if (!ctx) return;
+    const labels    = meses.map(item => MESES_ABR[item.mes - 1]);
+    const metaSerie = meses.map(item => meta ? _metaAlvoParaMes(meta, ano, item.mes) : null);
+    const trend = _calcTrendLine(fatSerie);
+    const avg   = _calcAvgLine(fatSerie);
+    charts['auditFat'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Faturamento', data: fatSerie,  borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.08)', fill: true,  tension: .3, spanGaps: true, pointRadius: 4 },
+                { label: 'Meta',        data: metaSerie, borderColor: '#059669', borderDash: [6, 4], borderWidth: 2,   pointRadius: 0, fill: false, spanGaps: true },
+                { label: 'Tendência',   data: trend,     borderColor: '#d97706', borderDash: [7, 4], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true },
+                { label: 'Média',       data: avg,       borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: '#475569', font: { size: 10 }, boxWidth: 12 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => fBRL(v) }, beginAtZero: true },
+                x: { grid: { display: false }, ticks: { color: '#475569' } }
+            }
+        }
+    });
+}
+
+function abrirAuditApiCost() {
+    const ano = filtro.ano, mes = filtro.mes;
+    const p = getPeriodoAtual();
+    const antigo = _custoApiAntigo(ano, mes);
+    const novo   = _custoApiNovoEstimado(p);
+    const modo   = financeiroData.apiCost.modoAtivo;
+    const ativo  = modo === 'novo' ? novo : antigo;
+
+    document.getElementById('audit-api-sub').textContent = `${MESES_PT[mes - 1]}/${ano} · modelo ${modo === 'novo' ? 'novo (estimado)' : 'antigo'} selecionado`;
+    document.getElementById('audit-api-tag').textContent = modo === 'novo' ? 'MODELO NOVO (ESTIMADO)' : 'MODELO ANTIGO (REAL)';
+    document.getElementById('audit-api-big').textContent = ativo != null ? fBRL(ativo) : '—';
+    document.getElementById('audit-api-antigo').textContent = antigo != null ? fBRL(antigo) : '—';
+    document.getElementById('audit-api-novo').textContent = novo != null ? fBRL(novo) : '—';
+    const dif = (antigo != null && novo != null) ? (novo - antigo) : null;
+    document.getElementById('audit-api-dif').textContent = dif != null ? (dif >= 0 ? '+' : '') + fBRL(dif) : '—';
+    document.getElementById('audit-api-preco').textContent = 'R$ ' + String(financeiroData.apiCost.precoPorMsgBRL || 0.035).replace('.', ',') + '/msg';
+    document.getElementById('audit-api-pct').textContent = (financeiroData.apiCost.pctEmpresa != null ? financeiroData.apiCost.pctEmpresa : 50) + '%';
+    document.getElementById('audit-api-cotacao').textContent = financeiroData.apiCost.dolarCotacao ? 'R$ ' + Number(financeiroData.apiCost.dolarCotacao).toFixed(2) : '—';
+
+    const meses = getPeriodsForMesComparacao(ano);
+    const novoSerie = meses.map(item => _custoApiNovoEstimado(item.p));
+    const validos = novoSerie.filter(v => v != null);
+    const media = validos.length ? validos.reduce((a, b) => a + b, 0) / validos.length : null;
+    document.getElementById('audit-api-media').textContent = media != null ? fBRL(media) : '—';
+    const trend = _calcTrendLine(novoSerie);
+    const trendValidos = trend.filter(v => v != null);
+    document.getElementById('audit-api-tend').textContent = (trendValidos.length >= 2)
+        ? (trendValidos[trendValidos.length - 1] >= trendValidos[0] ? '▲ Em alta' : '▼ Em queda') : '—';
+
+    _renderAuditApiGoalBox(ano, mes);
+    _renderAuditApiChart(ano, meses);
+    document.getElementById('audit-apicost-modal').style.display = 'flex';
+}
+
+// Bloco separado dentro do pop-up de custo da API: meta de reduzir o volume de
+// mensagens trocadas (menos mensagem = menos cobrança no modelo novo). Some
+// se não houver nenhuma meta desse tipo cadastrada.
+function _renderAuditApiGoalBox(ano, mes) {
+    const box = document.getElementById('audit-api-goal-box');
+    if (!box) return;
+    const meta = _metaAtivaDoTipo('mensagens');
+    if (!meta) { box.style.display = 'none'; return; }
+
+    const st = _metaStatus(meta, ano, mes);
+    box.style.display = '';
+    document.getElementById('audit-api-goal-nome').textContent = meta.nome || 'Meta de Redução de Mensagens';
+    const statusEl = document.getElementById('audit-api-goal-status');
+    statusEl.className = 'proj-fin-status st-' + (st.status === 'sem-dado' ? 'semdado' : st.status);
+    statusEl.textContent = st.status === 'batida' ? 'Meta batida' : st.status === 'perto' ? 'Perto de bater' : st.status === 'falta' ? 'Falta bater' : 'Sem dado no mês';
+    document.getElementById('audit-api-goal-atual').textContent = st.atual != null ? fNum(st.atual) + ' msgs' : '—';
+    document.getElementById('audit-api-goal-alvo').textContent = st.alvo != null ? fNum(Math.round(st.alvo)) + ' msgs' : '—';
+    const pctClamp = st.pct != null ? Math.max(0, Math.min(100, st.pct)) : 0;
+    document.getElementById('audit-api-goal-pct').textContent = st.pct != null ? pctClamp.toFixed(0) + '%' : '—';
+    document.getElementById('audit-api-goal-bar').style.width = pctClamp + '%';
+}
+
+function _renderAuditApiChart(ano, meses) {
+    destroyChart('auditApi');
+    const ctx = getCtx('audit-api-chart');
+    if (!ctx) return;
+    const labels      = meses.map(item => MESES_ABR[item.mes - 1]);
+    const antigoSerie = meses.map(item => _custoApiAntigo(ano, item.mes));
+    const novoSerie   = meses.map(item => _custoApiNovoEstimado(item.p));
+    const trend = _calcTrendLine(novoSerie);
+    const avg   = _calcAvgLine(novoSerie);
+    charts['auditApi'] = new Chart(ctx, {
+        data: {
+            labels,
+            datasets: [
+                { type: 'bar',  label: 'Modelo Antigo (real)',     data: antigoSerie, backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 5, order: 3 },
+                { type: 'bar',  label: 'Modelo Novo (estimado)',   data: novoSerie,   backgroundColor: 'rgba(217,119,6,0.7)', borderRadius: 5, order: 3 },
+                { type: 'line', label: 'Tendência (novo)', data: trend, borderColor: '#dc2626', borderDash: [7, 4], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 1 },
+                { type: 'line', label: 'Média (novo)',     data: avg,   borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 2 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: '#475569', font: { size: 10 }, boxWidth: 12 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fBRL(ctx.raw)}` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', callback: v => fBRL(v) }, beginAtZero: true },
+                x: { grid: { display: false }, ticks: { color: '#475569' } }
+            }
+        }
+    });
+}
+
+// ── Pop-up de auditoria: dashboard mensal do Atendente ──────────
+// Clique num atendente do ranking "Avaliação por Atendente" abre este
+// pop-up (mesma estética "Tintas Compradas") com o histórico mês a mês
+// de avaliações enviadas/respondidas/não respondidas dele no ano filtrado.
+function abrirAuditAtendente(nome) {
+    const ano = filtro.ano || new Date().getFullYear();
+    const meses = getPeriodsForMesComparacao(ano);
+    const porMes = meses.map(item => (item.p.atendentes || []).find(a => a.nome === nome) || null);
+
+    const atFiltro = (getPeriodoAtual()?.atendentes || []).find(a => a.nome === nome) || null;
+    const env = atFiltro?.avalEnviadas || 0;
+    const resp = atFiltro?.avalRespondidas || 0;
+    const naoResp = Math.max(0, env - resp);
+    const pctAtual = env ? Math.round(resp / env * 100) : null;
+
+    document.getElementById('audit-at-nome').textContent = nome;
+    document.getElementById('audit-at-sub').textContent = `${MESES_PT[(filtro.mes || 1) - 1]}/${ano}`;
+    const tagEl = document.getElementById('audit-at-tag');
+    tagEl.textContent = !atFiltro ? 'SEM DADO NO MÊS' : pctAtual >= 80 ? 'BOA RESPOSTA' : pctAtual >= 50 ? 'RESPOSTA MEDIANA' : 'RESPOSTA BAIXA';
+    tagEl.className = 'audit-side-tag' + (!atFiltro ? '' : pctAtual >= 80 ? ' st-batida' : pctAtual >= 50 ? ' st-perto' : ' st-falta');
+    document.getElementById('audit-at-big').textContent = pctAtual != null ? pctAtual + '%' : '—';
+    document.getElementById('audit-at-atend').textContent = atFiltro ? fNum(atFiltro.atendimentos) : '—';
+    document.getElementById('audit-at-aval').textContent = atFiltro ? fAval(atFiltro.avaliacao) : '—';
+    document.getElementById('audit-at-env').textContent = fNum(env);
+    document.getElementById('audit-at-resp').textContent = fNum(resp);
+    document.getElementById('audit-at-naoresp').textContent = fNum(naoResp);
+
+    const pctSerie = porMes.map(at => (at && at.avalEnviadas) ? +(at.avalRespondidas / at.avalEnviadas * 100).toFixed(1) : null);
+    const validos = pctSerie.filter(v => v != null);
+    const media = validos.length ? validos.reduce((a, b) => a + b, 0) / validos.length : null;
+    document.getElementById('audit-at-media').textContent = media != null ? media.toFixed(1) + '%' : '—';
+    const trend = _calcTrendLine(pctSerie);
+    const trendValidos = trend.filter(v => v != null);
+    document.getElementById('audit-at-tend').textContent = (trendValidos.length >= 2)
+        ? (trendValidos[trendValidos.length - 1] >= trendValidos[0] ? '▲ Melhorando' : '▼ Piorando') : '—';
+    let melhorIdx = -1, melhorVal = -1;
+    pctSerie.forEach((v, i) => { if (v != null && v > melhorVal) { melhorVal = v; melhorIdx = i; } });
+    document.getElementById('audit-at-melhor').textContent = melhorIdx >= 0 ? `${MESES_ABR[meses[melhorIdx].mes - 1]} (${melhorVal.toFixed(0)}%)` : '—';
+
+    _renderAuditAtendenteChart(meses, porMes, pctSerie);
+    document.getElementById('audit-atendente-modal').style.display = 'flex';
+}
+
+function _renderAuditAtendenteChart(meses, porMes, pctSerie) {
+    destroyChart('auditAt');
+    const ctx = getCtx('audit-at-chart');
+    if (!ctx) return;
+    const labels      = meses.map(item => MESES_ABR[item.mes - 1]);
+    const envData     = porMes.map(at => at ? at.avalEnviadas : null);
+    const respData    = porMes.map(at => at ? at.avalRespondidas : null);
+    const naoRespData = porMes.map(at => at ? Math.max(0, (at.avalEnviadas || 0) - (at.avalRespondidas || 0)) : null);
+    const trend = _calcTrendLine(pctSerie);
+    const avg   = _calcAvgLine(pctSerie);
+
+    charts['auditAt'] = new Chart(ctx, {
+        data: {
+            labels,
+            datasets: [
+                { type: 'bar',  label: 'Enviadas',         data: envData,     backgroundColor: 'rgba(100,116,139,0.55)', borderRadius: 4, order: 4, yAxisID: 'y' },
+                { type: 'bar',  label: 'Respondidas',      data: respData,    backgroundColor: 'rgba(5,150,105,0.75)',   borderRadius: 4, order: 4, yAxisID: 'y' },
+                { type: 'bar',  label: 'Não respondidas',  data: naoRespData, backgroundColor: 'rgba(220,38,38,0.7)',    borderRadius: 4, order: 4, yAxisID: 'y' },
+                { type: 'line', label: 'Taxa de resposta (%)', data: pctSerie, borderColor: '#2563eb', borderWidth: 2, pointRadius: 4, fill: false, spanGaps: true, order: 1, yAxisID: 'y1' },
+                { type: 'line', label: 'Tendência', data: trend, borderColor: '#d97706', borderDash: [7, 4], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 2, yAxisID: 'y1' },
+                { type: 'line', label: 'Média',     data: avg,   borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true, order: 3, yAxisID: 'y1' }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: '#475569', font: { size: 9 }, boxWidth: 10 } },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            if (ctx.raw == null) return ` ${ctx.dataset.label}: sem dado`;
+                            return ctx.dataset.yAxisID === 'y1' ? ` ${ctx.dataset.label}: ${ctx.raw}%` : ` ${ctx.dataset.label}: ${fNum(ctx.raw)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y:  { position: 'left',  grid: { color: '#e2e8f0' }, ticks: { color: '#64748b' }, beginAtZero: true, title: { display: true, text: 'Avaliações', color: '#94a3b8', font: { size: 9 } } },
+                y1: { position: 'right', grid: { display: false },   ticks: { color: '#2563eb' },  min: 0, max: 100,   title: { display: true, text: '% resposta',  color: '#94a3b8', font: { size: 9 } } },
+                x:  { grid: { display: false }, ticks: { color: '#475569' } }
+            }
+        }
+    });
+}
+
+// ── Fechamento genérico de modal (usado pelos pop-ups novos) ────
+function fecharModalGenerico(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+}
+function modalOverlayClickGenerico(e, id) {
+    if (e.target === document.getElementById(id)) fecharModalGenerico(id);
 }
 
 // ── Planilha base (linhas cruas) no Firebase ────────────────────
@@ -124,7 +1059,6 @@ function _mesKeyFromDate(str) {
 }
 let atendentesForm   = [];
 let charts           = {};
-let mostrarComparacao = false;   // inicia fechado; abre só ao clicar
 
 // ── Seed ──────────────────────────────────────────────────────
 const SEED = [];
@@ -232,6 +1166,41 @@ function init() {
     renderDashboard();
     renderSpreadsheet();
     carregarNomeAdmin();
+    relStartIdleWatch();
+    relResetIdle();
+}
+
+// ── Sessão: auto-logout por inatividade (60 min) + contagem regressiva ──
+// Mesmo padrão do módulo Financeiro (.idle-chip/.idle-timer), replicado aqui
+// porque esse módulo ainda não tinha logout automático nenhum.
+const _REL_IDLE_MS = 60 * 60 * 1000;
+let _relIdleTimer = null;
+let _relIdleTick  = null;
+let _relIdleDeadline = 0;
+
+function relResetIdle() {
+    clearTimeout(_relIdleTimer);
+    _relIdleDeadline = Date.now() + _REL_IDLE_MS;
+    _relIdleTimer = setTimeout(relIdleLogout, _REL_IDLE_MS);
+    if (!_relIdleTick) _relIdleTick = setInterval(_relUpdateIdleChip, 1000);
+    _relUpdateIdleChip();
+}
+
+function _relUpdateIdleChip() {
+    let ms = _relIdleDeadline - Date.now(); if (ms < 0) ms = 0;
+    const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+    const txt = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    document.querySelectorAll('.idle-timer').forEach(el => { el.textContent = txt; });
+    document.querySelectorAll('.idle-chip').forEach(chip => chip.classList.toggle('idle-timer-warn', ms <= 60000));
+}
+
+function relIdleLogout() {
+    relLogout();
+}
+
+function relStartIdleWatch() {
+    ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(ev =>
+        document.addEventListener(ev, relResetIdle, { passive: true }));
 }
 
 function carregarNomeAdmin() {
@@ -543,7 +1512,7 @@ function agregarLista(lista, meta) {
         tipo: meta.tipo, ano, mes: null, quinzena: null,
         nome: meta.nome,
         total: 0, contatos: 0, mensagens: 0,
-        avaliacao: 0, silenciosos: 0, concluidos: 0, clienteEncerrou: 0,
+        avaliacao: 0, silenciosos: 0, concluidos: 0, clienteEncerrou: 0, aberto: 0,
         avalEnviadas: 0, avalRespondidas: 0, avalPendentes: 0,
         avalEnviadas: 0,
         resultados: 0, coleta: 0, atendente: 0, info: 0,
@@ -569,6 +1538,7 @@ function agregarLista(lista, meta) {
         base.silenciosos += p.silenciosos || 0;
         base.concluidos  += p.concluidos  || 0;
         base.clienteEncerrou += p.clienteEncerrou || 0;
+        base.aberto      += p.aberto      || 0;
         base.avalEnviadas    += p.avalEnviadas    || 0;
         base.avalRespondidas += p.avalRespondidas || 0;
         base.avalPendentes   += p.avalPendentes   || 0;
@@ -702,8 +1672,10 @@ function renderDashboard() {
         renderRankings(null);
         const heatEl = document.getElementById('heat-horario');
         if (heatEl) heatEl.innerHTML = '';
-        // Limpar todos os charts
-        Object.keys(charts).forEach(k => destroyChart(k));
+        // Limpar todos os charts (exceto Projeção Financeira — depende do ANO
+        // filtrado, não do período exato sem CC, então continua útil mostrar)
+        Object.keys(charts).forEach(k => { if (k !== 'faturamento' && k !== 'apicost') destroyChart(k); });
+        renderProjecaoFinanceira();
         return;
     }
 
@@ -711,6 +1683,7 @@ function renderDashboard() {
     atualizarKPIs(p);
     renderRankings(p);
     renderCharts(p);
+    renderProjecaoFinanceira();
 
     // Label comparação
     document.getElementById('comp-ano-label').textContent = filtro.ano;
@@ -730,7 +1703,7 @@ function atualizarKPIs(p) {
         return;
     }
 
-    const emAberto = Math.max(0, (p.total || 0) - (p.concluidos || 0) - (p.silenciosos || 0));
+    const emAberto = p.aberto || 0;   // literal status "Aberto" na planilha (não mais derivado por subtração)
 
     // Total de Atendimentos
     document.getElementById('kpi-total').textContent = fNum(p.total);
@@ -826,9 +1799,8 @@ function renderRankings(p) {
             const cls = v >= 4 ? 'aval-verde' : v >= 3 ? 'aval-amarela' : 'aval-vermelha';
             const pct = Math.max(0, Math.min(100, (v / 5) * 100));
             const nAval = at.avaliacoes || 0;
-            const sel = (avalAtendenteSel === at.nome) ? ' sel' : '';
             return `
-            <div class="rank-item rank-aval-item${sel}" data-nome="${escHtml(at.nome)}" title="Clique para ver a resposta às avaliações deste atendente">
+            <div class="rank-item rank-aval-item" data-nome="${escHtml(at.nome)}" title="Clique para abrir o dashboard mensal deste atendente">
                 <div class="rank-pos ${posClass(i)}">${i+1}</div>
                 <div class="rank-aval-main">
                     <div class="rank-aval-top">
@@ -845,22 +1817,15 @@ function renderRankings(p) {
             raEl._avalBound = true;
             raEl.addEventListener('click', (e) => {
                 const item = e.target.closest('.rank-aval-item');
-                if (item && item.dataset.nome != null) selecionarAtendenteAval(item.dataset.nome);
+                if (item && item.dataset.nome != null) abrirAuditAtendente(item.dataset.nome);
             });
         }
     }
 }
 
-// Seleciona/desseleciona um atendente → o card "Resposta às Avaliações" mostra os dados dele.
-function selecionarAtendenteAval(nome) {
-    avalAtendenteSel = (avalAtendenteSel === nome) ? null : nome;
-    const p = getPeriodoAtual();
-    renderRankings(p);
-    renderAvalResumo(p);
-}
-
-// Card "Resposta às Avaliações" — agregado do período. Gauge 0–100% da taxa de
-// resposta + contagem de enviadas / respondidas / não respondidas.
+// Card "Resposta às Avaliações" — SEMPRE geral (soma todos os atendentes).
+// Gauge 0–100% da taxa de resposta do período filtrado + contagem de
+// enviadas/respondidas/não respondidas + evolução mês a mês no ano (com média).
 function renderAvalResumo(p) {
     destroyChart('avalGauge');
     const ctx = getCtx('chart-aval-gauge');
@@ -869,37 +1834,28 @@ function renderAvalResumo(p) {
     const tituloEl = document.getElementById('aval-resumo-titulo');
     if (!p) return;
 
-    // Se um atendente estiver selecionado no ranking, usa os dados dele; senão, o geral.
-    let enviadas, respondidas, titulo, selecionado = false;
-    if (avalAtendenteSel) {
-        const at = (p.atendentes || []).find(a => a.nome === avalAtendenteSel);
-        enviadas = at?.avalEnviadas || 0;
-        respondidas = at?.avalRespondidas || 0;
-        titulo = avalAtendenteSel;
-        selecionado = true;
-    } else {
-        enviadas = p.avalEnviadas || 0;
-        respondidas = p.avalRespondidas || 0;
-        titulo = 'Geral · todos os atendentes';
-    }
+    const enviadas    = p.avalEnviadas || 0;
+    const respondidas = p.avalRespondidas || 0;
     const naoResp = Math.max(0, enviadas - respondidas);
     const pct     = enviadas ? Math.round(respondidas / enviadas * 100) : 0;
 
-    if (tituloEl) {
-        tituloEl.innerHTML = selecionado
-            ? `<span class="aval-res-sel">${escHtml(titulo)}</span> <button class="aval-res-clear" type="button" onclick="selecionarAtendenteAval('')">✕ ver geral</button>`
-            : titulo;
-    }
+    if (tituloEl) tituloEl.textContent = 'Geral · todos os atendentes';
     if (pctEl) pctEl.textContent = pct + '%';
 
     if (ctx) {
         charts['avalGauge'] = new Chart(ctx, {
             type: 'doughnut',
-            data: { datasets: [{ data: [respondidas, naoResp], backgroundColor: ['#059669', '#e2e8f0'], borderWidth: 0 }] },
+            data: {
+                labels: ['Respondidas', 'Não respondidas'],
+                datasets: [{ data: [respondidas, naoResp], backgroundColor: ['#059669', '#e2e8f0'], borderWidth: 0 }]
+            },
             options: {
                 responsive: true, maintainAspectRatio: false, cutout: '78%',
                 rotation: -90, circumference: 360,
-                plugins: { legend: { display: false }, tooltip: { enabled: false } }
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fNum(ctx.raw)}` } }
+                }
             }
         });
     }
@@ -908,6 +1864,47 @@ function renderAvalResumo(p) {
         <div class="aval-res-row"><span class="aval-det-dot" style="background:#64748b"></span>Avaliações enviadas <strong>${fNum(enviadas)}</strong></div>
         <div class="aval-res-row"><span class="aval-det-dot" style="background:#059669"></span>Respondida <strong>${fNum(respondidas)}</strong></div>
         <div class="aval-res-row"><span class="aval-det-dot" style="background:#dc2626"></span>Avaliação não respondida <strong>${fNum(naoResp)}</strong></div>`;
+
+    _renderAvalEvolucaoChart();
+}
+
+// Evolução da taxa de resposta (%) mês a mês no ano filtrado, com linha de média.
+function _renderAvalEvolucaoChart() {
+    destroyChart('avalEvolucao');
+    const ctx = getCtx('chart-aval-evolucao');
+    if (!ctx) return;
+    const ano = filtro.ano || new Date().getFullYear();
+    const meses = getPeriodsForMesComparacao(ano);
+    const labels = meses.map(item => MESES_ABR[item.mes - 1]);
+    const serie = meses.map(item => {
+        const env = item.p.avalEnviadas || 0;
+        if (!env) return null;
+        return +((item.p.avalRespondidas || 0) / env * 100).toFixed(1);
+    });
+    const avg = _calcAvgLine(serie);
+
+    charts['avalEvolucao'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: '% respondida', data: serie, borderColor: '#059669', backgroundColor: 'rgba(5,150,105,0.08)', fill: true, tension: .3, spanGaps: true, pointRadius: 3 },
+                { label: 'Média', data: avg, borderColor: '#8b5cf6', borderDash: [2, 3], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: true }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: true, labels: { color: '#475569', font: { size: 9 }, boxWidth: 10 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${ctx.raw}%` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 9 } }, min: 0, max: 100 },
+                x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 9 } } }
+            }
+        }
+    });
 }
 
 // Score de qualidade do atendente. Combina:
@@ -951,21 +1948,6 @@ function toggleInfo(ev, btn) {
     }
 }
 
-function toggleComparacao() {
-    mostrarComparacao = !mostrarComparacao;
-    const btn  = document.getElementById('btn-comp');
-    const wrap = document.getElementById('comparacao-wrap');
-
-    btn.classList.toggle('active', mostrarComparacao);
-    wrap.style.display = mostrarComparacao ? 'block' : 'none';
-
-    if (mostrarComparacao) {
-        chartComparacao(filtro.ano);
-    } else {
-        destroyChart('comp');
-    }
-}
-
 // ============================================================
 // CHARTS
 // ============================================================
@@ -978,7 +1960,8 @@ function renderCharts(p) {
     chartCanais(p);
     chartClientes(p);
     renderAvalResumo(p);
-    if (mostrarComparacao) chartComparacao(filtro.ano);
+    // Sempre aberto — antes só renderizava com o card expandido (toggleComparacao)
+    chartComparacao(filtro.ano);
 }
 
 function chartCanais(p) {
@@ -1040,7 +2023,7 @@ function chartDadosGerais(p) {
     if (!ctx || !p) return;
 
     const concluidos = p.concluidos || 0;
-    const emAberto   = Math.max(0, (p.total || 0) - concluidos - (p.silenciosos || 0));
+    const emAberto   = p.aberto || 0;
     const mensagens  = p.mensagens || 0;
 
     charts['geral'] = new Chart(ctx, {
@@ -1119,34 +2102,70 @@ function chartComparacao(ano) {
         }
     }
 
+    // Linha de tendência (regressão linear sobre os meses com dado) e linha de
+    // média (valor médio dos meses com dado) — mesmo período/eixo do gráfico.
+    const trendData = _calcTrendLine(efData);
+    const avgData   = _calcAvgLine(efData);
+
     charts['comp'] = new Chart(ctx, {
         type: 'line',
         data: {
             labels: lista.map(item => MESES_ABR[item.mes - 1]),
-            datasets: [{
-                label: 'Eficiência (msgs/atendimento)',
-                data: efData,
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37,99,235,0.08)',
-                pointBackgroundColor: pointColors,
-                pointBorderColor: pointColors,
-                pointRadius: 5,
-                pointHoverRadius: 7,
-                tension: 0.35,
-                fill: true,
-                spanGaps: true
-            }]
+            datasets: [
+                {
+                    label: 'Eficiência (msgs/atendimento)',
+                    data: efData,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37,99,235,0.08)',
+                    pointBackgroundColor: pointColors,
+                    pointBorderColor: pointColors,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    tension: 0.35,
+                    fill: true,
+                    spanGaps: true,
+                    order: 1
+                },
+                {
+                    label: 'Tendência',
+                    data: trendData,
+                    borderColor: '#d97706',
+                    borderDash: [7, 4],
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHitRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    spanGaps: true,
+                    order: 2
+                },
+                {
+                    label: 'Média',
+                    data: avgData,
+                    borderColor: '#8b5cf6',
+                    borderDash: [2, 3],
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    pointHitRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    spanGaps: true,
+                    order: 3
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { labels: { color: '#475569', font: { size: 11 } } },
                 tooltip: {
                     callbacks: {
-                        label: ctx => ctx.raw == null
-                            ? ' sem dados de mensagens'
-                            : ` ${ctx.raw} msgs por atendimento`
+                        label: ctx => {
+                            if (ctx.raw == null) return ` ${ctx.dataset.label}: sem dados`;
+                            return ` ${ctx.dataset.label}: ${ctx.raw} msgs por atendimento`;
+                        }
                     }
                 }
             },
@@ -1159,8 +2178,34 @@ function chartComparacao(ano) {
     });
 }
 
+// Regressão linear simples (y = a + b·x) sobre os pontos não-nulos de um array;
+// devolve um array do mesmo tamanho, com null nas posições sem dado (spanGaps
+// cuida do visual). Usada nas linhas de "Tendência" dos gráficos de linha.
+function _calcTrendLine(vals) {
+    const pts = vals.map((v, i) => v == null ? null : [i, v]).filter(Boolean);
+    if (pts.length < 2) return vals.map(() => null);
+    const n = pts.length;
+    const sumX  = pts.reduce((s, [x])    => s + x, 0);
+    const sumY  = pts.reduce((s, [, y])  => s + y, 0);
+    const sumXY = pts.reduce((s, [x, y]) => s + x * y, 0);
+    const sumX2 = pts.reduce((s, [x])    => s + x * x, 0);
+    const denom = n * sumX2 - sumX * sumX;
+    if (!denom) return vals.map(() => null);
+    const b = (n * sumXY - sumX * sumY) / denom;
+    const a = (sumY - b * sumX) / n;
+    return vals.map((v, i) => v == null ? null : +(a + b * i).toFixed(2));
+}
+
+// Linha de média — mesmo valor (a média dos pontos com dado) repetido em toda
+// a extensão do eixo X, só null onde o próprio ponto não tem dado.
+function _calcAvgLine(vals) {
+    const nums = vals.filter(v => v != null);
+    if (!nums.length) return vals.map(() => null);
+    const avg = nums.reduce((s, v) => s + v, 0) / nums.length;
+    return vals.map(v => v == null ? null : +avg.toFixed(2));
+}
+
 // Canal selecionado no card "Por Que Buscam" ('todos' | 'whatsapp' | 'instagram')
-let avalAtendenteSel = null;   // atendente selecionado no card Resposta às Avaliações
 let buscamCanal = 'todos';
 const _BUSCAM_CANAIS = ['todos', 'whatsapp', 'instagram'];
 const _BUSCAM_CANAL_LBL = { todos: 'Todos os canais', whatsapp: 'WhatsApp', instagram: 'Instagram' };
@@ -1176,6 +2221,7 @@ function chartBuscam(p) {
     const ctx = getCtx('chart-buscam');
     const lblEl = document.getElementById('buscam-canal-label');
     if (lblEl) lblEl.textContent = _BUSCAM_CANAL_LBL[buscamCanal];
+    _renderBuscamGrowthChart();   // independe de "p" (varre o ano inteiro) — roda mesmo sem período atual
     if (!ctx || !p) return;
 
     const labels = ['Resultados', 'Coleta Dom.', 'Falar Atend.', 'Info Gerais', 'Orçamentos', 'Reclamações', 'Vacinas'];
@@ -1234,6 +2280,74 @@ function chartBuscam(p) {
     });
 }
 
+// Crescimento de atendimento por canal (Conexão), mês a mês no ano filtrado —
+// interativo com o mesmo seletor de canal do gráfico de pizza acima ("Todos"
+// mostra WhatsApp em verde + Instagram em vermelho + Outros se houver dado;
+// um canal específico mostra só a linha dele), com linha de média.
+function _renderBuscamGrowthChart() {
+    destroyChart('buscamGrowth');
+    const ctx = getCtx('chart-buscam-growth');
+    if (!ctx) return;
+
+    const ano   = filtro.ano || new Date().getFullYear();
+    const meses = getPeriodsForMesComparacao(ano);
+    const labels = meses.map(item => MESES_ABR[item.mes - 1]);
+
+    const seriesDef = [];
+    if (buscamCanal === 'todos') {
+        seriesDef.push({ key: 'whatsapp', label: 'WhatsApp', color: '#25D366' });
+        seriesDef.push({ key: 'instagram', label: 'Instagram', color: '#dc2626' });
+        if (meses.some(item => (item.p.canais?.outros || 0) > 0)) {
+            seriesDef.push({ key: 'outros', label: 'Outros', color: '#94a3b8' });
+        }
+    } else if (buscamCanal === 'whatsapp') {
+        seriesDef.push({ key: 'whatsapp', label: 'WhatsApp', color: '#25D366' });
+    } else if (buscamCanal === 'instagram') {
+        seriesDef.push({ key: 'instagram', label: 'Instagram', color: '#dc2626' });
+    }
+
+    // Coluna (barra) por canal — não linha; a média de cada série é que vem
+    // sobreposta em linha, igual ao padrão dos outros gráficos de coluna.
+    const datasets = seriesDef.map(def => ({
+        type: 'bar',
+        label: def.label,
+        data: meses.map(item => item.p.canais?.[def.key] ?? 0),
+        backgroundColor: def.color + 'cc',
+        borderRadius: 5,
+        order: 2
+    }));
+
+    // 1 linha de média por série visível (mesma cor da barra, tracejada) — assim
+    // dá pra comparar cada canal com a própria média, não só uma média geral.
+    seriesDef.forEach((def, i) => {
+        datasets.push({
+            type: 'line',
+            label: `Média ${def.label}`,
+            data: _calcAvgLine(datasets[i].data),
+            borderColor: def.color,
+            borderDash: [6, 4], borderWidth: 1.5,
+            pointRadius: 0, pointHitRadius: 0, fill: false, spanGaps: true,
+            order: 1
+        });
+    });
+
+    charts['buscamGrowth'] = new Chart(ctx, {
+        data: { labels, datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: true, labels: { color: '#475569', font: { size: 9 }, boxWidth: 10 } },
+                tooltip: { callbacks: { label: ctx => ctx.raw == null ? ` ${ctx.dataset.label}: sem dado` : ` ${ctx.dataset.label}: ${fNum(ctx.raw)} atend.` } }
+            },
+            scales: {
+                y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b', font: { size: 9 } }, beginAtZero: true },
+                x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 9 } } }
+            }
+        }
+    });
+}
+
 function chartDias(p) {
     destroyChart('dias');
     const ctx = getCtx('chart-dias');
@@ -1245,25 +2359,47 @@ function chartDias(p) {
     // Cores sólidas: dia de maior fluxo em âmbar, demais em azul. Só destaca se houver dado.
     const cores  = vals.map(v => (maxV > 0 && v === maxV) ? '#d97706' : '#2563eb');
     const bordas = vals.map(v => (maxV > 0 && v === maxV) ? '#b45309' : '#1d4ed8');
+    const soma  = vals.reduce((a, b) => a + b, 0);
+    const media = soma ? soma / vals.length : 0;
 
     charts['dias'] = new Chart(ctx, {
-        type: 'bar',
         data: {
             labels: dias,
-            datasets: [{
-                label: 'Atendimentos',
-                data: vals,
-                backgroundColor: cores,
-                borderColor: bordas,
-                borderWidth: 1,
-                borderRadius: 6,
-                borderSkipped: false
-            }]
+            datasets: [
+                {
+                    type: 'bar',
+                    label: 'Atendimentos',
+                    data: vals,
+                    backgroundColor: cores,
+                    borderColor: bordas,
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    order: 2
+                },
+                {
+                    type: 'line',
+                    label: 'Média',
+                    data: dias.map(() => +media.toFixed(1)),
+                    borderColor: '#8b5cf6',
+                    borderDash: [7, 4],
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHitRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    order: 1
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: true, labels: { color: '#475569', font: { size: 11 }, boxWidth: 14 } },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fNum(ctx.raw, ctx.dataset.label === 'Média' ? 1 : 0)}` } }
+            },
             scales: {
                 y: { grid: { color: '#e2e8f0' }, ticks: { color: '#64748b' }, beginAtZero: true },
                 x: { grid: { display: false }, ticks: { color: '#475569', font: { weight: '600' } } }
@@ -1332,7 +2468,7 @@ function chartClientes(p) {
     const concluidos  = p.concluidos  || 0;
     const silenciosos = p.silenciosos || 0;
     const cliente     = p.clienteEncerrou || 0;
-    const emAberto    = Math.max(0, (p.total || 0) - concluidos - silenciosos - cliente);
+    const emAberto    = p.aberto || 0;
 
     charts['clientes'] = new Chart(ctx, {
         type: 'doughnut',
@@ -1843,66 +2979,104 @@ function exportarCSV() {
 // RELATÓRIO (IMPRIMIR)
 // ============================================================
 
-function gerarRelatorio() {
+// Abre o pop-up de escolha do que entra no relatório (todas as seções vêm
+// pré-marcadas — desmarca quem não quiser).
+function abrirRelatorioModal() {
     const p = getPeriodoAtual();
     if (!p) {
         alert('Nenhum dado disponível para o período selecionado.');
         return;
     }
+    document.getElementById('relatorio-opcoes-modal').style.display = 'flex';
+}
 
-    const ef   = calcEficiencia(p);
-    const data = new Date().toLocaleDateString('pt-BR');
-    const emAberto = Math.max(0, (p.total||0) - (p.concluidos||0) - (p.silenciosos||0) - (p.clienteEncerrou||0));
-    const avalEnv  = p.avalEnviadas || 0;
-    const avalResp = p.avalRespondidas || 0;
-    const avalNao  = Math.max(0, avalEnv - avalResp);
-    const c        = p.canais || { whatsapp:0, instagram:0, outros:0 };
+// Gera o PDF conforme as caixinhas marcadas no pop-up. Cada seção que tem um
+// gráfico já renderizado na tela ganha a imagem dele (toBase64Image) além dos
+// dados em número/porcentagem — se "incluir gráficos" estiver desmarcado, ou
+// se o gráfico daquela seção não estiver disponível/der erro ao desenhar, a
+// seção sai só com a tabela de dados mesmo (nunca fica sem nada).
+function gerarRelatorioComOpcoes() {
+    const p = getPeriodoAtual();
+    if (!p) { alert('Nenhum dado disponível para o período selecionado.'); return; }
 
-    const sections = [
-        { heading: 'Indicadores Gerais', headers: ['Indicador', 'Valor'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: [
-            ['Total de Atendimentos', fNum(p.total)],
-            ['Atendimentos em Aberto', fNum(emAberto)],
-            ['Avaliação Média', fAval(p.avaliacao)],
-            ['Eficiência (msgs/atend.)', ef.hasData ? fNum(ef.index, 1) : '—'],
-          ] },
-        { heading: 'Status dos Clientes', headers: ['Situação', 'Quantidade'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: [
-            ['Resolvidos (finalizados)', fNum(p.concluidos)],
-            ['Silenciosos (não responderam)', fNum(p.silenciosos)],
-            ['Em andamento (status Aberto)', fNum(emAberto)],
-            ['Cliente encerrou (fila vazia, sem usuário)', fNum(p.clienteEncerrou || 0)],
-          ] },
-        { heading: 'Resposta às Avaliações', headers: ['Indicador', 'Valor'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: [
-            ['Avaliações enviadas', fNum(avalEnv)],
-            ['Respondida', fNum(avalResp)],
-            ['Avaliação não respondida', fNum(avalNao)],
-            ['Taxa de resposta', (avalEnv ? Math.round(avalResp / avalEnv * 100) : 0) + '%'],
-            ['Total de Mensagens', fNum(p.mensagens)],
-          ] },
-        { heading: 'Volume por Canal (Conexão)', headers: ['Canal', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: [
-            ['WhatsApp', fNum(c.whatsapp || 0)],
-            ['Instagram', fNum(c.instagram || 0)],
-            ['Outros', fNum(c.outros || 0)],
-          ] },
-        { heading: 'Por Que Buscam o LAMIC', headers: ['Motivo', 'Quantidade'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: [
-            ['Resultados de Exames', fNum(p.resultados)],
-            ['Coleta Domiciliar', fNum(p.coleta)],
-            ['Falar com Atendente', fNum(p.atendente)],
-            ['Informações Gerais', fNum(p.info)],
-            ['Orçamentos', fNum(p.orcamentos)],
-            ['Reclamações', fNum(p.reclamacoes)],
-            ['Vacinas', fNum(p.vacinas)],
-          ] },
-        { heading: 'Fluxo por Dia da Semana', headers: ['Dia', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: Object.entries(p.dias || {}).map(([d, v]) => [d, fNum(v)]) },
-        { heading: 'Fluxo por Horário', headers: ['Horário', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
-          rows: Object.entries(p.horarios || {}).map(([h, v]) => [String(h).replace('-', 'h–') + 'h', fNum(v)]) },
-    ];
-    if (p.atendentes?.length) {
+    // Ressincroniza a Projeção Financeira com o tipo (CC/IA) que está na tela.
+    financeiroData = (dashTipo === 'ia') ? financeiroData_ia : financeiroData_cc;
+    _financeiroTipoAtivo = dashTipo;
+
+    const opt = id => !!document.getElementById(id)?.checked;
+    const incluirGraficos = opt('rpt-opt-graficos');
+    const imgFrom = (key) => {
+        if (!incluirGraficos) return null;
+        const c = charts[key];
+        if (!c || !c.canvas) return null;
+        try { return { data: c.toBase64Image(), w: c.canvas.width, h: c.canvas.height }; }
+        catch (e) { console.warn('[Relatório] Gráfico', key, 'não pôde ser capturado, seguindo só com os dados:', e); return null; }
+    };
+
+    const ano = filtro.ano || new Date().getFullYear();
+    const sections = [];
+
+    if (opt('rpt-opt-indicadores')) {
+        const ef = calcEficiencia(p);
+        sections.push({ heading: 'Indicadores Gerais', headers: ['Indicador', 'Valor'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            rows: [
+                ['Total de Atendimentos', fNum(p.total)],
+                ['Atendimentos em Aberto', fNum(p.aberto || 0)],
+                ['Avaliação Média', fAval(p.avaliacao)],
+                ['Eficiência (msgs/atend.)', ef.hasData ? fNum(ef.index, 1) : '—'],
+            ] });
+    }
+    if (opt('rpt-opt-status')) {
+        sections.push({ heading: 'Status dos Clientes', headers: ['Situação', 'Quantidade'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('clientes'),
+            rows: [
+                ['Resolvidos (finalizados)', fNum(p.concluidos)],
+                ['Silenciosos (não responderam)', fNum(p.silenciosos)],
+                ['Em andamento (status Aberto)', fNum(p.aberto || 0)],
+                ['Cliente encerrou (fila vazia, sem usuário)', fNum(p.clienteEncerrou || 0)],
+            ] });
+    }
+    if (opt('rpt-opt-avaliacoes')) {
+        const avalEnv = p.avalEnviadas || 0, avalResp = p.avalRespondidas || 0, avalNao = Math.max(0, avalEnv - avalResp);
+        sections.push({ heading: 'Resposta às Avaliações', headers: ['Indicador', 'Valor'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('avalGauge'),
+            rows: [
+                ['Avaliações enviadas', fNum(avalEnv)],
+                ['Respondida', fNum(avalResp)],
+                ['Avaliação não respondida', fNum(avalNao)],
+                ['Taxa de resposta', (avalEnv ? Math.round(avalResp / avalEnv * 100) : 0) + '%'],
+                ['Total de Mensagens', fNum(p.mensagens)],
+            ] });
+    }
+    if (opt('rpt-opt-canal')) {
+        const c = p.canais || { whatsapp: 0, instagram: 0, outros: 0 };
+        sections.push({ heading: 'Volume por Canal (Conexão)', headers: ['Canal', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('canais'),
+            rows: [['WhatsApp', fNum(c.whatsapp || 0)], ['Instagram', fNum(c.instagram || 0)], ['Outros', fNum(c.outros || 0)]] });
+    }
+    if (opt('rpt-opt-buscam')) {
+        sections.push({ heading: 'Por Que Buscam o LAMIC', headers: ['Motivo', 'Quantidade'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('buscam'),
+            rows: [
+                ['Resultados de Exames', fNum(p.resultados)],
+                ['Coleta Domiciliar', fNum(p.coleta)],
+                ['Falar com Atendente', fNum(p.atendente)],
+                ['Informações Gerais', fNum(p.info)],
+                ['Orçamentos', fNum(p.orcamentos)],
+                ['Reclamações', fNum(p.reclamacoes)],
+                ['Vacinas', fNum(p.vacinas)],
+            ] });
+    }
+    if (opt('rpt-opt-dias')) {
+        sections.push({ heading: 'Fluxo por Dia da Semana', headers: ['Dia', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('dias'),
+            rows: Object.entries(p.dias || {}).map(([d, v]) => [d, fNum(v)]) });
+    }
+    if (opt('rpt-opt-horario')) {
+        sections.push({ heading: 'Fluxo por Horário', headers: ['Horário', 'Atendimentos'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            rows: Object.entries(p.horarios || {}).map(([h, v]) => [String(h).replace('-', 'h–') + 'h', fNum(v)]) });
+    }
+    if (opt('rpt-opt-atendentes') && p.atendentes?.length) {
         sections.push({
             heading: 'Desempenho por Atendente',
             headers: ['#', 'Nome', 'Atend.', 'Avaliação', 'Aval. env.', 'Respond.'],
@@ -1910,13 +3084,60 @@ function gerarRelatorio() {
             rows: p.atendentes.map((at, i) => [String(i + 1), at.nome, fNum(at.atendimentos), fAval(at.avaliacao), fNum(at.avalEnviadas || 0), fNum(at.avalRespondidas || 0)])
         });
     }
+    if (opt('rpt-opt-eficiencia')) {
+        const lista = getPeriodsForMesComparacao(ano);
+        sections.push({ heading: `Evolução da Eficiência — ${ano}`, headers: ['Mês', 'Msgs/Atendimento'], cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            image: imgFrom('comp'),
+            rows: lista.map(item => { const ef = calcEficiencia(item.p); return [MESES_PT[item.mes - 1], ef.hasData ? fNum(ef.index, 1) : '—']; }) });
+    }
+    if (opt('rpt-opt-fatmeta')) {
+        const lista = getPeriodsForMesComparacao(ano);
+        const meta = _metaAtivaDoTipo('faturamento');
+        sections.push({ heading: `Faturamento x Meta — ${ano}`, headers: ['Mês', 'Faturamento', 'Meta', 'Status'],
+            cols: [{ w: .3 }, { w: .25, align: 'right' }, { w: .25, align: 'right' }, { w: .2, align: 'right' }],
+            image: imgFrom('faturamento'),
+            rows: lista.map(item => {
+                const v  = _valorNoMes('faturamento', ano, item.mes);
+                const st = meta ? _metaStatus(meta, ano, item.mes) : null;
+                const stTxt = !st ? '—' : st.status === 'batida' ? 'Batida' : st.status === 'perto' ? 'Perto' : st.status === 'falta' ? 'Falta' : '—';
+                return [MESES_PT[item.mes - 1], v != null ? fBRL(v) : '—', (st && st.alvo != null) ? fBRL(st.alvo) : '—', stTxt];
+            }) });
+    }
+    if (opt('rpt-opt-apicusto')) {
+        const lista = getPeriodsForMesComparacao(ano);
+        sections.push({ heading: `Projeção de Custo — API Oficial — ${ano}`, headers: ['Mês', 'Modelo Antigo', 'Modelo Novo (estim.)'],
+            cols: [{ w: .4 }, { w: .3, align: 'right' }, { w: .3, align: 'right' }],
+            image: imgFrom('apicost'),
+            rows: lista.map(item => {
+                const a = _custoApiAntigo(ano, item.mes);
+                const n = _custoApiNovoEstimado(item.p);
+                return [MESES_PT[item.mes - 1], a != null ? fBRL(a) : '—', n != null ? fBRL(n) : '—'];
+            }) });
+    }
+    if (opt('rpt-opt-metas')) {
+        const metas = Object.values(financeiroData.metas || {});
+        const mesRef = filtro.mes || (new Date().getMonth() + 1);
+        sections.push({ heading: 'Metas Cadastradas', headers: ['Nome', 'Tipo', 'Alvo', 'Status'],
+            cols: [{ w: .34 }, { w: .22 }, { w: .22, align: 'right' }, { w: .22, align: 'right' }],
+            rows: metas.map(m => {
+                const st = _metaStatus(m, ano, mesRef);
+                const sinal = m.direcao === 'diminuir' ? '-' : '+';
+                const alvoTxt = m.modoAlvo === 'percentual' ? `${sinal}${m.valorAlvo}%` : (m.tipo === 'exames' || m.tipo === 'mensagens' ? fNum(m.valorAlvo) : fBRL(m.valorAlvo));
+                const stTxt = st.status === 'batida' ? 'Batida' : st.status === 'perto' ? 'Perto de bater' : st.status === 'falta' ? 'Falta bater' : 'Sem dado';
+                return [m.nome, _labelTipoMeta(m.tipo), alvoTxt, stTxt];
+            }) });
+    }
 
+    if (!sections.length) { alert('Escolha pelo menos uma seção pra incluir no relatório.'); return; }
+
+    const data = new Date().toLocaleDateString('pt-BR');
     gerarPdfSimples({
         filename: `Relatorio-${String(p.nome || 'LAMIC').replace(/[^\w-]+/g, '_')}.pdf`,
         title: `Relatório de Atendimento — ${p.nome}`,
-        subtitle: `Gerado em ${data} | LAMIC`,
+        subtitle: `Gerado em ${data} | LAMIC | Canal do Cliente — ${dashTipo.toUpperCase()}`,
         sections
     });
+    fecharModalGenerico('relatorio-opcoes-modal');
 }
 
 // PDF simples (jsPDF) com download direto — mesmo formato do dashboard
@@ -1944,6 +3165,19 @@ function gerarPdfSimples({ filename, title, subtitle, sections }) {
         pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor(71, 85, 105);
         pdf.text(String(sec.heading).toUpperCase(), M, y); y += 6;
         pdf.setDrawColor(226, 232, 240); pdf.setLineWidth(0.6); pdf.line(M, y, W - M, y); y += 14;
+
+        // Gráfico como imagem (se a seção trouxe um e a opção "incluir gráficos"
+        // estava marcada) — escala mantendo proporção, largura máx = largura útil.
+        if (sec.image && sec.image.data && sec.image.w && sec.image.h) {
+            const maxIW = CW, maxIH = 190;
+            let iw = maxIW, ih = iw * (sec.image.h / sec.image.w);
+            if (ih > maxIH) { ih = maxIH; iw = ih * (sec.image.w / sec.image.h); }
+            if (y + ih + 12 > BOT) brk();
+            try {
+                pdf.addImage(sec.image.data, 'PNG', M, y, iw, ih);
+                y += ih + 14;
+            } catch (e) { console.warn('[Relatório] Não deu pra desenhar o gráfico, seguindo só com os dados:', e); }
+        }
 
         const cols = sec.cols, widths = cols.map(c => c.w * CW), xs = [];
         let acc = M; cols.forEach((c, i) => { xs.push(acc); acc += widths[i]; });
@@ -2067,7 +3301,7 @@ function _motivosVazio() {
 function _novoBucket() {
     return {
         total:0, mensagens:0,
-        avaliacao:0, silenciosos:0, concluidos:0, clienteEncerrou:0,
+        avaliacao:0, silenciosos:0, concluidos:0, clienteEncerrou:0, aberto:0,
         avalEnviadas:0, avalRespondidas:0, avalPendentes:0,
         resultados:0, coleta:0, atendente:0, info:0,
         orcamentos:0, reclamacoes:0, vacinas:0,
@@ -2100,7 +3334,7 @@ function _applyToBucket(b, d) {
     } else if (d.motivo.includes('silencioso')) {
         b.silenciosos++;
     } else if (d.status === 'aberto') {
-        /* em andamento → derivado */
+        b.aberto++;   // Em Aberto = literalmente status "Aberto" na planilha (não mais derivado por subtração)
     } else {
         b.concluidos++;
     }
@@ -2127,7 +3361,7 @@ function _finalizarBucket(b, extra) {
         total: b.total, contatos: b.total, mensagens: b.mensagens || 0,
         avaliacao: b._avalQtd ? +(b._avalSoma / b._avalQtd).toFixed(2) : 0,
         avalEnviadas: b.avalEnviadas, avalRespondidas: b.avalRespondidas, avalPendentes: b.avalPendentes,
-        silenciosos: b.silenciosos, concluidos: b.concluidos, clienteEncerrou: b.clienteEncerrou,
+        silenciosos: b.silenciosos, concluidos: b.concluidos, clienteEncerrou: b.clienteEncerrou, aberto: b.aberto,
         resultados: b.resultados, coleta: b.coleta, atendente: b.atendente, info: b.info,
         orcamentos: b.orcamentos, reclamacoes: b.reclamacoes, vacinas: b.vacinas,
         dias: b.dias, horarios: b.horarios, heat: b.heat,

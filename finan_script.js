@@ -1,0 +1,9323 @@
+"use strict";
+/* ══════════════════════════════════════════════
+   TI Compras v2 — script.js
+══════════════════════════════════════════════ */
+
+const State = {
+  currentUnit: null, currentType: null,
+  adminUser: null,
+  editingRequestId: null, modalStatus: null,
+  requests: {}, units: {}, unitSetores: {}, groups: {}, groupMeta: {}, subOpts: {}, subgroups: {}, admins: {}, suppliers: {},
+  estoque: {}, estoqueMov: {}, compras: {}, activityLog: {}, metas: {}, config: {},
+  charts: {},
+  calYear: new Date().getFullYear(), calMonth: new Date().getMonth(),
+  editCallback: null
+};
+
+const DEFAULTS = {
+  units: ["Unidade Central","Filial Norte","Filial Sul","Almoxarifado"],
+  groups: ["Tinta","Pilhas ou Baterias","Outros"],
+  admins: { admin: "admin123" }
+};
+
+/* ─── Firebase ──────────────────────────────── */
+const DB = {
+  ref:    p  => window._ref(window._db, p),
+  set:    (p,d) => window._set(DB.ref(p), d),
+  push:   (p,d) => window._push(DB.ref(p), d),
+  update: (p,d) => window._update(DB.ref(p), d),
+  remove: p  => window._remove(DB.ref(p)),
+  listen: (p,cb) => window._onValue(DB.ref(p), s => cb(s.val())),
+  get:    async p => { const s = await window._get(DB.ref(p)); return s.val(); },
+  // Transação atômica — usada para alocar números sequenciais sem corrida
+  tx:     (p, fn) => window._runTransaction(DB.ref(p), fn)
+};
+
+/* ─── LocalStorage ──────────────────────────── */
+const LS = {
+  save:   (k,v) => { try { localStorage.setItem('tic_'+k, JSON.stringify(v)); } catch(e){} },
+  load:   (k,d=null) => { try { const v=localStorage.getItem('tic_'+k); return v!==null?JSON.parse(v):d; } catch(e){ return d; } },
+  remove: k => { try { localStorage.removeItem('tic_'+k); } catch(e){} }
+};
+
+/* ─── Toast ─────────────────────────────────── */
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast '+type;
+  el.classList.remove('hidden');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.add('hidden'), 3500);
+}
+
+/* ══════════════════════════════════════════════
+   APP
+══════════════════════════════════════════════ */
+const App = {
+
+  reqSortDir: 'desc',   // padrão: mais recentes primeiro (nenhum botão marcado)
+  reqSortField: 'createdAt',
+  reqHiddenStatuses: new Set(),
+
+  setSortDate(dir, btn) {
+    App.reqSortDir = dir;
+    document.querySelectorAll('.btn-sort-req').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    App.renderRequests();
+  },
+
+  toggleAllStatus(btn) {
+    // Escopado a #req-filter-panel: o pop-up de Relatório de Solicitações
+    // reaproveita a MESMA classe .req-status-chip pro visual, mas com estado
+    // próprio (rptSolToggleStatus/rptSolToggleAllStatus) — sem o escopo, um
+    // clique aqui mexeria nos chips dos dois lugares ao mesmo tempo.
+    const chips = document.querySelectorAll('#req-filter-panel .req-status-chip');
+    const allActive = [...chips].every(c => c.classList.contains('active'));
+    if (allActive) {
+      // Desmarcar todos
+      chips.forEach(c => { c.classList.remove('active'); App.reqHiddenStatuses.add(c.dataset.status); });
+      btn.textContent = 'Todos ✕';
+      btn.classList.add('all-off');
+    } else {
+      // Marcar todos
+      chips.forEach(c => { c.classList.add('active'); App.reqHiddenStatuses.delete(c.dataset.status); });
+      btn.textContent = 'Todos ✓';
+      btn.classList.remove('all-off');
+    }
+    App.renderRequests();
+  },
+
+  toggleStatusFilter(btn) {
+    const st = btn?.dataset?.status;
+    if (!st) return;
+    if (App.reqHiddenStatuses.has(st)) {
+      App.reqHiddenStatuses.delete(st);
+      btn.classList.add('active');
+    } else {
+      App.reqHiddenStatuses.add(st);
+      btn.classList.remove('active');
+    }
+    // Sincroniza botão "Todos"
+    const allBtn = document.getElementById('btn-toggle-all-status');
+    if (allBtn) {
+      const chips = document.querySelectorAll('#req-filter-panel .req-status-chip');
+      const allActive = [...chips].every(c => c.classList.contains('active'));
+      allBtn.textContent = allActive ? 'Todos ✓' : 'Todos ✕';
+      allActive ? allBtn.classList.remove('all-off') : allBtn.classList.add('all-off');
+    }
+    App.renderRequests();
+  },
+
+  goTo(id) {
+    // Só troca de tela se o destino existir. As telas de login vivem na casca
+    // (index.html); apontar pra uma delas aqui esconderia tudo e deixaria a
+    // página em branco, sem erro visível.
+    const alvo = document.getElementById(id);
+    if (!alvo) { console.error('[goTo] tela inexistente neste módulo:', id); return; }
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    alvo.classList.add('active');
+  },
+
+  /* ── UNITS ────────────────────────────────── */
+  renderUnitsDropdown() {
+    const sel = document.getElementById('unit-select');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Selecione uma unidade —</option>';
+    Object.entries(State.units||{}).forEach(([id,name]) => {
+      const o = document.createElement('option');
+      o.value = id; o.textContent = name;
+      if (id === cur) o.selected = true;
+      sel.appendChild(o);
+    });
+  },
+
+  /* ── SETORES (por unidade) ───────────────────
+     Cadastro fica em Home → Configurações; aqui só lemos State.unitSetores
+     (nó próprio, não mexe em `units`) pra montar os seletores de Solicitante. */
+  _setoresSeedEmAndamento: new Set(),
+  _setoresDaUnidade(unitId) {
+    const raw = (State.unitSetores || {})[unitId] || {};
+    const lista = Object.entries(raw).map(([id, nome]) => ({ id, nome })).sort((a,b)=>a.nome.localeCompare(b.nome));
+    // Unidade sem nenhum setor ainda (cadastro antigo) → cria "Própria Unidade" com chave
+    // fixa ('padrao'), não com push (chave aleatória): um set() na mesma chave nunca duplica,
+    // mesmo que este módulo (iframe à parte) e a Home semeiem quase ao mesmo tempo.
+    if (!lista.length && unitId && State.units?.[unitId] && !App._setoresSeedEmAndamento.has(unitId)) {
+      App._setoresSeedEmAndamento.add(unitId);
+      Promise.resolve(DB.set(`unitSetores/${unitId}/padrao`, 'Própria Unidade'))
+        .then(() => App._setoresSeedEmAndamento.delete(unitId), () => App._setoresSeedEmAndamento.delete(unitId));
+    }
+    return lista;
+  },
+
+  // Popula um <select> de Setor pro selId, com base na unidade. Preserva valor antigo
+  // (texto livre já salvo antes desta função existir) como opção extra, se não bater com nenhum setor cadastrado.
+  _popularSelectSetor(selId, unitId, valorAtual) {
+    const sel = document.getElementById(selId); if (!sel) return;
+    const setores = unitId ? App._setoresDaUnidade(unitId) : [];
+    let html = '<option value="">— Selecione —</option>' + setores.map(s => `<option value="${s.nome}">${s.nome}</option>`).join('');
+    if (valorAtual && !setores.some(s => s.nome === valorAtual)) {
+      html += `<option value="${valorAtual}">${valorAtual}</option>`;
+    }
+    sel.innerHTML = html;
+    // Sem valor salvo ainda (solicitação nova) → cai no padrão "Própria Unidade" (ou o
+    // primeiro setor cadastrado, se o padrão tiver sido renomeado/apagado pelo admin).
+    if (valorAtual) { sel.value = valorAtual; }
+    else { const padrao = setores.find(s => s.nome === 'Própria Unidade'); sel.value = padrao ? padrao.nome : (setores[0]?.nome || ''); }
+  },
+
+  onUnitSelectChange() {
+    const sel = document.getElementById('unit-select');
+    const info = document.getElementById('unit-selected-info');
+    const nameEl = document.getElementById('unit-selected-name');
+    const btn = document.getElementById('btn-units-ok');
+    if (sel.value) {
+      info.classList.remove('hidden');
+      nameEl.textContent = State.units[sel.value] || '—';
+      btn.disabled = false;
+    } else {
+      info.classList.add('hidden');
+      btn.disabled = true;
+    }
+  },
+
+  selectUnit() {
+    const sel = document.getElementById('unit-select');
+    if (!sel.value) return;
+    State.currentUnit = sel.value;
+    LS.save('currentUnit', sel.value);
+    document.getElementById('topbar-unit-name').textContent = State.units[sel.value] || '—';
+    App._popularSelectSetor('req-setor', sel.value, '');
+    App.buildRequestPanel();
+    App.goTo('screen-request');
+    App.restoreRequestForm();
+  },
+
+  // A escolha de unidade agora é feita na casca (index.html)
+  backToUnits() {
+    App.resetRequestForm();
+    LS.remove('currentUnit');
+    window.location.href = 'index.html';
+  },
+
+  /* ── ADMIN LOGIN ──────────────────────────── */
+  adminLogin() {
+    const user = document.getElementById('admin-user').value.trim();
+    const pass = document.getElementById('admin-pass').value;
+    const err  = document.getElementById('login-error');
+    const rec = State.admins && State.admins[user];
+    const senhaOk = typeof rec === 'string' ? rec === pass : (rec && rec.pass === pass);
+    if (senhaOk) {
+      err.classList.add('hidden');
+      State.adminUser = user;
+      LS.save('adminUser', user);
+      // Update sidebar
+      const letter = user[0].toUpperCase();
+      const el = document.getElementById('sad-avatar-letter');
+      const nm = document.getElementById('sad-name-text');
+      if (el) el.textContent = letter;
+      if (nm) nm.textContent = user;
+      App.goTo('screen-admin');
+      App.renderAdminPanels();
+      // Este módulo é o portal financeiro: entra direto no Dashboard
+      const dashBtn = document.querySelector('.nav-item[data-tab="tab-dashboard"]');
+      if (dashBtn) App.adminTab(dashBtn);
+      App.resetIdle();
+    } else {
+      err.classList.remove('hidden');
+    }
+  },
+
+  // Sair encerra a sessão e devolve para a casca, onde fica o login
+  adminLogout() {
+    State.adminUser = null;
+    LS.remove('adminUser');
+    LS.remove('currentUnit');
+    clearTimeout(App._idleTimer);
+    clearInterval(App._idleTick); App._idleTick = null;
+    if (window.parent && window.parent !== window) {
+      try { window.parent.postMessage('sairDoSistema', '*'); return; } catch (e) {}
+    }
+    window.location.href = 'index.html';
+  },
+
+  /* ── Sessão: auto-logout por inatividade (60 min) + contagem regressiva ── */
+  _IDLE_MS: 60 * 60 * 1000,
+  _idleTimer: null,
+  _idleTick: null,
+  _idleDeadline: 0,
+  resetIdle() {
+    if (!State.adminUser) return;
+    clearTimeout(App._idleTimer);
+    App._idleDeadline = Date.now() + App._IDLE_MS;
+    App._idleTimer = setTimeout(App.idleLogout, App._IDLE_MS);
+    if (!App._idleTick) App._idleTick = setInterval(App._updateIdleChip, 1000);
+    App._updateIdleChip();
+  },
+  // Chip do timer replicado em várias abas (Dashboard/Calendário/Solicitações/
+  // Estoque/Configurações) — por isso classList/querySelectorAll em vez de um
+  // único id (só a 1ª aba aberta ficaria contando se fosse por id).
+  _updateIdleChip() {
+    let ms = App._idleDeadline - Date.now(); if (ms < 0) ms = 0;
+    const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+    const txt = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    document.querySelectorAll('.idle-timer').forEach(el => { el.textContent = txt; });
+    document.querySelectorAll('.idle-chip').forEach(chip => chip.classList.toggle('idle-timer-warn', ms <= 60000));
+  },
+  idleLogout() {
+    if (!State.adminUser) return;
+    App.adminLogout();
+    toast('Sessão encerrada por inatividade.', 'error');
+  },
+  startIdleWatch() {
+    ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(ev =>
+      document.addEventListener(ev, App.resetIdle, { passive: true }));
+  },
+
+  /* ── Sempre entra pelo Dashboard — inclusive no F5, mesmo saindo de outra aba
+     há pouco. (Antes restaurava a última aba salva; a pedido, não restaura mais.) ── */
+  _restoreAdminTab() {
+    const btn = document.querySelector('.nav-item[data-tab="tab-dashboard"]');
+    if (btn) App.adminTab(btn);
+  },
+
+  /* ── Menu de conta na sidebar (abre p/ cima, opção Sair) ── */
+  toggleUserMenu(ev) {
+    if (ev) ev.stopPropagation();
+    const m = document.getElementById('sb-user-menu'); if (!m) return;
+    const hidden = m.classList.toggle('hidden');
+    const card = document.querySelector('.sidebar-user');
+    if (card) card.classList.toggle('open', !hidden);
+    if (!hidden && card) {
+      // posiciona acima do card, alinhado à esquerda (fixed = não sofre clip da sidebar)
+      const r = card.getBoundingClientRect();
+      m.style.left = r.left + 'px';
+      m.style.width = Math.max(r.width, 190) + 'px';
+      m.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+    }
+  },
+  closeUserMenu() {
+    const m = document.getElementById('sb-user-menu'); if (m) m.classList.add('hidden');
+    const card = document.querySelector('.sidebar-user'); if (card) card.classList.remove('open');
+  },
+
+  /* ── REQUEST PANEL ────────────────────────── */
+  buildRequestPanel() {
+    const wrap = document.getElementById('type-selector');
+    wrap.innerHTML = '';
+    Object.entries(State.groups||{}).forEach(([id,name]) => {
+      if (App._isGroupInternal(id)) return;   // grupos internos só aparecem na Nova Solicitação do admin
+      const btn = document.createElement('button');
+      btn.className = 'type-btn';
+      btn.textContent = name;
+      btn.dataset.groupId = id;
+      btn.onclick = () => App.selectType(btn, id, name);
+      wrap.appendChild(btn);
+    });
+  },
+
+  selectType(btn, id, name) {
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    State.currentType = { id, name };
+    ['sub-ink','sub-battery','sub-other'].forEach(s => document.getElementById(s).classList.add('hidden'));
+    document.getElementById('urgency-row').style.display = 'none';
+    const norm = name.toLowerCase();
+    if (norm.includes('tinta')) { App.buildInkPanel(id); document.getElementById('sub-ink').classList.remove('hidden'); }
+    else if (norm.includes('pilha') || norm.includes('bateria') || norm.includes('conserto') || norm.includes('concerto')) { App.buildBatteryPanel(id); document.getElementById('sub-battery').classList.remove('hidden'); }
+    else { document.getElementById('sub-other').classList.remove('hidden'); }
+    document.getElementById('urgency-row').style.display = '';
+    App.saveRequestForm();
+  },
+
+  buildInkPanel(groupId) {
+    const opts = (State.subOpts||{})[groupId] || {};
+    const nums = opts.numeracoes || ["664","673","680XL","711","950XL","951XL"];
+    const cores = opts.cores || ["Preta","Vermelha","Azul","Amarela","Kit 4 cores"];
+    // Numeração: radio (1 escolha)
+    const numWrap = document.getElementById('ink-numbers'); numWrap.innerHTML = '';
+    nums.forEach(n => {
+      const l=document.createElement('label'); l.className='check-item';
+      l.innerHTML=`<input type="radio" name="num" value="${n}"/> ${n}`;
+      l.querySelector('input').onchange=()=>App.saveRequestForm();
+      numWrap.appendChild(l);
+    });
+    // Cor: checkbox (múltipla escolha) + quantidade por cor (igual ao padrão de Pilha/Bateria)
+    const colWrap = document.getElementById('ink-colors'); colWrap.innerHTML = '';
+    cores.forEach((c,i) => {
+      const safeId = 'cor_'+i;
+      const div = document.createElement('div');
+      div.className = 'cor-item-wrap';
+      div.innerHTML = `
+        <label class="check-item">
+          <input type="checkbox" name="cor" value="${c}" id="${safeId}" onchange="App.toggleBatQty('${safeId}',this.checked);App.saveRequestForm()"/>
+          ${c}
+        </label>
+        <div class="cor-qty-wrap" id="qty_${safeId}" style="display:none">
+          <input type="number" class="input-field cor-qty-input" data-cor="${c}" min="1" value="1" title="Quantidade" onchange="App.saveRequestForm()" />
+        </div>`;
+      colWrap.appendChild(div);
+    });
+  },
+
+  // Grupo de conserto (aceita grafia antiga "concerto")
+  _isConserto(name) { const n = (name || '').toLowerCase(); return n.includes('conserto') || n.includes('concerto'); },
+
+  // Nome de grupo pra exibição: pedidos antigos podem ter gravado "Concerto" (grafia
+  // antiga) enquanto o grupo cadastrado hoje é "Conserto" — sem isso viravam 2 barras
+  // separadas no gráfico Por Grupo. Unifica na grafia que está cadastrada em State.groups
+  // (ou "Conserto" se não achar nenhum grupo cadastrado com esse nome).
+  _displayGroupName(name) {
+    if (!App._isConserto(name)) return name || '?';
+    const cadastrado = Object.values(State.groups || {}).find(g => App._isConserto(g));
+    return cadastrado || 'Conserto';
+  },
+
+  // Rótulo de exibição da forma de pagamento (dinheiro/boleto/cartão)
+  _pagLabel(fp) { return { dinheiro: 'Dinheiro', boleto: 'Boleto', cartao: 'Cartão' }[fp] || (fp || '—'); },
+
+  buildBatteryPanel(groupId) {
+    const opts = (State.subOpts||{})[groupId] || {};
+    const gname = (State.groups?.[groupId]||'').toLowerCase();
+    const isConserto = App._isConserto(gname);
+    const isBat = gname.includes('pilha')||gname.includes('bateria');
+    const modelos = opts.modelos || (isBat ? ["AAA","AA","Bateria de balança 2032","Bateria do cronômetro 1210"] : []);
+    const wrap = document.getElementById('battery-models'); wrap.innerHTML = '';
+    const motivoWrap = document.getElementById('conserto-motivo-wrap');
+    if (motivoWrap) motivoWrap.classList.toggle('hidden', !isConserto);
+    if (!modelos.length) { wrap.innerHTML = `<p style="color:var(--gray-500);font-size:.82rem;padding:6px">Nenhum ${isConserto?'equipamento':'modelo'} cadastrado. Cadastre em Configurações → Grupos → este grupo → Sub-opções.</p>`; return; }
+    // Conserto: escolhe o EQUIPAMENTO consertado — SEM quantidade, COM motivo (obrigatório)
+    if (isConserto) {
+      modelos.forEach(m => {
+        const l = document.createElement('label'); l.className = 'check-item';
+        l.innerHTML = `<input type="checkbox" name="bat" value="${m}"/> ${m}`;
+        l.querySelector('input').onchange = () => App.saveRequestForm();
+        wrap.appendChild(l);
+      });
+      return;
+    }
+    // Each model has a checkbox + qty field (multiple selection allowed)
+    modelos.forEach((m,i) => {
+      const safeId = 'bat_'+i;
+      const div = document.createElement('div');
+      div.className = 'bat-model-row';
+      div.innerHTML = `
+        <label class="check-item bat-check">
+          <input type="checkbox" name="bat" value="${m}" id="${safeId}" onchange="App.toggleBatQty('${safeId}',this.checked);App.saveRequestForm()"/>
+          ${m}
+        </label>
+        <div class="bat-qty-wrap" id="qty_${safeId}" style="display:none">
+          <input type="number" class="input-field bat-qty-input" data-model="${m}" min="1" value="1" placeholder="Qtd" onchange="App.saveRequestForm()" />
+        </div>`;
+      wrap.appendChild(div);
+    });
+  },
+
+  toggleBatQty(safeId, checked) {
+    const qw = document.getElementById('qty_'+safeId);
+    if (qw) qw.style.display = checked ? 'flex' : 'none';
+  },
+
+  saveRequestForm() {
+    if (!State.currentType) return;
+    const norm = State.currentType.name.toLowerCase();
+    const d = { type: State.currentType, urgency: document.getElementById('chk-urgency').checked, obs: document.getElementById('req-obs').value };
+    if (norm.includes('tinta')) {
+      const nr = document.querySelector('input[name="num"]:checked');
+      const crs = [...document.querySelectorAll('input[name="cor"]:checked')];
+      d.num  = nr ? nr.value : '';
+      d.cors = crs.map(cb => {
+        const qtyEl = document.querySelector(`.cor-qty-input[data-cor="${cb.value}"]`);
+        return { cor: cb.value, qty: qtyEl ? parseInt(qtyEl.value)||1 : 1 };
+      });
+    } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
+      const checked = [...document.querySelectorAll('input[name="bat"]:checked')];
+      d.batModels = checked.map(cb => {
+        const qtyEl = document.querySelector(`.bat-qty-input[data-model="${cb.value}"]`);
+        return { modelo: cb.value, qty: qtyEl ? parseInt(qtyEl.value)||1 : 1 };
+      });
+      if (App._isConserto(norm)) d.motivoConserto = document.getElementById('conserto-motivo')?.value || '';
+    } else {
+      d.product = document.getElementById('other-product').value;
+      d.reason  = document.getElementById('other-reason').value;
+    }
+    LS.save('requestForm', d);
+  },
+
+  restoreRequestForm() {
+    const d = LS.load('requestForm');
+    if (!d || !d.type) return;
+    setTimeout(() => {
+      const btn = [...document.querySelectorAll('.type-btn')].find(b => b.dataset.groupId === d.type.id);
+      if (btn) {
+        App.selectType(btn, d.type.id, d.type.name);
+        const norm = d.type.name.toLowerCase();
+        if (norm.includes('tinta')) {
+          if (d.num) { const r=document.querySelector(`input[name="num"][value="${d.num}"]`); if(r) r.checked=true; }
+          (d.cors||[]).forEach(item => {
+            // Compat: rascunhos antigos guardavam d.cors como array de strings (sem qty)
+            const corVal = typeof item === 'string' ? item : item.cor;
+            const qty    = typeof item === 'string' ? 1   : (item.qty || 1);
+            const cb = document.querySelector(`input[name="cor"][value="${corVal}"]`);
+            if (cb) {
+              cb.checked = true;
+              App.toggleBatQty(cb.id, true);
+              const qtyEl = document.querySelector(`.cor-qty-input[data-cor="${corVal}"]`);
+              if (qtyEl) qtyEl.value = qty;
+            }
+          });
+        } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
+          const motivoEl = document.getElementById('conserto-motivo');
+          if (motivoEl) motivoEl.value = d.motivoConserto || '';
+          (d.batModels||[]).forEach(bm => {
+            const cb=document.querySelector(`input[name="bat"][value="${bm.modelo}"]`);
+            if (cb) {
+              cb.checked=true;
+              const safeId = cb.id;
+              App.toggleBatQty(safeId, true);
+              const qtyEl=document.querySelector(`.bat-qty-input[data-model="${bm.modelo}"]`);
+              if(qtyEl) qtyEl.value=bm.qty||1;
+            }
+          });
+        } else {
+          document.getElementById('other-product').value = d.product||'';
+          document.getElementById('other-reason').value  = d.reason||'';
+        }
+      }
+      document.getElementById('chk-urgency').checked = !!d.urgency;
+      document.getElementById('req-obs').value = d.obs||'';
+    }, 80);
+  },
+
+  resetRequestForm() {
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    ['sub-ink','sub-battery','sub-other'].forEach(s => document.getElementById(s).classList.add('hidden'));
+    document.getElementById('urgency-row').style.display = 'none';
+    document.getElementById('chk-urgency').checked = false;
+    document.getElementById('req-obs').value = '';
+    document.querySelectorAll('input[name="bat"]').forEach(c=>c.checked=false);
+    document.querySelectorAll('input[name="cor"]').forEach(c=>c.checked=false);
+    document.querySelectorAll('.bat-qty-wrap').forEach(w=>w.style.display='none');
+    document.getElementById('other-product').value = '';
+    document.getElementById('other-reason').value = '';
+    const motivoEl = document.getElementById('conserto-motivo');
+    if (motivoEl) motivoEl.value = '';
+    document.getElementById('conserto-motivo-wrap')?.classList.add('hidden');
+    State.currentType = null;
+    LS.remove('requestForm');
+  },
+
+  submitRequest() {
+    if (!State.currentType) { toast('Selecione o tipo de solicitação.','error'); return; }
+    const norm = State.currentType.name.toLowerCase();
+    const base = {
+      unitId: State.currentUnit, unitName: State.units[State.currentUnit]||'?',
+      setor: document.getElementById('req-setor')?.value || '',
+      groupId: State.currentType.id, groupName: State.currentType.name,
+      urgent: document.getElementById('chk-urgency').checked,
+      obs: document.getElementById('req-obs').value,
+      status: 'Solicitado', createdAt: new Date().toISOString(),
+      shippedStatus: 'Não', shippedAt: null
+    };
+
+    let rows = [];
+
+    if (norm.includes('tinta')) {
+      const nr  = document.querySelector('input[name="num"]:checked');
+      const crs = [...document.querySelectorAll('input[name="cor"]:checked')];
+      if (!nr)         { toast('Selecione a numeração da tinta.','error'); return; }
+      if (!crs.length) { toast('Selecione ao menos uma cor.','error'); return; }
+      // 1 row per color combination
+      crs.forEach(c => {
+        const qtyEl = document.querySelector(`.cor-qty-input[data-cor="${c.value}"]`);
+        const qty = parseInt(qtyEl?.value) || 1;
+        rows.push({...base, num: nr.value, cor: c.value, nums: nr.value, cores: c.value, qty});
+      });
+    } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
+      const checked = [...document.querySelectorAll('input[name="bat"]:checked')];
+      if (!checked.length) { toast('Selecione ao menos um modelo.','error'); return; }
+      const isConserto = App._isConserto(norm);
+      let motivoConserto = '';
+      if (isConserto) {
+        motivoConserto = document.getElementById('conserto-motivo')?.value.trim() || '';
+        if (!motivoConserto) { toast('Informe o motivo do conserto.','error'); return; }
+      }
+      // 1 row per model
+      checked.forEach(cb => {
+        const qtyEl = document.querySelector(`.bat-qty-input[data-model="${cb.value}"]`);
+        const qty = parseInt(qtyEl?.value)||1;
+        rows.push({...base, modelo: cb.value, qty, batModel: cb.value, ...(isConserto ? { reason: motivoConserto } : {})});
+      });
+    } else {
+      const product = document.getElementById('other-product').value.trim();
+      const reason  = document.getElementById('other-reason').value.trim();
+      if (!product) { toast('Informe o produto desejado.','error'); return; }
+      if (!reason)  { toast('Informe o motivo da solicitação.','error'); return; }
+      rows.push({...base, product, reason});
+    }
+
+    // Aloca números sequenciais (seq) atomicamente para o lote
+    DB.tx('meta/lastSeq', cur => (cur || 0) + rows.length)
+      .then(res => {
+        const fim = (res?.snapshot?.val()) || rows.length;
+        const ini = fim - rows.length;            // primeiro seq deste lote
+        rows.forEach((r, i) => { r.seq = ini + i + 1; });
+        return Promise.all(rows.map(r => DB.push('requests', r)));
+      })
+      .then(() => {
+        toast(`✓ ${rows.length} solicitação(ões) enviada(s)!`);
+        App._logActivity('Solicitações', 'Nova solicitação criada', `${rows.length}× ${base.groupName} · ${base.unitName}`);
+        App.resetRequestForm();
+      })
+      .catch(() => toast('Erro ao enviar.','error'));
+  },
+
+  /* ── Nova solicitação pelo ADMIN (modal) — mesmo fluxo das unidades + grupos internos ── */
+  _nsolType: null,
+  _isGroupInternal(id) {
+    const m = State.groupMeta && State.groupMeta[id];
+    return !!(m && m.internal);
+  },
+  openNovaSolic() {
+    const usel = document.getElementById('nsol-unit');
+    usel.innerHTML = '<option value="">Selecione a unidade</option>';
+    Object.entries(State.units || {}).forEach(([id, nome]) => {
+      const o = document.createElement('option'); o.value = id; o.textContent = nome; usel.appendChild(o);
+    });
+    App._popularSelectSetor('nsol-setor', '', '');
+    App._nsolType = null;
+    App._nsolBuildGroups();
+    ['nsol-sub-ink', 'nsol-sub-battery', 'nsol-sub-other'].forEach(s => document.getElementById(s).classList.add('hidden'));
+    document.getElementById('nsol-product').value = '';
+    document.getElementById('nsol-reason').value = '';
+    document.getElementById('nsol-urgency').checked = false;
+    document.getElementById('nsol-obs').value = '';
+    const nsolMotivoEl = document.getElementById('nsol-conserto-motivo');
+    if (nsolMotivoEl) nsolMotivoEl.value = '';
+    document.getElementById('nsol-conserto-motivo-wrap')?.classList.add('hidden');
+    document.getElementById('modal-nova-solic').classList.remove('hidden');
+  },
+  closeNovaSolic() { document.getElementById('modal-nova-solic').classList.add('hidden'); },
+
+  _nsolUnitChange() {
+    App._popularSelectSetor('nsol-setor', document.getElementById('nsol-unit')?.value || '', '');
+  },
+
+  _nsolBuildGroups() {
+    const wrap = document.getElementById('nsol-groups'); wrap.innerHTML = '';
+    Object.entries(State.groups || {}).forEach(([id, name]) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'type-btn';
+      btn.innerHTML = `${name}${App._isGroupInternal(id) ? ' <span class="grp-int-badge">interno</span>' : ''}`;
+      btn.dataset.groupId = id;
+      btn.onclick = () => App.nsolSelectGroup(btn, id, name);
+      wrap.appendChild(btn);
+    });
+  },
+
+  nsolSelectGroup(btn, id, name) {
+    document.querySelectorAll('#nsol-groups .type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    App._nsolType = { id, name };
+    ['nsol-sub-ink', 'nsol-sub-battery', 'nsol-sub-other'].forEach(s => document.getElementById(s).classList.add('hidden'));
+    const norm = name.toLowerCase();
+    if (norm.includes('tinta')) { App._nsolBuildInk(id); document.getElementById('nsol-sub-ink').classList.remove('hidden'); }
+    else if (norm.includes('pilha') || norm.includes('bateria') || norm.includes('conserto') || norm.includes('concerto')) { App._nsolBuildBattery(id); document.getElementById('nsol-sub-battery').classList.remove('hidden'); }
+    else { document.getElementById('nsol-sub-other').classList.remove('hidden'); }
+  },
+
+  _nsolBuildInk(gid) {
+    const opts = (State.subOpts || {})[gid] || {};
+    const nums = opts.numeracoes || ["664", "673", "680XL", "711", "950XL", "951XL"];
+    const cores = opts.cores || ["Preta", "Vermelha", "Azul", "Amarela", "Kit 4 cores"];
+    const nw = document.getElementById('nsol-ink-numbers'); nw.innerHTML = '';
+    nums.forEach(n => { const l = document.createElement('label'); l.className = 'check-item'; l.innerHTML = `<input type="radio" name="nsol-num" value="${n}"/> ${n}`; nw.appendChild(l); });
+    const cw = document.getElementById('nsol-ink-colors'); cw.innerHTML = '';
+    cores.forEach((c,i) => {
+      const safeId = 'nsolcor_'+i;
+      const div = document.createElement('div');
+      div.className = 'cor-item-wrap';
+      div.innerHTML = `
+        <label class="check-item">
+          <input type="checkbox" name="nsol-cor" value="${c}" id="${safeId}" onchange="App.toggleBatQty('${safeId}',this.checked)"/>
+          ${c}
+        </label>
+        <div class="cor-qty-wrap" id="qty_${safeId}" style="display:none">
+          <input type="number" class="input-field nsol-cor-qty-input" data-cor="${c}" min="1" value="1" title="Quantidade" />
+        </div>`;
+      cw.appendChild(div);
+    });
+  },
+
+  _nsolBuildBattery(gid) {
+    const opts = (State.subOpts || {})[gid] || {};
+    const gname = (State.groups?.[gid]||'').toLowerCase();
+    const isConserto = App._isConserto(gname);
+    const isBat = gname.includes('pilha')||gname.includes('bateria');
+    const modelos = opts.modelos || (isBat ? ["AAA", "AA", "Bateria de balança 2032", "Bateria do cronômetro 1210"] : []);
+    const wrap = document.getElementById('nsol-battery-models'); wrap.innerHTML = '';
+    const motivoWrap = document.getElementById('nsol-conserto-motivo-wrap');
+    if (motivoWrap) motivoWrap.classList.toggle('hidden', !isConserto);
+    if (!modelos.length) { wrap.innerHTML = `<p style="color:var(--gray-500);font-size:.82rem;padding:6px">Nenhum ${isConserto?'equipamento':'modelo'} cadastrado. Cadastre em Configurações → Grupos → este grupo → Sub-opções.</p>`; return; }
+    // Conserto: escolhe o EQUIPAMENTO consertado — SEM quantidade, COM motivo (obrigatório)
+    if (isConserto) {
+      modelos.forEach(m => {
+        const l = document.createElement('label'); l.className = 'check-item';
+        l.innerHTML = `<input type="checkbox" name="nsol-bat" value="${m}"/> ${m}`;
+        wrap.appendChild(l);
+      });
+      return;
+    }
+    modelos.forEach((m, i) => {
+      const sid = 'nsolbat_' + i;
+      const div = document.createElement('div'); div.className = 'bat-model-row';
+      div.innerHTML = `
+        <label class="check-item bat-check"><input type="checkbox" name="nsol-bat" value="${m}" id="${sid}" onchange="document.getElementById('qty_${sid}').style.display=this.checked?'flex':'none'"/> ${m}</label>
+        <div class="bat-qty-wrap" id="qty_${sid}" style="display:none"><input type="number" class="input-field nsol-bat-qty" data-model="${m}" min="1" value="1" placeholder="Qtd"/></div>`;
+      wrap.appendChild(div);
+    });
+  },
+
+  nsolSubmit() {
+    const unitId = document.getElementById('nsol-unit').value;
+    if (!unitId) { toast('Selecione a unidade.', 'error'); return; }
+    if (!App._nsolType) { toast('Selecione o tipo de solicitação.', 'error'); return; }
+    const norm = App._nsolType.name.toLowerCase();
+    const base = {
+      unitId, unitName: State.units[unitId] || '?',
+      setor: document.getElementById('nsol-setor')?.value || '',
+      groupId: App._nsolType.id, groupName: App._nsolType.name,
+      urgent: document.getElementById('nsol-urgency').checked,
+      obs: document.getElementById('nsol-obs').value,
+      status: 'Solicitado', createdAt: new Date().toISOString(),
+      shippedStatus: 'Não', shippedAt: null
+    };
+    let rows = [];
+    if (norm.includes('tinta')) {
+      const nr = document.querySelector('input[name="nsol-num"]:checked');
+      const crs = [...document.querySelectorAll('input[name="nsol-cor"]:checked')];
+      if (!nr) { toast('Selecione a numeração da tinta.', 'error'); return; }
+      if (!crs.length) { toast('Selecione ao menos uma cor.', 'error'); return; }
+      crs.forEach(c => {
+        const qtyEl = document.querySelector(`.nsol-cor-qty-input[data-cor="${c.value}"]`);
+        const qty = parseInt(qtyEl?.value) || 1;
+        rows.push({ ...base, num: nr.value, cor: c.value, nums: nr.value, cores: c.value, qty });
+      });
+    } else if (norm.includes('pilha') || norm.includes('bateria') || norm.includes('conserto') || norm.includes('concerto')) {
+      const checked = [...document.querySelectorAll('input[name="nsol-bat"]:checked')];
+      if (!checked.length) { toast('Selecione ao menos um modelo.', 'error'); return; }
+      const isConserto = App._isConserto(norm);
+      let motivoConserto = '';
+      if (isConserto) {
+        motivoConserto = document.getElementById('nsol-conserto-motivo')?.value.trim() || '';
+        if (!motivoConserto) { toast('Informe o motivo do conserto.', 'error'); return; }
+      }
+      checked.forEach(cb => {
+        const qtyEl = document.querySelector(`.nsol-bat-qty[data-model="${cb.value}"]`);
+        rows.push({ ...base, modelo: cb.value, qty: parseInt(qtyEl?.value) || 1, batModel: cb.value, ...(isConserto ? { reason: motivoConserto } : {}) });
+      });
+    } else {
+      const product = document.getElementById('nsol-product').value.trim();
+      const reason = document.getElementById('nsol-reason').value.trim();
+      if (!product) { toast('Informe o produto desejado.', 'error'); return; }
+      if (!reason) { toast('Informe o motivo.', 'error'); return; }
+      rows.push({ ...base, product, reason });
+    }
+    DB.tx('meta/lastSeq', cur => (cur || 0) + rows.length)
+      .then(res => {
+        const fim = (res?.snapshot?.val()) || rows.length;
+        const ini = fim - rows.length;
+        rows.forEach((r, i) => { r.seq = ini + i + 1; });
+        return Promise.all(rows.map(r => DB.push('requests', r)));
+      })
+      .then(() => {
+        toast(`✓ ${rows.length} solicitação(ões) criada(s)!`);
+        App._logActivity('Solicitações', 'Nova solicitação criada (admin)', `${rows.length}× ${base.groupName} · ${base.unitName}`);
+        App.closeNovaSolic();
+      })
+      .catch(() => toast('Erro ao criar.', 'error'));
+  },
+
+  toggleGroupInternal(gid, checked) {
+    DB.set(`groupMeta/${gid}/internal`, !!checked).then(() => {
+      App._logActivity('Configurações', checked ? 'Grupo marcado como interno' : 'Grupo liberado p/ unidades', State.groups?.[gid] || gid);
+    });
+  },
+
+  // Atribui seq (#) às solicitações sem número, por ordem de criação. Idempotente.
+  async backfillSeq() {
+    const btn = document.getElementById('btn-numerar-seq');
+    const orig = btn ? btn.innerHTML : '';
+    const reqs = Object.entries(State.requests || {});
+    const maxSeq = reqs.reduce((m, [, r]) => Math.max(m, parseInt(r.seq) || 0), 0);
+    const semSeq = reqs.filter(([, r]) => r.seq == null)
+      .sort((a, b) => (a[1].createdAt || '').localeCompare(b[1].createdAt || ''));
+    if (!semSeq.length) { toast('Todas as solicitações já estão numeradas.'); return; }
+    if (!confirm(`Numerar ${semSeq.length} solicitação(ões) sem número?`)) return;
+    if (btn) { btn.innerHTML = 'Numerando…'; btn.disabled = true; }
+    try {
+      let n = maxSeq;
+      const ops = [];
+      semSeq.forEach(([id]) => { n++; ops.push(DB.set(`requests/${id}/seq`, n)); });
+      await Promise.all(ops);
+      await DB.tx('meta/lastSeq', cur => Math.max(cur || 0, n)); // mantém contador à frente
+      toast(`✓ ${semSeq.length} solicitação(ões) numerada(s).`);
+    } catch (e) {
+      console.error('[backfillSeq] erro', e);
+      toast('Erro ao numerar. Veja o console.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  // Fecha lacunas de numeração: reordena todas as solicitações numeradas em sequência
+  // contígua (1..N) por ordem de seq atual. excludeIds = ids já removidos que ainda
+  // podem estar em State.requests (listener assíncrono) e não devem entrar na contagem.
+  async _renumerarSeq(excludeIds = []) {
+    const excl = new Set(excludeIds);
+    const reqs = Object.entries(State.requests || {})
+      .filter(([id, r]) => r.seq != null && !excl.has(id))
+      .sort((a, b) => (parseInt(a[1].seq) || 0) - (parseInt(b[1].seq) || 0));
+    const ops = [];
+    reqs.forEach(([id, r], idx) => {
+      const novoSeq = idx + 1;
+      if ((parseInt(r.seq) || 0) !== novoSeq) ops.push(DB.set(`requests/${id}/seq`, novoSeq));
+    });
+    await Promise.all(ops);
+    await DB.tx('meta/lastSeq', () => reqs.length);
+    return reqs.length;
+  },
+
+  // Botão manual: fecha lacunas já existentes (ex.: SL apagadas no passado, antes desta função existir).
+  async compactarSeq() {
+    const btn = document.getElementById('btn-compactar-seq');
+    const reqs = Object.entries(State.requests || {}).filter(([, r]) => r.seq != null);
+    if (!reqs.length) { toast('Nenhuma solicitação numerada.'); return; }
+    if (!confirm('Fechar lacunas de numeração?\nAs solicitações serão renumeradas em sequência (SL-1, SL-2, ...), sem buracos.')) return;
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Renumerando…'; btn.disabled = true; }
+    try {
+      const n = await App._renumerarSeq();
+      toast(`✓ Numeração compactada · ${n} solicitação(ões).`);
+      App.renderRequests();
+    } catch (e) {
+      console.error('[compactarSeq] erro', e);
+      toast('Erro ao renumerar. Veja o console.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  // Preenche forma de pagamento de compras antigas (sem o campo ainda): dinheiro por
+  // padrão; parceladas (já tinham esse comportamento antes deste campo existir) ficam
+  // como boleto. Só toca em quem não tem o campo — idempotente, não sobrescreve escolhas já feitas.
+  async backfillFormaPagamento() {
+    const btn = document.getElementById('btn-backfill-pagamento');
+    const semCampo = Object.entries(State.requests || {})
+      .filter(([, r]) => r.status === 'Comprado' && r.formaPagamento == null);
+    const itensEstoqueSemCampo = Object.entries(State.estoque || {})
+      .filter(([, it]) => it.parcelas && it.parcelas.length && it.formaPagamento == null);
+    const total = semCampo.length + itensEstoqueSemCampo.length;
+    if (!total) { toast('Todas as compras já têm forma de pagamento definida.'); return; }
+    if (!confirm(`Preencher forma de pagamento de ${total} compra(s) antiga(s)?\nPadrão: Dinheiro. Parceladas: Boleto.`)) return;
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Preenchendo…'; btn.disabled = true; }
+    try {
+      const ops = [];
+      semCampo.forEach(([id, r]) => {
+        const fp = (r.parcelas && r.parcelas.length) ? 'boleto' : 'dinheiro';
+        ops.push(DB.set(`requests/${id}/formaPagamento`, fp));
+      });
+      itensEstoqueSemCampo.forEach(([id]) => ops.push(DB.set(`estoque/${id}/formaPagamento`, 'boleto')));
+      await Promise.all(ops);
+      toast(`✓ Forma de pagamento preenchida em ${total} compra(s).`);
+      App.renderRequests();
+    } catch (e) {
+      console.error('[backfillFormaPagamento] erro', e);
+      toast('Erro ao preencher. Veja o console.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  // Correção pontual (uma vez só) dos dados já cadastrados: tudo que for da NOLEI ou
+  // ODYSSEIA INFORMÁTICA vira Boleto. Não é regra permanente — só corrige o que já existe.
+  async corrigirPagamentoPorFornecedor() {
+    const btn = document.getElementById('btn-corrigir-fornecedor-boleto');
+    const fornecedoresAlvo = ['nolei', 'odysseia informatica', 'odysseia informática'];
+    const bate = f => fornecedoresAlvo.includes((f || '').trim().toLowerCase());
+
+    const reqsAlvo = Object.entries(State.requests || {})
+      .filter(([, r]) => r.status === 'Comprado' && bate(r.fornecedor) && r.formaPagamento !== 'boleto');
+    const itensAlvo = Object.entries(State.estoque || {})
+      .filter(([, it]) => bate(it.fornecedor) && it.formaPagamento !== 'boleto');
+    const total = reqsAlvo.length + itensAlvo.length;
+    if (!total) { toast('Nada pra corrigir — já está tudo como Boleto.'); return; }
+    if (!confirm(`Marcar como Boleto ${total} compra(s) da NOLEI/ODYSSEIA INFORMÁTICA já cadastrada(s)?`)) return;
+
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Corrigindo…'; btn.disabled = true; }
+    try {
+      const ops = [];
+      reqsAlvo.forEach(([id]) => ops.push(DB.set(`requests/${id}/formaPagamento`, 'boleto')));
+      itensAlvo.forEach(([id]) => ops.push(DB.set(`estoque/${id}/formaPagamento`, 'boleto')));
+      await Promise.all(ops);
+      toast(`✓ ${total} compra(s) da NOLEI/ODYSSEIA INFORMÁTICA marcada(s) como Boleto.`);
+      App.renderRequests();
+    } catch (e) {
+      console.error('[corrigirPagamentoPorFornecedor] erro', e);
+      toast('Erro ao corrigir. Veja o console.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  /* ══════════════════════════════════════════════
+     COMPRA COMBINADA — FLUXO EM 2 PASSOS
+  ══════════════════════════════════════════════ */
+
+  _compraSelectedIds: new Set(),
+  _compraShowCompradas: false,
+  _compraManageCodigo: null,   // null = criar nova compra; senão = editando compra combinada existente
+
+  openCompraModal() {
+    App._closeAllPopovers?.();   // fecha o popover de Conf ao abrir o modal
+    App._fromChooser = false;   // default: aberto direto (não do chooser)
+    App._compraManageCodigo = null;
+    App._compraSelectedIds = new Set();
+    App._compraShowCompradas = false;
+    const search = document.getElementById('compra-search');
+    if (search) search.value = '';
+    const btnToggle = document.getElementById('btn-toggle-compradas');
+    if (btnToggle) btnToggle.textContent = 'Mostrar Compradas';
+    document.getElementById('compra-step-1')?.classList.remove('hidden');
+    document.getElementById('compra-step-2')?.classList.add('hidden');
+    document.getElementById('compra-modal-title').textContent = 'Compra Combinada — Seleção';
+    document.getElementById('btn-compra-descombinar')?.style.setProperty('display', 'none');
+    // Toggle "Mostrar Compradas" não faz mais sentido: só listamos autorizadas.
+    document.getElementById('btn-toggle-compradas')?.style.setProperty('display', 'none');
+    App.renderCompraReqList();
+    document.getElementById('compra-modal').classList.remove('hidden');
+  },
+
+  closeCompraModal() {
+    document.getElementById('compra-modal').classList.add('hidden');
+    App._compraManageCodigo = null;
+    document.getElementById('btn-compra-voltar')?.style.setProperty('display', '');
+    const salvarBtn = document.getElementById('btn-salvar-compra');
+    if (salvarBtn) salvarBtn.textContent = 'Registrar Compra';
+  },
+
+  toggleCompradasVisiveis() {
+    App._compraShowCompradas = !App._compraShowCompradas;
+    const btn = document.getElementById('btn-toggle-compradas');
+    if (btn) btn.textContent = App._compraShowCompradas ? 'Ocultar Compradas' : 'Mostrar Compradas';
+    App.renderCompraReqList();
+  },
+
+  renderCompraReqList() {
+    const box = document.getElementById('compra-req-list'); if (!box) return;
+    const termo = (document.getElementById('compra-search')?.value || '').toLowerCase();
+    // Só combina COMPRADAS (autorizadas/compradas) ainda NÃO combinadas.
+    // Autorização é feita antes, pelo botão "Autorizar compra".
+    let reqs = Object.entries(State.requests || {})
+      .filter(([, r]) => r.status === 'Comprado' && !r.compraCodigo && !r.origemEstoque);
+    if (termo) {
+      reqs = reqs.filter(([, r]) =>
+        [r.seq != null ? 'SL-' + r.seq : '', r.seq, r.unitName, r.groupName, App.reqSummary(r)].filter(Boolean).join(' ').toLowerCase().includes(termo)
+      );
+    }
+    // Ordenação: mais recente (boughtAt/createdAt desc), mais antiga (asc) ou por SL
+    const sort = document.getElementById('compra-sort')?.value || 'recente';
+    const dataDe = r => (r.boughtAt || r.createdAt || '').substring(0, 10);
+    if (sort === 'sl') reqs.sort((a, b) => (parseInt(a[1].seq) || 0) - (parseInt(b[1].seq) || 0));
+    else if (sort === 'antiga') reqs.sort((a, b) => dataDe(a[1]).localeCompare(dataDe(b[1])) || (parseInt(a[1].seq) || 0) - (parseInt(b[1].seq) || 0));
+    else reqs.sort((a, b) => dataDe(b[1]).localeCompare(dataDe(a[1])) || (parseInt(b[1].seq) || 0) - (parseInt(a[1].seq) || 0));
+    if (!reqs.length) {
+      box.innerHTML = '<div class="compra-empty">Nenhuma compra disponível para combinar.<br>Só entram aqui solicitações já <strong>compradas</strong> (e ainda não combinadas).</div>';
+      App._updateCompraSel();
+      return;
+    }
+    box.innerHTML = reqs.map(([id, r]) => {
+      const checked = App._compraSelectedIds.has(id);
+      return `
+        <div class="compra-req-item ${checked ? 'sel' : ''} comprada">
+          <input type="checkbox" data-id="${id}" ${checked ? 'checked' : ''} onchange="App.onCompraReqToggle('${id}', this.checked)">
+          <span class="req-seq-badge">SL-${r.seq != null ? r.seq : '—'}</span>
+          <div class="compra-req-info">
+            <span class="compra-req-unit">${r.unitName || '—'}</span>
+            <span class="compra-req-sum">${r.groupName || ''} · ${App.reqSummary(r)}</span>
+          </div>
+        </div>`;
+    }).join('');
+    App._updateCompraSel();
+  },
+
+  _updateCompraSel() {
+    const n = App._compraSelectedIds.size;
+    const countEl = document.getElementById('compra-sel-count');
+    if (countEl) countEl.textContent = n > 0 ? `${n} selecionado(s)${n < 2 ? ' — escolha ao menos 2' : ''}` : '';
+    // Combinar exige 2+ (não faz sentido "combinar" 1 só).
+    const btn = document.getElementById('btn-compra-prosseguir');
+    if (btn) btn.disabled = n < 2;
+  },
+
+  onCompraReqToggle(id, on) {
+    if (on) App._compraSelectedIds.add(id);
+    else App._compraSelectedIds.delete(id);
+    const el = document.querySelector(`.compra-req-item input[data-id="${id}"]`);
+    el?.closest('.compra-req-item')?.classList.toggle('sel', on);
+    App._updateCompraSel();
+  },
+
+  compraStep2() {
+    const ids = [...App._compraSelectedIds];
+    if (!ids.length) return;
+    App._compraManageCodigo = null;   // fluxo normal = criar nova compra
+    // Restaura UI de criação (modo gestão pode ter alterado)
+    document.getElementById('btn-compra-voltar')?.style.setProperty('display', '');
+    document.getElementById('btn-compra-descombinar')?.style.setProperty('display', 'none');
+    const autzBoxNew = document.getElementById('compra-autz-info');
+    if (autzBoxNew) autzBoxNew.innerHTML = '';
+    const salvarBtn = document.getElementById('btn-salvar-compra');
+    if (salvarBtn) salvarBtn.textContent = 'Registrar Compra';
+    const sup = document.getElementById('compra-fornecedor');
+    if (sup) sup.innerHTML = '<option value="">— Selecione —</option>' +
+      Object.values(State.suppliers || {}).map(s => `<option value="${s}">${s}</option>`).join('');
+    const firstReq = (State.requests || {})[ids[0]];
+    const defaultDate = firstReq?.createdAt ? firstReq.createdAt.substring(0, 10) : new Date().toISOString().substring(0, 10);
+    const dataEl = document.getElementById('compra-data');
+    if (dataEl) dataEl.value = defaultDate;
+    // Envio auto = data da compra
+    const envioEl = document.getElementById('compra-envio-data');
+    if (envioEl) envioEl.value = defaultDate;
+    const [ey, em, ed] = defaultDate.split('-');
+    const dispEl = document.getElementById('compra-envio-display');
+    if (dispEl) dispEl.textContent = `${ed}/${em}/${ey}`;
+    const editWrap = document.getElementById('compra-envio-edit-wrap');
+    if (editWrap) editWrap.style.display = 'none';
+    document.getElementById('chk-compra-parcelas').checked = false;
+    document.getElementById('compra-parcelas-wrap').style.display = 'none';
+    document.getElementById('compra-parcelas-n').value = '';
+    const fpSel = document.getElementById('compra-forma-pagamento');
+    if (fpSel) fpSel.value = 'dinheiro';
+    App.renderCompraStep2Items(ids);
+    App.calcCompraStep2Total();
+    document.getElementById('compra-step-1')?.classList.add('hidden');
+    document.getElementById('compra-step-2')?.classList.remove('hidden');
+    document.getElementById('compra-modal-title').textContent = 'Compra Combinada — Dados';
+  },
+
+  toggleEnvioEdit() {
+    const wrap = document.getElementById('compra-envio-edit-wrap');
+    if (!wrap) return;
+    wrap.style.display = wrap.style.display === 'none' ? '' : 'none';
+  },
+
+  applyEnvioEdit() {
+    const val = document.getElementById('compra-envio-data')?.value;
+    if (val) {
+      const [y, m, d] = val.split('-');
+      const disp = document.getElementById('compra-envio-display');
+      if (disp) disp.textContent = `${d}/${m}/${y}`;
+    }
+    const wrap = document.getElementById('compra-envio-edit-wrap');
+    if (wrap) wrap.style.display = 'none';
+  },
+
+  compraBackStep1() {
+    document.getElementById('compra-step-2')?.classList.add('hidden');
+    document.getElementById('compra-step-1')?.classList.remove('hidden');
+    document.getElementById('compra-modal-title').textContent = 'Compra Combinada — Seleção';
+  },
+
+  toggleCompraParcelas() {
+    const on = document.getElementById('chk-compra-parcelas').checked;
+    document.getElementById('compra-parcelas-wrap').style.display = on ? '' : 'none';
+    App.calcCompraStep2Total();
+  },
+
+  _compraSubgroupOpts(r) {
+    const opts = ['<option value="">— Selecione —</option>'];
+    Object.entries(State.subgroups || {}).forEach(([gid, list]) => {
+      const gname = State.groups?.[gid] || '';
+      const match = (r.groupId && gid === r.groupId) || (r.groupName && gname.toLowerCase() === r.groupName.toLowerCase());
+      if (!match) return;
+      list.forEach(sg => opts.push(`<option value="${sg}">${sg}</option>`));
+    });
+    return opts.join('');
+  },
+
+  renderCompraStep2Items(ids) {
+    const wrap = document.getElementById('compra-items-wrap'); if (!wrap) return;
+    wrap.innerHTML = ids.map((id, idx) => {
+      const r = (State.requests || {})[id] || {};
+      return `
+        <div class="compra-item-card" data-id="${id}">
+          <div class="compra-item-card-header">
+            <span class="req-seq-badge" style="font-size:.72rem">SL-${r.seq != null ? r.seq : '—'}</span>
+            <strong style="font-size:.84rem;color:#1a3a6b">${r.unitName || '—'}</strong>
+            <span style="font-size:.78rem;color:#6680a0">${r.groupName || ''} · ${App.reqSummary(r)}</span>
+          </div>
+          <div class="form-row-3" style="margin-top:8px">
+            <div class="form-group">
+              <label class="form-label">Grupo</label>
+              <input type="text" class="input-field" value="${r.groupName || '—'}" readonly style="background:#f8fafc">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Subgrupo</label>
+              <select class="input-field select-styled compra-item-subgrupo" data-id="${id}">${App._compraSubgroupOpts(r)}</select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Solicitante</label>
+              <input type="text" class="input-field compra-item-solicitante" data-id="${id}" value="${r.solicitante || ''}" placeholder="Nome do solicitante">
+            </div>
+          </div>
+          <div class="form-row-2" style="margin-top:8px">
+            <div class="form-group">
+              <label class="form-label">Quantidade</label>
+              <input type="number" class="input-field compra-item-qty" data-id="${id}" value="${r.quantidade || ''}" min="0" step="1" oninput="App.calcCompraStep2Total()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Valor Unitário (R$)</label>
+              <input type="number" class="input-field compra-item-val" data-id="${id}" value="${r.valor || ''}" min="0" step="0.01" placeholder="0,00" oninput="App.calcCompraStep2Total()">
+            </div>
+          </div>
+          <div class="form-row-2" style="margin-top:8px">
+            <div class="form-group">
+              <label class="form-label">Valor Total</label>
+              <input type="text" class="input-field compra-item-total" data-id="${id}" readonly style="background:#f8fafc;font-weight:600;color:#1a7a4a">
+            </div>
+            <div class="form-group compra-item-parcela-line" data-id="${id}" style="display:none">
+              <label class="form-label">Parcelas</label>
+              <input type="text" class="input-field compra-item-parcela-val" data-id="${id}" readonly style="background:#f8fafc;font-weight:600;color:#7c52d4">
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:8px">
+            <label class="form-label">Descrição</label>
+            <input type="text" class="input-field compra-item-desc" data-id="${id}" value="${r.descricao || ''}" placeholder="Descrição">
+          </div>
+          <div class="form-group" style="margin-top:8px">
+            <label class="form-label">Descrição Técnica</label>
+            <input type="text" class="input-field compra-item-desctec" data-id="${id}" value="${r.descTecnica || ''}" placeholder="Descrição técnica">
+          </div>
+          <div class="form-group" style="margin-top:8px">
+            <label class="form-label">Data de envio</label>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span class="compra-item-envio-disp" data-id="${id}" style="font-size:.8rem;font-weight:600;color:#1a3a6b">Segue a data de envio geral</span>
+              <button type="button" class="btn-ghost" onclick="App.toggleItemEnvio('${id}')" style="font-size:.72rem;padding:2px 8px">Alterar</button>
+            </div>
+            <input type="date" class="input-field compra-item-envio" data-id="${id}" data-override="0" style="display:none;margin-top:6px;max-width:180px">
+          </div>
+        </div>
+        ${idx < ids.length - 1 ? '<hr style="margin:14px 0;border:none;border-top:1px dashed #d4dff0">' : ''}`;
+    }).join('');
+    // Envio por item: pré-carrega override quando shippedAt do item difere da data geral
+    const envioGlobal = (document.getElementById('compra-envio-data')?.value || '').substring(0,10);
+    ids.forEach(id => {
+      const r = (State.requests || {})[id] || {};
+      const itemEnvio = (r.shippedAt || '').substring(0,10);
+      const inp  = wrap.querySelector(`.compra-item-envio[data-id="${id}"]`);
+      const disp = wrap.querySelector(`.compra-item-envio-disp[data-id="${id}"]`);
+      if (!inp) return;
+      if (itemEnvio && itemEnvio !== envioGlobal) {
+        inp.value = itemEnvio; inp.dataset.override = '1'; inp.style.display = '';
+        if (disp) disp.textContent = 'Data própria:';
+      }
+    });
+    // Force subgrupo values after render
+    ids.forEach(id => {
+      const r = (State.requests || {})[id] || {};
+      const sg = wrap.querySelector(`.compra-item-subgrupo[data-id="${id}"]`);
+      if (sg && r.subgrupo) sg.value = r.subgrupo;
+    });
+  },
+
+  // Envio por item: liga/desliga a data própria. Desligado → segue a data de envio geral.
+  toggleItemEnvio(id) {
+    const inp  = document.querySelector(`.compra-item-envio[data-id="${id}"]`);
+    const disp = document.querySelector(`.compra-item-envio-disp[data-id="${id}"]`);
+    if (!inp) return;
+    const ativo = inp.dataset.override === '1';
+    if (ativo) {
+      inp.dataset.override = '0'; inp.style.display = 'none';
+      if (disp) disp.textContent = 'Segue a data de envio geral';
+    } else {
+      inp.dataset.override = '1'; inp.style.display = '';
+      if (!inp.value) inp.value = (document.getElementById('compra-envio-data')?.value || '').substring(0,10);
+      if (disp) disp.textContent = 'Data própria:';
+    }
+  },
+
+  // Data de envio efetiva de um item: própria (se override) ou a geral
+  _envioDoItem(id, envioGeral) {
+    const inp = document.querySelector(`.compra-item-envio[data-id="${id}"]`);
+    return (inp && inp.dataset.override === '1' && inp.value) ? inp.value : envioGeral;
+  },
+
+  calcCompraStep2Total() {
+    const ids = [...App._compraSelectedIds];
+    const parcelar = document.getElementById('chk-compra-parcelas')?.checked;
+    const n = parcelar ? (parseInt(document.getElementById('compra-parcelas-n')?.value) || 0) : 0;
+    const fmt = v => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let grandTotal = 0;
+    ids.forEach(id => {
+      const qty = parseFloat(document.querySelector(`.compra-item-qty[data-id="${id}"]`)?.value) || 0;
+      const val = parseFloat(document.querySelector(`.compra-item-val[data-id="${id}"]`)?.value) || 0;
+      const total = qty * val;
+      grandTotal += total;
+      const totalEl = document.querySelector(`.compra-item-total[data-id="${id}"]`);
+      if (totalEl) totalEl.value = total > 0 ? fmt(total) : '';
+      const parcelaLine = document.querySelector(`.compra-item-parcela-line[data-id="${id}"]`);
+      if (parcelaLine) {
+        if (parcelar && n >= 2 && total > 0) {
+          parcelaLine.style.display = '';
+          const inp = parcelaLine.querySelector('.compra-item-parcela-val');
+          if (inp) inp.value = `${n}× de ${fmt(total / n)}`;
+        } else {
+          parcelaLine.style.display = 'none';
+        }
+      }
+    });
+    const resumo = document.getElementById('compra-step2-resumo');
+    if (resumo) {
+      if (grandTotal > 0) {
+        resumo.style.display = '';
+        let parceLine = '';
+        if (parcelar && n >= 2) parceLine = `<div class="compra-resumo-line">${n}× de ${fmt(grandTotal / n)} (total geral)</div>`;
+        resumo.innerHTML = `
+          <div class="compra-resumo-line">Itens selecionados: <strong>${ids.length}</strong></div>
+          <div class="compra-resumo-line">Total Geral: <strong style="color:#1a7a4a">${fmt(grandTotal)}</strong></div>
+          ${parceLine}`;
+      } else {
+        resumo.style.display = 'none';
+      }
+    }
+  },
+
+  // Gera plano de parcelas (mesma lógica de datas do save individual)
+  _buildParcelas(boughtAt, n, valorTotal) {
+    const [baseY, baseM, baseD] = boughtAt.split('-').map(Number);
+    return Array.from({ length: n }, (_, i) => {
+      let y = baseY, m = baseM - 1 + i;
+      y += Math.floor(m / 12); m = m % 12;
+      const lastDay = new Date(y, m + 1, 0).getDate();
+      const day = Math.min(baseD, lastDay);
+      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return { date: dateStr, month: dateStr.substring(0, 7), valor: (valorTotal / n).toFixed(2), num: i + 1, total: n };
+    });
+  },
+
+  // Compra parcelada totalmente paga: hoje já passou da data da ÚLTIMA parcela
+  // (mesmo critério usado no calendário para saber quando uma parcelada termina).
+  _parcelaPaga(parcelas) {
+    if (!parcelas || !parcelas.length) return false;
+    const ultima = parcelas[parcelas.length - 1];
+    const dataUltima = (ultima.date || (ultima.month ? ultima.month + '-01' : '')).substring(0, 10);
+    if (!dataUltima) return false;
+    const hoje = new Date().toISOString().substring(0, 10);
+    return hoje >= dataUltima;
+  },
+
+  // Tag de status pra usar ao lado de texto que já diz "Nx parcelas"/"Nx de R$Y"
+  // (a palavra "Parcelada" ali seria redundante) — só mostra algo quando termina: "PAGO".
+  _tagParcelaStatus(parcelas) {
+    if (!parcelas || !parcelas.length) return '';
+    return App._parcelaPaga(parcelas)
+      ? '<span class="mov-tag-pago" title="Todas as parcelas já venceram">✓ PAGO</span>'
+      : '';
+  },
+
+  // Tag completa pra usar onde NÃO há nenhum outro texto indicando parcelamento
+  // (ex.: lista de lotes só com produto/grupo) — sempre mostra "Parcelada" e,
+  // quando termina de vencer, mostra "Parcelada ✓ PAGO" junto (não substitui).
+  _tagParceladaInfo(parcelas) {
+    if (!parcelas || !parcelas.length) return '';
+    const pago = App._parcelaPaga(parcelas);
+    return `<span style="color:#7c52d4;font-weight:700">Parcelada</span>${pago ? ' <span class="mov-tag-pago" title="Todas as parcelas já venceram">✓ PAGO</span>' : ''}`;
+  },
+
+  // Linha de UMA parcela na lista de detalhe: marca "paga" individualmente se a
+  // data dela já passou (independe das demais — parcela 1 pode estar paga com a
+  // 3 ainda por vencer).
+  _parcelaRowHtml(p) {
+    const fmtD = v => v ? (() => { const [y,m,d]=v.substring(0,10).split('-'); return `${d}/${m}/${y}`; })() : '—';
+    const fmtR = v => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const paga = App._parcelaPaga([p]);
+    return `<div class="compra-detalhe-item" style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.78rem">Parcela ${p.num}/${p.total} · vence ${fmtD(p.date)}${paga ? ' <span class="mov-tag-pago" title="Parcela já vencida">✓ paga</span>' : ''}</span>
+      <strong style="color:${paga ? '#059669' : '#7c52d4'}">${fmtR(p.valor)}</strong>
+    </div>`;
+  },
+
+  // Abre o modal de compra combinada em MODO GESTÃO: carrega todos os membros da compra
+  // já registrada (mesmo compraCodigo), editável no mesmo formulário do passo 2.
+  manageCompra(codigo) {
+    const membros = Object.entries(State.requests || {}).filter(([, r]) => r.compraCodigo === codigo);
+    if (!membros.length) { toast('Compra não encontrada.', 'error'); return; }
+    membros.sort((a, b) => (parseInt(a[1].seq) || 0) - (parseInt(b[1].seq) || 0));
+    const ids = membros.map(([id]) => id);
+    const first = membros[0][1];
+
+    App._fromChooser = false;
+    App._compraManageCodigo = codigo;
+    App._compraSelectedIds = new Set(ids);
+
+    // Fornecedor
+    const sup = document.getElementById('compra-fornecedor');
+    if (sup) {
+      sup.innerHTML = '<option value="">— Selecione —</option>' +
+        Object.values(State.suppliers || {}).map(s => `<option value="${s}">${s}</option>`).join('');
+      sup.value = first.fornecedor || '';
+    }
+    // Data da compra
+    const dataC = (first.boughtAt || '').substring(0, 10) || new Date().toISOString().substring(0, 10);
+    const dataEl = document.getElementById('compra-data'); if (dataEl) dataEl.value = dataC;
+    // Data de envio geral (a de menor divergência: usa a do primeiro membro)
+    const envioG = (first.shippedAt || '').substring(0, 10) || dataC;
+    const envioEl = document.getElementById('compra-envio-data'); if (envioEl) envioEl.value = envioG;
+    const [ey, em, ed] = envioG.split('-');
+    const dispEl = document.getElementById('compra-envio-display'); if (dispEl) dispEl.textContent = `${ed}/${em}/${ey}`;
+    const editWrap = document.getElementById('compra-envio-edit-wrap'); if (editWrap) editWrap.style.display = 'none';
+    // Parcelas
+    const hasParc = !!(first.parcelas && first.parcelas.length);
+    document.getElementById('chk-compra-parcelas').checked = hasParc;
+    document.getElementById('compra-parcelas-wrap').style.display = hasParc ? '' : 'none';
+    document.getElementById('compra-parcelas-n').value = hasParc ? first.parcelas.length : '';
+    const fpSelManage = document.getElementById('compra-forma-pagamento');
+    if (fpSelManage) fpSelManage.value = first.formaPagamento || 'dinheiro';
+
+    App.renderCompraStep2Items(ids);
+    App.calcCompraStep2Total();
+    // Bloco "Autorizada" acima do Fornecedor (igual às outras solicitações)
+    const autzBox = document.getElementById('compra-autz-info');
+    if (autzBox) autzBox.innerHTML = App._infoAutorizacaoCompra(membros);
+
+    // UI modo gestão: sem "voltar", título e botão próprios + Descombinar
+    document.getElementById('btn-compra-voltar')?.style.setProperty('display', 'none');
+    document.getElementById('btn-compra-descombinar')?.style.setProperty('display', '');
+    const salvarBtn = document.getElementById('btn-salvar-compra');
+    if (salvarBtn) salvarBtn.textContent = 'Salvar Alterações';
+    document.getElementById('compra-modal-title').textContent = `Gerenciar Compra ${codigo}`;
+    document.getElementById('compra-step-1')?.classList.add('hidden');
+    document.getElementById('compra-step-2')?.classList.remove('hidden');
+    document.getElementById('compra-modal').classList.remove('hidden');
+  },
+
+  async saveCompraCombinada() {
+    const ids = [...App._compraSelectedIds];
+    if (!ids.length) { toast('Nenhum item selecionado.', 'error'); return; }
+    const manageCodigo = App._compraManageCodigo;   // null = criar; senão = editar
+    const data = document.getElementById('compra-data')?.value || new Date().toISOString().substring(0, 10);
+    const fornecedor = document.getElementById('compra-fornecedor')?.value || '';
+    const formaPagamento = document.getElementById('compra-forma-pagamento')?.value || 'dinheiro';
+    const parcelar = document.getElementById('chk-compra-parcelas')?.checked;
+    const n = parcelar ? (parseInt(document.getElementById('compra-parcelas-n')?.value) || 0) : 0;
+    const envioData = document.getElementById('compra-envio-data')?.value || data;
+    if (parcelar && n < 2) { toast('Nº de parcelas deve ser ≥ 2.', 'error'); return; }
+
+    // Coleta e valida dados de cada item (inclui data de envio própria, se marcada)
+    const itemsData = [];
+    for (const id of ids) {
+      const qty = parseFloat(document.querySelector(`.compra-item-qty[data-id="${id}"]`)?.value) || 0;
+      const val = parseFloat(document.querySelector(`.compra-item-val[data-id="${id}"]`)?.value) || 0;
+      if (qty <= 0 || val <= 0) {
+        toast(`Item SL-${(State.requests || {})[id]?.seq || id}: preencha quantidade e valor.`, 'error'); return;
+      }
+      itemsData.push({
+        id, qty, val,
+        valorTotal: (qty * val).toFixed(2),
+        subgrupo:   document.querySelector(`.compra-item-subgrupo[data-id="${id}"]`)?.value || '',
+        solicitante:document.querySelector(`.compra-item-solicitante[data-id="${id}"]`)?.value || '',
+        descricao:  document.querySelector(`.compra-item-desc[data-id="${id}"]`)?.value || '',
+        descTecnica:document.querySelector(`.compra-item-desctec[data-id="${id}"]`)?.value || '',
+        envio:      App._envioDoItem(id, envioData)   // própria (se "Alterar") ou a geral
+      });
+    }
+    const grandTotal = itemsData.reduce((s, it) => s + parseFloat(it.valorTotal), 0);
+
+    // Snapshot ANTES (só na edição) — para o log mostrar de → para por item.
+    const antes = manageCodigo ? ids.reduce((o, id) => {
+      const r = (State.requests || {})[id] || {};
+      o[id] = { valor: r.valor, shippedAt: r.shippedAt, fornecedor: r.fornecedor, boughtAt: r.boughtAt, seq: r.seq };
+      return o;
+    }, {}) : null;
+
+    const btn = document.getElementById('btn-salvar-compra');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Salvando…'; btn.disabled = true; }
+    try {
+      let codigo, compraId;
+      if (manageCodigo) {
+        // EDIÇÃO: mantém o código; localiza o node compras (pode não existir)
+        codigo = manageCodigo;
+        const entry = Object.entries(State.compras || {}).find(([, c]) => c.codigo === manageCodigo);
+        compraId = entry?.[0] || null;
+      } else {
+        // CRIAÇÃO: reaproveita o MENOR número CMP livre (evita buracos deixados
+        // por descombinar). Considera tanto o node compras quanto os requests.
+        const usados = new Set();
+        Object.values(State.compras || {}).forEach(c => { const nn = parseInt(String(c.codigo || '').replace(/\D/g, '')); if (nn) usados.add(nn); });
+        Object.values(State.requests || {}).forEach(r => { if (r.compraCodigo) { const nn = parseInt(String(r.compraCodigo).replace(/\D/g, '')); if (nn) usados.add(nn); } });
+        let num = 1; while (usados.has(num)) num++;
+        codigo = 'CMP-' + String(num).padStart(4, '0');
+        await DB.tx('meta/lastCompra', cur => Math.max(cur || 0, num));   // mantém meta coerente
+        const compraRef = DB.push('compras', {
+          codigo, fornecedor, boughtAt: data, valorTotal: grandTotal.toFixed(2),
+          parcelas: parcelar ? App._buildParcelas(data, n, grandTotal) : null,
+          reqIds: ids.reduce((o, id) => (o[id] = true, o), {}),
+          createdAt: new Date().toISOString()
+        });
+        compraId = compraRef.key;
+      }
+
+      // 1) Grava os requests PRIMEIRO — é a fonte de verdade da compra combinada.
+      const ops = [];
+      itemsData.forEach(it => {
+        const upd = {
+          status: 'Comprado',
+          boughtAt: data,
+          fornecedor,
+          quantidade: String(it.qty),
+          valor: it.val.toFixed(2),
+          valorTotal: it.valorTotal,
+          descricao: it.descricao,
+          descTecnica: it.descTecnica,
+          subgrupo: it.subgrupo,
+          solicitante: it.solicitante,
+          formaPagamento,
+          compraId: compraId || null, compraCodigo: codigo,
+          // Guarda o status anterior p/ o descombinar restaurar (preserva o já gravado).
+          statusAntesCombinada: ((State.requests || {})[it.id]?.statusAntesCombinada) || ((State.requests || {})[it.id]?.status) || 'Comprado',
+          // Mapeamento: quem montou/combinou a compra (admin logado); preserva o já gravado.
+          usuarioResp: ((State.requests || {})[it.id]?.usuarioResp) || State.adminUser || '—',
+          usuarioRespAt: ((State.requests || {})[it.id]?.usuarioRespAt) || new Date().toISOString(),
+          parcelas: parcelar ? App._buildParcelas(data, n, parseFloat(it.valorTotal)) : null,
+          // Rastreabilidade do Envio: se há data, marca como enviado (assim a data
+          // aparece na solicitação — antes ficava 'Não' e a data nunca era exibida).
+          shippedStatus: it.envio ? 'Sim' : 'Não',
+          shippedAt: it.envio || null
+        };
+        ops.push(DB.update(`requests/${it.id}`, upd));
+      });
+      await Promise.all(ops);
+
+      // 2) Atualiza o node compras (na edição) — NÃO fatal: se falhar, os requests
+      //    já foram salvos, então a alteração não se perde.
+      if (manageCodigo && compraId) {
+        try {
+          await DB.update(`compras/${compraId}`, {
+            fornecedor, boughtAt: data, valorTotal: grandTotal.toFixed(2),
+            parcelas: parcelar ? App._buildParcelas(data, n, grandTotal) : null
+          });
+        } catch (e2) { console.warn('[saveCompraCombinada] falha ao atualizar node compras (requests já salvos):', e2); }
+      }
+
+      toast(manageCodigo
+        ? `✓ Compra ${codigo} atualizada · ${ids.length} pedido(s).`
+        : `✓ Compra ${codigo} registrada · ${ids.length} pedido(s).`);
+
+      // Monta o de → para (o que mudou) para o detalhe do log.
+      const mudancas = [];
+      if (manageCodigo && antes) {
+        const fmtR = v => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const fmtD = s => s ? (() => { const [y,m,d] = s.substring(0,10).split('-'); return `${d}/${m}/${y}`; })() : '—';
+        const p0 = antes[ids[0]] || {};
+        if ((p0.fornecedor || '') !== (fornecedor || ''))
+          mudancas.push({ campo: 'Fornecedor', de: p0.fornecedor || '—', para: fornecedor || '—' });
+        if ((p0.boughtAt || '').substring(0,10) !== data)
+          mudancas.push({ campo: 'Data da compra', de: fmtD(p0.boughtAt), para: fmtD(data) });
+        itemsData.forEach(it => {
+          const a = antes[it.id] || {};
+          const sl = a.seq != null ? 'SL-' + a.seq : it.id;
+          if (parseFloat(a.valor || 0) !== it.val)
+            mudancas.push({ campo: `${sl} · Valor`, de: fmtR(a.valor), para: fmtR(it.val) });
+          if ((a.shippedAt || '').substring(0,10) !== (it.envio || ''))
+            mudancas.push({ campo: `${sl} · Data de envio`, de: fmtD(a.shippedAt), para: fmtD(it.envio) });
+        });
+      }
+      const resumoMud = mudancas.length ? mudancas.map(m => m.campo).join(', ') : (manageCodigo ? 'sem alterações de valor/envio' : '');
+      App._logActivity('Solicitações',
+        manageCodigo ? `Compra combinada ${codigo} atualizada` : `Compra combinada ${codigo} registrada`,
+        `${ids.length} pedido(s)${resumoMud ? ' · ' + resumoMud : ''}`,
+        { alvo: codigo, mudancas });
+      App._compraManageCodigo = null;
+      App.closeCompraModal();
+      App.renderRequests(); App.renderDashboard(); App.updatePendingBadge();
+    } catch (e) {
+      console.error('[saveCompraCombinada] erro', e);
+      toast('Erro ao salvar: ' + (e?.message || e || 'desconhecido'), 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  // Descombinar: separa os pedidos de uma compra combinada. Cada um continua
+  // COMPRADO (individual) com seu valor, mas perde o código CMP e as parcelas
+  // combinadas. Mantém o gestor que autorizou. Remove o node compras.
+  async descombinarCompra() {
+    const codigo = App._compraManageCodigo;
+    if (!codigo) { toast('Abra o Gerenciar de uma compra para descombinar.', 'error'); return; }
+    const membros = Object.entries(State.requests || {}).filter(([, r]) => r.compraCodigo === codigo);
+    if (!membros.length) { toast('Compra não encontrada.', 'error'); return; }
+    if (!confirm(`Descombinar a compra ${codigo}?\nAs ${membros.length} solicitação(ões) voltam ao status que tinham antes de combinar (sem o código ${codigo} e sem as parcelas combinadas).`)) return;
+
+    const btn = document.getElementById('btn-compra-descombinar');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Descombinando…'; btn.disabled = true; }
+    try {
+      // Restaura o status anterior à combinação (geralmente Comprado) e desagrupa.
+      const ops = membros.map(([id, r]) => DB.update(`requests/${id}`, {
+        compraCodigo: null, compraId: null, parcelas: null,
+        status: r.statusAntesCombinada || 'Comprado', statusAntesCombinada: null
+      }));
+      const entry = Object.entries(State.compras || {}).find(([, c]) => c.codigo === codigo);
+      if (entry) ops.push(DB.remove(`compras/${entry[0]}`));
+      await Promise.all(ops);
+      App._logActivity('Solicitações', `Compra combinada ${codigo} descombinada`, `${membros.length} pedido(s) voltaram a compras individuais`);
+      toast(`✓ ${codigo} descombinada · ${membros.length} pedido(s) individuais.`);
+      App._compraManageCodigo = null;
+      App.closeCompraModal();
+      App.renderRequests(); App.renderDashboard(); App.updatePendingBadge();
+    } catch (e) {
+      console.error('[descombinarCompra] erro', e);
+      toast('Erro ao descombinar.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  // Renumera as compras combinadas pra ficarem contíguas (CMP-0001, CMP-0002…),
+  // fechando lacunas deixadas por descombinar. Atualiza o node compras + os requests.
+  async _renumerarCompras() {
+    const compras = Object.entries(State.compras || {});
+    if (!compras.length) return 0;
+    compras.sort((a, b) => (parseInt(String(a[1].codigo || '').replace(/\D/g, '')) || 0) - (parseInt(String(b[1].codigo || '').replace(/\D/g, '')) || 0));
+    const ops = [];
+    compras.forEach(([compraId, c], idx) => {
+      const novoCod = 'CMP-' + String(idx + 1).padStart(4, '0');
+      if (c.codigo !== novoCod) {
+        ops.push(DB.set(`compras/${compraId}/codigo`, novoCod));
+        Object.entries(State.requests || {}).forEach(([rid, r]) => {
+          if ((r.compraId && r.compraId === compraId) || r.compraCodigo === c.codigo)
+            ops.push(DB.set(`requests/${rid}/compraCodigo`, novoCod));
+        });
+      }
+    });
+    await Promise.all(ops);
+    await DB.tx('meta/lastCompra', () => compras.length);
+    return ops.length;
+  },
+
+  // Correção 1x por sessão: (1) renumera CMP contíguo e (2) preenche a tag de
+  // mapeamento em TODOS os dados concluídos (Comprado, Estoque e combinadas) —
+  // mostra quem autorizou (gestor) ou, se foi feito direto pelo Gerenciar (sem
+  // gestor), o admin logado. Regra idêntica à do _mapTag.
+  _comprasFixOK: false,
+  async _maybeFixCompras() {
+    if (App._comprasFixOK || !State.adminUser) return;
+    if (!Object.keys(State.requests || {}).length) return;   // espera os requests carregarem
+    App._comprasFixOK = true;
+    let mudou = false;
+
+    const compras = Object.values(State.compras || {});
+    const nums = compras.map(c => parseInt(String(c.codigo || '').replace(/\D/g, '')) || 0).sort((a, b) => a - b);
+    const contiguo = nums.length && nums.every((n, i) => n === i + 1);
+    if (compras.length && !contiguo) { await App._renumerarCompras(); mudou = true; }
+
+    // Backfill da tag: concluído (Comprado/Estoque/combinada), sem gestor e sem
+    // responsável → carimba o admin logado (quem fez via Gerenciar). Se tem gestor,
+    // a tag já mostra o gestor — não mexe.
+    const ops = [];
+    Object.entries(State.requests || {}).forEach(([rid, r]) => {
+      const concluido = r.status === 'Comprado' || r.status === 'Estoque' || r.status === 'Negado' || !!r.compraCodigo;
+      if (concluido && !r.gestorNome && (!r.usuarioResp || r.usuarioResp === '—'))
+        ops.push(DB.set(`requests/${rid}/usuarioResp`, State.adminUser));
+    });
+    if (ops.length) { await Promise.all(ops); mudou = true; }
+
+    if (mudou) App.renderRequests();
+  },
+
+  /* ══ ADMIN ══════════════════════════════════ */
+ adminTab(btn) {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+
+    const targetTab = btn.dataset.tab;
+    document.getElementById(targetTab).classList.add('active');
+
+    if (btn.dataset.tab === 'tab-dashboard') App.renderDashboard();
+    if (btn.dataset.tab === 'tab-requests')  App.renderRequests();
+    if (btn.dataset.tab === 'tab-settings')  App.renderSettings();
+    if (btn.dataset.tab === 'tab-calendar')  App.renderCalendar();
+    if (btn.dataset.tab === 'tab-estoque')   App.renderEstoque();
+  },
+
+  // As cinco abas deste módulo
+  ABAS_FINANCEIRO: ['tab-dashboard', 'tab-calendar', 'tab-requests', 'tab-estoque', 'tab-settings'],
+
+  // ÚNICA VERSÃO: Trata a volta perfeita para o Dashboard
+  backToCompras() {
+    const layout = document.querySelector('.admin-layout');
+    if (layout) layout.classList.remove('hide-master-sidebar');
+
+    const dashBtn = document.querySelector('.nav-item[data-tab="tab-dashboard"]');
+    if (dashBtn) App.adminTab(dashBtn);
+  },
+  // FUNÇÃO CORRIGIDA: Remove a trava visual e joga o usuário no Dashboard
+  backToCompras() {
+    const layout = document.querySelector('.admin-layout');
+    if (layout) layout.classList.remove('hide-master-sidebar');
+    
+    const dashBtn = document.querySelector('.nav-item[data-tab="tab-dashboard"]');
+    if (dashBtn) App.adminTab(dashBtn);
+  },
+
+  // NOVA FUNÇÃO: Executa a volta perfeita para o Dashboard do Compras
+  backToCompras() {
+    // 1. Remove a classe que escondeu a barra lateral do compras
+    const layout = document.querySelector('.admin-layout');
+    if (layout) layout.classList.remove('hide-master-sidebar');
+    
+    // 2. Força o clique no botão "Dashboard" do Compras para atualizar os gráficos
+    const dashBtn = document.querySelector('.nav-item[data-tab="tab-dashboard"]');
+    if (dashBtn) App.adminTab(dashBtn);
+  },
+
+  // Volta ao menu principal. Dentro do iframe avisa a casca (index.html);
+  // aberto direto, navega para ela.
+  backToCompras() {
+    App.closeUserMenu?.();
+    if (window.parent && window.parent !== window) {
+      try { window.parent.postMessage('fecharFinanceiro', '*'); return; } catch (e) {}
+    }
+    window.location.href = 'index.html';
+  },
+
+  renderAdminPanels() {
+    // Update badge + admin label
+    const user = State.adminUser || '';
+    const letter = user[0] ? user[0].toUpperCase() : 'A';
+    const el = document.getElementById('sad-avatar-letter');
+    const nm = document.getElementById('sad-name-text');
+    if (el) el.textContent = letter;
+    if (nm) nm.textContent = user;
+    App.updatePendingBadge();
+    App.renderDashboard();
+    // Populate dash filters
+    App.populateDashFilters();
+  },
+
+  updatePendingBadge() {
+    const pending = Object.values(State.requests||{}).filter(r => r.status==='Solicitado').length;
+    const el = document.getElementById('nav-badge-pending');
+    if (el) { el.textContent = pending; el.style.display = pending ? '' : 'none'; }
+  },
+
+  populateDashFilters() {
+    const units = State.units||{};
+    // Dash unit filter
+    const du = document.getElementById('dash-filter-unit');
+    if (du) {
+      const cur = du.value;
+      du.innerHTML = '<option value="">Unidade: Todas</option>';
+      Object.values(units).forEach(n => { const o=document.createElement('option'); o.value=n; o.textContent=n; if(n===cur) o.selected=true; du.appendChild(o); });
+      // "Estoque Central" não é uma unidade cadastrada (State.units) — é o nome usado nas
+      // entradas criadas direto pela aba Estoque, mas precisa poder ser filtrada aqui também.
+      const oc = document.createElement('option');
+      oc.value = oc.textContent = 'Estoque Central';
+      if (cur === 'Estoque Central') oc.selected = true;
+      du.appendChild(oc);
+    }
+    // Dash group filter
+    const dg = document.getElementById('dash-filter-group');
+    if (dg) {
+      const cur = dg.value;
+      dg.innerHTML = '<option value="">Grupo: Todos</option>';
+      Object.values(State.groups||{}).forEach(n => { const o=document.createElement('option'); o.value=n; o.textContent=n; if(n===cur) o.selected=true; dg.appendChild(o); });
+    }
+    // Dash month filter
+    const dm = document.getElementById('dash-filter-month');
+    if (dm) {
+      const cur = dm.value;
+      const months = new Set();
+      Object.values(State.requests||{}).forEach(r => { if(r.createdAt) months.add(r.createdAt.substring(0,7)); });
+      dm.innerHTML = '<option value="">Todos os meses</option>';
+      [...months].sort().reverse().forEach(m => {
+        const o=document.createElement('option'); o.value=m;
+        const [y,mo]=m.split('-');
+        o.textContent = new Date(+y,+mo-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+        if(m===cur) o.selected=true;
+        dm.appendChild(o);
+      });
+    }
+    App.updateDashFilterBadge();
+  },
+
+  _popovers: [
+    { pop: 'dash-filter-popover', btn: 'btn-dash-filter' },
+    { pop: 'req-conf-popover', btn: 'btn-req-conf-toggle' },
+    { pop: 'req-filter-panel', btn: 'btn-req-filter-toggle', label: 'btn-filter-label', labelOn: 'Ocultar Filtros', labelOff: 'Mostrar Filtros', reserveTab: 'tab-requests' },
+    { pop: 'estoque-conf-popover', btn: 'btn-estoque-conf-toggle' },
+    { pop: 'estoque-filter-popover', btn: 'btn-estoque-filter-toggle' },
+    { pop: 'activity-filter-popover', btn: 'btn-activity-filter' },
+  ],
+
+  toggleActivityFilterPopover(ev) {
+    ev?.stopPropagation();
+    App._togglePopover('activity-filter-popover', 'btn-activity-filter');
+  },
+
+  _syncPopoverLabel(entry, open) {
+    if (!entry?.label) return;
+    const lbl = document.getElementById(entry.label);
+    if (lbl) lbl.textContent = open ? entry.labelOn : entry.labelOff;
+  },
+
+  // Alguns popovers são flutuantes (position:absolute) e podem ser cortados
+  // pelo container rolável quando a lista abaixo está curta/vazia. Reserva a
+  // altura exata (medida) no tab enquanto o popover está aberto.
+  _reservePopoverSpace(entry, open) {
+    if (!entry?.reserveTab) return;
+    const tab = document.getElementById(entry.reserveTab);
+    if (!tab) return;
+    tab.style.minHeight = '';
+    if (!open) return;
+    const pop = document.getElementById(entry.pop);
+    if (!pop) return;
+    const tabTop = tab.getBoundingClientRect().top;
+    const popBottom = pop.getBoundingClientRect().bottom;
+    const needed = Math.ceil(popBottom - tabTop + 24);
+    if (needed > 0) tab.style.minHeight = needed + 'px';
+  },
+
+  _closeAllPopovers(exceptPopId) {
+    App._popovers.forEach(entry => {
+      if (entry.pop === exceptPopId) return;
+      const pop = document.getElementById(entry.pop);
+      const btn = document.getElementById(entry.btn);
+      if (!pop) return;
+      if (pop.classList.contains('open')) {
+        pop.classList.remove('open');
+        btn?.classList.remove('active');
+        App._syncPopoverLabel(entry, false);
+        App._reservePopoverSpace(entry, false);
+      }
+    });
+  },
+
+  _togglePopover(popId, btnId) {
+    const pop = document.getElementById(popId);
+    const btn = document.getElementById(btnId);
+    if (!pop) return;
+    const entry = App._popovers.find(e => e.pop === popId);
+    const wasOpen = pop.classList.contains('open');
+    App._closeAllPopovers(popId);
+    const open = !wasOpen;
+    pop.classList.toggle('open', open);
+    btn?.classList.toggle('active', open);
+    App._syncPopoverLabel(entry, open);
+    App._reservePopoverSpace(entry, open);
+    if (open) {
+      const closeOnOutside = (e) => {
+        if (!pop.contains(e.target) && e.target !== btn && !btn?.contains(e.target)) {
+          pop.classList.remove('open');
+          btn?.classList.remove('active');
+          App._syncPopoverLabel(entry, false);
+          App._reservePopoverSpace(entry, false);
+          document.removeEventListener('click', closeOnOutside);
+        }
+      };
+      setTimeout(() => document.addEventListener('click', closeOnOutside), 0);
+    }
+  },
+
+  toggleDashFilterPopover(ev) {
+    ev?.stopPropagation();
+    App._togglePopover('dash-filter-popover', 'btn-dash-filter');
+  },
+
+  updateDashFilterBadge() {
+    const fUnit  = document.getElementById('dash-filter-unit')?.value  || '';
+    const fGroup = document.getElementById('dash-filter-group')?.value || '';
+    const count = (fUnit ? 1 : 0) + (fGroup ? 1 : 0);
+    const badge = document.getElementById('dash-filter-badge');
+    if (badge) { badge.textContent = count; badge.style.display = count ? '' : 'none'; }
+  },
+
+  /* ── DASHBOARD ────────────────────────────── */
+  getFilteredReqs() {
+    const fUnit  = document.getElementById('dash-filter-unit')?.value  || '';
+    const fGroup = document.getElementById('dash-filter-group')?.value || '';
+    const fFrom  = document.getElementById('filter-date-from')?.value  || '';
+    const fTo    = document.getElementById('filter-date-to')?.value    || '';
+
+    return Object.values(State.requests||{}).filter(r => {
+      if (fUnit  && r.unitName  !== fUnit)  return false;
+      if (fGroup && r.groupName !== fGroup) return false;
+      // Date range — compare against createdAt (date the request was made)
+      if (fFrom || fTo) {
+        const ds = (r.createdAt||'').substring(0,10);
+        if (fFrom && ds < fFrom) return false;
+        if (fTo   && ds > fTo)   return false;
+      }
+      return true;
+    });
+  },
+
+  clearReqDateRange() {
+    const f = document.getElementById('req-date-from');
+    const t = document.getElementById('req-date-to');
+    if (f) f.value = '';
+    if (t) t.value = '';
+    App.renderRequests();
+  },
+
+  toggleReqFilterPanel(ev) {
+    ev?.stopPropagation();
+    App._togglePopover('req-filter-panel', 'btn-req-filter-toggle');
+  },
+
+  toggleEstoqueConfPopover(ev) {
+    ev?.stopPropagation();
+    App._togglePopover('estoque-conf-popover', 'btn-estoque-conf-toggle');
+  },
+
+  toggleEstoqueFilterPopover(ev) {
+    ev?.stopPropagation();
+    App._togglePopover('estoque-filter-popover', 'btn-estoque-filter-toggle');
+  },
+
+  toggleReqConfPopover(ev) {
+    ev?.stopPropagation();
+    App._togglePopover('req-conf-popover', 'btn-req-conf-toggle');
+  },
+
+  setReqSort(field, dir, btn) {
+    // Toggle: clicar no botão já ativo desmarca e volta ao padrão (crescente por solicitação)
+    if (btn && btn.classList.contains('active')) {
+      App.reqSortField = 'createdAt';
+      App.reqSortDir   = 'desc';
+      document.querySelectorAll('.req-sort-btn').forEach(b => b.classList.remove('active'));
+      App.renderRequests();
+      return;
+    }
+    App.reqSortField = field;
+    App.reqSortDir   = dir;
+    // Só um botão ativo por vez (limpa os dois pares e marca o clicado)
+    document.querySelectorAll('.req-sort-btn').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+    App.renderRequests();
+  },
+
+  setReqStatus(btn) {
+    document.querySelectorAll('.req-status-chips .req-chip').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('filter-status').value = btn.dataset.status;
+    App.renderRequests();
+  },
+
+  toggleReqSort() {
+    App.reqSortDir = App.reqSortDir === 'desc' ? 'asc' : 'desc';
+    const lbl = document.getElementById('req-sort-label');
+    if (lbl) lbl.textContent = App.reqSortDir === 'asc' ? 'Mais antigas' : 'Mais recentes';
+    App.renderRequests();
+  },
+
+  clearAllReqFilters() {
+    ['req-date-from','req-date-to','req-sent-from','req-sent-to'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    ['filter-status','filter-unit-req','filter-group-req','filter-subgroup-req'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    ['req-filter-unit-vis','req-filter-group-vis','req-filter-subgroup-vis'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    // Reativa todos os chips rosca (escopado — .req-status-chip é reaproveitada
+    // no pop-up de Relatório de Solicitações, com estado próprio)
+    App.reqHiddenStatuses.clear();
+    document.querySelectorAll('#req-filter-panel .req-status-chip').forEach(c => c.classList.add('active'));
+    const allBtn = document.getElementById('btn-toggle-all-status');
+    if (allBtn) { allBtn.textContent = 'Todos ✓'; allBtn.classList.remove('all-off'); }
+    App.reqSortDir = 'desc';
+    document.querySelectorAll('.req-sort-btn').forEach(b => b.classList.remove('active'));
+    const lbl = document.getElementById('req-sort-label');
+    if (lbl) lbl.textContent = 'Mais recentes';
+    App.renderRequests();
+  },
+
+  _renderReqStats(allReqs, statsId='req-stats-bar', negId='req-negados-bar') {
+    const counts = { Solicitado:0, Aguardando:0, Comprado:0, Estoque:0, Negado:0 };
+    allReqs.forEach(([,r]) => { if (counts[r.status] !== undefined) counts[r.status]++; });
+    const total   = Object.values(counts).reduce((a,b)=>a+b,0);
+    const negados = counts.Negado;
+
+    const statsBar = document.getElementById(statsId);
+    const negBar   = document.getElementById(negId);   // opcional: nem toda tela tem essa faixa extra
+    if (!statsBar) return;
+
+    if (total === 0) { statsBar.innerHTML = ''; statsBar.style.display = 'none'; if (negBar) negBar.style.display = 'none'; return; }
+
+    statsBar.style.display = 'flex';
+    statsBar.innerHTML = `
+      <span class="rqs-label">De <strong>${total}</strong> pedidos:</span>
+      <span class="rqs-item rqs-sol"><span class="rqs-dot"></span>${counts.Solicitado} solicitado${counts.Solicitado!==1?'s':''}</span>
+      <span class="rqs-sep">·</span>
+      <span class="rqs-item rqs-agu"><span class="rqs-dot"></span>${counts.Aguardando} em aguardo</span>
+      <span class="rqs-sep">·</span>
+      <span class="rqs-item rqs-com"><span class="rqs-dot"></span>${counts.Comprado} comprado${counts.Comprado!==1?'s':''}</span>
+      <span class="rqs-sep">·</span>
+      <span class="rqs-item rqs-est"><span class="rqs-dot"></span>${counts.Estoque} do estoque</span>
+      <span class="rqs-sep">·</span>
+      <span class="rqs-item rqs-neg"><span class="rqs-dot"></span>${counts.Negado} negado${counts.Negado!==1?'s':''}</span>`;
+
+    // Faixa extra (se a tela tiver): destaque do % negado, sem emoji — SVG do sistema
+    if (!negBar) return;
+    if (negados > 0) {
+      const pct = Math.round(negados/total*100);
+      negBar.style.display = 'flex';
+      negBar.innerHTML = `
+        <span class="rqn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></span>
+        <span><strong>${negados}</strong> pedido${negados!==1?'s':''} negado${negados!==1?'s':''} — <strong>${pct}%</strong> do total de ${total}</span>`;
+    } else {
+      negBar.style.display = 'none';
+    }
+  },
+
+  _syncReqFilterSelects() {
+    const unitVis  = document.getElementById('req-filter-unit-vis');
+    const groupVis = document.getElementById('req-filter-group-vis');
+    const unitHid  = document.getElementById('filter-unit-req');
+    const groupHid = document.getElementById('filter-group-req');
+    if (unitVis && unitHid) {
+      const cur = unitVis.value;
+      unitVis.innerHTML = unitHid.innerHTML;
+      unitVis.value = cur;
+    }
+    if (groupVis && groupHid) {
+      const cur = groupVis.value;
+      groupVis.innerHTML = groupHid.innerHTML;
+      groupVis.value = cur;
+    }
+    const subgroupVis = document.getElementById('req-filter-subgroup-vis');
+    const subgroupHid = document.getElementById('filter-subgroup-req');
+    if (subgroupVis && subgroupHid) {
+      const cur = subgroupVis.value;
+      subgroupVis.innerHTML = subgroupHid.innerHTML;
+      subgroupVis.value = cur;
+    }
+  },
+
+  clearReqDateRange() {
+    const f = document.getElementById('req-date-from');
+    const t = document.getElementById('req-date-to');
+    if (f) f.value = '';
+    if (t) t.value = '';
+    App.renderRequests();
+  },
+
+  clearDateRange() {
+    const f = document.getElementById('filter-date-from');
+    const t = document.getElementById('filter-date-to');
+    const y = document.getElementById('dash-year-select');
+    if (f) f.value = '';
+    if (t) t.value = '';
+    if (y) y.value = '';
+    App.renderDashboard();
+  },
+
+  dashSearch(q) {
+    q = q.toLowerCase();
+    const reqs = App.getFilteredReqs();
+    const f = q ? reqs.filter(r =>
+      (r.unitName||'').toLowerCase().includes(q) ||
+      (r.groupName||'').toLowerCase().includes(q) ||
+      (r.product||'').toLowerCase().includes(q) ||
+      (r.fornecedor||'').toLowerCase().includes(q)
+    ) : reqs;
+    App.updateKPIs(f);
+    App.updateCharts(f);
+  },
+
+  renderDashboard() {
+    App.populateDashFilters();
+    App.populateYearFilter();   // preenche select de ano e inicializa filtro se necessário
+    const reqs = App.getFilteredReqs();
+    App.updateKPIs(reqs);
+    App.updateCharts(reqs);
+    App._renderGroupSpendChart();
+    App.updateCompareCard();
+    App.renderConsumoCards();
+    App.renderNovasSolicitacoes();
+    App.renderActivityLog();
+    App.renderParcelasCard();
+    // Depois de tudo renderizado (canvas da rosca incluso) — só aí dá pra medir
+    // a posição real dos cards/rosca na tela e desenhar as linhas certas.
+    requestAnimationFrame(() => App._renderKpiConnectors());
+  },
+
+  // Linhas ligando cada card do KPI ring à rosca central — desenhadas em
+  // SVG, calculadas pela posição REAL na tela (não dá pra fazer isso só
+  // com CSS: os cards ficam em coluna própria, a rosca noutra, cada card
+  // numa altura diferente). Pra cada card, acha o ponto na borda do círculo
+  // na MESMA altura do card (interseção de y=cardY com a equação do
+  // círculo) e traça uma linha até lá — efeito de "raio" apontando pro
+  // centro, parecido com leader line de gráfico de pizza rotulado.
+  _renderKpiConnectors() {
+    const svg = document.getElementById('kpi-ring-connectors');
+    const section = document.querySelector('.kpi-ring-section');
+    const ringEl = document.querySelector('.kpi-ring-center canvas');
+    if (!svg || !section || !ringEl) return;
+    const secRect  = section.getBoundingClientRect();
+    const ringRect = ringEl.getBoundingClientRect();
+    if (!secRect.width || !ringRect.width) return; // seção ainda não visível (aba fechada)
+
+    const ringCx = ringRect.left + ringRect.width / 2 - secRect.left;
+    const ringCy = ringRect.top + ringRect.height / 2 - secRect.top;
+    const ringR  = Math.min(ringRect.width, ringRect.height) / 2;
+
+    svg.setAttribute('viewBox', `0 0 ${secRect.width} ${secRect.height}`);
+    svg.innerHTML = '';
+    const NS = 'http://www.w3.org/2000/svg';
+
+    document.querySelectorAll('.kpi-ring-col .kpi-card').forEach(card => {
+      const r = card.getBoundingClientRect();
+      if (!r.width) return;
+      const cardCy    = r.top + r.height / 2 - secRect.top;
+      const isLeftCol = (r.left + r.width / 2) < ringRect.left;
+      const cardEdgeX = isLeftCol ? (r.right - secRect.left) : (r.left - secRect.left);
+
+      // Ponto na borda do círculo na mesma altura do card (x = cx ± √(r²−dy²));
+      // se o card estiver mais alto/baixo que o raio alcança, gruda no topo/base.
+      const dy = Math.max(-ringR, Math.min(ringR, cardCy - ringCy));
+      const dx = Math.sqrt(Math.max(ringR * ringR - dy * dy, 0)) * (isLeftCol ? -1 : 1);
+      const ringEdgeX = ringCx + dx;
+      const ringEdgeY = ringCy + dy;
+
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', cardEdgeX);
+      line.setAttribute('y1', cardCy);
+      line.setAttribute('x2', ringEdgeX);
+      line.setAttribute('y2', ringEdgeY);
+      line.setAttribute('stroke', '#c7d2e0');
+      line.setAttribute('stroke-width', '2');
+      svg.appendChild(line);
+
+      const dot = document.createElementNS(NS, 'circle');
+      dot.setAttribute('cx', ringEdgeX);
+      dot.setAttribute('cy', ringEdgeY);
+      dot.setAttribute('r', '3.5');
+      dot.setAttribute('fill', '#8898b8');
+      svg.appendChild(dot);
+    });
+  },
+
+  /* ── Impressão / PDF do dashboard ─────────── */
+  printDashboard() {
+    const reqs = App.getFilteredReqs();
+    const g   = id => (document.getElementById(id)?.textContent || '').trim();
+    const fmt = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+    // Filtros aplicados
+    const fUnit  = document.getElementById('dash-filter-unit')?.value  || '';
+    const fGroup = document.getElementById('dash-filter-group')?.value || '';
+    const fFrom  = document.getElementById('filter-date-from')?.value  || '';
+    const fTo    = document.getElementById('filter-date-to')?.value    || '';
+    const filtros = [];
+    if (fUnit)  filtros.push(`Unidade: ${fUnit}`);
+    if (fGroup) filtros.push(`Grupo: ${fGroup}`);
+    if (fFrom || fTo) filtros.push(`Período: ${fFrom ? App._labelDia(fFrom) : '…'} → ${fTo ? App._labelDia(fTo) : '…'}`);
+    const filtrosTxt = filtros.length ? filtros.join(' · ') : 'Todas as solicitações (sem filtro)';
+
+    // Status
+    const stC = { Solicitado: 0, Aguardando: 0, Comprado: 0, Estoque: 0, Negado: 0 };
+    reqs.forEach(r => { if (stC[r.status] !== undefined) stC[r.status]++; });
+
+    // Por unidade (contagem) e por grupo (contagem)
+    const byUnit = {}, byGroup = {};
+    reqs.forEach(r => {
+      const u = r.unitName || '—'; byUnit[u] = (byUnit[u] || 0) + 1;
+      const gr = r.groupName || '—'; byGroup[gr] = (byGroup[gr] || 0) + 1;
+    });
+
+    // Gasto por unidade (mesma lógica dos KPIs: à vista por boughtAt, parcelada por p.date)
+    const byUnitSpend = {};
+    Object.values(State.requests || {})
+      .filter(r => r.status === 'Comprado' && (!fUnit || r.unitName === fUnit) && (!fGroup || r.groupName === fGroup))
+      .forEach(r => {
+        const u = r.unitName || '—';
+        if (r.parcelas && r.parcelas.length) {
+          r.parcelas.forEach(p => { const pd = (p.date || p.month + '-01').substring(0, 10); if ((!fFrom || pd >= fFrom) && (!fTo || pd <= fTo)) byUnitSpend[u] = (byUnitSpend[u] || 0) + parseFloat(p.valor || 0); });
+        } else {
+          const bd = (r.boughtAt || '').substring(0, 10); if ((!fFrom || bd >= fFrom) && (!fTo || bd <= fTo)) byUnitSpend[u] = (byUnitSpend[u] || 0) + parseFloat(r.valorTotal || 0);
+        }
+      });
+
+    // Comparativo anual (lê o que já está na tela)
+    const cmp = { curY: g('cmp-cur-year'), curV: g('cmp-cur-val'), prevY: g('cmp-prev-year'), prevV: g('cmp-prev-val'), pct: g('cmp-gauge-pct'), lbl: g('cmp-gauge-lbl'), trend: g('compare-trend-badge') };
+
+    const kpis = [
+      ['Total de solicitações', g('kpi-total')],
+      ['Compradas',             g('kpi-bought')],
+      ['Negadas',               g('kpi-negado')],
+      ['Do estoque (sem compra)', g('kpi-estoque')],
+      ['Aguardando decisão',    g('kpi-aguardando')],
+      ['Gasto do período',      g('kpi-month-spent')],
+    ];
+    const data  = new Date().toLocaleDateString('pt-BR');
+    const admin = State.adminUser || 'LAMIC';
+
+    // Sub-opções mais pedidas — mesmo ranking já cacheado pelo card (_renderSuboptsHeat)
+    const suboptsRows = (App._suboptsData || []).slice(0, 20).map(([k, v]) => [App._pdfClean(k), String(v)]);
+
+    // Gastos por Grupo de Produto — mesma fonte/regra do gráfico (Comprado, respeita
+    // Unidade + intervalo de datas, mas NÃO o filtro de Grupo — ele existe pra comparar os grupos)
+    const byGroupSpend = {};
+    Object.values(State.requests || {})
+      .filter(r => r.status === 'Comprado' && r.boughtAt)
+      .forEach(r => {
+        if (fUnit && r.unitName !== fUnit) return;
+        const gName = App._displayGroupName(r.groupName);
+        const isParceled = r.parcelas && r.parcelas.length > 0;
+        if (!isParceled) {
+          const bd = (r.boughtAt || '').substring(0, 10);
+          if ((!fFrom || bd >= fFrom) && (!fTo || bd <= fTo)) byGroupSpend[gName] = (byGroupSpend[gName] || 0) + (parseFloat(r.valorTotal) || 0);
+        } else {
+          r.parcelas.forEach(p => {
+            const pd = (p.date || (p.month + '-01')).substring(0, 10);
+            if ((!fFrom || pd >= fFrom) && (!fTo || pd <= fTo)) byGroupSpend[gName] = (byGroupSpend[gName] || 0) + (parseFloat(p.valor) || 0);
+          });
+        }
+      });
+
+    // Gastos por Mês — mesma fonte do gráfico "Gastos por Período" (respeita Unidade
+    // + Grupo, NÃO o createdAt usado em getFilteredReqs — a janela de data aqui é
+    // sobre a data da COMPRA/parcela, por isso usa um recorte próprio, sem status)
+    const spendReqs = Object.values(State.requests || {}).filter(r => {
+      if (fUnit  && r.unitName  !== fUnit)  return false;
+      if (fGroup && r.groupName !== fGroup) return false;
+      return true;
+    });
+    const monthly = App._buildSpendMap(spendReqs, 'month', null, fFrom, fTo);
+    const monthlyRows = Object.keys(monthly).sort().map(k => {
+      const [y, mo] = k.split('-');
+      const lbl = new Date(+y, +mo - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return [lbl.charAt(0).toUpperCase() + lbl.slice(1), fmt(monthly[k])];
+    });
+
+    // Compras Parceladas — mesma coleta do card/modal
+    const parceladas = App._collectParceladas();
+    const parcPagas = parceladas.filter(x => App._parcelaPaga(x.parcelas)).length;
+    const parcelasRows = parceladas.map(x => {
+      const total = x.parcelas.length;
+      const pagas = x.parcelas.filter(p => App._parcelaPaga([p])).length;
+      return [App._pdfClean(x.titulo), App._pdfClean(x.sub || '—'), `${pagas}/${total}`, App._parcelaPaga(x.parcelas) ? 'Quitada' : 'Em aberto'];
+    });
+
+    // Consumo por categoria (Tintas/Pilhas/Outros/Conserto) — mesmos números dos
+    // cards, no período que estiver selecionado em cada um deles
+    const consumoRows = Object.entries(App._CONSUMO_CFG || {}).map(([kind, def]) => {
+      const s = App._consumoStats(kind, def.keywords, def.cfg);
+      return [def.cfg.titulo, String(s.curCount || 0), fmt(s.curSpent || 0), App._pdfClean(s.top ? s.top[0] : '—')];
+    });
+
+    // Log de Atividades Recentes — últimos 15 registros
+    const logsRows = Object.values(State.activityLog || {})
+      .sort((a, b) => (b.ts || '').localeCompare(a.ts || ''))
+      .slice(0, 15)
+      .map(l => [App._fmtDate(l.ts), App._pdfClean(l.ator || '—'), App._pdfClean(l.modulo || '—'), App._pdfClean(`${l.acao || ''} ${l.detalhe || ''}`.trim())]);
+
+    const sections = [
+      { heading: 'Indicadores Gerais', headers: ['Indicador', 'Valor'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: kpis.map(([l, v]) => [l, v || '0']) },
+      { heading: 'Solicitações por Status', headers: ['Status', 'Quantidade'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: Object.entries(stC).map(([k, v]) => [k, String(v)]) },
+      { heading: 'Por Unidade', headers: ['Unidade', 'Solicitações', 'Gasto'],
+        cols: [{ w: .5 }, { w: .22, align: 'right' }, { w: .28, align: 'right' }],
+        rows: Object.keys({ ...byUnit, ...byUnitSpend }).sort((a, b) => (byUnit[b] || 0) - (byUnit[a] || 0))
+          .map(u => [u, String(byUnit[u] || 0), fmt(byUnitSpend[u] || 0)]) },
+      { heading: 'Por Grupo', headers: ['Grupo', 'Solicitações'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: Object.entries(byGroup).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, String(v)]) },
+      { heading: 'Sub-opções Mais Pedidas', headers: ['Sub-opção', 'Pedidos'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: suboptsRows },
+      { heading: 'Gastos por Grupo de Produto', headers: ['Grupo', 'Gasto'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: Object.entries(byGroupSpend).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, fmt(v)]) },
+      { heading: 'Gastos por Mês', headers: ['Mês', 'Gasto'],
+        cols: [{ w: .7 }, { w: .3, align: 'right' }],
+        rows: monthlyRows },
+      { heading: 'Comparativo Anual', headers: ['Referência', 'Valor'],
+        cols: [{ w: .5 }, { w: .5, align: 'right' }],
+        rows: [
+          [cmp.curY || 'Ano atual', cmp.curV || '—'],
+          [cmp.prevY || 'Ano anterior', cmp.prevV || '—'],
+          ['Projeção / referência', `${cmp.pct || '—'} ${cmp.lbl || ''} ${cmp.trend ? '· ' + cmp.trend : ''}`.trim()],
+        ] },
+      { heading: `Compras Parceladas (${parceladas.length} no total · ${parcPagas} quitada(s))`, headers: ['Item', 'Detalhe', 'Parcelas', 'Status'],
+        cols: [{ w: .32 }, { w: .28 }, { w: .16, align: 'center' }, { w: .24 } ],
+        rows: parcelasRows.length ? parcelasRows : [] },
+      { heading: 'Consumo por Categoria', headers: ['Categoria', 'Qtd no período', 'Gasto', 'Item mais comprado'],
+        cols: [{ w: .3 }, { w: .18, align: 'right' }, { w: .22, align: 'right' }, { w: .3 }],
+        rows: consumoRows },
+      { heading: 'Log de Atividades Recentes', headers: ['Data', 'Quem', 'Módulo', 'Ação'],
+        cols: [{ w: .13 }, { w: .2 }, { w: .17 }, { w: .5 }],
+        rows: logsRows },
+    ];
+
+    App._pdfReport({
+      filename: `Relatorio-Dashboard-${new Date().toISOString().slice(0, 10)}.pdf`,
+      title: 'Relatório do Dashboard — Gestão TI',
+      subtitle: `Gerado em ${data} | ${admin}  ·  Filtros: ${filtrosTxt}`,
+      sections
+    });
+  },
+
+  /* ── Gera um PDF simples (jsPDF) e baixa direto — funciona sem depender do diálogo de impressão ── */
+  _pdfReport({ filename, title, subtitle, sections }) {
+    const J = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (!J) { toast('Biblioteca de PDF não carregada. Recarregue a página (Ctrl+F5).', 'error'); return; }
+    const pdf = new J({ unit: 'pt', format: 'a4' });
+    const W = pdf.internal.pageSize.getWidth();
+    const H = pdf.internal.pageSize.getHeight();
+    const M = 40, CW = W - M * 2, BOT = H - M, LH = 11, PADV = 6;
+    let y = M + 8;
+    const brk = () => { pdf.addPage(); y = M + 8; };
+
+    // Título (quebra se longo)
+    pdf.setFont('helvetica', 'bold'); pdf.setFontSize(15); pdf.setTextColor(15, 30, 53);
+    pdf.splitTextToSize(title, CW).forEach(l => { pdf.text(l, M, y); y += 18; });
+    if (subtitle) {
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(110, 128, 160);
+      pdf.splitTextToSize(subtitle, CW).forEach(l => { pdf.text(l, M, y); y += 11; });
+    }
+    y += 4;
+    pdf.setDrawColor(37, 99, 235); pdf.setLineWidth(1.2); pdf.line(M, y, W - M, y); y += 18;
+
+    sections.forEach(sec => {
+      if (y + 42 > BOT) brk();
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(10); pdf.setTextColor(71, 85, 105);
+      pdf.text(String(sec.heading).toUpperCase(), M, y); y += 6;
+      pdf.setDrawColor(226, 232, 240); pdf.setLineWidth(0.6); pdf.line(M, y, W - M, y); y += 14;
+
+      const cols = sec.cols, widths = cols.map(c => c.w * CW), xs = [];
+      let acc = M; cols.forEach((c, i) => { xs.push(acc); acc += widths[i]; });
+      const cx = (i, align) => align === 'right' ? xs[i] + widths[i] - 5 : xs[i] + 5;
+
+      if (sec.headers) {
+        if (y + 16 > BOT) brk();
+        pdf.setFillColor(6, 15, 30); pdf.rect(M, y - 9, CW, 15, 'F');
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(255, 255, 255);
+        sec.headers.forEach((h, i) => pdf.text(String(h), cx(i, cols[i].align), y + 1, { align: cols[i].align || 'left' }));
+        y += 16;
+      }
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9);
+      const rws = (sec.rows && sec.rows.length) ? sec.rows : [['— sem dados —']];
+      rws.forEach(row => {
+        const cellLines = row.map((cell, i) => pdf.splitTextToSize(String(cell ?? ''), (widths[i] || CW) - 10));
+        const nL = Math.max(1, ...cellLines.map(l => l.length));
+        const rowH = nL * LH + PADV;
+        if (y + rowH > BOT) brk();
+        pdf.setTextColor(30, 41, 59);
+        cellLines.forEach((lines, i) => {
+          const align = (cols[i] || cols[0]).align || 'left';
+          lines.forEach((ln, k) => pdf.text(ln, cx(i, align), y + k * LH, { align }));
+        });
+        y += rowH;
+        pdf.setDrawColor(238, 242, 248); pdf.setLineWidth(0.4); pdf.line(M, y - PADV + 2, W - M, y - PADV + 2);
+      });
+      y += 12;
+    });
+
+    pdf.save(filename);
+  },
+
+  // Limpa texto pro PDF: as fontes padrão do jsPDF (helvetica etc.) só cobrem
+  // Latin-1/WinAnsi — acento português passa numa boa, mas emoji/símbolo Unicode
+  // (✓ ✕ ↗ 📦 🏆 📅) vira caixinha em branco ou some. Troca pelos equivalentes
+  // em texto antes de jogar em qualquer célula/linha do relatório.
+  _pdfClean(s) {
+    return String(s ?? '')
+      .replace(/✓/g, 'OK')
+      .replace(/✕/g, 'X')
+      .replace(/[↗↑↓]/g, '')
+      .replace(/📦|🏆|📅/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  },
+
+  /* ── Relatório em PDF — Solicitações — pop-up de filtro próprio, independente
+     do que estiver filtrado na tela (status, unidade, grupo, subgrupo,
+     pagamento e 3 intervalos de data: solicitação/envio/compra) ── */
+  abrirRelatorioSolicitacoes() {
+    document.querySelectorAll('#relatorio-solicitacoes-modal .req-status-chip').forEach(b => b.classList.add('active'));
+    App._rptSolSyncAllLabel();
+    const uSel = document.getElementById('rpt-sol-unidade');
+    if (uSel) uSel.innerHTML = '<option value="">Todas</option>' + Object.values(State.units || {}).map(n => `<option value="${n}">${n}</option>`).join('');
+    const gSel = document.getElementById('rpt-sol-grupo');
+    if (gSel) gSel.innerHTML = '<option value="">Todos</option>' + Object.values(State.groups || {}).map(n => `<option value="${n}">${n}</option>`).join('');
+    App._rptSolPopulateSubgrupos('');
+    const pSel = document.getElementById('rpt-sol-pagamento');
+    if (pSel) pSel.value = '';
+    ['rpt-sol-req-from', 'rpt-sol-req-to', 'rpt-sol-env-from', 'rpt-sol-env-to', 'rpt-sol-compra-from', 'rpt-sol-compra-to']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('relatorio-solicitacoes-modal')?.classList.remove('hidden');
+  },
+
+  rptSolToggleStatus(btn) {
+    btn.classList.toggle('active');
+    App._rptSolSyncAllLabel();
+  },
+
+  rptSolToggleAllStatus(btn) {
+    const chips = document.querySelectorAll('#relatorio-solicitacoes-modal .req-status-chip');
+    const allOn = [...chips].every(c => c.classList.contains('active'));
+    chips.forEach(c => c.classList.toggle('active', !allOn));
+    App._rptSolSyncAllLabel();
+  },
+
+  _rptSolSyncAllLabel() {
+    const chips = document.querySelectorAll('#relatorio-solicitacoes-modal .req-status-chip');
+    const allOn = chips.length > 0 && [...chips].every(c => c.classList.contains('active'));
+    const btn = document.getElementById('rpt-sol-toggle-all');
+    if (!btn) return;
+    btn.textContent = allOn ? 'Todos ✓' : 'Todos';
+    btn.classList.toggle('all-off', !allOn);
+  },
+
+  _rptSolOnGrupoChange() {
+    App._rptSolPopulateSubgrupos(document.getElementById('rpt-sol-grupo')?.value || '');
+  },
+
+  _rptSolPopulateSubgrupos(gname) {
+    const sel = document.getElementById('rpt-sol-subgrupo'); if (!sel) return;
+    sel.innerHTML = '<option value="">Todos</option>';
+    const gid = Object.entries(State.groups || {}).find(([, n]) => n === gname)?.[0];
+    const list = gid ? (State.subgroups?.[gid] || []) : [];
+    list.forEach(sg => { const o = document.createElement('option'); o.value = o.textContent = sg; sel.appendChild(o); });
+  },
+
+  rptSolLimpar() {
+    document.querySelectorAll('#relatorio-solicitacoes-modal .req-status-chip').forEach(b => b.classList.add('active'));
+    App._rptSolSyncAllLabel();
+    const uSel = document.getElementById('rpt-sol-unidade'); if (uSel) uSel.value = '';
+    const gSel = document.getElementById('rpt-sol-grupo');   if (gSel) gSel.value = '';
+    App._rptSolPopulateSubgrupos('');
+    const pSel = document.getElementById('rpt-sol-pagamento'); if (pSel) pSel.value = '';
+    ['rpt-sol-req-from', 'rpt-sol-req-to', 'rpt-sol-env-from', 'rpt-sol-env-to', 'rpt-sol-compra-from', 'rpt-sol-compra-to']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  },
+
+  printRequestsList() {
+    const statuses = new Set();
+    document.querySelectorAll('#relatorio-solicitacoes-modal .req-status-chip.active').forEach(b => statuses.add(b.dataset.status));
+    const fUnit       = document.getElementById('rpt-sol-unidade')?.value || '';
+    const fGroup      = document.getElementById('rpt-sol-grupo')?.value || '';
+    const fSubgroup   = document.getElementById('rpt-sol-subgrupo')?.value || '';
+    const fPag        = document.getElementById('rpt-sol-pagamento')?.value || '';
+    const reqFrom     = document.getElementById('rpt-sol-req-from')?.value || '';
+    const reqTo       = document.getElementById('rpt-sol-req-to')?.value || '';
+    const envFrom     = document.getElementById('rpt-sol-env-from')?.value || '';
+    const envTo       = document.getElementById('rpt-sol-env-to')?.value || '';
+    const compraFrom  = document.getElementById('rpt-sol-compra-from')?.value || '';
+    const compraTo    = document.getElementById('rpt-sol-compra-to')?.value || '';
+
+    let list = Object.values(State.requests || {});
+    if (statuses.size)  list = list.filter(r => statuses.has(r.status));
+    if (fUnit)     list = list.filter(r => r.unitName === fUnit);
+    if (fGroup)    list = list.filter(r => r.groupName === fGroup);
+    if (fSubgroup) list = list.filter(r => r.subgrupo === fSubgroup);
+    if (fPag === 'parcelado')      list = list.filter(r => r.parcelas && r.parcelas.length > 0);
+    else if (fPag === 'combinada') list = list.filter(r => !!r.compraId);
+    else if (fPag === 'boleto' || fPag === 'dinheiro' || fPag === 'cartao') list = list.filter(r => (r.formaPagamento || 'dinheiro') === fPag);
+    const inRange = (dateVal, from, to) => {
+      const d = (dateVal || '').substring(0, 10);
+      if (!d) return false;
+      if (from && d < from) return false;
+      if (to   && d > to)   return false;
+      return true;
+    };
+    if (reqFrom || reqTo)       list = list.filter(r => inRange(r.createdAt, reqFrom, reqTo));
+    if (envFrom || envTo)       list = list.filter(r => inRange(r.shippedAt, envFrom, envTo));
+    if (compraFrom || compraTo) list = list.filter(r => inRange(r.boughtAt, compraFrom, compraTo));
+
+    list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    const rows = list.map(r => {
+      const seq = r.seq != null ? `SL-${r.seq}` : '';
+      const dt  = r.createdAt ? App._fmtDate(r.createdAt) : '—';
+      const envio = r.shippedAt ? App._fmtDate(r.shippedAt) : ((r.status === 'Comprado' || r.status === 'Estoque') ? 'Pendente' : '—');
+      return [
+        App._pdfClean(`${seq} ${dt}`),
+        App._pdfClean(r.unitName || '—'),
+        App._pdfClean(r.groupName || '—'),
+        App._pdfClean(r.subgrupo || '—'),
+        App._pdfClean(App.reqSummary(r)),
+        r.urgent ? 'Urgente' : '—',
+        App._pdfClean(envio),
+        App._pdfClean(r.status || '—'),
+      ];
+    });
+
+    const filtros = [];
+    if (statuses.size && statuses.size < 5) filtros.push(`Status: ${[...statuses].join(', ')}`);
+    if (fUnit)     filtros.push(`Unidade: ${fUnit}`);
+    if (fGroup)    filtros.push(`Grupo: ${fGroup}`);
+    if (fSubgroup) filtros.push(`Subgrupo: ${fSubgroup}`);
+    if (fPag)      filtros.push(`Pagamento: ${document.getElementById('rpt-sol-pagamento')?.selectedOptions?.[0]?.textContent || fPag}`);
+    if (reqFrom || reqTo)       filtros.push(`Data solicitação: ${reqFrom ? App._fmtDate(reqFrom) : '…'} → ${reqTo ? App._fmtDate(reqTo) : '…'}`);
+    if (envFrom || envTo)       filtros.push(`Data envio: ${envFrom ? App._fmtDate(envFrom) : '…'} → ${envTo ? App._fmtDate(envTo) : '…'}`);
+    if (compraFrom || compraTo) filtros.push(`Data compra: ${compraFrom ? App._fmtDate(compraFrom) : '…'} → ${compraTo ? App._fmtDate(compraTo) : '…'}`);
+    const filtrosTxt = filtros.length ? filtros.join(' · ') : 'Todas as solicitações (sem filtro)';
+
+    App._pdfReport({
+      filename: `Relatorio-Solicitacoes-${new Date().toISOString().slice(0, 10)}.pdf`,
+      title: 'Relatório de Solicitações — Gestão TI',
+      subtitle: `Gerado em ${new Date().toLocaleDateString('pt-BR')} | ${State.adminUser || 'LAMIC'}  ·  ${filtrosTxt}  ·  ${rows.length} solicitação(ões)`,
+      sections: [
+        { heading: 'Solicitações', headers: ['Data', 'Unidade', 'Grupo', 'Subgrupo', 'Resumo', 'Urg.', 'Envio', 'Status'],
+          cols: [{ w: .11 }, { w: .14 }, { w: .12 }, { w: .12 }, { w: .24 }, { w: .06, align: 'center' }, { w: .10 }, { w: .11 }],
+          rows }
+      ]
+    });
+    document.getElementById('relatorio-solicitacoes-modal')?.classList.add('hidden');
+  },
+
+  /* ── Relatório em PDF — Estoque — pop-up com o tipo (saldo atual ou
+     entradas/saídas), e dentro de cada um a opção certa (zerados sim/não,
+     ou entrada/saída/ambas) ── */
+  _rptEstoqueTipo: 'itens',
+  _rptEstoqueMov: 'ambos',
+
+  abrirRelatorioEstoque() {
+    App._rptEstoqueTipo = 'itens';
+    App._rptEstoqueMov = 'ambos';
+    document.querySelectorAll('#relatorio-estoque-modal .extrato-per-btn[data-tipo]').forEach(b => b.classList.toggle('active', b.dataset.tipo === 'itens'));
+    document.querySelectorAll('#relatorio-estoque-modal .extrato-per-btn[data-mov]').forEach(b => b.classList.toggle('active', b.dataset.mov === 'ambos'));
+    const zerCk = document.getElementById('rpt-est-zerados'); if (zerCk) zerCk.checked = true;
+    App._syncRptEstoqueOpts();
+    document.getElementById('relatorio-estoque-modal')?.classList.remove('hidden');
+  },
+
+  setRptEstoqueTipo(tipo, btn) {
+    App._rptEstoqueTipo = tipo;
+    document.querySelectorAll('#relatorio-estoque-modal .extrato-per-btn[data-tipo]').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+    App._syncRptEstoqueOpts();
+  },
+
+  setRptEstoqueMov(mov, btn) {
+    App._rptEstoqueMov = mov;
+    document.querySelectorAll('#relatorio-estoque-modal .extrato-per-btn[data-mov]').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+  },
+
+  _syncRptEstoqueOpts() {
+    const isItens = App._rptEstoqueTipo === 'itens';
+    document.getElementById('rpt-est-itens-opts')?.classList.toggle('hidden', !isItens);
+    document.getElementById('rpt-est-movs-opts')?.classList.toggle('hidden', isItens);
+  },
+
+  gerarRelatorioEstoque() {
+    const tipo  = App._rptEstoqueTipo;
+    const fmt   = v => 'R$ ' + (parseFloat(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const data  = new Date().toLocaleDateString('pt-BR');
+    const admin = State.adminUser || 'LAMIC';
+
+    if (tipo === 'movs') {
+      const movFiltro = App._rptEstoqueMov; // 'ambos' | 'entrada' | 'saida'
+      let movs = Object.values(State.estoqueMov || {}).slice().sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+      if (movFiltro === 'entrada') movs = movs.filter(m => m.tipo === 'entrada');
+      else if (movFiltro === 'saida') movs = movs.filter(m => m.tipo === 'saida');
+      const nEnt = movs.filter(m => m.tipo === 'entrada').length;
+      const nSai = movs.filter(m => m.tipo === 'saida').length;
+      const rows = movs.map(m => [
+        App._fmtDate(m.data),
+        m.tipo === 'entrada' ? 'Entrada' : 'Saída',
+        App._pdfClean(m.produto || '—'),
+        App._pdfClean(m.grupo || '—'),
+        `${m.tipo === 'entrada' ? '+' : '-'}${m.qtd ?? 0} ${m.unidade || ''}`.trim(),
+        m.saldo != null ? String(m.saldo) : '—',
+        App._pdfClean(m.tipo === 'entrada' ? (m.origem || '—') : (m.destino || '—')),
+      ]);
+      App._pdfReport({
+        filename: `Relatorio-Estoque-Movimentacoes-${new Date().toISOString().slice(0, 10)}.pdf`,
+        title: 'Relatório de Estoque — Entradas e Saídas',
+        subtitle: `Gerado em ${data} | ${admin}  ·  ${nEnt} entrada(s) · ${nSai} saída(s) · ${movs.length} movimentação(ões)`,
+        sections: [
+          { heading: 'Resumo', headers: ['Indicador', 'Valor'],
+            cols: [{ w: .7 }, { w: .3, align: 'right' }],
+            rows: [['Entradas registradas', String(nEnt)], ['Saídas registradas', String(nSai)], ['Total de movimentações', String(movs.length)]] },
+          { heading: 'Movimentações', headers: ['Data', 'Tipo', 'Produto', 'Grupo', 'Qtd', 'Saldo', 'Origem/Destino'],
+            cols: [{ w: .11 }, { w: .10 }, { w: .24 }, { w: .15 }, { w: .12, align: 'right' }, { w: .10, align: 'right' }, { w: .18 }],
+            rows }
+        ]
+      });
+      document.getElementById('relatorio-estoque-modal')?.classList.add('hidden');
+      return;
+    }
+
+    // tipo === 'itens' — saldo atual de cada item cadastrado (todo o estoque, sem
+    // depender do filtro de busca/grupo que estiver ativo na tela nesse momento;
+    // zerados entram ou não conforme o checkbox do pop-up)
+    const incluirZerados = document.getElementById('rpt-est-zerados')?.checked !== false;
+    let items = Object.entries(State.estoque || {}).map(([id, i]) => ({ id, ...i }))
+      .sort((a, b) => (a.grupo || '').localeCompare(b.grupo || '') || (a.produto || '').localeCompare(b.produto || ''));
+    const zerados = items.filter(i => (parseFloat(i.quantidade) || 0) <= 0).length;
+    if (!incluirZerados) items = items.filter(i => (parseFloat(i.quantidade) || 0) > 0);
+    const saldoTotal = items.reduce((s, i) => s + (parseFloat(i.quantidade) || 0), 0);
+    const porGrupo = {};
+    items.forEach(i => { const g = i.grupo || '—'; porGrupo[g] = (porGrupo[g] || 0) + (parseFloat(i.quantidade) || 0); });
+
+    const rows = items.map(i => {
+      const qtd = parseFloat(i.quantidade) || 0;
+      return [
+        App._pdfClean(App._loteDisplay(i)),
+        App._pdfClean(i.produto || '—'),
+        App._pdfClean(i.grupo || '—'),
+        App._pdfClean(i.subgrupo || '—'),
+        String(qtd) + (qtd <= 0 ? ' (ZERADO)' : ''),
+      ];
+    });
+
+    App._pdfReport({
+      filename: `Relatorio-Estoque-Itens-${new Date().toISOString().slice(0, 10)}.pdf`,
+      title: 'Relatório de Estoque — Itens em Estoque',
+      subtitle: `Gerado em ${data} | ${admin}  ·  ${items.length} item(ns) cadastrado(s) · ${zerados} zerado(s) · Saldo total: ${saldoTotal}`,
+      sections: [
+        { heading: 'Resumo por Grupo', headers: ['Grupo', 'Saldo'],
+          cols: [{ w: .7 }, { w: .3, align: 'right' }],
+          rows: Object.entries(porGrupo).sort((a, b) => b[1] - a[1]).map(([g, v]) => [g, String(v)]) },
+        { heading: 'Itens em Estoque', headers: ['Lote/Código', 'Produto', 'Grupo', 'Subgrupo', 'Quantidade'],
+          cols: [{ w: .14 }, { w: .30 }, { w: .20 }, { w: .20 }, { w: .16, align: 'right' }],
+          rows }
+      ]
+    });
+    document.getElementById('relatorio-estoque-modal')?.classList.add('hidden');
+  },
+
+  /* ── Relatório em PDF — Calendário (mês visível, dia a dia) ── */
+  printCalendarReport() {
+    const y = State.calYear, m = State.calMonth;
+    const label = new Date(y, m, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const fmt = v => 'R$ ' + parseFloat(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Mesma lógica de montagem do dia→eventos de renderCalendar() (só leitura,
+    // duplicada aqui de propósito pra não mexer numa função que já funciona).
+    const dayMap = {};
+    Object.values(State.requests || {}).forEach(r => {
+      if (r.status === 'Comprado' && r.boughtAt) {
+        const isParceled = r.parcelas && r.parcelas.length > 0;
+        if (!isParceled && r.boughtAt.startsWith(`${y}-${String(m + 1).padStart(2, '0')}`)) {
+          const day = parseInt(r.boughtAt.substring(8, 10));
+          if (!dayMap[day]) dayMap[day] = [];
+          dayMap[day].push({ type: 'direta', val: r.valorTotal, unit: r.unitName || '?', desc: (r.compraCodigo ? `[${r.compraCodigo}] ` : '') + (r.descricao || r.product || r.groupName || 'Compra') });
+        }
+      }
+      if (r.parcelas) {
+        r.parcelas.forEach(p => {
+          const pMonthStr = `${y}-${String(m + 1).padStart(2, '0')}`;
+          const pDate = p.date || (p.month + '-01');
+          if (!pDate.startsWith(pMonthStr)) return;
+          const day = parseInt(pDate.substring(8, 10)) || 1;
+          if (!dayMap[day]) dayMap[day] = [];
+          const lbl = p.num ? `Parcela ${p.num}/${p.total}` : 'Parcela';
+          dayMap[day].push({ type: 'parcela', val: p.valor, unit: r.unitName || '?', desc: `${r.compraCodigo ? `[${r.compraCodigo}] ` : ''}${lbl} — ${r.descricao || r.groupName || 'Compra'}` });
+        });
+      }
+    });
+
+    const rows = [];
+    let totalMes = 0;
+    Object.keys(dayMap).map(Number).sort((a, b) => a - b).forEach(day => {
+      dayMap[day].forEach(ev => {
+        totalMes += parseFloat(ev.val || 0);
+        rows.push([
+          String(day).padStart(2, '0') + '/' + String(m + 1).padStart(2, '0'),
+          ev.type === 'parcela' ? 'Parcela' : 'Compra Direta',
+          App._pdfClean(ev.unit),
+          App._pdfClean(ev.desc),
+          fmt(ev.val),
+        ]);
+      });
+    });
+
+    const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+    App._pdfReport({
+      filename: `Relatorio-Calendario-${y}-${String(m + 1).padStart(2, '0')}.pdf`,
+      title: `Relatório do Calendário de Compras — ${labelCap}`,
+      subtitle: `Gerado em ${new Date().toLocaleDateString('pt-BR')} | ${State.adminUser || 'LAMIC'}  ·  ${rows.length} lançamento(s) · Total do mês: ${fmt(totalMes)}`,
+      sections: [
+        { heading: `Itens de ${labelCap}`, headers: ['Dia', 'Tipo', 'Unidade', 'Descrição', 'Valor'],
+          cols: [{ w: .08 }, { w: .16 }, { w: .20 }, { w: .40 }, { w: .16, align: 'right' }],
+          rows }
+      ]
+    });
+  },
+
+  /* ── Cards de consumo: Tintas e Pilhas/Baterias ─── */
+  consPeriod: { ink: 'year', bat: 'year', outros: 'year', concerto: 'year' },
+  consYear:   { ink: new Date().getFullYear().toString(), bat: new Date().getFullYear().toString(), outros: new Date().getFullYear().toString(), concerto: new Date().getFullYear().toString() },
+  consMonth:  { ink: (new Date().getMonth() + 1).toString().padStart(2,'0'), bat: (new Date().getMonth() + 1).toString().padStart(2,'0'), outros: (new Date().getMonth() + 1).toString().padStart(2,'0'), concerto: (new Date().getMonth() + 1).toString().padStart(2,'0') },
+  // Dia escolhido pro filtro "Semana" (a semana é os 7 dias terminando nele) — YYYY-MM-DD
+  consWeek: (() => { const t = new Date().toISOString().substring(0,10); return { ink: t, bat: t, outros: t, concerto: t }; })(),
+
+  setConsPeriod(kind, period, btn) {
+    App.consPeriod[kind] = period;
+    if (btn) {
+      document.querySelectorAll(`.cons-per-btn[data-kind="${kind}"]`).forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+    // Só o controle do período escolhido fica visível — os outros dois somem
+    const weekSel  = document.getElementById(`${kind}-week`);
+    const monthSel = document.getElementById(`${kind}-month`);
+    const yearSel  = document.getElementById(`${kind}-year`);
+    if (weekSel)  weekSel.classList.toggle('hidden',  period !== 'week');
+    if (monthSel) monthSel.classList.toggle('hidden', period !== 'month');
+    if (yearSel)  yearSel.classList.toggle('hidden',  period !== 'year');
+    App.renderConsumoCards();
+  },
+
+  setConsYear(kind, year) {
+    App.consYear[kind] = year;
+    App.renderConsumoCards();
+  },
+
+  setConsMonth(kind, ym) {
+    // <input type="month"> devolve "YYYY-MM" — separa em ano+mês (consYear/consMonth
+    // continuam existindo separados, é só o INPUT que virou um calendário só)
+    const [y, m] = (ym || '').split('-');
+    if (y) App.consYear[kind]  = y;
+    if (m) App.consMonth[kind] = m;
+    App.renderConsumoCards();
+  },
+
+  setConsWeek(kind, dateStr) {
+    if (!dateStr) return;
+    App.consWeek[kind] = dateStr;
+    App.renderConsumoCards();
+  },
+
+  // Preenche o valor inicial dos 3 controles (semana/mês/ano) e sincroniza visibilidade
+  _populateConsYears() {
+    // Anos com pedidos (qualquer status, qualquer tipo)
+    const allYears = new Set([new Date().getFullYear().toString()]);
+    Object.values(State.requests || {}).forEach(r => {
+      const y = (r.boughtAt || r.createdAt || '').substring(0, 4);
+      if (/^\d{4}$/.test(y)) allYears.add(y);
+    });
+    const sortedYears = [...allYears].sort().reverse();
+
+    ['ink', 'bat', 'concerto', 'outros'].forEach(kind => {
+      const period   = App.consPeriod[kind] || 'year';
+      const weekSel  = document.getElementById(`${kind}-week`);
+      const monthSel = document.getElementById(`${kind}-month`);
+      const yearSel  = document.getElementById(`${kind}-year`);
+
+      // ── Ano ──
+      if (yearSel) {
+        const cur = App.consYear[kind] || new Date().getFullYear().toString();
+        yearSel.innerHTML = sortedYears.map(y => `<option value="${y}">${y}</option>`).join('');
+        yearSel.value = cur;
+        if (!yearSel.value && sortedYears.length) { yearSel.value = sortedYears[0]; App.consYear[kind] = sortedYears[0]; }
+        yearSel.classList.toggle('hidden', period !== 'year');
+      }
+
+      // ── Mês — calendário nativo (ano+mês juntos, "YYYY-MM") ──
+      if (monthSel) {
+        const y = App.consYear[kind]  || new Date().getFullYear().toString();
+        const m = App.consMonth[kind] || (new Date().getMonth() + 1).toString().padStart(2, '0');
+        monthSel.value = `${y}-${m}`;
+        monthSel.classList.toggle('hidden', period !== 'month');
+      }
+
+      // ── Semana — um dia qualquer; a semana é calculada a partir dele ──
+      if (weekSel) {
+        weekSel.value = App.consWeek[kind] || new Date().toISOString().substring(0, 10);
+        weekSel.classList.toggle('hidden', period !== 'week');
+      }
+    });
+  },
+
+  // Retorna {from, to} ISO para o período (offset 0=atual, 1=anterior), ancorado em
+  // baseYear/baseMonth (mês/ano) ou baseWeekDate (semana, "YYYY-MM-DD" escolhido no card)
+  _periodWindow(period, offset = 0, baseYear = null, baseMonth = null, baseWeekDate = null) {
+    const now = new Date();
+    const anchorYear  = baseYear  ? +baseYear  : now.getFullYear();
+    const anchorMonth = baseMonth ? +baseMonth - 1 : now.getMonth(); // 0-indexed
+    let from, to;
+    if (period === 'year') {
+      const y = anchorYear - offset;
+      from = new Date(y, 0, 1); to = new Date(y, 11, 31);
+    } else if (period === 'month') {
+      // Navega por mês dentro do ano âncora; offset recua mês
+      let m = anchorMonth - offset;
+      let y = anchorYear;
+      while (m < 0)  { m += 12; y--; }
+      while (m > 11) { m -= 12; y++; }
+      from = new Date(y, m, 1);
+      to   = new Date(y, m + 1, 0);
+    } else { // week — ancorado no dia escolhido no filtro (ou hoje, se nada foi escolhido)
+      const anchor = baseWeekDate ? new Date(baseWeekDate + 'T00:00:00') : now;
+      to   = new Date(anchor); to.setDate(to.getDate() - offset * 7);
+      from = new Date(to);     from.setDate(from.getDate() - 6);
+    }
+    const iso = dt => dt.toISOString().substring(0, 10);
+    return { from: iso(from), to: iso(to) };
+  },
+
+  // Rótulo legível de um período
+  _fmtPeriodLabel(period, win) {
+    const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    if (period === 'year') return win.from.substring(0, 4);
+    if (period === 'month') {
+      const [y, m] = win.from.split('-');
+      return `${meses[+m - 1]}/${y}`;
+    }
+    const f = win.from.split('-'), t = win.to.split('-');
+    return `${f[2]}/${f[1]} – ${t[2]}/${t[1]}`;
+  },
+
+  // Soma gasto (à vista por boughtAt, parcelado por p.date) dentro da janela
+  _spentInWindow(reqList, from, to) {
+    let total = 0;
+    reqList.forEach(r => {
+      if (r.parcelas && r.parcelas.length) {
+        r.parcelas.forEach(p => {
+          const pd = (p.date || (p.month ? p.month + '-01' : '')).substring(0, 10);
+          if (pd && pd >= from && pd <= to) total += parseFloat(p.valor || 0);
+        });
+      } else {
+        const bd = (r.boughtAt || '').substring(0, 10);
+        if (bd && bd >= from && bd <= to) total += parseFloat(r.valorTotal || 0);
+      }
+    });
+    return total;
+  },
+
+  // Data efetiva de compra para contar dentro da janela
+  _purchaseDate(r) {
+    if (r.boughtAt) return r.boughtAt.substring(0, 10);
+    if (r.parcelas && r.parcelas.length) {
+      const p0 = r.parcelas[0];
+      return (p0.date || (p0.month ? p0.month + '-01' : '')).substring(0, 10);
+    }
+    return (r.createdAt || '').substring(0, 10);
+  },
+
+  // Config central dos 4 cards de consumo — usada tanto pro render dos cards
+  // quanto pelo popup de auditoria (mesma fonte, sem repetir os keywords/campos
+  // em 2 lugares). titulo/countLbl/unitStatLbl/solStatLbl só são usados pelo popup.
+  _CONSUMO_CFG: {
+    ink: {
+      keywords: ['tinta'],
+      cfg: { topField: 'cor', topLabel: 'ink-top-color', breakdownTitle: 'Por cor',
+             titulo: 'Tintas Compradas', countLbl: 'tintas no período',
+             topStatLbl: 'Cor mais comprada', unitStatLbl: 'Unidade que mais comprou', solStatLbl: 'Maior solicitante' }
+    },
+    bat: {
+      keywords: ['pilha', 'bateria'],
+      cfg: { topField: 'modelo', topLabel: 'bat-top-model', breakdownTitle: 'Por modelo',
+             titulo: 'Pilhas & Baterias', countLbl: 'unidades no período',
+             topStatLbl: 'Modelo mais comprado', unitStatLbl: 'Unidade que mais comprou', solStatLbl: 'Maior solicitante' }
+    },
+    concerto: {
+      keywords: ['conserto', 'concerto'],
+      cfg: { topField: 'modelo', topLabel: 'concerto-top-model', breakdownTitle: 'Por modelo',
+             titulo: 'Conserto', countLbl: 'consertos no período',
+             topStatLbl: 'Modelo que mais deu problema', unitStatLbl: 'Unidade que mais deu problema', solStatLbl: 'Maior solicitante' }
+    },
+    outros: {
+      keywords: ['tinta', 'pilha', 'bateria', 'conserto', 'concerto'],
+      cfg: { topField: 'subgrupo', topLabel: 'outros-top-subgrupo', breakdownTitle: 'Por subgrupo', exclude: true,
+             titulo: 'Outros', countLbl: 'itens no período',
+             topStatLbl: 'Subgrupo mais comprado', unitStatLbl: 'Unidade que mais comprou', solStatLbl: 'Maior solicitante' }
+    }
+  },
+
+  renderConsumoCards() {
+    App._populateConsYears();
+    Object.entries(App._CONSUMO_CFG).forEach(([kind, def]) => App._renderConsumo(kind, def.keywords, def.cfg));
+  },
+
+  // Atalho: abre a config do grupo Conserto (sub-opções/modelos) a partir do card do dashboard
+  openConcertoSubopts() {
+    const entry = Object.entries(State.groups || {}).find(([, name]) => /conserto|concerto/i.test(name));
+    if (!entry) { toast('Cadastre o grupo "Conserto" em Configurações → Grupos de Produto.', 'error'); return; }
+    const btn = document.querySelector('.nav-item[data-tab="tab-settings"]');
+    if (btn) App.adminTab(btn);
+    setTimeout(() => App.openGroupEdit(entry[0]), 120);
+  },
+
+  /* ── Popup de Auditoria dos cards de consumo ────────────────────────
+     Reusa App._consumoStats (mesmos números que já aparecem no card),
+     só que "de forma mais bonita" com gráfico de comparativo semanal/
+     mensal/anual (Tendência + Média, como no Gastos por Período) e uma
+     caixa mostrando quanto da meta anual esse tipo de material já consumiu. ── */
+  _auditKind: null,
+  _auditGran: 'month',
+
+  openConsumoAudit(kind) {
+    if (!App._CONSUMO_CFG[kind]) return;
+    App._auditKind = kind;
+    App._auditGran = 'month';
+    document.querySelectorAll('#audit-gran-toggle .cons-per-btn').forEach(b => b.classList.toggle('active', b.dataset.g === 'month'));
+    document.getElementById('consumo-audit-modal')?.classList.remove('hidden');
+    App._renderConsumoAudit();
+  },
+
+  closeConsumoAudit() {
+    document.getElementById('consumo-audit-modal')?.classList.add('hidden');
+    App._auditKind = null;
+  },
+
+  setAuditGranularity(g, btn) {
+    App._auditGran = g;
+    document.querySelectorAll('#audit-gran-toggle .cons-per-btn').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+    App._renderAuditChart();
+  },
+
+  _renderConsumoAudit() {
+    const kind = App._auditKind; const def = App._CONSUMO_CFG[kind]; if (!def) return;
+    const { keywords, cfg } = def;
+    const s = App._consumoStats(kind, keywords, cfg);
+    const fmt = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const setTxt = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+    setTxt('audit-title', cfg.titulo || kind);
+    setTxt('audit-sub', `Período: ${App._fmtPeriodLabel(s.period, s.win)}`);
+    setTxt('audit-spent', fmt(s.curSpent));
+    setTxt('audit-trend-tag', s.trend.txt);
+    setTxt('audit-count-lbl', (cfg.countLbl || 'no período').replace(/^./, c => c.toUpperCase()));
+    setTxt('audit-count', s.curCount);
+    setTxt('audit-prev', `${s.prevCount} · ${fmt(s.prevSpent)}`);
+    setTxt('audit-top-lbl', cfg.topStatLbl || 'Mais comprado');
+    setTxt('audit-top', s.top ? `${s.top[0]} (${s.top[1]})` : '—');
+    setTxt('audit-unit-lbl', cfg.unitStatLbl || 'Unidade que mais comprou');
+    setTxt('audit-top-unit', s.topUnit ? `${s.topUnit[0]} (${s.topUnit[1]})` : '—');
+    setTxt('audit-sol-lbl', cfg.solStatLbl || 'Maior solicitante');
+    setTxt('audit-top-sol', s.topSolicitante ? `${s.topSolicitante[0]} (${s.topSolicitante[1]})` : '—');
+
+    const tag = document.getElementById('audit-trend-tag');
+    if (tag) tag.className = `audit-side-tag trend-${s.trend.cls}`;
+
+    // Ranking em gráfico de barra horizontal com eixo (igual ao modelo enviado —
+    // linhas de grade e escala embaixo, em vez das barrinhas de CSS do card pequeno).
+    setTxt('audit-bd-title', cfg.breakdownTitle);
+    App._renderAuditBreakdownChart(kind, s.topSorted);
+
+    // Caixa azul: % da meta anual configurada que esse material já consumiu
+    const metaInfo = App._auditMetaPct(def);
+    const metaBox = document.getElementById('audit-meta-box');
+    if (metaInfo) {
+      setTxt('audit-meta-pct', metaInfo.pct.toFixed(1).replace('.', ',') + '%');
+      metaBox?.classList.remove('hidden');
+    } else {
+      metaBox?.classList.add('hidden');
+    }
+
+    App._renderAuditChart();
+  },
+
+  // Série dos últimos N períodos (semana/mês/ano) de gasto — reusa
+  // _spentInWindow (mesma conta de sempre: à vista por boughtAt, parcelado por
+  // p.date) em janelas construídas em ordem cronológica (sem depender de
+  // ordenar string de rótulo, que pra semana não ordena certo).
+  _consumoSeries(keywords, exclude, gran) {
+    const reqs = Object.values(State.requests || {}).filter(r => {
+      if (r.status !== 'Comprado') return false;
+      const g = (r.groupName || '').toLowerCase();
+      const hit = keywords.some(k => g.includes(k));
+      return exclude ? !hit : hit;
+    });
+    const N = gran === 'year' ? 6 : 12;
+    const now = new Date();
+    const iso = d => d.toISOString().substring(0, 10);
+    const buckets = [];
+    for (let i = N - 1; i >= 0; i--) {
+      let from, to, label;
+      if (gran === 'year') {
+        const y = now.getFullYear() - i;
+        from = new Date(y, 0, 1); to = new Date(y, 11, 31); label = String(y);
+      } else if (gran === 'week') {
+        const end = new Date(now); end.setDate(end.getDate() - i * 7);
+        to = new Date(end); from = new Date(end); from.setDate(from.getDate() - 6);
+        label = `${String(from.getDate()).padStart(2, '0')}/${String(from.getMonth() + 1).padStart(2, '0')}`;
+      } else { // month
+        let m = now.getMonth() - i, y = now.getFullYear();
+        while (m < 0) { m += 12; y--; }
+        from = new Date(y, m, 1); to = new Date(y, m + 1, 0);
+        label = `${String(m + 1).padStart(2, '0')}/${String(y).substring(2)}`;
+      }
+      buckets.push({ label, from: iso(from), to: iso(to) });
+    }
+    return { labels: buckets.map(b => b.label), vals: buckets.map(b => App._spentInWindow(reqs, b.from, b.to)) };
+  },
+
+  // Regressão linear simples (mínimos quadrados) e média — mesma matemática já
+  // usada no Gastos por Período (_drawLine), copiada aqui pra não arriscar
+  // mexer numa função que já está funcionando por causa de um gráfico novo.
+  _calcTrendLine(vals) {
+    const n = vals.length;
+    if (n < 2) return vals.slice();
+    const xs = vals.map((_, i) => i);
+    const sumX = xs.reduce((a, b) => a + b, 0), sumY = vals.reduce((a, b) => a + b, 0);
+    const sumXY = xs.reduce((s, x, i) => s + x * vals[i], 0), sumXX = xs.reduce((s, x) => s + x * x, 0);
+    const denom = (n * sumXX - sumX * sumX) || 1;
+    const slope = (n * sumXY - sumX * sumY) / denom, intercept = (sumY - slope * sumX) / n;
+    return xs.map(x => slope * x + intercept);
+  },
+  _calcAvgLine(vals) {
+    const avg = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+    return vals.map(() => avg);
+  },
+
+  // Ranking (Por cor/modelo/subgrupo) em barra horizontal com eixo — igual ao
+  // modelo enviado (linhas de grade + escala embaixo do gráfico).
+  _renderAuditBreakdownChart(kind, topSorted) {
+    const canvas = document.getElementById('audit-breakdown-chart');
+    const emptyEl = document.getElementById('audit-breakdown-empty');
+    App._destroyChart('audit-breakdown-chart');
+    if (!canvas) return;
+    if (!topSorted.length) {
+      canvas.style.display = 'none';
+      emptyEl?.classList.remove('hidden');
+      return;
+    }
+    canvas.style.display = '';
+    emptyEl?.classList.add('hidden');
+
+    const shown  = topSorted.slice(0, 8);
+    const labels = shown.map(([name]) => name);
+    const vals   = shown.map(([, n]) => n);
+    const palette = ['#d9a520', '#2a68d4', '#1db87a', '#e8830a', '#7c52d4', '#d94040'];
+    const colors = labels.map((name, i) => kind === 'ink' ? App._inkColor(name, i) : palette[i % palette.length]);
+
+    State.charts['audit-breakdown-chart'] = new Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 6, maxBarThickness: 26 }] },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.raw} un.` } } },
+        scales: {
+          x: { beginAtZero: true, ticks: { color: '#8898b8', font: { size: 10 } }, grid: { color: '#eef2f8' } },
+          y: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } }
+        }
+      }
+    });
+  },
+
+  _renderAuditChart() {
+    const canvas = document.getElementById('audit-chart'); if (!canvas) return;
+    const kind = App._auditKind; const def = App._CONSUMO_CFG[kind]; if (!def) return;
+    const gran = App._auditGran || 'month';
+    const { labels, vals } = App._consumoSeries(def.keywords, def.cfg.exclude, gran);
+    const trendLine = App._calcTrendLine(vals);
+    const avgLine   = App._calcAvgLine(vals);
+    const fmtR = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    App._destroyChart('audit-chart');
+    State.charts['audit-chart'] = new Chart(canvas, {
+      data: {
+        labels,
+        datasets: [
+          { type: 'bar', label: 'Gastos', data: vals, backgroundColor: '#2a68d4cc', borderColor: '#2a68d4', borderWidth: 1.5, borderRadius: 6, order: 3 },
+          { type: 'line', label: 'Tendência', data: trendLine, borderColor: '#e8830a', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0, order: 1 },
+          { type: 'line', label: 'Média', data: avgLine, borderColor: '#7c52d4', borderWidth: 2, borderDash: [2, 3], pointRadius: 0, fill: false, tension: 0, order: 2 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 14, boxHeight: 2, font: { size: 11, weight: '600' }, color: '#5a6a84' } },
+          tooltip: {
+            enabled: true, backgroundColor: '#0f1e35', cornerRadius: 10, padding: 10,
+            titleFont: { size: 12, weight: '700' }, titleColor: '#fff',
+            bodyFont: { size: 11, weight: '600' }, bodyColor: 'rgba(255,255,255,.85)',
+            callbacks: { label: item => `${item.dataset.label}: ${fmtR(item.raw)}` }
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#8898b8', font: { size: 11 } }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: '#8898b8', font: { size: 11 } }, grid: { color: '#eef2f8' } }
+        }
+      }
+    });
+  },
+
+  // % da meta anual (mesma meta configurada em "Comparativo Anual de Gastos",
+  // Configurações → Meta) que esse tipo de material já consumiu sozinho —
+  // sempre sobre o ANO CORRENTE inteiro (a meta é anual), independente do
+  // filtro semana/mês/ano do card. Sem meta configurada, retorna null (a
+  // caixa azul fica escondida em vez de mostrar um número sem sentido).
+  _auditMetaPct(def) {
+    const curYear = new Date().getFullYear();
+    const meta = State.metas?.[curYear] || null;
+    if (!meta) return null;
+    const prevEff = App._prevYearEffective(curYear, meta);
+    const metaTarget = prevEff.value * (1 - (meta.reductionPct || 0) / 100);
+    if (!(metaTarget > 0)) return null;
+    const reqs = Object.values(State.requests || {}).filter(r => {
+      if (r.status !== 'Comprado') return false;
+      const g = (r.groupName || '').toLowerCase();
+      const hit = def.keywords.some(k => g.includes(k));
+      return def.cfg.exclude ? !hit : hit;
+    });
+    const spend = App._spentInWindow(reqs, curYear + '-01-01', curYear + '-12-31');
+    return { pct: spend / metaTarget * 100, spend, metaTarget };
+  },
+
+  // Formata data/hora ISO curto: "05/07 · 14:32"
+  _fmtDataHora(iso) {
+    if (!iso) return '—';
+    const [y, m, d] = iso.substring(0, 10).split('-');
+    const hh = iso.length > 10 ? iso.substring(11, 16) : '';
+    return `${d}/${m}${hh ? ' · ' + hh : ''}`;
+  },
+
+  // Card "Central de Tratamento" — fila de solicitações novas (status Solicitado),
+  // clicar abre o MESMO modal/fluxo completo da aba Solicitações (aprovar/reprovar/
+  // encaminhar/editar) — sem duplicar lógica nenhuma, é o App.openModal já existente.
+  renderNovasSolicitacoes() {
+    const el = document.getElementById('novas-sol-feed'); if (!el) return;
+    const badge = document.getElementById('novas-sol-count');
+    const pend = Object.entries(State.requests || {})
+      .filter(([, r]) => r.status === 'Solicitado')
+      .sort(([, a], [, b]) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    if (badge) badge.textContent = pend.length ? `${pend.length} pendente${pend.length!==1?'s':''}` : '';
+    if (!pend.length) {
+      el.innerHTML = '<div class="mgmt-empty">Nenhuma solicitação nova no momento.</div>';
+      return;
+    }
+    const TOP = 8;
+    el.innerHTML = pend.slice(0, TOP).map(([id, r]) => `
+      <div class="mgmt-item" onclick="App.openModal('${id}')" title="Abrir e tratar esta solicitação">
+        <span class="mgmt-item-badge">${r.seq != null ? 'SL-' + r.seq : '—'}</span>
+        <div class="mgmt-item-body">
+          <div class="mgmt-item-title">${r.unitName || '—'} · ${r.groupName || '—'}${r.urgent ? ' <span class="badge-urgent" style="margin-left:4px">🚨</span>' : ''}</div>
+          <div class="mgmt-item-sub">${App.reqSummary(r)}</div>
+        </div>
+        <span class="mgmt-item-date">${App._fmtDataHora(r.createdAt)}</span>
+      </div>`).join('') +
+      (pend.length > TOP ? `<div class="mgmt-more" onclick="App.adminTab(document.querySelector('.nav-item[data-tab=tab-requests]'))">Ver todas (${pend.length}) →</div>` : '');
+  },
+
+  // Card "Log de Atividades" — timeline de auditoria multiusuário (Estoque/Configurações/
+  // Calendário/Solicitações), alimentada por App._logActivity() nas ações principais.
+  _populateActivityYearFilter() {
+    const sel = document.getElementById('activity-filter-year'); if (!sel) return;
+    const cur = sel.value;
+    const years = new Set();
+    Object.values(State.activityLog || {}).forEach(l => { if (l.ts) years.add(l.ts.substring(0, 4)); });
+    sel.innerHTML = '<option value="">Todos</option>' +
+      [...years].sort().reverse().map(y => `<option value="${y}">${y}</option>`).join('');
+    if (cur) sel.value = cur;
+  },
+
+  renderActivityLog() {
+    const el = document.getElementById('activity-log-feed'); if (!el) return;
+    const badge = document.getElementById('activity-log-count');
+    App._populateActivityYearFilter();
+
+    const fModulo = document.getElementById('activity-filter-modulo')?.value || '';
+    const fYear   = document.getElementById('activity-filter-year')?.value || '';
+    const fSearch = (document.getElementById('activity-search')?.value || '').toLowerCase().trim();
+
+    const filterBadge = document.getElementById('activity-filter-badge');
+    const activeCount = (fModulo ? 1 : 0) + (fYear ? 1 : 0) + (fSearch ? 1 : 0);
+    if (filterBadge) { filterBadge.textContent = activeCount; filterBadge.style.display = activeCount ? '' : 'none'; }
+
+    let logs = Object.entries(State.activityLog || {})
+      .map(([id, l]) => ({ id, ...l }))
+      .sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
+
+    const totalAll = logs.length;
+    if (fModulo) logs = logs.filter(l => l.modulo === fModulo);
+    if (fYear)   logs = logs.filter(l => (l.ts || '').substring(0, 4) === fYear);
+    if (fSearch) logs = logs.filter(l => {
+      const txt = `${l.ator||''} ${l.unitName||''} ${l.modulo||''} ${l.acao||''} ${l.detalhe||''}`.toLowerCase();
+      return txt.includes(fSearch);
+    });
+
+    if (badge) badge.textContent = totalAll ? `${totalAll} registro${totalAll!==1?'s':''}` : '';
+    if (!logs.length) {
+      el.innerHTML = `<div class="mgmt-empty">${totalAll ? 'Nenhum registro para esse filtro.' : 'Nenhuma atividade registrada ainda.'}</div>`;
+      return;
+    }
+    const icones = {
+      'Estoque': '<svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" stroke="currentColor" stroke-width="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" stroke="currentColor" stroke-width="2"/></svg>',
+      'Configurações': '<svg viewBox="0 0 24 24" fill="none" width="13" height="13"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.66 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2.5a2 2 0 010-4h.09A1.65 1.65 0 004.6 8.66a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V2a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5"/></svg>',
+      'Calendário': '<svg viewBox="0 0 24 24" fill="none" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2"/></svg>',
+      'Solicitações': '<svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="2"/><path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2"/></svg>'
+    };
+    const icoDefault = '<svg viewBox="0 0 24 24" fill="none" width="13" height="13"><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg>';
+    const TOP = 15;
+    // Agrupado por DIA: cabeçalho de dia (Hoje/Ontem/data) + itens daquele dia.
+    let html = '';
+    let ultimoDia = null;
+    logs.slice(0, TOP).forEach(l => {
+      const dia = (l.ts || '').substring(0, 10);
+      if (dia !== ultimoDia) {
+        ultimoDia = dia;
+        const nDia = logs.filter(x => (x.ts || '').substring(0, 10) === dia).length;
+        html += `<div class="log-dia-header"><span>${App._labelDia(dia)}</span><span class="log-dia-count">${nDia}</span></div>`;
+      }
+      const quem = l.ator + (l.unitName ? ` (${l.unitName})` : (l.atorTipo === 'admin' ? ' (Admin)' : ''));
+      const hora = l.ts && l.ts.length > 10 ? l.ts.substring(11, 16) : '';
+      html += `
+      <div class="mgmt-item" onclick="App.showActivityDetail('${l.id}')" title="Clique para ver o que foi feito/modificado">
+        <span class="mgmt-item-badge mgmt-log-ico" title="${l.modulo || '—'}">${icones[l.modulo] || icoDefault}</span>
+        <div class="mgmt-item-body">
+          <div class="mgmt-item-title"><strong>${quem}</strong> — ${l.acao || '—'}</div>
+          ${l.detalhe ? `<div class="mgmt-item-sub">${l.detalhe}</div>` : ''}
+        </div>
+        <span class="mgmt-item-date">${hora}</span>
+      </div>`;
+    });
+    el.innerHTML = html;
+  },
+
+  // Rótulo amigável do dia para os cabeçalhos do log: Hoje / Ontem / DD/MM/AAAA.
+  _labelDia(dateStr) {
+    if (!dateStr) return '—';
+    const hoje = new Date(); const ontem = new Date(); ontem.setDate(hoje.getDate() - 1);
+    const iso = d => d.toISOString().substring(0, 10);
+    if (dateStr === iso(hoje))  return 'Hoje';
+    if (dateStr === iso(ontem)) return 'Ontem';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+  },
+
+  // Detalhe completo de 1 registro do log — mostra o que foi feito (ação) e o
+  // que foi modificado (detalhe), sem o corte de texto do feed compacto.
+  showActivityDetail(id) {
+    const l = State.activityLog?.[id]; if (!l) return;
+    const modal = document.getElementById('activity-detail-modal');
+    const body  = document.getElementById('activity-detail-body');
+    if (!modal || !body) return;
+    const quem = l.ator + (l.unitName ? ` (${l.unitName})` : (l.atorTipo === 'admin' ? ' (Admin)' : ''));
+    const dataCompleta = l.ts ? new Date(l.ts).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' }) : '—';
+    const linha = (lbl, val) => `<div class="parc-modal-parcela"><span>${lbl}</span><span style="font-weight:700;color:#1a3050">${val}</span></div>`;
+    // Lista de mudanças de → para (quando o log tiver)
+    let mudHtml = '';
+    if (Array.isArray(l.mudancas) && l.mudancas.length) {
+      mudHtml = `<div style="margin-top:10px;padding:10px 12px;background:var(--surf-1);border-radius:var(--r-sm)">
+        <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#8898b8;margin-bottom:6px">O que foi modificado${l.alvo ? ` — ${l.alvo}` : ''}</div>
+        ${l.mudancas.map(m => `
+          <div class="activity-mud-row">
+            <span class="activity-mud-campo">${m.campo}</span>
+            <span class="activity-mud-vals"><span class="activity-mud-de">${m.de}</span><span class="activity-mud-seta">→</span><span class="activity-mud-para">${m.para}</span></span>
+          </div>`).join('')}
+      </div>`;
+    } else if (l.detalhe) {
+      mudHtml = `<div style="margin-top:10px;padding:10px 12px;background:var(--surf-1);border-radius:var(--r-sm);font-size:.84rem;color:#4a6080">
+        <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#8898b8;margin-bottom:4px">O que foi modificado</div>
+        ${l.detalhe}
+      </div>`;
+    }
+    body.innerHTML = `
+      ${linha('Quem', quem)}
+      ${linha('Módulo', l.modulo || '—')}
+      ${linha('Ação', l.acao || '—')}
+      ${linha('Quando', dataCompleta)}
+      ${mudHtml}
+    `;
+    modal.classList.remove('hidden');
+  },
+
+  /* ── Compras Parceladas (card + modal) ─────── */
+  // Junta todas as compras parceladas em uma lista única: combinadas (por
+  // compraCodigo), parceladas avulsas (SL com parcelas) e parceladas criadas
+  // direto no estoque. Cada entrada carrega suas parcelas e o link de detalhe.
+  _collectParceladas() {
+    const list = [];
+    const cmpMap = {};
+    Object.entries(State.requests || {}).forEach(([id, r]) => {
+      if (r.compraCodigo) {
+        (cmpMap[r.compraCodigo] = cmpMap[r.compraCodigo] || []).push([id, r]);
+      } else if (r.parcelas && r.parcelas.length) {
+        list.push({ key: id, titulo: `SL-${r.seq} · ${r.unitName || '—'}`, sub: App.reqSummary(r), parcelas: r.parcelas, onclick: `App.showParceladaInfo('${id}')` });
+      }
+    });
+    Object.keys(cmpMap).forEach(codigo => {
+      const items = cmpMap[codigo];
+      const comParc = items.find(([, r]) => r.parcelas && r.parcelas.length);
+      if (!comParc) return; // combinada à vista não conta como parcelada
+      list.push({ key: codigo, titulo: `${codigo} · ${items.length} pedido(s)`, sub: items.map(([, r]) => r.unitName).filter(Boolean).join(', '), parcelas: comParc[1].parcelas, onclick: `App.showCompraDetalhe('${codigo}')` });
+    });
+    Object.entries(State.estoque || {}).forEach(([eid, it]) => {
+      if (it.parcelas && it.parcelas.length) {
+        list.push({ key: eid, titulo: `${App._loteDisplay(it)} · ${it.produto || '—'}`, sub: it.grupo || '', parcelas: it.parcelas, onclick: `App.showLoteInfo('${eid}')` });
+      }
+    });
+    return list;
+  },
+
+  renderParcelasCard() {
+    const canvas = document.getElementById('chart-parcelas'); if (!canvas) return;
+    const list = App._collectParceladas();
+    const total = list.length;
+    let pagas = 0, pendentes = 0;
+    list.forEach(x => { if (App._parcelaPaga(x.parcelas)) pagas++; else pendentes++; });
+
+    const badge = document.getElementById('parcelas-count');
+    if (badge) badge.textContent = total ? `${total}` : '';
+    const totalEl = document.getElementById('parcelas-total');
+    if (totalEl) totalEl.textContent = total;
+    const leg = document.getElementById('parcelas-legend');
+
+    App._destroyChart('chart-parcelas');
+    if (total === 0) {
+      if (leg) leg.innerHTML = '<div class="mgmt-empty" style="padding:6px 8px">Nenhuma compra parcelada.</div>';
+      const ctx = canvas.getContext('2d'); ctx && ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+    State.charts['chart-parcelas'] = new Chart(canvas, {
+      type: 'pie',
+      data: { labels: ['Quitadas', 'Em aberto'], datasets: [{ data: [pagas, pendentes], backgroundColor: ['#1db87abb', '#e8830abb'], borderColor: '#fff', borderWidth: 2, hoverOffset: 8 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}` } } } }
+    });
+    if (leg) leg.innerHTML = `
+      <div class="parc-leg-item"><span class="parc-leg-dot" style="background:#1db87a"></span>Quitadas <strong>${pagas}</strong></div>
+      <div class="parc-leg-item"><span class="parc-leg-dot" style="background:#e8830a"></span>Em aberto <strong>${pendentes}</strong></div>
+      <div class="parc-leg-item"><span class="parc-leg-dot" style="background:#c8d4e8"></span>Total <strong>${total}</strong></div>`;
+  },
+
+  openParcelasModal() {
+    const modal = document.getElementById('parcelas-modal');
+    const body = document.getElementById('parcelas-modal-body');
+    if (!modal || !body) return;
+    const fmtR = v => 'R$ ' + (parseFloat(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtD = v => v ? (() => { const [y, m, d] = v.substring(0, 10).split('-'); return `${d}/${m}/${y}`; })() : '—';
+    const list = App._collectParceladas();
+    if (!list.length) {
+      body.innerHTML = '<div class="mgmt-empty" style="padding:30px">Nenhuma compra parcelada registrada.</div>';
+      modal.classList.remove('hidden');
+      return;
+    }
+
+    // Métricas gerais no topo — visão rápida antes de entrar item por item
+    const quitadas = list.filter(x => App._parcelaPaga(x.parcelas)).length;
+    const emAberto = list.length - quitadas;
+    const valorAberto = list.reduce((s, x) => s + x.parcelas
+      .filter(p => !App._parcelaPaga([p]))
+      .reduce((s2, p) => s2 + (parseFloat(p.valor) || 0), 0), 0);
+    const metricsHtml = `
+      <div class="parc-metrics">
+        <div class="parc-metric">
+          <div class="parc-metric-ico"><svg viewBox="0 0 24 24" fill="none" width="17" height="17"><rect x="1" y="4" width="22" height="16" rx="2" stroke="currentColor" stroke-width="2"/><line x1="1" y1="10" x2="23" y2="10" stroke="currentColor" stroke-width="2"/></svg></div>
+          <div><div class="parc-metric-val">${list.length}</div><div class="parc-metric-lbl">Compras parceladas</div></div>
+        </div>
+        <div class="parc-metric parc-metric-green">
+          <div class="parc-metric-ico"><svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div><div class="parc-metric-val">${quitadas}</div><div class="parc-metric-lbl">Quitadas</div></div>
+        </div>
+        <div class="parc-metric parc-metric-orange">
+          <div class="parc-metric-ico"><svg viewBox="0 0 24 24" fill="none" width="17" height="17"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l2.5 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div><div class="parc-metric-val">${emAberto}</div><div class="parc-metric-lbl">Em aberto</div></div>
+        </div>
+        <div class="parc-metric parc-metric-blue">
+          <div class="parc-metric-ico"><svg viewBox="0 0 24 24" fill="none" width="17" height="17"><line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="2"/></svg></div>
+          <div><div class="parc-metric-val">${fmtR(valorAberto)}</div><div class="parc-metric-lbl">Valor pendente</div></div>
+        </div>
+      </div>`;
+
+    list.sort((a, b) => (App._parcelaPaga(a.parcelas) ? 1 : 0) - (App._parcelaPaga(b.parcelas) ? 1 : 0));
+    const cardsHtml = list.map(x => {
+      const paga = App._parcelaPaga(x.parcelas);
+      const parc = x.parcelas.slice().sort((a, b) => (a.num || 0) - (b.num || 0));
+      const ultima = parc[parc.length - 1];
+      const quitaData = ultima ? (ultima.date || (ultima.month ? ultima.month + '-01' : '')) : '';
+      const pagasN = parc.filter(p => App._parcelaPaga([p])).length;
+      const pct = parc.length ? Math.round(pagasN / parc.length * 100) : 0;
+      const rows = parc.map(p => {
+        const pg = App._parcelaPaga([p]);
+        return `<div class="parc-modal-parcela">
+          <span>Parcela ${p.num}/${p.total} · vence ${fmtD(p.date || (p.month ? p.month + '-01' : ''))}</span>
+          <span class="${pg ? 'parc-pg' : 'parc-pd'}">${pg ? 'paga' : 'pendente'} · ${fmtR(p.valor)}</span>
+        </div>`;
+      }).join('');
+      return `<div class="parc-modal-card ${paga ? 'is-paga' : 'is-aberto'}">
+        <div class="parc-modal-head" onclick="${x.onclick}" title="Abrir detalhe completo">
+          <div style="min-width:0">
+            <div class="parc-modal-title">${x.titulo}</div>
+            <div class="parc-modal-sub">${x.sub || ''}</div>
+          </div>
+          <span class="parc-modal-tag ${paga ? 'tag-pg' : 'tag-pd'}">${paga ? 'Quitada' : `${pagasN}/${parc.length} pagas`}</span>
+        </div>
+        <div class="parc-modal-progress"><div class="parc-modal-progress-bar" style="width:${pct}%"></div></div>
+        <div class="parc-modal-parcelas">${rows}</div>
+        <div class="parc-modal-foot">${paga ? 'Quitada em ' + fmtD(quitaData) : 'Termina de pagar em ' + fmtD(quitaData)}</div>
+      </div>`;
+    }).join('');
+
+    body.innerHTML = metricsHtml + cardsHtml;
+    modal.classList.remove('hidden');
+  },
+
+  /* ── Meta anual de gastos ──────────────────── */
+  _parseMoney(s) {
+    if (typeof s === 'number') return s;
+    if (!s) return 0;
+    return parseFloat(String(s).replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
+  },
+
+  // Gasto (Comprado) de um ano específico + nº de meses com movimento.
+  _spendForYear(year) {
+    let spend = 0;
+    const monthsSet = new Set();
+    Object.values(State.requests || {}).filter(r => r.status === 'Comprado').forEach(r => {
+      const isP = r.parcelas && r.parcelas.length > 0;
+      if (!isP) {
+        const bd = (r.boughtAt || '').substring(0, 10);
+        if (parseInt(bd.substring(0, 4)) === year) { spend += parseFloat(r.valorTotal || 0); if (bd) monthsSet.add(bd.substring(0, 7)); }
+      } else {
+        r.parcelas.forEach(p => {
+          const pd = (p.date || p.month + '-01').substring(0, 10);
+          if (parseInt(pd.substring(0, 4)) === year) { spend += parseFloat(p.valor || 0); monthsSet.add(pd.substring(0, 7)); }
+        });
+      }
+    });
+    return { spend, months: monthsSet.size };
+  },
+
+  // Ano anterior efetivo: usa o gasto real de (year-1) se existir; senão o valor
+  // manual salvo na meta. Retorna { value, source: 'auto'|'manual'|'none' }.
+  _prevYearEffective(year, meta) {
+    const auto = App._spendForYear(year - 1).spend;
+    if (auto > 0) return { value: auto, source: 'auto' };
+    const manual = App._parseMoney(meta?.prevManual);
+    if (manual > 0) return { value: manual, source: 'manual' };
+    return { value: 0, source: 'none' };
+  },
+
+  // Status da meta a partir de projeção x alvo. green/yellow/red.
+  _metaStatus(projection, target) {
+    if (!target) return { key: 'none', color: '', icon: 'ℹ️', txt: 'Sem meta definida.' };
+    const ratio = projection / target;
+    if (ratio <= 1.0)  return { key: 'ok',   color: 'var(--status-com)', icon: '✅', txt: 'Dentro da meta.' };
+    if (ratio <= 1.10) return { key: 'warn', color: 'var(--orange)',     icon: '⚠️', txt: 'Quase estourando a meta.' };
+    return { key: 'over', color: 'var(--red)', icon: '🚨', txt: 'Meta estourada.' };
+  },
+
+  openMetaModal() {
+    const modal = document.getElementById('meta-modal'); if (!modal) return;
+    const sel = document.getElementById('meta-year');
+    const curYear = new Date().getFullYear();
+    if (sel) {
+      const anos = [];
+      for (let y = curYear + 1; y >= curYear - 4; y--) anos.push(y);
+      sel.innerHTML = anos.map(y => `<option value="${y}"${y === curYear ? ' selected' : ''}>${y}</option>`).join('');
+    }
+    App.onMetaYearChange();
+    App.renderMetaHistorico();
+    modal.classList.remove('hidden');
+  },
+
+  // Lista de consulta: todos os anos com meta configurada, mostrando se bateu
+  // ou não (ano fechado usa gasto real; ano em andamento usa a projeção, igual
+  // ao card do dashboard) + a variação % contra a meta.
+  renderMetaHistorico() {
+    const el = document.getElementById('meta-hist-list'); if (!el) return;
+    const years = Object.keys(State.metas || {}).map(Number).sort((a, b) => b - a);
+    if (!years.length) {
+      el.innerHTML = '<div class="mgmt-empty" style="padding:10px 0">Nenhuma meta configurada ainda.</div>';
+      return;
+    }
+    const fmtR = v => 'R$ ' + (parseFloat(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const curYear = new Date().getFullYear();
+    el.innerHTML = years.map(year => {
+      const meta = State.metas[year];
+      const prevEff = App._prevYearEffective(year, meta);
+      const target = prevEff.value * (1 - (meta.reductionPct || 0) / 100);
+      const cur = App._spendForYear(year);
+      const real = cur.spend;
+      const isCur = year === curYear;
+      const comparador = isCur ? (real / Math.max(cur.months, 1)) * 12 : real; // projeção se em andamento, real se ano fechado
+
+      if (target <= 0) {
+        return `<div class="meta-hist-row">
+          <div class="meta-hist-year">${year}${isCur ? ' <span class="meta-hist-cur-tag">atual</span>' : ''}</div>
+          <div class="meta-hist-mid"><div class="meta-hist-vals">Sem meta válida configurada</div></div>
+        </div>`;
+      }
+      const st = App._metaStatus(comparador, target);
+      const label = isCur
+        ? (st.key === 'ok' ? 'No caminho certo' : st.key === 'warn' ? 'Quase estourando' : 'Estourando')
+        : (st.key === 'ok' ? 'Bateu a meta' : 'Não bateu a meta');
+      const variacao = (real - target) / target * 100;
+      return `<div class="meta-hist-row">
+        <div class="meta-hist-year">${year}${isCur ? ' <span class="meta-hist-cur-tag">atual</span>' : ''}</div>
+        <div class="meta-hist-mid">
+          <div class="meta-hist-vals">Meta ${fmtR(target)} · Gasto ${fmtR(real)}</div>
+          <div class="meta-hist-var" style="color:${variacao > 0 ? '#c23a3a' : '#159666'}">${variacao > 0 ? '+' : ''}${variacao.toFixed(1)}% vs meta</div>
+        </div>
+        <span class="meta-hist-badge meta-st-${st.key}">${st.icon} ${label}</span>
+      </div>`;
+    }).join('');
+  },
+
+  onMetaYearChange() {
+    const year = parseInt(document.getElementById('meta-year')?.value) || new Date().getFullYear();
+    const meta = State.metas?.[year] || null;
+    const fmtR = v => (parseFloat(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const prevLbl = document.getElementById('meta-prev-year-lbl');
+    const curLbl  = document.getElementById('meta-cur-year-lbl');
+    if (prevLbl) prevLbl.textContent = year - 1;
+    if (curLbl)  curLbl.textContent  = year;
+
+    const prevEff = App._prevYearEffective(year, meta);
+    const prevInput = document.getElementById('meta-prev-val');
+    const prevSrc = document.getElementById('meta-prev-src');
+    const prevHint = document.getElementById('meta-prev-hint');
+    if (prevInput) {
+      prevInput.value = prevEff.value ? 'R$ ' + fmtR(prevEff.value) : '';
+      // Se o valor vem automático dos dados, trava a edição; se não há dados, libera pra digitar.
+      prevInput.readOnly = prevEff.source === 'auto';
+      prevInput.classList.toggle('is-locked', prevEff.source === 'auto');
+    }
+    if (prevSrc) prevSrc.textContent = prevEff.source === 'auto' ? 'automático (dados do sistema)' : (prevEff.source === 'manual' ? 'informado manualmente' : '');
+    if (prevHint) prevHint.textContent = prevEff.source === 'auto'
+      ? `Puxado das solicitações compradas de ${year - 1}.`
+      : `Sem dados de ${year - 1} no sistema — informe quanto foi gasto naquele ano.`;
+
+    const redInput = document.getElementById('meta-reduction');
+    if (redInput) redInput.value = meta?.reductionPct != null ? meta.reductionPct : '';
+
+    const clearBtn = document.getElementById('meta-clear-btn');
+    if (clearBtn) clearBtn.style.display = meta ? '' : 'none';
+
+    App.recalcMetaPreview();
+  },
+
+  recalcMetaPreview() {
+    const year = parseInt(document.getElementById('meta-year')?.value) || new Date().getFullYear();
+    const fmtR = v => 'R$ ' + (parseFloat(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const prevInputEl = document.getElementById('meta-prev-val');
+    const prevVal = App._parseMoney(prevInputEl?.value);
+    const redPct  = parseFloat(document.getElementById('meta-reduction')?.value) || 0;
+    const target  = prevVal * (1 - redPct / 100);
+
+    const cur = App._spendForYear(year);
+    const perMonth = target / 12;
+    const monthsElapsed = Math.max(cur.months, 1);
+    const projection = (cur.spend / monthsElapsed) * 12;
+
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('meta-cur-val', fmtR(cur.spend));
+    set('meta-target-val', target > 0 ? fmtR(target) : '—');
+    set('meta-permonth-val', target > 0 ? fmtR(perMonth) : '—');
+
+    const box = document.getElementById('meta-status-box');
+    if (box) {
+      if (target <= 0) {
+        box.className = 'meta-status-box';
+        box.innerHTML = 'Informe o ano anterior e a % de redução para calcular a meta.';
+      } else {
+        const st = App._metaStatus(projection, target);
+        box.className = 'meta-status-box meta-st-' + st.key;
+        box.innerHTML = `<span>${st.icon}</span> <span>${st.txt} Projeção anual ${fmtR(projection)}.</span>`;
+      }
+    }
+  },
+
+  saveMeta() {
+    const year = parseInt(document.getElementById('meta-year')?.value);
+    if (!year) return;
+    const prevInputEl = document.getElementById('meta-prev-val');
+    const prevEff = App._prevYearEffective(year, null);
+    const redPct = parseFloat(document.getElementById('meta-reduction')?.value);
+    if (isNaN(redPct) || redPct < 0) { toast('Informe a % de redução da meta.', 'error'); return; }
+    // Só grava prevManual quando não há dado automático (senão o auto sempre manda).
+    const prevManual = prevEff.source === 'auto' ? null : App._parseMoney(prevInputEl?.value);
+    if (prevEff.source !== 'auto' && (!prevManual || prevManual <= 0)) { toast('Informe o gasto do ano anterior.', 'error'); return; }
+
+    DB.set('metas/' + year, {
+      prevManual: prevManual,
+      reductionPct: redPct,
+      savedAt: new Date().toISOString(),
+      savedBy: State.adminUser || null
+    }).then(() => {
+      App._logActivity('Configurações', 'Definiu meta de gastos', `Ano ${year} · redução ${redPct}%`);
+      toast('Meta salva.');
+      document.getElementById('meta-modal').classList.add('hidden');
+      App.updateCompareCard();
+      App.renderMetaHistorico();
+    }).catch(() => toast('Erro ao salvar meta.', 'error'));
+  },
+
+  clearMeta() {
+    const year = parseInt(document.getElementById('meta-year')?.value);
+    if (!year) return;
+    DB.remove('metas/' + year).then(() => {
+      App._logActivity('Configurações', 'Removeu meta de gastos', `Ano ${year}`);
+      toast('Meta removida.');
+      document.getElementById('meta-modal').classList.add('hidden');
+      App.updateCompareCard();
+      App.renderMetaHistorico();
+    }).catch(() => toast('Erro ao remover meta.', 'error'));
+  },
+
+  // Quantidade efetivamente comprada de uma solicitação: usa a quantidade confirmada
+  // na compra (quantidade); r.qty (só existe em pilha/bateria, definido na solicitação
+  // original) é usado como fallback só se a compra não tiver quantidade registrada.
+  // Tinta "Kit 4 cores": cada kit comprado = 4 unidades (1 de cada cor), não 1.
+  _qtyComprada(r) {
+    const q = parseFloat(r.quantidade) || parseInt(r.qty) || 1;
+    const cor = (r.cor || r.cores || '').toLowerCase();
+    if (cor.includes('kit') && cor.includes('4')) return q * 4;
+    return q;
+  },
+
+  // Cor fixa da barra no card de Tintas: segue a cor real da tinta (não o
+  // rank/índice) — azul→azul, amarela→amarela, vermelha→vermelha, preta→preta,
+  // Kit 4 cores→roxo. Nome fora dessa lista cai no palette padrão por índice.
+  _inkColor(name, i) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('kit') && n.includes('4')) return '#7c52d4';
+    if (n.includes('azul'))     return '#2a68d4';
+    if (n.includes('amarel'))   return '#d9a520';
+    if (n.includes('vermelh'))  return '#d94040';
+    if (n.includes('pret'))     return '#1f2937';
+    const fallback = ['#d9a520', '#2a68d4', '#1db87a', '#e8830a', '#7c52d4', '#d94040'];
+    return fallback[i % fallback.length];
+  },
+
+  // Nome padrão (Title Case) de uma cor de tinta — solicitações feitas em
+  // épocas diferentes (ou com a sub-opção reconfigurada) podem ter salvo
+  // "azul" numa e "Azul" noutra; sem isso viram 2 baldes diferentes no
+  // gráfico "Por cor". Nome fora do padrão conhecido (Preta/Azul/Amarela/
+  // Vermelha) mantém como veio, sem inventar nada.
+  _inkCanonColor(name) {
+    const n = (name || '').trim();
+    const low = n.toLowerCase();
+    if (low.startsWith('preta'))    return 'Preta';
+    if (low.startsWith('azul'))     return 'Azul';
+    if (low.startsWith('amarela'))  return 'Amarela';
+    if (low.startsWith('vermelha')) return 'Vermelha';
+    return n;
+  },
+
+  // Calcula tudo que os cards de consumo mostram (extraído do render pra poder
+  // ser reusado também no popup de auditoria — mesmos números nos dois lugares,
+  // sem duplicar a lógica). Não muda nenhuma conta, só separa cálculo de DOM.
+  _consumoStats(kind, keywords, cfg) {
+    const period    = App.consPeriod[kind] || 'year';
+    const baseYear  = App.consYear[kind]  || null;
+    const baseMonth = App.consMonth[kind] || null;
+    const baseWeek  = App.consWeek[kind]  || null;
+
+    // Respeita filtro de unidade do dashboard (não o de data, pois usamos janela própria)
+    const fUnit = document.getElementById('dash-filter-unit')?.value || '';
+
+    // Todos os pedidos Comprados do tipo (cfg.exclude=true → "Outros": tudo que NÃO bate com as keywords)
+    const matches = Object.values(State.requests || {}).filter(r => {
+      const g = (r.groupName || '').toLowerCase();
+      if (r.status !== 'Comprado') return false;
+      if (fUnit && r.unitName !== fUnit) return false;
+      const hit = keywords.some(k => g.includes(k));
+      return cfg.exclude ? !hit : hit;
+    });
+
+    const win  = App._periodWindow(period, 0, baseYear, baseMonth, baseWeek);
+    const prev = App._periodWindow(period, 1, baseYear, baseMonth, baseWeek);
+
+    const inCur  = matches.filter(r => { const d = App._purchaseDate(r); return d && d >= win.from  && d <= win.to;  });
+    const inPrev = matches.filter(r => { const d = App._purchaseDate(r); return d && d >= prev.from && d <= prev.to; });
+
+    const qty = list => list.reduce((s, r) => s + App._qtyComprada(r), 0);
+
+    const curCount  = qty(inCur);
+    const prevCount = qty(inPrev);
+    const curSpent  = App._spentInWindow(inCur,  win.from,  win.to);
+    const prevSpent = App._spentInWindow(inPrev, prev.from, prev.to);
+
+    // Top item (cor/modelo) no período atual. Conserto às vezes só tem o
+    // equipamento marcado (sem "modelo" propriamente) ou nem isso — nesse caso
+    // cai pro subgrupo (ex: "Impressora"), pra não sumir da métrica.
+    const topMap = {};
+    inCur.forEach(r => {
+      // Tinta "Kit 4 cores": conta 1 kit no balde "Kit 4 cores" (nº de kits
+      // comprados, sem o ×4) E soma +1×kits em CADA cor (Preta/Azul/Amarela/
+      // Vermelha), já que cada kit físico traz 1 de cada — assim dá pra ver
+      // tanto "quantos kits" quanto "quanto de cada cor entrou, direto ou via kit".
+      if (kind === 'ink') {
+        const cor = (r.cor || r.cores || '').toLowerCase();
+        if (cor.includes('kit') && cor.includes('4')) {
+          const nKits = parseFloat(r.quantidade) || parseInt(r.qty) || 1;
+          topMap['Kit 4 cores'] = (topMap['Kit 4 cores'] || 0) + nKits;
+          ['Preta', 'Azul', 'Amarela', 'Vermelha'].forEach(c => { topMap[c] = (topMap[c] || 0) + nKits; });
+          return;
+        }
+      }
+      // r.produto: entradas feitas direto pela aba Estoque (Nova Compra/Entrada
+      // em vez de Solicitação) salvam o item escolhido nesse campo, não em
+      // "modelo" — mas quando o grupo tem Sub-opções cadastradas (Tinta/Pilha),
+      // o <select> de produto da tela de Estoque É o mesmo cadastro (mesma
+      // fonte, State.subOpts), então é um modelo cadastrado de verdade, só
+      // guardado com outro nome de campo por ter vindo de outra tela.
+      // Fallback pro equipamento/subgrupo é só do Conserto (às vezes só tem o
+      // equipamento marcado, sem "modelo" — cai pro subgrupo, ex. "Impressora").
+      let key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || r.produto || '').toString();
+      if (!key && kind === 'concerto') key = (r.equipamento || r.subgrupo || '').toString();
+      if (!key) return;
+      // Normaliza maiúscula/minúscula da cor da tinta — solicitações antigas
+      // (ou sub-opção reconfigurada em outro momento) podem ter guardado
+      // "azul" em vez de "Azul", virando um balde duplicado no gráfico.
+      if (kind === 'ink') key = App._inkCanonColor(key);
+      topMap[key] = (topMap[key] || 0) + App._qtyComprada(r);
+    });
+    let topSorted = Object.entries(topMap).sort((a, b) => b[1] - a[1]);
+    const top = topSorted[0];
+    // "Kit 4 cores" sempre por último no gráfico/lista, separado das cores —
+    // é informativo (mostra quantos kits foram comprados), não compete no
+    // ranking de cor mais pedida (as 4 cores já foram somadas com o valor dele).
+    if (kind === 'ink') {
+      const kitIdx = topSorted.findIndex(([name]) => name === 'Kit 4 cores');
+      if (kitIdx > -1) topSorted.push(topSorted.splice(kitIdx, 1)[0]);
+    }
+
+    // Unidade que mais comprou — mesma base das demais métricas (compradas na janela),
+    // contando pela QUANTIDADE comprada (não por nº de solicitações).
+    const unitMap = {};
+    inCur.forEach(r => {
+      const u = r.unitName || '?';
+      unitMap[u] = (unitMap[u] || 0) + App._qtyComprada(r);
+    });
+    const topUnit = Object.entries(unitMap).sort((a, b) => b[1] - a[1])[0];
+
+    // Maior Solicitante — UNIDADE que mais SOLICITOU, não a que mais comprou:
+    // conta QUALQUER status (Negado/Aguardando/Comprado/Estoque/Solicitado), já
+    // que "solicitou" independe de ter virado compra ou ter sido negado depois.
+    // Por isso usa uma lista à parte (matchesAll), sem o filtro status==='Comprado'
+    // que "matches"/inCur têm — as outras métricas do card continuam só com Comprado.
+    const matchesAll = Object.values(State.requests || {}).filter(r => {
+      const g = (r.groupName || '').toLowerCase();
+      if (fUnit && r.unitName !== fUnit) return false;
+      const hit = keywords.some(k => g.includes(k));
+      return cfg.exclude ? !hit : hit;
+    });
+    const inCurAllStatus = matchesAll.filter(r => { const d = App._purchaseDate(r); return d && d >= win.from && d <= win.to; });
+    const solicitanteMap = {};
+    inCurAllStatus.forEach(r => {
+      const u = (r.unitName || '').trim();
+      if (!u) return;
+      solicitanteMap[u] = (solicitanteMap[u] || 0) + 1;
+    });
+    const topSolicitante = Object.entries(solicitanteMap).sort((a, b) => b[1] - a[1])[0];
+
+    // Tendência (variação de quantidade vs período anterior)
+    let trend = null;
+    {
+      let diffPct, cls, arrow, word;
+      if (prevCount === 0) {
+        diffPct = curCount > 0 ? 100 : 0;
+        cls = curCount > 0 ? 'up' : 'flat';
+        arrow = curCount > 0 ? '▲' : '–';
+        word = curCount > 0 ? 'aumento' : 'estável';
+      } else {
+        diffPct = Math.round((curCount - prevCount) / prevCount * 100);
+        cls = diffPct > 0 ? 'up' : diffPct < 0 ? 'down' : 'flat';
+        arrow = diffPct > 0 ? '▲' : diffPct < 0 ? '▼' : '–';
+        word = diffPct > 0 ? 'aumento' : diffPct < 0 ? 'queda' : 'estável';
+      }
+      const lbl = { week: 'vs semana ant.', month: 'vs mês ant.', year: 'vs ano ant.' }[period];
+      trend = { diffPct, cls, arrow, word, txt: `${arrow} ${Math.abs(diffPct)}% ${word} ${lbl}` };
+    }
+
+    return { period, win, prev, curCount, prevCount, curSpent, prevSpent, topSorted, top, topUnit, topSolicitante, trend };
+  },
+
+  _renderConsumo(kind, keywords, cfg) {
+    const fmt = v => 'R$ ' + (v||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const s = App._consumoStats(kind, keywords, cfg);
+
+    // Preenche DOM
+    const setTxt = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    setTxt(`${kind}-count`, s.curCount);
+    setTxt(`${kind}-spent`, fmt(s.curSpent));
+    setTxt(`${kind}-prev`,  `${s.prevCount} · ${fmt(s.prevSpent)}`);
+    setTxt(`${kind}-prev-lbl`, `Anterior (${App._fmtPeriodLabel(s.period, s.prev)})`);
+    setTxt(cfg.topLabel, s.top ? `${s.top[0]} (${s.top[1]})` : '—');
+    setTxt(`${kind}-top-unit`, s.topUnit ? `${s.topUnit[0]} (${s.topUnit[1]})` : '—');
+    setTxt(`${kind}-top-solicitante`, s.topSolicitante ? `${s.topSolicitante[0]} (${s.topSolicitante[1]})` : '—');
+
+    const trendEl = document.getElementById(`${kind}-trend`);
+    if (trendEl) {
+      trendEl.className = `consumo-trend trend-${s.trend.cls}`;
+      trendEl.textContent = s.trend.txt;
+    }
+
+    // Breakdown (lista de cores/modelos)
+    const bd = document.getElementById(`${kind}-breakdown`);
+    if (bd) {
+      if (!s.topSorted.length) {
+        bd.innerHTML = `<div class="consumo-bd-empty">Nenhuma compra no período</div>`;
+      } else {
+        const shown = s.topSorted.slice(0, 6);
+        const total = s.topSorted.reduce((sum, [, n]) => sum + n, 0) || 1;
+        const palette = ['#d9a520', '#2a68d4', '#1db87a', '#e8830a', '#7c52d4', '#d94040'];
+        bd.innerHTML = `<div class="consumo-bd-title">${cfg.breakdownTitle}</div>` +
+          shown.map(([name, n], i) => {
+            const pct = Math.round(n / total * 100);
+            const w = Math.max(pct, 14); // largura mínima p/ o texto caber
+            // Tinta: cor da barra segue a cor real (azul/amarelo/vermelho/preto),
+            // e "Kit 4 cores" fica roxo — em vez do índice de rank genérico.
+            const color = kind === 'ink' ? App._inkColor(name, i) : palette[i % palette.length];
+            return `
+            <div class="consumo-bd2-row">
+              <div class="consumo-bd2-label" title="${name}">${name}</div>
+              <div class="consumo-bd2-bar">
+                <div class="consumo-bd2-fill" style="width:${w}%;background:${color}">
+                  <span>${n} · ${pct}%</span>
+                </div>
+              </div>
+            </div>`;
+          }).join('');
+      }
+    }
+  },
+
+  // Popula o select de ano com os anos presentes nos dados + ano atual
+  // Na primeira carga (sem datas definidas), aplica o ano atual automaticamente
+  populateYearFilter() {
+    const sel = document.getElementById('dash-year-select');
+    if (!sel) return;
+    const curYear = new Date().getFullYear().toString();
+    const years = new Set([curYear]);
+    Object.values(State.requests || {}).forEach(r => {
+      const y = (r.boughtAt || r.createdAt || '').substring(0, 4);
+      if (/^\d{4}$/.test(y)) years.add(y);
+    });
+    const prevVal = sel.value; // guarda seleção atual antes de recriar
+    sel.innerHTML = '<option value="">Todos os anos</option>';
+    [...years].sort().reverse().forEach(y => {
+      const o = document.createElement('option');
+      o.value = o.textContent = y;
+      sel.appendChild(o);
+    });
+    if (prevVal) {
+      sel.value = prevVal; // restaura seleção
+    } else {
+      const fFrom = document.getElementById('filter-date-from');
+      if (!fFrom?.value) {
+        // Primeira carga: padrão = ano atual
+        sel.value = curYear;
+        App.applyYearToDateInputs(curYear);
+      }
+    }
+  },
+
+  applyYearToDateInputs(year) {
+    const fFrom = document.getElementById('filter-date-from');
+    const fTo   = document.getElementById('filter-date-to');
+    if (year) {
+      if (fFrom) fFrom.value = year + '-01-01';
+      if (fTo)   fTo.value   = year + '-12-31';
+    } else {
+      if (fFrom) fFrom.value = '';
+      if (fTo)   fTo.value   = '';
+    }
+  },
+
+  onYearFilterChange(sel) {
+    App.applyYearToDateInputs(sel.value);
+    App.renderDashboard();
+  },
+
+  clearYearSelect() {
+    const sel = document.getElementById('dash-year-select');
+    if (sel) sel.value = '';
+  },
+
+  updateCompareCard() {
+    const curYear  = new Date().getFullYear();
+    const prevYear = curYear - 1;
+    const fmt = v => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const $   = id => document.getElementById(id);
+
+    const curData  = App._spendForYear(curYear);
+    const curSpend = curData.spend;
+
+    // Meta configurada para o ano atual (se houver)
+    const meta = State.metas?.[curYear] || null;
+    const prevEff = App._prevYearEffective(curYear, meta);
+    const metaTarget = meta ? prevEff.value * (1 - (meta.reductionPct || 0) / 100) : 0;
+
+    // Gasto do ano anterior: usa dado real do sistema quando existir; se não
+    // existir, cai no valor manual informado ao configurar a meta (mesma regra
+    // usada no cálculo da meta, pra o comparativo não ficar zerado à toa).
+    const prevSpend = prevEff.value;
+
+    const monthsElapsed = Math.max(curData.months, 1);
+    const avgMonth      = curSpend / monthsElapsed;
+    const projection    = avgMonth * 12;
+    const max           = Math.max(curSpend, prevSpend, 1);
+    const diffPct       = prevSpend > 0 ? ((curSpend - prevSpend) / prevSpend * 100) : null;
+
+    if ($('cmp-cur-year'))   $('cmp-cur-year').textContent   = curYear;
+    if ($('cmp-prev-year'))  $('cmp-prev-year').textContent  = prevYear;
+    if ($('cmp-cur-val'))    $('cmp-cur-val').textContent    = fmt(curSpend);
+    if ($('cmp-prev-val'))   $('cmp-prev-val').textContent   = fmt(prevSpend);
+    if ($('cmp-cur-bar'))    $('cmp-cur-bar').style.width    = (curSpend  / max * 100).toFixed(1) + '%';
+    if ($('cmp-prev-bar'))   $('cmp-prev-bar').style.width   = (prevSpend / max * 100).toFixed(1) + '%';
+
+    // Badge tendência (YoY: atual vs anterior)
+    const badge = $('compare-trend-badge');
+    if (badge) {
+      if (diffPct === null)      { badge.textContent = '';          badge.className = 'compare-trend-badge'; }
+      else if (diffPct >  10)    { badge.textContent = '↑ Acima';  badge.className = 'compare-trend-badge trend-up'; }
+      else if (diffPct < -10)    { badge.textContent = '↓ Abaixo'; badge.className = 'compare-trend-badge trend-down'; }
+      else                       { badge.textContent = '≈ Estável'; badge.className = 'compare-trend-badge trend-stable'; }
+    }
+
+    // ── Indicador único: usa a meta configurada como referência; sem meta,
+    // usa o gasto do ano anterior — o velocímetro e a tag sempre têm algo pra
+    // mostrar, e a lógica de cor (verde/amarelo/vermelho) fica num só lugar.
+    const hasMeta   = meta && metaTarget > 0;
+    const refTarget = hasMeta ? metaTarget : prevSpend;
+    const hasRef    = refTarget > 0;
+    const st        = hasRef ? App._metaStatus(projection, refTarget) : { key: 'none', color: '', icon: 'ℹ️' };
+    const ratio     = hasRef ? Math.min(curSpend / refTarget, 1) : 0;
+
+    App._drawCmpGauge(ratio, st.key);
+
+    const pctEl = $('cmp-gauge-pct');
+    if (pctEl) pctEl.textContent = hasRef ? Math.round(curSpend / refTarget * 100) + '%' : '—';
+    const gaugeLblEl = $('cmp-gauge-lbl');
+    if (gaugeLblEl) gaugeLblEl.textContent = hasMeta ? 'da meta' : 'do ano anterior';
+
+    const tagEl     = $('cmp-status-tag');
+    const tagTxtEl  = $('cmp-status-tag-txt');
+    const iconEl    = $('cmp-status-icon');
+    const metricsEl = $('cmp-status-metrics');
+    if (!tagEl) return;
+
+    if (iconEl) iconEl.textContent = st.icon;
+    tagEl.className = 'cmp-status-tag cmp-status-tag--' + st.key;
+    if (tagTxtEl) tagTxtEl.textContent = !hasRef
+      ? 'Sem dados para comparar'
+      : st.key === 'ok'   ? (hasMeta ? 'Dentro da meta' : 'Abaixo do ano anterior')
+      : st.key === 'warn' ? 'Quase estourando'
+      :                      (hasMeta ? 'Meta estourada' : 'Acima do ano anterior');
+
+    const metric = (lbl, val, cls) => `<div class="cmp-status-metric"><span class="cmp-status-metric-lbl">${lbl}</span><strong class="${cls||''}">${val}</strong></div>`;
+    if (metricsEl) {
+      if (!hasRef) {
+        metricsEl.innerHTML = `<div class="cmp-status-metric-full">Sem histórico de ${prevYear} para comparar. Defina uma meta.</div>`;
+      } else {
+        const deltaLbl = st.key === 'ok' ? (hasMeta ? 'Folga' : 'Folga vs ' + prevYear) : (hasMeta ? 'Excedente' : 'Excedente vs ' + prevYear);
+        const deltaVal = fmt(Math.abs(refTarget - projection));
+        metricsEl.innerHTML = metric('Projeção', fmt(projection))
+          + metric('Média/mês', fmt(avgMonth))
+          + metric(deltaLbl, deltaVal, st.key === 'ok' ? 'cmp-status-good' : 'cmp-status-bad');
+      }
+    }
+  },
+
+  // Velocímetro (donut quase-completo) do card Comparativo: fatia de progresso
+  // (ratio 0-1) colorida pelo status da meta + trilho cinza pro restante.
+  _drawCmpGauge(ratio, statusKey) {
+    const canvas = document.getElementById('chart-cmp-gauge'); if (!canvas) return;
+    App._destroyChart('chart-cmp-gauge');
+    const colors = { ok: '#1db87a', warn: '#e8830a', over: '#d94040', none: '#c8d4e8' };
+    const color = colors[statusKey] || colors.none;
+    State.charts['chart-cmp-gauge'] = new Chart(canvas, {
+      type: 'doughnut',
+      data: { datasets: [{ data: [ratio, 1 - ratio], backgroundColor: [color, '#eef2f8'], borderWidth: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '76%',
+        rotation: -90, circumference: 360,
+        animation: { duration: 600 },
+        plugins: { legend: { display: false }, tooltip: { enabled: false } }
+      }
+    });
+  },
+
+  // Read all active dashboard filters (unit, group, date range)
+  _getKpiFilters() {
+    return {
+      fUnit:  document.getElementById('dash-filter-unit')?.value  || '',
+      fGroup: document.getElementById('dash-filter-group')?.value || '',
+      fFrom:  document.getElementById('filter-date-from')?.value  || '',
+      fTo:    document.getElementById('filter-date-to')?.value    || '',
+    };
+  },
+
+  _applyKpiFilters(reqs, filters) {
+    const { fUnit, fGroup, fFrom, fTo } = filters;
+    return reqs.filter(r => {
+      if (fUnit  && r.unitName  !== fUnit)  return false;
+      if (fGroup && r.groupName !== fGroup) return false;
+      if (fFrom || fTo) {
+        const ds = (r.createdAt||'').substring(0,10);
+        if (fFrom && ds < fFrom) return false;
+        if (fTo   && ds > fTo)   return false;
+      }
+      return true;
+    });
+  },
+
+  _fmtDate(iso) {
+    if (!iso) return '—';
+    const [y,m,d] = iso.substring(0,10).split('-');
+    return `${d}/${m}/${y}`;
+  },
+
+  showTotalKpi() {
+    const modal = document.getElementById('kpi-list-modal');
+    const title = document.getElementById('kpi-list-title');
+    const tbody = document.getElementById('kpi-list-tbody');
+    const thead = document.getElementById('kpi-list-thead');
+    const filters = App._getKpiFilters();
+    const { fUnit, fGroup, fFrom, fTo } = filters;
+
+    let reqs = App._applyKpiFilters(Object.values(State.requests||{}), filters);
+
+    // Count by unit
+    const byUnit = {};
+    reqs.forEach(r=>{ byUnit[r.unitName||'?']=(byUnit[r.unitName||'?']||0)+1; });
+    const sorted = Object.entries(byUnit).sort((a,b)=>b[1]-a[1]);
+
+    const rangeStr = (fFrom||fTo) ? ` · ${App._fmtDate(fFrom)} → ${App._fmtDate(fTo)}` : '';
+    const filterDesc = [fUnit||'Todas as unidades', fGroup||'Todos os grupos'].join(' · ') + rangeStr;
+    title.textContent = `Total Solicitado — ${filterDesc}`;
+
+    // Este modal é compartilhado com showKpiList('Comprado') — a barra de
+    // filtro interna (calendário + grupo/subgrupo) é só de lá, então some aqui.
+    const toolbarTK = document.getElementById('kpi-list-toolbar');
+    const totalBoxTK = document.getElementById('kpi-list-total-box');
+    if (toolbarTK) toolbarTK.style.display = 'none';
+    if (totalBoxTK) totalBoxTK.style.display = 'none';
+
+    if (thead) thead.innerHTML = `<tr><th>Unidade</th><th>Total de Solicitações</th><th>% do Total</th></tr>`;
+    tbody.innerHTML = '';
+    const grandTotal = reqs.length || 1;
+    if (!sorted.length) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#8898b8;padding:20px">Nenhuma solicitação.</td></tr>';
+    } else {
+      sorted.forEach(([unit, count], i) => {
+        const pct = Math.round(count/grandTotal*100);
+        const bar = `<div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:8px;background:#e8eef8;border-radius:4px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:#1a5bbf;border-radius:4px"></div>
+          </div>
+          <span style="font-size:.75rem;color:#6680a0;min-width:32px">${pct}%</span>
+        </div>`;
+        tbody.innerHTML += `<tr>
+          <td style="font-weight:600">${i===0?'🏆 ':''}${unit}</td>
+          <td style="font-size:1.1rem;font-weight:700;color:#1a3a6b">${count}</td>
+          <td style="min-width:140px">${bar}</td>
+        </tr>`;
+      });
+      // Total row
+      tbody.innerHTML += `<tr style="border-top:2px solid #d4dff0">
+        <td style="font-weight:700">Total Geral</td>
+        <td style="font-size:1.1rem;font-weight:700;color:#1a3a6b">${grandTotal}</td>
+        <td>100%</td>
+      </tr>`;
+    }
+    modal.classList.remove('hidden');
+  },
+
+  /* ── Extrato de Compras (estilo extrato de banco) ─────────── */
+  _extratoPeriodo: 'tudo',
+
+  showExtrato() {
+    App._extratoPeriodo = 'tudo';
+    document.querySelectorAll('.extrato-per-btn').forEach(b => b.classList.toggle('active', b.dataset.per === 'tudo'));
+    App._showExtratoPicker('tudo');
+    App._renderExtrato();
+    document.getElementById('extrato-modal').classList.remove('hidden');
+  },
+
+  setExtratoPeriodo(per, btn) {
+    App._extratoPeriodo = per;
+    document.querySelectorAll('.extrato-per-btn').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+    App._showExtratoPicker(per);
+    App._renderExtrato();
+  },
+
+  // Mostra só o seletor do período escolhido (Ano/Mês/Semana/Dia) e, na primeira vez,
+  // pré-preenche com o período atual (hoje) — mas o usuário pode trocar livremente.
+  _showExtratoPicker(per) {
+    const hoje = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const hojeStr = `${hoje.getFullYear()}-${pad(hoje.getMonth()+1)}-${pad(hoje.getDate())}`;
+    const selAno     = document.getElementById('extrato-ano-select');
+    const inpMes     = document.getElementById('extrato-mes-input');
+    const wrapSemana = document.getElementById('extrato-semana-wrap');
+    const inpSemana  = document.getElementById('extrato-semana-input');
+    const wrapDia    = document.getElementById('extrato-dia-wrap');
+    const inpDia     = document.getElementById('extrato-dia-input');
+    [selAno, inpMes, wrapSemana, wrapDia].forEach(el => { if (el) el.style.display = 'none'; });
+
+    if (per === 'ano') {
+      App._populateExtratoAnos();
+      if (selAno) { selAno.style.display = ''; if (!selAno.value) selAno.value = String(hoje.getFullYear()); }
+    } else if (per === 'mes') {
+      if (inpMes) { inpMes.style.display = ''; if (!inpMes.value) inpMes.value = hojeStr.substring(0, 7); }
+    } else if (per === 'semana') {
+      if (wrapSemana) {
+        wrapSemana.style.display = '';
+        if (inpSemana && !inpSemana.value) {
+          const ini = new Date(hoje); ini.setDate(hoje.getDate() - 6);
+          inpSemana.value = `${ini.getFullYear()}-${pad(ini.getMonth()+1)}-${pad(ini.getDate())}`;
+        }
+        App._updateExtratoSemanaRange();
+      }
+    } else if (per === 'dia') {
+      if (wrapDia) { wrapDia.style.display = ''; if (inpDia && !inpDia.value) inpDia.value = hojeStr; }
+    }
+  },
+
+  // Semana: usuário escolhe 1 dia no calendário nativo do input; calcula e mostra
+  // a janela de 7 dias a partir dele (mesma janela usada pelo filtro).
+  _updateExtratoSemanaRange() {
+    const inp = document.getElementById('extrato-semana-input');
+    const out = document.getElementById('extrato-semana-range');
+    if (!inp || !out) return;
+    if (!inp.value) { out.textContent = ''; return; }
+    const fmtD = d => { const p = n => String(n).padStart(2,'0'); return `${p(d.getDate())}/${p(d.getMonth()+1)}`; };
+    const ini = new Date(inp.value + 'T00:00:00');
+    const fim = new Date(ini); fim.setDate(ini.getDate() + 6);
+    out.textContent = `${fmtD(ini)} → ${fmtD(fim)}`;
+  },
+
+  _onExtratoSemanaChange() {
+    App._updateExtratoSemanaRange();
+    App._renderExtrato();
+  },
+
+  // Dia: seta anterior/próximo — sempre parte do dia atualmente escolhido (padrão: hoje).
+  extratoDiaMover(delta) {
+    const inp = document.getElementById('extrato-dia-input'); if (!inp) return;
+    const base = inp.value ? new Date(inp.value + 'T00:00:00') : new Date();
+    base.setDate(base.getDate() + delta);
+    const pad = n => String(n).padStart(2, '0');
+    inp.value = `${base.getFullYear()}-${pad(base.getMonth()+1)}-${pad(base.getDate())}`;
+    App._renderExtrato();
+  },
+
+  // Popula o select de anos do Extrato com os anos que têm compra + ano atual, preservando a seleção
+  _populateExtratoAnos() {
+    const sel = document.getElementById('extrato-ano-select'); if (!sel) return;
+    const prevVal = sel.value;
+    const anos = new Set([new Date().getFullYear()]);
+    App._extratoEventos().forEach(e => { const y = (e.data||'').substring(0,4); if (/^\d{4}$/.test(y)) anos.add(parseInt(y)); });
+    sel.innerHTML = '';
+    [...anos].sort((a,b)=>b-a).forEach(y => { const o = document.createElement('option'); o.value = o.textContent = y; sel.appendChild(o); });
+    if (prevVal && [...anos].map(String).includes(prevVal)) sel.value = prevVal;
+  },
+
+  // Monta os lançamentos: compra à vista (combinada = 1 linha por CMP; avulsa = SL)
+  // data na data da compra. Compra PARCELADA: 1 linha por parcela, datada no
+  // vencimento dela (mesma lógica do gráfico "Gastos por Período") — assim o
+  // extrato filtrado por mês bate com o que o gráfico mostra pra aquele mês,
+  // em vez de jogar o valor inteiro no mês da compra original.
+  // Ordenadas por data, com saldo corrente antes/depois (acumulado de gastos).
+  _extratoEventos() {
+    const cmpMap = {};       // à vista combinada: 1 linha por compraCodigo
+    const cmpParcMap = {};   // parcelada combinada: 1 linha por compraCodigo + nº da parcela
+    const eventos = [];
+    Object.values(State.requests || {}).filter(r => r.status === 'Comprado' && !r.entradaSemCusto).forEach(r => {
+      const isParceled = r.parcelas && r.parcelas.length > 0;
+
+      if (isParceled) {
+        r.parcelas.forEach(p => {
+          const dt = (p.date || (p.month ? p.month + '-01' : '')).substring(0, 10);
+          const v  = parseFloat(p.valor || 0);
+          if (r.compraCodigo) {
+            const chave = `${r.compraCodigo}#${p.num}`;
+            if (!cmpParcMap[chave]) {
+              cmpParcMap[chave] = { codigo: `${r.compraCodigo} (${p.num}/${p.total})`, data: dt, valor: 0, itens: 0 };
+              eventos.push(cmpParcMap[chave]);
+            }
+            cmpParcMap[chave].valor += v; cmpParcMap[chave].itens++;
+          } else {
+            eventos.push({ codigo: `${r.seq != null ? 'SL-' + r.seq : '—'} (${p.num}/${p.total})`, data: dt, valor: v, itens: 1 });
+          }
+        });
+        return;
+      }
+
+      const v = parseFloat(r.valorTotal || 0);
+      const dt = (r.boughtAt || '').substring(0, 10);
+      if (r.compraCodigo) {
+        if (!cmpMap[r.compraCodigo]) {
+          cmpMap[r.compraCodigo] = { codigo: r.compraCodigo, data: dt, valor: 0, itens: 0 };
+          eventos.push(cmpMap[r.compraCodigo]);
+        }
+        const e = cmpMap[r.compraCodigo];
+        e.valor += v; e.itens++;
+        if (dt && (!e.data || dt < e.data)) e.data = dt;   // data mais antiga do grupo
+      } else {
+        eventos.push({ codigo: r.seq != null ? 'SL-' + r.seq : '—', data: dt, valor: v, itens: 1 });
+      }
+    });
+    eventos.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+    let saldo = 0;
+    eventos.forEach(e => { e.antes = saldo; saldo += e.valor; e.depois = saldo; });
+    return eventos;
+  },
+
+  _extratoNoPeriodo(dataStr) {
+    if (App._extratoPeriodo === 'tudo' || !dataStr) return true;
+    const d = new Date(dataStr + 'T00:00:00');
+
+    if (App._extratoPeriodo === 'ano') {
+      const v = document.getElementById('extrato-ano-select')?.value;
+      if (!v) return true;
+      return d.getFullYear() === parseInt(v);
+    }
+    if (App._extratoPeriodo === 'mes') {
+      const v = document.getElementById('extrato-mes-input')?.value; // "AAAA-MM"
+      if (!v) return true;
+      const [y, m] = v.split('-').map(Number);
+      return d.getFullYear() === y && (d.getMonth() + 1) === m;
+    }
+    if (App._extratoPeriodo === 'semana') {
+      const v = document.getElementById('extrato-semana-input')?.value; // início da janela de 7 dias
+      if (!v) return true;
+      const ini = new Date(v + 'T00:00:00');
+      const fim = new Date(ini); fim.setDate(ini.getDate() + 6);
+      return d >= ini && d <= fim;
+    }
+    if (App._extratoPeriodo === 'dia') {
+      const v = document.getElementById('extrato-dia-input')?.value;
+      if (!v) return true;
+      return dataStr === v;
+    }
+    return true;
+  },
+
+  _renderExtrato() {
+    const tbody = document.getElementById('extrato-tbody'); if (!tbody) return;
+    const fmt = v => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtD = s => { if (!s) return '—'; const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; };
+    const todos = App._extratoEventos();
+    const evs = todos.filter(e => App._extratoNoPeriodo(e.data));
+
+    const resumo = document.getElementById('extrato-resumo');
+    const gastoPeriodo = evs.reduce((s, e) => s + e.valor, 0);
+    if (resumo) resumo.innerHTML = `<span>${evs.length} lançamento${evs.length!==1?'s':''} no período</span><span>Total gasto: <strong>${fmt(gastoPeriodo)}</strong></span>`;
+
+    if (!evs.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8898b8;padding:24px">Nenhuma compra no período.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = evs.map(e => {
+      const isCmp = e.codigo.startsWith('CMP');
+      return `<tr>
+        <td>${fmtD(e.data)}</td>
+        <td><span class="extrato-cod ${isCmp ? 'cod-cmp' : 'cod-sl'}">${e.codigo}</span>${e.itens > 1 ? ` <span class="extrato-itens">${e.itens} itens</span>` : ''}</td>
+        <td style="font-weight:700;color:#d94040">− ${fmt(e.valor)}</td>
+        <td style="color:#8898b8">${fmt(e.antes)}</td>
+        <td style="font-weight:700;color:#1a3a6b">${fmt(e.depois)}</td>
+      </tr>`;
+    }).join('');
+  },
+
+  // Filtro interno do pop-up (calendário + grupo/subgrupo) — só existe pra 'Comprado'.
+  _kpiListStatus: null,
+  _kpiListInternal: { periodo: 'todos', grupo: '', subgrupo: '' },
+
+  showKpiList(status) {
+    App._kpiListStatus = status;
+    App._kpiListInternal = { periodo: 'todos', grupo: '', subgrupo: '' };
+    const toolbar = document.getElementById('kpi-list-toolbar');
+    const totalBox = document.getElementById('kpi-list-total-box');
+    const isComprado = status === 'Comprado';
+    if (toolbar)  toolbar.style.display  = isComprado ? '' : 'none';
+    if (totalBox) totalBox.style.display = 'none';
+    if (isComprado) {
+      document.querySelectorAll('.kpi-list-per-btn').forEach(b => b.classList.toggle('active', b.dataset.per === 'todos'));
+      App._showKpiListPicker('todos');
+      App._populateKpiListGrupos();
+      App._populateKpiListSubgrupos('');
+    }
+    App._renderKpiList();
+    document.getElementById('kpi-list-modal').classList.remove('hidden');
+  },
+
+  // Ano/Mês/Dia do filtro interno — mesmo padrão do Extrato, sem a opção Semana (não pedida aqui).
+  _showKpiListPicker(per) {
+    const hoje = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const hojeStr = `${hoje.getFullYear()}-${pad(hoje.getMonth()+1)}-${pad(hoje.getDate())}`;
+    const selAno = document.getElementById('kpi-list-ano-select');
+    const inpMes = document.getElementById('kpi-list-mes-input');
+    const inpDia = document.getElementById('kpi-list-dia-input');
+    [selAno, inpMes, inpDia].forEach(el => { if (el) el.style.display = 'none'; });
+    if (per === 'ano') {
+      App._populateKpiListAnos();
+      if (selAno) { selAno.style.display = ''; if (!selAno.value) selAno.value = String(hoje.getFullYear()); }
+    } else if (per === 'mes') {
+      if (inpMes) { inpMes.style.display = ''; if (!inpMes.value) inpMes.value = hojeStr.substring(0, 7); }
+    } else if (per === 'dia') {
+      if (inpDia) { inpDia.style.display = ''; if (!inpDia.value) inpDia.value = hojeStr; }
+    }
+  },
+
+  _populateKpiListAnos() {
+    const sel = document.getElementById('kpi-list-ano-select'); if (!sel) return;
+    const prevVal = sel.value;
+    const anos = new Set([new Date().getFullYear()]);
+    Object.values(State.requests||{}).forEach(r => { const y=(r.createdAt||'').substring(0,4); if (/^\d{4}$/.test(y)) anos.add(parseInt(y)); });
+    sel.innerHTML = '';
+    [...anos].sort((a,b)=>b-a).forEach(y => { const o=document.createElement('option'); o.value=o.textContent=y; sel.appendChild(o); });
+    if (prevVal && [...anos].map(String).includes(prevVal)) sel.value = prevVal;
+  },
+
+  setKpiListPeriodo(per, btn) {
+    App._kpiListInternal.periodo = per;
+    document.querySelectorAll('.kpi-list-per-btn').forEach(b => b.classList.remove('active'));
+    btn?.classList.add('active');
+    App._showKpiListPicker(per);
+    App._renderKpiList();
+  },
+
+  _populateKpiListGrupos() {
+    const sel = document.getElementById('kpi-list-grupo-select'); if (!sel) return;
+    const prevVal = sel.value;
+    sel.innerHTML = '<option value="">Grupo: Todos</option>';
+    Object.values(State.groups||{}).forEach(n => { const o=document.createElement('option'); o.value=o.textContent=n; sel.appendChild(o); });
+    if (prevVal) sel.value = prevVal;
+  },
+
+  _onKpiListGrupoChange() {
+    const gname = document.getElementById('kpi-list-grupo-select')?.value || '';
+    App._kpiListInternal.grupo = gname;
+    App._kpiListInternal.subgrupo = '';
+    App._populateKpiListSubgrupos(gname);
+    App._renderKpiList();
+  },
+
+  // Subgrupo depende do Grupo escolhido (lista cadastrada em State.subgroups[gid],
+  // ex.: Tinta → Originais/Genéricas, Conserto → Impressora...).
+  _populateKpiListSubgrupos(gname) {
+    const sel = document.getElementById('kpi-list-subgrupo-select'); if (!sel) return;
+    sel.innerHTML = '<option value="">Subgrupo: Todos</option>';
+    const gid = Object.entries(State.groups||{}).find(([,n]) => n === gname)?.[0];
+    const list = gid ? (State.subgroups?.[gid] || []) : [];
+    list.forEach(sg => { const o=document.createElement('option'); o.value=o.textContent=sg; sel.appendChild(o); });
+  },
+
+  onKpiListSubgrupoChange() {
+    App._kpiListInternal.subgrupo = document.getElementById('kpi-list-subgrupo-select')?.value || '';
+    App._renderKpiList();
+  },
+
+  // Aplica o filtro interno do pop-up (calendário + grupo/subgrupo) em cima do
+  // que já passou pelo filtro do dashboard (_applyKpiFilters).
+  _applyKpiListInternalFilters(reqs) {
+    const st = App._kpiListInternal || {};
+    return reqs.filter(r => {
+      if (st.grupo && r.groupName !== st.grupo) return false;
+      if (st.subgrupo && r.subgrupo !== st.subgrupo) return false;
+      if (st.periodo && st.periodo !== 'todos') {
+        const ds = (r.createdAt||'').substring(0,10);
+        if (!ds) return false;
+        if (st.periodo === 'ano') {
+          const v = document.getElementById('kpi-list-ano-select')?.value;
+          if (v && ds.substring(0,4) !== v) return false;
+        } else if (st.periodo === 'mes') {
+          const v = document.getElementById('kpi-list-mes-input')?.value;
+          if (v && ds.substring(0,7) !== v) return false;
+        } else if (st.periodo === 'dia') {
+          const v = document.getElementById('kpi-list-dia-input')?.value;
+          if (v && ds !== v) return false;
+        }
+      }
+      return true;
+    });
+  },
+
+  _renderKpiList() {
+    const status = App._kpiListStatus;
+    const modal = document.getElementById('kpi-list-modal');
+    const title = document.getElementById('kpi-list-title');
+    const tbody = document.getElementById('kpi-list-tbody');
+    const thead = document.getElementById('kpi-list-thead');
+    const totalBox = document.getElementById('kpi-list-total-box');
+    const filters = App._getKpiFilters();
+    const { fUnit, fGroup, fFrom, fTo } = filters;
+    const fmt = v => v ? 'R$ '+parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+
+    let reqs = App._applyKpiFilters(
+      Object.values(State.requests||{}).filter(r=>r.status===status),
+      filters
+    );
+
+    const isComprado = status === 'Comprado';
+    if (isComprado) reqs = App._applyKpiListInternalFilters(reqs);
+
+    reqs.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+
+    const rangeStr = (fFrom||fTo) ? ` · ${App._fmtDate(fFrom)} → ${App._fmtDate(fTo)}` : '';
+    let filterDesc = [fUnit||'Todas as unidades', fGroup||'Todos os grupos'].join(' · ') + rangeStr;
+    if (isComprado) {
+      const st = App._kpiListInternal;
+      const extra = [];
+      if (st.grupo) extra.push(st.grupo);
+      if (st.subgrupo) extra.push(st.subgrupo);
+      if (st.periodo === 'ano') { const v = document.getElementById('kpi-list-ano-select')?.value; if (v) extra.push(v); }
+      if (st.periodo === 'mes') { const v = document.getElementById('kpi-list-mes-input')?.value; if (v) { const [y,m]=v.split('-'); extra.push(`${m}/${y}`); } }
+      if (st.periodo === 'dia') { const v = document.getElementById('kpi-list-dia-input')?.value; if (v) extra.push(App._fmtDate(v)); }
+      if (extra.length) filterDesc += ' · ' + extra.join(' · ');
+    }
+    title.textContent = `${status} — ${filterDesc} (${reqs.length})`;
+
+    tbody.innerHTML = '';
+
+    if (status === 'Comprado') {
+      // Full columns for Comprado
+      if (thead) thead.innerHTML = `<tr>
+        <th>Data</th><th>Unidade</th><th>Grupo</th><th>Subgrupo</th>
+        <th>Resumo</th><th>Fornecedor</th><th>Status</th><th>Valor</th>
+      </tr>`;
+      if (!reqs.length) {
+        tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#8898b8;padding:20px">Nenhum pedido encontrado.</td></tr>';
+      } else {
+        reqs.forEach(r=>{
+          const d   = App._fmtDate(r.createdAt);
+          const val = r.parcelas?.length
+            ? `${fmt(r.valorTotal)} <span style="font-size:.72rem;color:#7c52d4">(${r.parcelas.length}×${fmt(r.parcelas[0]?.valor)})</span>`
+            : fmt(r.valorTotal);
+          tbody.innerHTML+=`<tr>
+            <td>${d}</td>
+            <td>${r.unitName||'—'}</td>
+            <td>${r.groupName||'—'}</td>
+            <td>${r.subgrupo||'—'}</td>
+            <td>${App.reqSummary(r)}</td>
+            <td>${r.fornecedor||'—'}</td>
+            <td>${App.statusBadge(r.status)}</td>
+            <td style="font-weight:600;color:#059669">${val}</td>
+          </tr>`;
+        });
+      }
+    } else {
+      // Simplified columns for Negado and others
+      if (thead) thead.innerHTML = `<tr>
+        <th>Data</th><th>Unidade</th><th>Grupo</th><th>Subgrupo</th><th>Status</th>
+      </tr>`;
+      if (!reqs.length) {
+        tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:#8898b8;padding:20px">Nenhum pedido encontrado.</td></tr>';
+      } else {
+        reqs.forEach(r=>{
+          const d=App._fmtDate(r.createdAt);
+          tbody.innerHTML+=`<tr>
+            <td>${d}</td>
+            <td>${r.unitName||'—'}</td>
+            <td>${r.groupName||'—'}</td>
+            <td>${r.subgrupo||'—'}</td>
+            <td>${App.statusBadge(r.status)}</td>
+          </tr>`;
+        });
+      }
+    }
+
+    // Caixa azul com o total (qtd + R$) referente ao filtro aplicado — só
+    // aparece quando algum filtro interno (calendário/grupo/subgrupo) está ativo.
+    if (isComprado && totalBox) {
+      const st = App._kpiListInternal;
+      const hasFilter = (st.periodo && st.periodo !== 'todos') || st.grupo || st.subgrupo;
+      if (hasFilter) {
+        const totalQtd = reqs.reduce((s,r) => s + App._qtyComprada(r), 0);
+        const totalVal = reqs.reduce((s,r) => s + (parseFloat(r.valorTotal)||0), 0);
+        totalBox.style.display = '';
+        totalBox.innerHTML = `
+          <div><span class="klt-label">Referente à pesquisa</span><div class="klt-qty">${totalQtd} ite${totalQtd===1?'m':'ns'} comprado${totalQtd===1?'':'s'}</div></div>
+          <div class="klt-val">${fmt(totalVal)}</div>`;
+      } else {
+        totalBox.style.display = 'none';
+      }
+    }
+
+    modal.classList.remove('hidden');
+  },
+
+  onSupplierSelChange() {
+    const sel = document.getElementById('modal-supplier-sel');
+    const inp = document.getElementById('modal-supplier');
+    if (sel.value==='__manual__') {
+      inp.style.display=''; inp.focus();
+    } else {
+      inp.style.display='none'; inp.value=sel.value;
+    }
+  },
+
+  updateKPIs(reqs) {
+    const fmt  = v => 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const fUnit = document.getElementById('dash-filter-unit')?.value || '';
+    const fFrom = document.getElementById('filter-date-from')?.value || '';
+    const fTo   = document.getElementById('filter-date-to')?.value   || '';
+
+    // Gasto do Período:
+    // - à vista:   valorTotal se boughtAt está no range (ou se não há range)
+    // - parcelada: soma somente as parcelas cujo p.date está no range
+    let periodSpent = 0;
+    const byUnitSpend = {};
+
+    // All Comprado requests filtered by unit/group (date filter applied below on boughtAt/p.date)
+    const _ku = fUnit;
+    const _kg = document.getElementById('dash-filter-group')?.value || '';
+    Object.values(State.requests||{})
+      .filter(r => r.status === 'Comprado' && !r.entradaSemCusto   // Nova entrada (sem custo) não é gasto
+        && (!_ku || r.unitName  === _ku)
+        && (!_kg || r.groupName === _kg))
+      .forEach(r => {
+      const unit = r.unitName||'?';
+      const isParceled = r.parcelas && r.parcelas.length > 0;
+
+      if (!isParceled) {
+        const bd = (r.boughtAt||'').substring(0,10);
+        if ((!fFrom || bd >= fFrom) && (!fTo || bd <= fTo)) {
+          const v = parseFloat(r.valorTotal||0);
+          periodSpent += v;
+          byUnitSpend[unit] = (byUnitSpend[unit]||0) + v;
+        }
+      } else {
+        // Only sum parcelas whose date falls within the range
+        r.parcelas.forEach(p => {
+          const pd = (p.date || p.month+'-01').substring(0,10);
+          if ((!fFrom || pd >= fFrom) && (!fTo || pd <= fTo)) {
+            const v = parseFloat(p.valor||0);
+            periodSpent += v;
+            byUnitSpend[unit] = (byUnitSpend[unit]||0) + v;
+          }
+        });
+      }
+    });
+
+    // Sub-label: top unit or selected unit spend
+    const topUnit = Object.entries(byUnitSpend).sort((a,b)=>b[1]-a[1])[0];
+    const unitBreakdown = fUnit && byUnitSpend[fUnit]
+      ? ` · ${fUnit}: ${fmt(byUnitSpend[fUnit])}`
+      : topUnit ? ` · Top: ${topUnit[0]}` : '';
+
+    // Card minimalista: sem o intervalo de datas no sub-rótulo
+    const sub = document.getElementById('kpi-period-sub');
+    if (sub) sub.textContent = '';
+
+    document.getElementById('kpi-total').textContent = reqs.length;
+    document.getElementById('kpi-negado').textContent = reqs.filter(r=>r.status==='Negado').length;
+    document.getElementById('kpi-bought').textContent = reqs.filter(r=>r.status==='Comprado').length;
+    document.getElementById('kpi-month-spent').textContent = fmt(periodSpent);
+    // Só informativo: atendidos com item do estoque, sem compra nova
+    const elEst = document.getElementById('kpi-estoque');
+    if (elEst) elEst.textContent = reqs.filter(r=>r.status==='Estoque').length;
+    // Só informativo: ainda em aprovação/decisão
+    const elAg = document.getElementById('kpi-aguardando');
+    if (elAg) elAg.textContent = reqs.filter(r=>r.status==='Aguardando').length;
+  },
+
+  // Helper: convert a date string to a grouping key for a given periodView
+  _dateToKey(dateStr, periodView) {
+    if (!dateStr || dateStr.length < 7) return null;
+    const full = dateStr.length >= 10 ? dateStr : dateStr+'-01';
+    const d = new Date(full+'T00:00:00');
+    if (periodView==='day')   return full.substring(0,10);
+    if (periodView==='week')  return `Sem ${App._weekNumber(d)}/${d.getFullYear()}`;
+    if (periodView==='year')  return full.substring(0,4);
+    return full.substring(0,7); // month or 'all'
+  },
+
+  updateCharts(reqs) {
+    const palette = ['#3a7ee8','#1db87a','#e8830a','#7c52d4','#00b8a2','#d94040','#e879b0','#f7c84a'];
+    const chartDefs = { responsive:true, plugins:{ legend:{ display:false } } };
+
+    // Units bar — cada unidade com uma cor distinta (hues espaçados por ângulo áureo), ordenado por mais pedidos
+    const unitCRaw = {}; reqs.forEach(r => unitCRaw[r.unitName||'?']=(unitCRaw[r.unitName||'?']||0)+1);
+    const unitC = Object.fromEntries(Object.entries(unitCRaw).sort((a,b)=>b[1]-a[1]));
+    const topUnit = Object.entries(unitC)[0];
+    const topBadge = document.getElementById('chart-units-top');
+    if (topBadge && topUnit) topBadge.textContent = `🏆 ${topUnit[0]}`;
+    App._drawBar('chart-units', unitC, App._distinctColors(Object.keys(unitC).length));
+
+    // Groups bar — ordenado por mais pedidos, com cor distinta por grupo (não fica limitado a 4 cores)
+    // Unifica grafias antigas de Conserto/Concerto num único grupo (App._displayGroupName)
+    const grpCRaw = {}; reqs.forEach(r => { const g = App._displayGroupName(r.groupName); grpCRaw[g]=(grpCRaw[g]||0)+1; });
+    const grpC = Object.fromEntries(Object.entries(grpCRaw).sort((a,b)=>b[1]-a[1]));
+    App._drawBar('chart-groups', grpC, App._distinctColors(Object.keys(grpC).length));
+
+    // Sub-opts bar — combine num+cor as one key for tinta, multi-model for batteries
+    const subC = {};
+    // Filter by selected group if any
+    const fGrpDash = document.getElementById('dash-filter-group')?.value || '';
+    reqs.forEach(r => {
+      const rn = (r.groupName||'').toLowerCase();
+      if (fGrpDash && r.groupName !== fGrpDash) return;
+      // Conta por SOLICITAÇÃO (1 por pedido), não pela quantidade dentro dele —
+      // pedir 50 tintas pretas numa solicitação só soma 1 pra "Preta", não 50.
+      // O objetivo aqui é o quanto cada sub-opção/subgrupo é PEDIDO, não o volume.
+      if (rn.includes('tinta')) {
+        // New format: single num + single cor combined
+        const num = r.num || (r.nums && !r.nums.includes(',') ? r.nums : '');
+        const cor = r.cor || (r.cores && !r.cores.includes(',') ? r.cores : '');
+        if (num && cor) { const k=`${num} ${cor}`; subC[k]=(subC[k]||0)+1; }
+        else if (num)   { subC[num]=(subC[num]||0)+1; }
+        else if (cor)   { subC[cor]=(subC[cor]||0)+1; }
+        // Legacy multi
+        if (r.nums && r.nums.includes(',')) r.nums.split(',').forEach(s=>{const v=s.trim();if(v)subC[v]=(subC[v]||0)+1;});
+        if (r.cores && r.cores.includes(',')) r.cores.split(',').forEach(s=>{const v=s.trim();if(v)subC[v]=(subC[v]||0)+1;});
+      } else if (rn.includes('pilha')||rn.includes('bateria')) {
+        if (r.batModels) r.batModels.forEach(b=>{ subC[b.modelo]=(subC[b.modelo]||0)+1; });
+        else if (r.modelo) subC[r.modelo]=(subC[r.modelo]||0)+1;
+      } else if (App._isConserto(r.groupName)) {
+        // Conserto conta pela sub-opção (equipamento/modelo), igual tinta/pilha — não pelo subgrupo
+        const eq = r.equipamento || r.batModel || r.modelo || '';
+        if (eq) subC[eq] = (subC[eq]||0) + 1;
+      } else {
+        // Outros: mostra subgrupo, não o texto livre do produto
+        const sg = r.subgrupo || '';
+        if (sg) subC[sg] = (subC[sg]||0) + 1;
+        // Se não tem subgrupo, não contabiliza (evita poluição com textos livres)
+      }
+    });
+    App._renderSuboptsHeat(subC);
+
+    // Status — Funnel chart
+    const stC = { Solicitado:0, Aguardando:0, Comprado:0, Estoque:0, Negado:0 };
+    reqs.forEach(r => { if(stC[r.status]!==undefined) stC[r.status]++; });
+
+    const fUnitDash  = document.getElementById('dash-filter-unit')?.value  || '';
+    const fGroupDash = document.getElementById('dash-filter-group')?.value || '';
+    const ctx = [fGroupDash||'Todos os grupos', fUnitDash||'Todas as unidades'].join(' · ');
+    const statusCardTitle = document.getElementById('status-card-title');
+    if (statusCardTitle) statusCardTitle.textContent = `Status — ${ctx}`;
+
+    const stColors  = ['#3a7ee8','#e8830a','#1db87a','#7c52d4','#d94040'];
+    App._drawDoughnut('chart-status', stC, stColors);
+    App._renderStatusLegend('status-legend', stC, stColors);
+    // Gastos por Período — auto-selects grouping based on date range
+    const _fFrom = document.getElementById('filter-date-from')?.value || '';
+    const _fTo   = document.getElementById('filter-date-to')?.value   || '';
+    const _fUnit = document.getElementById('dash-filter-unit')?.value || '';
+
+    // Decide grouping: day if range ≤ 31 days, else month
+    let _periodView = 'month';
+    let _chartTitle = 'Gastos por Mês (R$)';
+    if (_fFrom && _fTo) {
+      const diffDays = (new Date(_fTo+'T00:00:00') - new Date(_fFrom+'T00:00:00')) / 86400000;
+      if (diffDays <= 31) {
+        _periodView = 'day';
+        _chartTitle = 'Gastos por Dia (R$)';
+      }
+    }
+
+    // Filter requests by unit AND group
+    const _fGroup = document.getElementById('dash-filter-group')?.value || '';
+    const _spendReqs = Object.values(State.requests||{}).filter(r => {
+      if (_fUnit  && r.unitName  !== _fUnit)  return false;
+      if (_fGroup && r.groupName !== _fGroup) return false;
+      return true;
+    });
+
+    const monthly = App._buildSpendMap(_spendReqs, _periodView, null, _fFrom, _fTo);
+
+    // Update chart title dynamically
+    const _chartTitleEl = document.querySelector('.spending-card .chart-card-header span');
+    if (_chartTitleEl) _chartTitleEl.textContent = _chartTitle;
+
+    App._drawLine('chart-monthly', monthly, '#3a7ee8');
+
+    // Unit spending list — respects unit filter + date range
+    const fFromU  = document.getElementById('filter-date-from')?.value  || '';
+    const fToU    = document.getElementById('filter-date-to')?.value    || '';
+    const fUnitU  = document.getElementById('dash-filter-unit')?.value  || '';
+    const fGroupU = document.getElementById('dash-filter-group')?.value || '';
+    const unitSpend     = {};
+    const unitDirect    = {};
+    const unitParcelado = {};   // soma das parcelas no período (não lista parcela a parcela)
+
+    Object.values(State.requests||{}).filter(r => {
+      if (r.status !== 'Comprado' || !r.boughtAt) return false;
+      if (fUnitU  && r.unitName  !== fUnitU)  return false;
+      if (fGroupU && r.groupName !== fGroupU) return false;
+      return true;
+    }).forEach(r => {
+      const unit = r.unitName || '?';
+      const isParceled = r.parcelas && r.parcelas.length > 0;
+      if (!isParceled) {
+        const bd = (r.boughtAt||'').substring(0,10);
+        if ((!fFromU || bd >= fFromU) && (!fToU || bd <= fToU)) {
+          const v = parseFloat(r.valorTotal||0);
+          unitSpend[unit]  = (unitSpend[unit]||0)  + v;
+          unitDirect[unit] = (unitDirect[unit]||0) + v;
+        }
+      } else {
+        r.parcelas.forEach(p => {
+          const pd = (p.date || p.month+'-01').substring(0,10);
+          if ((!fFromU || pd >= fFromU) && (!fToU || pd <= fToU)) {
+            const v = parseFloat(p.valor||0);
+            unitSpend[unit]     = (unitSpend[unit]||0) + v;
+            unitParcelado[unit] = (unitParcelado[unit]||0) + v;
+          }
+        });
+      }
+    });
+
+    const sorted = Object.entries(unitSpend).sort((a,b)=>b[1]-a[1]);
+    const maxVal = sorted[0]?.[1] || 1;
+    const fmt = v => 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const spendEl = document.getElementById('unit-spending-list');
+    if (spendEl) {
+      if (!sorted.length) {
+        spendEl.innerHTML = '<div style="color:#8898b8;font-size:.82rem;padding:8px">Nenhum gasto registrado.</div>';
+      } else {
+        spendEl.innerHTML = '<div style="font-size:.7rem;color:#8898b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">Gastos por Unidade</div>';
+        // Preenche a altura do card e ROLA quando passar (min-height:0 deixa o flex encolher p/ scroll)
+        const scrollWrap = document.createElement('div');
+        scrollWrap.style.cssText = 'flex:1 1 0;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:3px;padding-right:2px';
+        sorted.forEach(([name, val], i) => {
+          const pct     = Math.round(val / maxVal * 100);
+          const parcVal = unitParcelado[name] || 0;
+          const dirVal  = unitDirect[name] || 0;
+          let parcInfoHtml = '';
+          if (parcVal > 0 || dirVal > 0) {
+            const parcTag = parcVal > 0
+              ? `<span style="font-size:.7rem;color:#7c52d4;background:#f0ebfc;border:1px solid #ede9fe;border-radius:4px;padding:2px 8px;font-weight:600">📦 Parcelado: ${fmt(parcVal)}</span>`
+              : '';
+            const dirTag = dirVal > 0
+              ? `<span style="font-size:.7rem;color:#059669;background:#f0fdf8;border:1px solid #d1fae5;border-radius:4px;padding:2px 8px;font-weight:600">✓ Direto: ${fmt(dirVal)}</span>`
+              : '';
+            parcInfoHtml = `<div style="display:flex;align-items:center;gap:5px;margin-top:4px;flex-wrap:wrap">${parcTag}${dirTag}</div>`;
+          }
+          const parcInfo = parcInfoHtml;
+          const item = document.createElement('div');
+          item.className = 'unit-spend-item';
+          item.style.cssText = 'flex-direction:column;align-items:stretch;gap:2px;padding:5px 10px';
+          item.innerHTML = `
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="unit-spend-rank ${i===0?'top':''}">${i+1}</div>
+              <div class="unit-spend-name" style="flex:1">${name}</div>
+              <div class="unit-spend-val">${fmt(val)}</div>
+            </div>
+
+            <div style="padding-left:28px">
+              <div class="unit-spend-bar-wrap" style="width:100%;margin-bottom:2px">
+                <div class="unit-spend-bar" style="width:${pct}%"></div>
+              </div>
+              ${parcInfo}
+            </div>`;
+          scrollWrap.appendChild(item);
+        });
+        spendEl.appendChild(scrollWrap);
+      }
+    }
+  },
+
+  _weekNumber(d) { const s=new Date(d.getFullYear(),0,1); return Math.ceil(((d-s)/86400000+s.getDay()+1)/7); },
+
+  /* Build a map of { periodKey → totalSpent } respecting parcelamento.
+   * Parcelada + day/week/month: only the installment(s) that fall in that period.
+   * Parcelada + year/all:       all installments in that year / overall.
+   * À vista:                    valorTotal in the boughtAt period.
+   * unitMap (optional): also accumulate { unit → spent } for the same logic. */
+  _buildSpendMap(reqs, periodView, unitMap, fFrom, fTo) {
+    const map = {};
+    const add = (key, val, unit) => {
+      map[key] = (map[key]||0) + val;
+      if (unitMap && unit) unitMap[unit] = (unitMap[unit]||0) + val;
+    };
+
+    const keyOf = (dateStr) => App._dateToKey(dateStr, periodView);
+
+    // Only include dates within the selected range (when range is active)
+    const inRange = (d) => {
+      if (!fFrom && !fTo) return true;
+      const s = (d||'').substring(0,10);
+      if (fFrom && s < fFrom) return false;
+      if (fTo   && s > fTo)   return false;
+      return true;
+    };
+
+    reqs.filter(r=>r.status==='Comprado'&&r.boughtAt).forEach(r => {
+      const isParceled = r.parcelas && r.parcelas.length > 0;
+      const unit = r.unitName||'?';
+
+      if (!isParceled) {
+        if (!inRange(r.boughtAt)) return; // fora do período selecionado
+        const k = keyOf(r.boughtAt);
+        if (k) add(k, parseFloat(r.valorTotal||0), unit);
+      } else {
+        r.parcelas.forEach(p => {
+          const pDate = p.date || (p.month + '-01');
+          if (!inRange(pDate)) return; // parcela fora do período
+
+          if (periodView==='year' || periodView==='all') {
+            const k = periodView==='year' ? pDate.substring(0,4) : pDate.substring(0,7);
+            if (k) add(k, parseFloat(p.valor||0), unit);
+          } else {
+            const k = keyOf(pDate);
+            if (k) add(k, parseFloat(p.valor||0), unit);
+          }
+        });
+      }
+    });
+    return map;
+  },
+  _destroyChart(id) { if (State.charts[id]) { State.charts[id].destroy(); delete State.charts[id]; } },
+
+  _drawBar(id, data, colors) {
+    const canvas = document.getElementById(id); if (!canvas) return;
+    App._destroyChart(id);
+    const labels = Object.keys(data), vals = Object.values(data);
+    State.charts[id] = new Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ data: vals, backgroundColor: labels.map((_,i) => colors[i%colors.length]), borderColor: labels.map((_,i) => colors[i%colors.length]), borderWidth: 1.5, borderRadius: 6 }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#6680a0', font: { size: 11 } }, grid: { color: '#e2e8f0' } }, y: { ticks: { color: '#6680a0', font: { size: 11 } }, grid: { color: '#e2e8f0' }, beginAtZero: true } } }
+    });
+  },
+
+  // N cores visualmente distintas (ângulo áureo espalha os matizes, sem repetir tom)
+  _distinctColors(n) {
+    return Array.from({ length: Math.max(1, n) }, (_, i) =>
+      `hsl(${Math.round((i * 137.508) % 360)}, 66%, 55%)`);
+  },
+
+  // Cor "termômetro": ratio 1 (mais pedido) → quente (vermelho/laranja); ratio 0 → frio (azul)
+  // (usada no ranking/popup "Ver todas as sub-opções" — não no gráfico de pizza)
+  _heatColor(ratio) {
+    const hue = Math.round(212 - Math.max(0, Math.min(1, ratio)) * 212); // 212=azul … 0=vermelho
+    return `hsl(${hue}, 82%, 52%)`;
+  },
+
+  // N cores discretas e mais sóbrias (mesmo espaçamento por ângulo áureo de
+  // _distinctColors, só que com menos saturação/brilho) — usada no gráfico de
+  // pizza de Sub-opções, que pedia um visual menos vibrante/mais "padrão".
+  _mutedColors(n) {
+    return Array.from({ length: Math.max(1, n) }, (_, i) =>
+      `hsl(${Math.round((i * 137.508) % 360)}, 28%, 56%)`);
+  },
+
+  // Gastos por Grupo de Produto — barra horizontal (estilo fluxo de caixa).
+  // Mesma fonte de dinheiro que o card "Gastos por Período" (status Comprado,
+  // à vista por boughtAt / parcelada por p.date, somando dentro do intervalo de
+  // datas escolhido), só que agrupado por grupo de produto em vez de por data.
+  // Não respeita o filtro de Grupo do popover — o gráfico existe justamente pra
+  // comparar os grupos entre si — mas respeita Unidade e o intervalo de datas,
+  // igual ao "Gastos por Período".
+  _renderGroupSpendChart() {
+    const canvas = document.getElementById('chart-groupspend'); if (!canvas) return;
+    const fFrom = document.getElementById('filter-date-from')?.value || '';
+    const fTo   = document.getElementById('filter-date-to')?.value   || '';
+    const fUnit = document.getElementById('dash-filter-unit')?.value || '';
+    const inRange = (d) => {
+      if (!fFrom && !fTo) return true;
+      const s = (d || '').substring(0, 10);
+      if (fFrom && s < fFrom) return false;
+      if (fTo   && s > fTo)   return false;
+      return true;
+    };
+
+    const byGroup = {};
+    Object.values(State.requests || {})
+      .filter(r => r.status === 'Comprado' && r.boughtAt)
+      .forEach(r => {
+        if (fUnit && r.unitName !== fUnit) return;
+        const g = App._displayGroupName(r.groupName);
+        const isParceled = r.parcelas && r.parcelas.length > 0;
+        if (!isParceled) {
+          if (!inRange(r.boughtAt)) return;
+          byGroup[g] = (byGroup[g] || 0) + (parseFloat(r.valorTotal) || 0);
+        } else {
+          r.parcelas.forEach(p => {
+            const pDate = p.date || (p.month + '-01');
+            if (!inRange(pDate)) return;
+            byGroup[g] = (byGroup[g] || 0) + (parseFloat(p.valor) || 0);
+          });
+        }
+      });
+
+    const entries = Object.entries(byGroup).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const fmt = v => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const badge = document.getElementById('groupspend-total');
+    if (badge) badge.textContent = entries.length ? fmt(entries.reduce((s, [, v]) => s + v, 0)) : '';
+
+    App._destroyChart('chart-groupspend');
+    if (!entries.length) return;
+
+    const labels = entries.map(([g]) => g);
+    const vals   = entries.map(([, v]) => v);
+    const colors = App._distinctColors(entries.length);
+
+    State.charts['chart-groupspend'] = new Chart(canvas, {
+      type: 'bar',
+      data: { labels, datasets: [{ data: vals, backgroundColor: colors, borderRadius: 6, maxBarThickness: 40 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        // mode:'index'+intersect:false: passa o mouse em qualquer ponto da
+        // coluna daquele grupo já mostra o tooltip — sem isso, grupo com
+        // barra bem baixa (Pilhas/Conserto, gasto pequeno perto de Tinta/
+        // Outros) exige acertar o mouse bem em cima da pontinha da barra.
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmt(c.raw) } } },
+        scales: {
+          x: { ticks: { color: '#1a3050', font: { size: 11, weight: '600' } }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: '#6680a0', font: { size: 10 }, callback: v => 'R$ ' + Number(v).toLocaleString('pt-BR') }, grid: { color: '#eef2f8' } }
+        }
+      }
+    });
+  },
+
+  _suboptsData: [],   // cache do ranking completo (p/ popup "todas")
+
+  // Card "Sub-opções": pizza por quantidade, cor de calor nas fatias visíveis
+  // (quente = mais pedido, fria = menos) — mesma lógica de ranking de antes,
+  // só o formato do gráfico mudou de barra horizontal pra pizza.
+  _renderSuboptsHeat(data) {
+    const canvas = document.getElementById('chart-subopts');
+    const moreLine = document.getElementById('subopts-more-line');
+    if (!canvas) return;
+    const entries = Object.entries(data).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    App._suboptsData = entries;
+    const badge = document.getElementById('subopts-total');
+    if (badge) badge.textContent = entries.length ? `${entries.length} tipos` : '';
+
+    App._destroyChart('chart-subopts');
+    if (!entries.length) {
+      canvas.style.display = 'none';
+      if (moreLine) moreLine.innerHTML = '<div class="subopts-empty">Sem sub-opções no período/filtro.</div>';
+      return;
+    }
+    canvas.style.display = '';
+
+    const TOP = 8;
+    const visiveis = entries.slice(0, TOP);
+    const resto = entries.slice(TOP);
+    const restoTotal = resto.reduce((s, [, v]) => s + v, 0);
+
+    const labels = visiveis.map(([name]) => name);
+    const vals   = visiveis.map(([, v]) => v);
+    const cores  = App._mutedColors(labels.length);
+    // "Outros" agrupa o que passou do TOP 8, pra fatia da pizza não mentir
+    // proporção (sem isso os 8 primeiros pareceriam 100% do total).
+    const temResto = restoTotal > 0;
+    const pieLabels = temResto ? [...labels, 'Outros'] : labels;
+    const pieVals   = temResto ? [...vals, restoTotal]  : vals;
+    const pieCores  = temResto ? [...cores, '#b8c2d1']  : cores;
+
+    State.charts['chart-subopts'] = new Chart(canvas, {
+      type: 'pie',
+      data: { labels: pieLabels, datasets: [{ data: pieVals, backgroundColor: pieCores, borderColor: '#fff', borderWidth: 2 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw} un.` } }
+        }
+      }
+    });
+
+    if (moreLine) {
+      moreLine.innerHTML = entries.length
+        ? `<button class="subopt-vermais" onclick="App.showSuboptsAll()" title="Ver todas as sub-opções">
+             <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+             Ver todas as sub-opções
+             <span class="subopt-vermais-badge">${entries.length}</span>
+           </button>`
+        : '';
+    }
+  },
+
+  // HTML de uma linha (reusado no card e no popup)
+  _suboptRowHtml(name, val, i, max) {
+    const ratio = val / (max || 1);
+    const cor = App._heatColor(ratio);
+    return `
+      <div class="subopt-row" title="${name}: ${val}">
+        <span class="subopt-rank" style="background:${cor}">${i + 1}</span>
+        <div class="subopt-body">
+          <div class="subopt-line">
+            <span class="subopt-name">${name}</span>
+            <span class="subopt-count">${val}</span>
+          </div>
+          <div class="subopt-track">
+            <div class="subopt-fill" style="width:${Math.max(6, Math.round(ratio * 100))}%;background:linear-gradient(90deg, ${App._heatColor(ratio * 0.55)}, ${cor})"></div>
+          </div>
+        </div>
+      </div>`;
+  },
+
+  // Popup: todas as sub-opções (ranking completo, mesmas métricas do card)
+  showSuboptsAll() {
+    const entries = App._suboptsData || [];
+    const body = document.getElementById('subopts-all-body'); if (!body) return;
+    const titulo = document.getElementById('subopts-all-titulo');
+    const total = entries.reduce((s, [, v]) => s + v, 0);
+    if (titulo) titulo.textContent = `Sub-opções — ${entries.length} tipos · ${total} un.`;
+    if (!entries.length) {
+      body.innerHTML = '<div class="subopts-empty">Sem sub-opções no período/filtro.</div>';
+    } else {
+      const max = entries[0][1] || 1;
+      body.innerHTML = `<div class="subopts-heat" style="max-height:none">${
+        entries.map(([name, val], i) => App._suboptRowHtml(name, val, i, max)).join('')
+      }</div>`;
+    }
+    document.getElementById('subopts-all-modal').classList.remove('hidden');
+  },
+
+  // Número total + "TOTAL" centralizado no buraco da rosca — soma só as fatias visíveis
+  // (respeita o toggle de clique na legenda).
+  _doughnutCenterPlugin: {
+    id: 'doughnutCenterText',
+    afterDraw(chart) {
+      if (chart.config.type !== 'doughnut') return;
+      const data = chart.data.datasets[0]?.data || [];
+      let total = 0;
+      data.forEach((v, i) => { if (chart.getDataVisibility(i)) total += (parseFloat(v) || 0); });
+      const { ctx, chartArea } = chart;
+      const cx = (chartArea.left + chartArea.right) / 2;
+      const cy = (chartArea.top + chartArea.bottom) / 2;
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = "700 26px 'Rajdhani', 'Inter', sans-serif";
+      ctx.fillStyle = '#0f1e35';
+      ctx.fillText(total, cx, cy - 9);
+      ctx.font = "700 10px 'Inter', sans-serif";
+      ctx.fillStyle = '#8898b8';
+      ctx.fillText('TOTAL', cx, cy + 12);
+      ctx.restore();
+    }
+  },
+
+  _drawDoughnut(id, data, colors) {
+    const canvas = document.getElementById(id); if (!canvas) return;
+    App._destroyChart(id);
+    State.charts[id] = new Chart(canvas, {
+      type: 'doughnut',
+      data: { labels: Object.keys(data), datasets: [{ data: Object.values(data), backgroundColor: colors.map(c=>c+'bb'), borderColor: colors, borderWidth: 2, hoverOffset: 6 }] },
+      options: { responsive: true, cutout: '68%', plugins: { legend: { display: false } } },
+      plugins: [App._doughnutCenterPlugin]
+    });
+  },
+
+  // Clica na legenda de status → mostra/esconde a fatia correspondente na rosca
+  // (API nativa do Chart.js pra doughnut/pie) e atualiza o total central.
+  toggleStatusSlice(idx, rowEl) {
+    const chart = State.charts['chart-status']; if (!chart) return;
+    chart.toggleDataVisibility(idx);
+    chart.update();
+    rowEl?.classList.toggle('status-leg-off', !chart.getDataVisibility(idx));
+  },
+
+  _drawFunnel(elId, data, colorMap) {
+    const el = document.getElementById(elId); if (!el) return;
+    const order = ['Solicitado','Aguardando','Comprado','Estoque','Negado'];
+    const total = Object.values(data).reduce((a,b)=>a+b,0)||1;
+    const max   = Math.max(...Object.values(data), 1);
+    const minW  = 38; // % mínimo para visibilidade
+    el.innerHTML = order.map((name, i) => {
+      const count = data[name]||0;
+      const pct   = Math.round(count/total*100);
+      const barW  = count > 0 ? Math.max(minW, Math.round(count/max*100)) : minW;
+      const color = colorMap[name];
+      return `
+        <div class="funnel-stage">
+          <div class="funnel-bar" style="width:${barW}%;background:${color}">
+            <span class="funnel-name">${name}</span>
+            <span class="funnel-count">${count}</span>
+          </div>
+          <span class="funnel-pct" style="color:${color}">${pct}%</span>
+        </div>`;
+    }).join('');
+  },
+
+  _drawPie(id, data, colors) {
+    const canvas = document.getElementById(id); if (!canvas) return;
+    App._destroyChart(id);
+    State.charts[id] = new Chart(canvas, {
+      type: 'pie',
+      data: { labels: Object.keys(data), datasets: [{ data: Object.values(data), backgroundColor: colors, borderColor: '#fff', borderWidth: 2, hoverOffset: 8 }] },
+      options: { responsive: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}` } } } }
+    });
+  },
+
+  _renderStatusLegend(elId, data, colors) {
+    const el = document.getElementById(elId); if (!el) return;
+    el.innerHTML = '';
+    Object.entries(data).forEach(([name,count],i) => {
+      const item = document.createElement('div');
+      item.className = 'status-leg-item';
+      item.title = 'Clique pra mostrar/esconder no gráfico';
+      item.onclick = () => App.toggleStatusSlice(i, item);
+      item.innerHTML = `
+        <div class="status-leg-dot" style="background:${colors[i]}"></div>
+        <span class="status-leg-name">${name}</span>
+        <span class="status-leg-count">${count}</span>`;
+      el.appendChild(item);
+    });
+  },
+
+  statusCarouselNav(dir) {
+    const slides = document.querySelectorAll('.sc-slide');
+    const dots   = document.querySelectorAll('.sc-dot');
+    let cur = [...slides].findIndex(s => s.classList.contains('active'));
+    slides[cur].classList.remove('active');
+    dots[cur].classList.remove('active');
+    cur = (cur + dir + slides.length) % slides.length;
+    slides[cur].classList.add('active');
+    dots[cur].classList.add('active');
+  },
+
+  // Rótulo legível de uma chave de período do gráfico de linha (YYYY, YYYY-MM, YYYY-MM-DD, "Sem N/YYYY")
+  _fmtLineKey(key) {
+    const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+      const [y,m,d] = key.split('-');
+      return `${d}/${m}/${y}`;
+    }
+    if (/^\d{4}-\d{2}$/.test(key)) {
+      const [y,m] = key.split('-');
+      return `${meses[+m-1]} ${y}`;
+    }
+    return key; // "Sem N/YYYY" ou "YYYY" já ficam legíveis
+  },
+
+  // Linha guia vertical tracejada no ponto ativo do tooltip (plugin local, sem libs extra)
+  _verticalGuidePlugin: {
+    id: 'verticalGuide',
+    afterDraw(chart) {
+      const active = chart.tooltip?._active;
+      if (!active || !active.length) return;
+      const { ctx, chartArea } = chart;
+      const x = active[0].element.x;
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash([4, 4]);
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#c8d4e8';
+      ctx.stroke();
+      ctx.restore();
+    }
+  },
+
+  // Gastos por Período — colunas, com linha de Tendência e linha de Média
+  // sobrepostas (clica no nome delas na legenda pra mostrar/esconder, igual
+  // o Chart.js já faz nativamente com qualquer dataset). Os valores em si
+  // (o "data" recebido) continuam vindo de _buildSpendMap, sem mudar nada
+  // no cálculo — só troca o tipo de gráfico e soma 2 séries derivadas dele.
+  _drawLine(id, data, color) {
+    const canvas = document.getElementById(id); if (!canvas) return;
+    App._destroyChart(id);
+    const sorted = Object.keys(data).sort();
+    const vals = sorted.map(k => data[k]);
+
+    // Linha de Média: valor constante = média simples dos períodos exibidos
+    const media = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+    const mediaLine = vals.map(() => media);
+
+    // Linha de Tendência: regressão linear simples (mínimos quadrados) sobre os pontos
+    let trendLine = vals.slice();
+    const n = vals.length;
+    if (n >= 2) {
+      const xs = vals.map((_, i) => i);
+      const sumX  = xs.reduce((a, b) => a + b, 0);
+      const sumY  = vals.reduce((a, b) => a + b, 0);
+      const sumXY = xs.reduce((s, x, i) => s + x * vals[i], 0);
+      const sumXX = xs.reduce((s, x) => s + x * x, 0);
+      const denom = (n * sumXX - sumX * sumX) || 1;
+      const slope = (n * sumXY - sumX * sumY) / denom;
+      const intercept = (sumY - slope * sumX) / n;
+      trendLine = xs.map(x => slope * x + intercept);
+    }
+
+    const fmtR = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Modelo em linha mesmo (voltou do formato em colunas) — gradiente suave
+    // no preenchimento, igual era antes das Tendência/Média entrarem.
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.clientHeight || 260);
+    gradient.addColorStop(0, color + '3d');
+    gradient.addColorStop(1, color + '00');
+
+    State.charts[id] = new Chart(canvas, {
+      data: {
+        labels: sorted,
+        datasets: [
+          {
+            type: 'line', label: 'Gastos', data: vals,
+            borderColor: color, backgroundColor: gradient,
+            borderWidth: 2.5, tension: 0.45, fill: true, cubicInterpolationMode: 'monotone',
+            pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 2,
+            pointRadius: 3.5, pointHoverRadius: 6, order: 3
+          },
+          { type: 'line', label: 'Tendência', data: trendLine, borderColor: '#e8830a', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0, order: 1 },
+          { type: 'line', label: 'Média', data: mediaLine, borderColor: '#7c52d4', borderWidth: 2, borderDash: [2, 3], pointRadius: 0, fill: false, tension: 0, order: 2 }
+        ]
+      },
+      plugins: [App._verticalGuidePlugin],
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            display: true, position: 'top', align: 'end',
+            labels: { boxWidth: 14, boxHeight: 2, font: { size: 11, weight: '600' }, color: '#5a6a84', usePointStyle: false }
+          },
+          tooltip: {
+            enabled: true, backgroundColor: '#0f1e35', cornerRadius: 10, padding: 10,
+            displayColors: true, usePointStyle: true, boxWidth: 8, boxHeight: 8, boxPadding: 4,
+            titleFont: { size: 12, weight: '700' }, titleColor: '#fff',
+            bodyFont: { size: 11, weight: '600' }, bodyColor: 'rgba(255,255,255,.85)',
+            callbacks: {
+              title: items => App._fmtLineKey(items[0].label),
+              label: item => `${item.dataset.label}: ${fmtR(item.raw)}`
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#8898b8', font: { size: 11 } }, grid: { display: false }, border: { display: false } },
+          y: { ticks: { color: '#8898b8', font: { size: 11 } }, grid: { color: '#eef2f8', drawTicks: false }, border: { display: false }, beginAtZero: true }
+        }
+      }
+    });
+  },
+
+  /* ── REQUESTS TABLE ───────────────────────── */
+  renderRequests() {
+    const tbody    = document.getElementById('requests-tbody');
+    const fStatus  = document.getElementById('filter-status')?.value || '';
+    const fUnit    = document.getElementById('filter-unit-req')?.value || '';
+    const fGroup   = document.getElementById('filter-group-req')?.value || '';
+    const fSubgroup = document.getElementById('filter-subgroup-req')?.value || '';
+    // Populate filters
+    App._populateReqFilters();
+    App._syncReqFilterSelects();
+    tbody.innerHTML = '';
+    const fReqFrom = document.getElementById('req-date-from')?.value || '';
+    const fReqTo   = document.getElementById('req-date-to')?.value   || '';
+
+    let reqs = Object.entries(State.requests||{});
+    if (fStatus) reqs = reqs.filter(([,r]) => r.status===fStatus);
+    if (fUnit)   reqs = reqs.filter(([,r]) => r.unitName===fUnit);
+    if (fGroup)  reqs = reqs.filter(([,r]) => r.groupName===fGroup);
+    if (fSubgroup) reqs = reqs.filter(([,r]) => r.subgrupo===fSubgroup);
+    if (fReqFrom || fReqTo) {
+      reqs = reqs.filter(([,r]) => {
+        const ds = (r.createdAt||'').substring(0,10);
+        if (fReqFrom && ds < fReqFrom) return false;
+        if (fReqTo   && ds > fReqTo)   return false;
+        return true;
+      });
+    }
+    // Filtro por data de envio
+    const fSentFrom = document.getElementById('req-sent-from')?.value || '';
+    const fSentTo   = document.getElementById('req-sent-to')?.value   || '';
+    if (fSentFrom || fSentTo) {
+      reqs = reqs.filter(([,r]) => {
+        const ds = (r.shippedAt||'').substring(0,10);
+        if (!ds) return false;
+        if (fSentFrom && ds < fSentFrom) return false;
+        if (fSentTo   && ds > fSentTo)   return false;
+        return true;
+      });
+    }
+    // Filtro de status pelos chips (toggled off = oculto)
+    if (App.reqHiddenStatuses?.size) {
+      reqs = reqs.filter(([,r]) => !App.reqHiddenStatuses.has(r.status));
+    }
+    // Filtro de parcelamento/forma de pagamento
+    const fParc = document.getElementById('filter-parcelado')?.value || '';
+    if (fParc === 'parcelado')        reqs = reqs.filter(([,r]) => r.parcelas && r.parcelas.length > 0);
+    else if (fParc === 'combinada')   reqs = reqs.filter(([,r]) => !!r.compraId);
+    else if (fParc === 'boleto' || fParc === 'dinheiro' || fParc === 'cartao') {
+      reqs = reqs.filter(([,r]) => (r.formaPagamento || 'dinheiro') === fParc);
+    }
+    // Busca ao vivo (mesmos campos exibidos na linha) — aplicada aqui pra que a barra
+    // "De N pedidos" abaixo reflita exatamente o que a busca encontrou, por status.
+    const qLive = (document.getElementById('req-live-search')?.value || '').toLowerCase().trim();
+    if (qLive) {
+      reqs = reqs.filter(([, r]) => {
+        const txt = [
+          r.seq != null ? 'SL-' + r.seq : '', r.unitName, r.groupName, r.subgrupo,
+          App.reqSummary(r), r.status, r.fornecedor, r.compraCodigo
+        ].filter(Boolean).join(' ').toLowerCase();
+        return txt.includes(qLive);
+      });
+    }
+    // Ordenação por DIA + direção; no mesmo dia, desempata por SL crescente
+    // (ex.: 30/06 com SL-119 e SL-120 → sempre 119 depois 120, nunca invertido).
+    const sortField = App.reqSortField || 'createdAt';
+    reqs.sort(([,a],[,b]) => {
+      const da = (a[sortField]||'').substring(0,10);
+      const db = (b[sortField]||'').substring(0,10);
+      const cmp = da.localeCompare(db);
+      if (cmp !== 0) return App.reqSortDir === 'asc' ? cmp : -cmp;
+      const s = (parseInt(a.seq)||0) - (parseInt(b.seq)||0);   // mesmo dia → segue direção (desc: SL maior em cima)
+      return App.reqSortDir === 'asc' ? s : -s;
+    });
+    // Compra combinada SEMPRE junta: independente da data/ordenação, os membros
+    // da mesma compra ficam adjacentes, ancorados na posição do 1º membro que
+    // aparece na ordenação (mantém o resto na ordem escolhida).
+    {
+      const emitidos = new Set();
+      const agrupados = [];
+      for (const item of reqs) {
+        const cod = item[1].compraCodigo;
+        if (cod) {
+          if (emitidos.has(cod)) continue;      // já saiu junto com o grupo
+          emitidos.add(cod);
+          agrupados.push(...reqs
+            .filter(([, rr]) => rr.compraCodigo === cod)
+            .sort((x, y) => (parseInt(x[1].seq)||0) - (parseInt(y[1].seq)||0)));
+        } else {
+          agrupados.push(item);
+        }
+      }
+      reqs.length = 0; reqs.push(...agrupados);
+    }
+    // Barra "De N pedidos" — reflete o conjunto já filtrado/pesquisado acima
+    App._renderReqStats(reqs, 'dash-stats-bar', 'dash-negados-bar');
+    if (!reqs.length) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray-500);padding:32px">Nenhuma solicitação encontrada.</td></tr>';
+      return;
+    }
+    reqs.forEach(([id,r]) => {
+      // Data da solicitação — parse direto para evitar timezone shift
+      let d = '—';
+      if (r.createdAt) {
+        const [cy, cm, cd] = r.createdAt.substring(0,10).split('-');
+        d = `${cd}/${cm}/${cy}`;
+      }
+      const seqTag = r.seq != null
+        ? `<span class="req-seq-badge">SL-${r.seq}</span>` : '';
+      const isOutros = !['tinta','pilha','bateria'].some(k=>(r.groupName||'').toLowerCase().includes(k));
+      const summary = App.reqSummary(r);
+      const comboTag = (parseFloat(r.estoqueComboQty) || 0) > 0
+        ? ' <span class="badge badge-est" style="margin-top:3px">Estoque</span>' : '';
+      const badge = App.statusBadge(r.status) + comboTag;
+      const subgrupoDisplay = r.subgrupo ? `<span style="font-size:.78rem;color:var(--gray-400)">${r.subgrupo}</span>` : '<span style="color:var(--gray-500)">—</span>';
+      // Data do envio — entradas vindas do Estoque não são enviadas a ninguém: sem info (—)
+      let envioDisplay;
+      if (r.origemEstoque) {
+        envioDisplay = '<span style="color:#c8d4e8;font-size:.78rem">—</span>';
+      } else if (r.shippedStatus === 'Sim' && r.shippedAt) {
+        // Parse date string directly to avoid UTC→local timezone shift
+        const [sy, sm, sd] = r.shippedAt.substring(0,10).split('-');
+        const envDate = `${sd}/${sm}/${sy}`;
+        envioDisplay = `<span style="color:#059669;font-size:.82rem;font-weight:600">✓ ${envDate}</span>`;
+      } else if (r.status === 'Comprado' || r.status === 'Estoque') {
+        envioDisplay = '<span style="color:#e8830a;font-size:.78rem">Pendente</span>';
+      } else {
+        envioDisplay = '<span style="color:#c8d4e8;font-size:.78rem">—</span>';
+      }
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><div style="display:flex;flex-direction:column;gap:2px">${seqTag}<span>${d}</span></div></td>
+        <td>${r.unitName||'—'}</td>
+        <td><span style="font-weight:500">${r.groupName||'—'}</span></td>
+        <td>${subgrupoDisplay}</td>
+        <td style="max-width:200px">
+          <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.84rem" title="${summary}">${summary}</div>
+          ${r.parcelas && r.parcelas.length ? (App._parcelaPaga(r.parcelas)
+            ? `<span class="mov-tag-pago" style="display:inline-block;margin-top:3px" title="Todas as parcelas já venceram">✓ PAGO</span>`
+            : `<span style="display:inline-block;margin-top:3px;font-size:.68rem;font-weight:700;color:#7c52d4;background:#f0ebfc;border:1px solid #ede9fe;border-radius:4px;padding:1px 7px">📦 ${r.parcelas.length}× parcelas · ${r.parcelas[0]?.valor ? 'R$ '+parseFloat(r.parcelas[0].valor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'/mês' : ''}</span>`) : ''}
+          ${r.compraCodigo ? `<span class="compra-codigo-tag" title="Compra combinada ${r.compraCodigo}">${r.compraCodigo}</span>` : ''}
+        </td>
+        <td>${r.urgent?`<span class="badge-urgent-ico" title="Urgente">${App._svg('alert')}</span>`:'<span style="color:var(--gray-500)">—</span>'}</td>
+        <td>${envioDisplay}${(r.obs||(isOutros&&(r.product||r.reason))) ? `<span title="${[r.product,r.reason,r.obs].filter(Boolean).join(' | ')}" style=""</span>` : ''}</td>
+        <td>${badge}</td>
+        <td style="white-space:nowrap">${App._reqAcoes(id, r)}</td>`;
+      // Realce amarelo para entradas vindas da aba Estoque; lilás para compra combinada
+      if (r.origemEstoque) {
+        tr.classList.add('row-estoque-entrada');
+        tr.style.background = '#fffef7';
+        const firstTd = tr.firstElementChild;
+        if (firstTd) firstTd.style.borderLeft = '4px solid #e9d27a';
+      } else if (r.compraCodigo) {
+        const c = App._compraColor(r.compraCodigo);
+        tr.classList.add('row-compra');
+        tr.style.background = c.g;
+        const firstTd = tr.firstElementChild;
+        if (firstTd) firstTd.style.borderLeft = `4px solid ${c.b}`;
+      }
+      tbody.appendChild(tr);
+    });
+  },
+
+  // ── Ações da linha de solicitação ─────────────────────────────
+  // origemEstoque e compra combinada seguem exatamente como eram (sem
+  // autorização). A solicitação normal ganha o passo-a-passo de Autorização
+  // ao lado do Gerenciar já existente — quem não precisa de autorização usa
+  // o Gerenciar como sempre.
+  // Ícones de sistema (SVG, cor via currentColor — nunca emoji)
+  _svg(name) {
+    const p = {
+      pencil: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>',
+      lock:   '<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>',
+      hour:   '<path d="M6 2h12M6 22h12M8 2c0 3.6 3.6 5 4 8M16 2c0 3.6-3.6 5-4 8M8 22c0-3.6 3.6-5 4-8M16 22c0-3.6-3.6-5-4-8"/>',
+      check:  '<path d="M20 6L9 17l-5-5"/>',
+      x:      '<path d="M18 6L6 18M6 6l12 12"/>',
+      trash:  '<path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>',
+      eye:    '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>',
+      alert:  '<path d="M10.3 3.6L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.6a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'
+    }[name] || '';
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">${p}</svg>`;
+  },
+
+  // Etiqueta de mapeamento na linha: quem autorizou (gestor) ou quem adicionou (admin).
+  _mapTag(r) {
+    if (r.gestorNome)
+      return `<span class="map-tag map-tag-ok" title="Autorizado por ${r.gestorNome}">${App._svg('check')}<span>${r.gestorNome}</span></span>`;
+    if (r.usuarioResp && r.usuarioResp !== '—')
+      return `<span class="map-tag" title="Adicionado por ${r.usuarioResp}">${App._svg('check')}<span>${r.usuarioResp}</span></span>`;
+    return '';
+  },
+
+  _reqAcoes(id, r) {
+    const S = App._svg;
+    const del = `<button class="btn-ico btn-ico-del" onclick="App.confirmDelete('${id}')" title="Apagar">${S('trash')}</button>`;
+    if (r.origemEstoque)
+      return `<button class="btn-ico" onclick="App.showSolicitacaoView('${id}')" title="Ver (editável na aba Estoque)">${S('eye')}</button>`;
+    if (r.compraCodigo) {
+      // Combinada mostra o mesmo ícone de autorização (derivado do status) + Gerenciar + Apagar.
+      const stc = r.status || 'Comprado';
+      const tagc = (r.gestorNome ? ` · autorizado por ${r.gestorNome}` : '') + (r.usuarioResp && r.usuarioResp !== '—' ? ` · add: ${r.usuarioResp}` : '');
+      const icoc = stc === 'Negado'
+        ? `<button class="btn-ico btn-ico-neg" onclick="App.manageCompra('${r.compraCodigo}')" title="Negado${tagc}">${S('x')}</button>`
+        : `<button class="btn-ico btn-ico-ok" onclick="App.manageCompra('${r.compraCodigo}')" title="Autorizado / comprado${tagc}">${S('check')}</button>`;
+      return `${icoc}<button class="btn-ico" onclick="App.manageCompra('${r.compraCodigo}')" title="Gerenciar compra combinada ${r.compraCodigo}">${S('pencil')}</button>${del}`;
+    }
+
+    // O Gerenciar (lápis) fica em TODAS as solicitações — nem toda precisa de autorização.
+    const editar = `<button class="btn-ico" onclick="App.openModal('${id}')" title="Gerenciar / Editar">${S('pencil')}</button>`;
+    // Ícone de autorização DERIVADO DO STATUS (responsivo: mudar o status pelo
+    // Gerenciar troca o ícone na hora). Solicitado→autorizar, Aguardando→decidir,
+    // Comprado/Estoque→✓ autorizado, Negado→✗ negado.
+    const st = r.status || 'Solicitado';
+    const gestor = r.gestorNome ? ` · gestor: ${r.gestorNome}` : '';
+    let mid = '';
+    if (st === 'Solicitado')
+      mid = `<button class="btn-ico btn-ico-autz" onclick="App.autorizarSolicitacao('${id}')" title="Enviar ao gestor para autorização">${S('lock')}</button>`;
+    else if (st === 'Aguardando')
+      mid = `<button class="btn-ico btn-ico-hour" onclick="App._abrirDecisaoAutorizacao('${id}')" title="Decidir — o gestor respondeu?${gestor}">${S('hour')}</button>`;
+    else if (st === 'Negado')
+      mid = `<button class="btn-ico btn-ico-neg" onclick="App._reabrirNegada('${id}')" title="Negado — clique para tentar autorizar de novo${gestor}">${S('x')}</button>`;
+    else  // Comprado / Estoque = autorizado/concluído → abre SÓ a aba de compra
+      mid = `<button class="btn-ico btn-ico-ok" onclick="App.openModal('${id}',{soloCompra:true,preStatus:'${st}',readOnly:true})" title="Autorizado — ver compra, somente leitura (mudar dados: Gerenciar)${gestor}">${S('check')}</button>`;
+    // Ordem: autorizar/decidir primeiro, depois Gerenciar, depois Apagar
+    return `${mid}${editar}${del}`;
+  },
+
+  // Bloco de destaque de autorização no modal — status + gestor + responsável
+  _infoAutorizacao(r) {
+    const wrap = (cor, bg, bd, ico, titulo, linha) =>
+      `<div style="background:${bg};border:1px solid ${bd};border-left:4px solid ${cor};border-radius:8px;padding:11px 13px;margin-bottom:12px">
+         <div style="display:flex;align-items:center;gap:7px;font-weight:800;color:${cor};font-size:.95rem">${ico}${titulo}</div>
+         ${linha}
+       </div>`;
+    const linhaTxt = t => `<div style="color:var(--ink-900);font-size:.86rem;margin-top:2px">${t}</div>`;
+    const usr   = (r.usuarioResp && r.usuarioResp !== '—') ? r.usuarioResp : '';
+    const gNome = r.gestorNome || '';
+    const gNum  = r.gestorNumero ? ' ' + App._fmtNumeroDisplay(r.gestorNumero) : '';
+
+    // Entrada direta pela aba Estoque (Estoque Geral) — só "Produto adicionado".
+    if (r.origemEstoque) {
+      if (!usr) return '';
+      return wrap('#2563eb', '#eff6ff', '#bfdbfe', App._svg('check'), 'Produto adicionado', linhaTxt(`Adicionado pelo usuário: <strong>${usr}</strong>`));
+    }
+
+    const st = r.status;
+    if (st === 'Aguardando')
+      return wrap('#b45309', '#fffbeb', '#fde68a', App._svg('hour'), 'Aguardando autorização',
+        gNome ? linhaTxt(`Enviado ao gestor: <strong>${gNome}${gNum}</strong>`) : linhaTxt('Enviado ao gestor'));
+    if (st === 'Comprado' || st === 'Estoque') {
+      const titulo = st === 'Comprado' ? 'Autorizada — Comprado' : 'Autorizada — Enviado do estoque';
+      const linha = gNome
+        ? linhaTxt(`Autorizado pelo gestor: <strong>${gNome}${gNum}</strong>`)
+        : (usr ? linhaTxt(`Autorizado pelo Usuário: <strong>${usr}</strong>`) : '');
+      return wrap('#059669', '#ecfdf5', '#a7f3d0', App._svg('check'), titulo, linha);
+    }
+    if (st === 'Negado') {
+      const linha = gNome
+        ? linhaTxt(`Negada pelo gestor: <strong>${gNome}${gNum}</strong>`)
+        : (usr ? linhaTxt(`Negada pelo usuário: <strong>${usr}</strong>`) : '');
+      return wrap('#dc2626', '#fef2f2', '#fecaca', App._svg('x'), 'Autorização negada', linha);
+    }
+    return '';
+  },
+
+  // Bloco de autorização da COMPRA combinada (agrega os gestores dos membros)
+  _infoAutorizacaoCompra(membros) {
+    const gestores = [...new Set(membros.map(([, r]) => r.gestorNome).filter(Boolean))];
+    const resp     = [...new Set(membros.map(([, r]) => r.usuarioResp).filter(v => v && v !== '—'))];
+    const lg = gestores.length ? `<div style="color:var(--ink-900);font-size:.86rem;margin-top:2px">Autorizado pelo gestor: <strong>${gestores.join(', ')}</strong></div>` : '';
+    const lr = resp.length     ? `<div style="color:var(--ink-900);font-size:.86rem;margin-top:2px">Adicionado por: <strong>${resp.join(', ')}</strong></div>` : '';
+    if (!lg && !lr) return '';
+    return `<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-left:4px solid #059669;border-radius:8px;padding:11px 13px;margin-bottom:12px">
+       <div style="display:flex;align-items:center;gap:7px;font-weight:800;color:#059669;font-size:.95rem">${App._svg('check')}Autorizada</div>
+       ${lg}${lr}
+     </div>`;
+  },
+
+  // Lista de gestores cadastrados (+ compat com o número único antigo)
+  _gestoresList() {
+    const g = (State.config && State.config.gestores) || {};
+    const arr = Object.entries(g)
+      .map(([gid, v]) => ({ id: gid, nome: (v && v.nome) || '', numero: ((v && v.numero) || '').replace(/\D/g, '') }))
+      .filter(x => x.numero);
+    const legacy = (State.config && State.config.gestorWhats || '').replace(/\D/g, '');
+    if (legacy && !arr.some(x => x.numero === legacy)) arr.unshift({ id: 'legacy', nome: 'Gestor', numero: legacy });
+    return arr;
+  },
+
+  // Formata número BR pra exibição: 88981765537 → +55 (88) 9 8176-5537
+  _fmtNumeroDisplay(num) {
+    let d = String(num || '').replace(/\D/g, '');
+    if (d.startsWith('55')) d = d.slice(2);
+    if (d.length === 11) return `+55 (${d.slice(0,2)}) ${d.slice(2,3)} ${d.slice(3,7)}-${d.slice(7)}`;
+    if (d.length === 10) return `+55 (${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+    return '+' + (String(num||'').replace(/\D/g,''));
+  },
+
+  // valorNum = valor UNITÁRIO (numérico). O total = valorNum × quantidade.
+  _msgWhatsGestor(r, valorNum) {
+    const qtdRaw = r.quantidade || r.qty || '';
+    const qtdN = parseFloat(qtdRaw) || 0;
+    const v = parseFloat(valorNum) || 0;
+    const total = v > 0 ? v * (qtdN || 1) : 0;
+    return [
+      '*Solicitação de compra — precisa de autorização*', '',
+      r.seq != null ? `*Nº:* SL-${r.seq}` : '',
+      `*Unidade:* ${r.unitName || '—'}`,
+      `*Grupo:* ${r.groupName || '—'}`,
+      r.subgrupo ? `*Subgrupo:* ${r.subgrupo}` : '',
+      `*Item:* ${App.reqSummary(r)}`,
+      r.product ? `*Produto:* ${r.product}` : '',
+      qtdRaw ? `*Quantidade:* ${qtdRaw}` : '',
+      `*Motivo:* ${r.reason || '—'}`,
+      v > 0 ? `*Valor unitário:* ${App._fmtMoeda(v)}` : '',
+      v > 0 ? `*Valor total:* ${App._fmtMoeda(total)}${qtdN > 1 ? ` (${App._fmtMoeda(v)} × ${qtdRaw})` : ''}` : '',
+      r.urgent ? '*⚠ URGENTE*' : '',
+      r.obs ? `*Obs:* ${r.obs}` : '',
+      '', 'Pode autorizar a compra?'
+    ].filter(l => l !== '').join('\n');
+  },
+
+  // ── Formatação de dinheiro (R$) ─────────────────────────────────
+  _fmtMoeda(n) {
+    const v = parseFloat(n); if (isNaN(v)) return '';
+    return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
+  _parseMoeda(s) {
+    const d = String(s || '').replace(/[^\d]/g, '');   // pega só dígitos (mask é em centavos)
+    if (!d) return 0;
+    return parseInt(d, 10) / 100;
+  },
+  _formatMoedaInput(el) {   // máscara ao vivo em centavos: digita 25000 → R$ 250,00
+    if (!el) return;
+    el.value = App._fmtMoeda(App._parseMoeda(el.value));
+  },
+
+  // Autorizar → abre o chooser: escolhe gestor (lista), digita valor, clica Enviar
+  _autzSendId: null,
+  _autzGestorSel: null,
+  autorizarSolicitacao(id) {
+    const r = (State.requests || {})[id]; if (!r) return;
+    if (!App._gestoresList().length) { toast('Cadastre ao menos um gestor em Configurações antes de autorizar.', 'error'); return; }
+    App._autzSendId = id;
+    App._autzGestorSel = null;
+    document.getElementById('autz-send-resumo').textContent =
+      `${r.seq != null ? 'SL-' + r.seq + ' · ' : ''}${r.unitName || ''} — ${App.reqSummary(r)}`;
+    document.getElementById('autz-send-qtd').textContent = (r.quantidade || r.qty || '—');
+    const valEl = document.getElementById('autz-send-valor');
+    valEl.value = r.valor ? App._fmtMoeda(r.valor) : '';
+    valEl.oninput = () => { App._formatMoedaInput(valEl); App._autzAtualizarEnviar(); };
+    App._autzSetMode(App._autzMode || localStorage.getItem('tic_autz_mode') || 'app', true);
+    document.getElementById('autz-send-modal').classList.remove('hidden');
+    setTimeout(() => valEl.focus(), 60);
+  },
+
+  _autzMode: null,
+  _autzSetMode(mode, silent) {
+    App._autzMode = mode;
+    try { localStorage.setItem('tic_autz_mode', mode); } catch (e) {}
+    document.getElementById('autz-mode-app')?.classList.toggle('active', mode === 'app');
+    document.getElementById('autz-mode-web')?.classList.toggle('active', mode === 'web');
+    App._autzRebuildLinks();
+  },
+
+  // Lista de gestores selecionável (radio). Escolhe um → depois clica Enviar.
+  _autzRebuildLinks() {
+    const box = document.getElementById('autz-send-gestores');
+    if (!box) return;
+    const lista = App._gestoresList();
+    if (!lista.some(g => g.id === App._autzGestorSel)) App._autzGestorSel = null;
+    box.innerHTML = lista.map(g => {
+      const sel = g.id === App._autzGestorSel;
+      return `<button type="button" class="autz-gestor-opt${sel ? ' selected' : ''}" onclick="App._autzSelecionarGestor('${g.id}')">
+        <span class="autz-g-radio">${sel ? App._svg('check') : ''}</span>
+        <span class="autz-g-nome">${g.nome || 'Gestor'}</span>
+        <small class="autz-g-num">${App._fmtNumeroDisplay(g.numero)}</small>
+      </button>`;
+    }).join('');
+    App._autzAtualizarEnviar();
+  },
+
+  _autzSelecionarGestor(gid) {
+    App._autzGestorSel = gid;
+    App._autzRebuildLinks();
+  },
+
+  // Atualiza o botão Enviar: é um <a> (respeita WhatsApp App/Web sem popup-block).
+  // Sem gestor escolhido → desabilitado.
+  _autzAtualizarEnviar() {
+    const id = App._autzSendId;
+    const r = (State.requests || {})[id];
+    const a = document.getElementById('autz-enviar-btn');
+    if (!a || !r) return;
+    const g = App._gestoresList().find(x => x.id === App._autzGestorSel);
+    if (!g) {
+      a.classList.add('is-disabled');
+      a.removeAttribute('href'); a.removeAttribute('target'); a.onclick = null;
+      a.textContent = 'Escolha um gestor';
+      return;
+    }
+    const valorNum = App._parseMoeda(document.getElementById('autz-send-valor').value);
+    const mode = App._autzMode || 'app';
+    const msg = App._msgWhatsGestor(r, valorNum);
+    a.href = mode === 'web'
+      ? `https://wa.me/${g.numero}?text=${encodeURIComponent(msg)}`
+      : `whatsapp://send?phone=${g.numero}&text=${encodeURIComponent(msg)}`;
+    if (mode === 'web') { a.target = '_blank'; a.rel = 'noopener'; } else { a.removeAttribute('target'); }
+    a.classList.remove('is-disabled');
+    a.textContent = `Enviar para ${g.nome || 'gestor'}`;
+    a.onclick = () => App._enviarAutorizacao(id, g.id);
+  },
+
+  // O <a> Enviar abre o WhatsApp (App ou Web); aqui grava status Aguardando, o
+  // valor (numérico) e VINCULA o gestor pra quem foi mandado (mapeia depois).
+  _enviarAutorizacao(id, gestorId) {
+    const r = (State.requests || {})[id]; if (!r) return;
+    const valorNum = App._parseMoeda(document.getElementById('autz-send-valor').value);
+    const g = App._gestoresList().find(x => x.id === gestorId) || {};
+    const ops = [
+      DB.set(`requests/${id}/status`, 'Aguardando'),
+      DB.set(`requests/${id}/gestorNome`, g.nome || 'Gestor'),
+      DB.set(`requests/${id}/gestorNumero`, g.numero || '')
+    ];
+    if (valorNum > 0) ops.push(DB.set(`requests/${id}/valor`, valorNum.toFixed(2)));
+    Promise.all(ops).then(() => {
+      App._logActivity?.('Solicitações', `Autorização enviada — ${g.nome || 'gestor'}`, App.reqSummary(r));
+      document.getElementById('autz-send-modal')?.classList.add('hidden');
+      App.renderRequests(); App.updatePendingBadge?.();
+    });
+  },
+
+  // ── Autorizar compra em LOTE — wizard 1 popup (seleção → valor/qtd → gestor) ──
+  _autzLoteIds: null,
+  _autzLoteGestor: null,
+  _autzLoteMode: null,
+  abrirAutorizarCompra() {
+    App._closeAllPopovers?.();   // fecha o popover de Conf ao abrir o modal
+    if (!App._gestoresList().length) { toast('Cadastre ao menos um gestor em Configurações antes de autorizar.', 'error'); return; }
+    App._autzLoteIds = new Set();
+    App._autzLoteGestor = null;
+    const s = document.getElementById('autz-lote-search'); if (s) s.value = '';
+    App._autzLoteShowStep(1);
+    App._autzLoteRenderList();
+    App._autzLoteSetMode(App._autzMode || localStorage.getItem('tic_autz_mode') || 'app', true);
+    document.getElementById('autz-lote-modal').classList.remove('hidden');
+  },
+  _autzLoteShowStep(n) {
+    [1, 2, 3].forEach(i => document.getElementById('autz-lote-step' + i)?.classList.toggle('hidden', i !== n));
+    const t = document.getElementById('autz-lote-title');
+    if (t) t.textContent = n === 1 ? 'Autorizar compra — Solicitações' : n === 2 ? 'Autorizar compra — Valores' : 'Autorizar compra — Gestor';
+  },
+
+  // PASSO 1 — seleção
+  _autzLoteRenderList() {
+    const box = document.getElementById('autz-lote-list'); if (!box) return;
+    const termo = (document.getElementById('autz-lote-search')?.value || '').toLowerCase();
+    let reqs = Object.entries(State.requests || {})
+      .filter(([, r]) => (r.status || 'Solicitado') === 'Solicitado' && !r.origemEstoque && !r.compraCodigo)
+      .sort((a, b) => (parseInt(b[1].seq) || 0) - (parseInt(a[1].seq) || 0));   // mais recente primeiro
+    if (termo) reqs = reqs.filter(([, r]) => [r.seq != null ? 'SL-' + r.seq : '', r.unitName, r.groupName, App.reqSummary(r)].filter(Boolean).join(' ').toLowerCase().includes(termo));
+    if (!reqs.length) { box.innerHTML = '<div class="compra-empty">Nenhuma solicitação pendente para autorizar.</div>'; App._autzLoteUpdateSel(); return; }
+    box.innerHTML = reqs.map(([id, r]) => {
+      const on = App._autzLoteIds.has(id);
+      return `<div class="compra-req-item ${on ? 'sel' : ''}">
+        <input type="checkbox" ${on ? 'checked' : ''} onchange="App._autzLoteToggle('${id}', this.checked)">
+        <span class="req-seq-badge">SL-${r.seq != null ? r.seq : '—'}</span>
+        <div class="compra-req-info">
+          <span class="compra-req-unit">${r.unitName || '—'}</span>
+          <span class="compra-req-sum">${r.groupName || ''} · ${App.reqSummary(r)}</span>
+        </div>
+      </div>`;
+    }).join('');
+    App._autzLoteUpdateSel();
+  },
+  _autzLoteToggle(id, on) { if (on) App._autzLoteIds.add(id); else App._autzLoteIds.delete(id); App._autzLoteRenderList(); },
+  _autzLoteUpdateSel() {
+    const n = App._autzLoteIds ? App._autzLoteIds.size : 0;
+    const c = document.getElementById('autz-lote-sel-count'); if (c) c.textContent = n ? `${n} selecionada(s)` : '';
+    const b = document.getElementById('autz-lote-next1'); if (b) b.disabled = n < 1;
+  },
+
+  // PASSO 2 — valor + quantidade (qtd vem do sistema; cadeado libera edição)
+  _autzLoteStep2() {
+    const ids = [...(App._autzLoteIds || [])]; if (!ids.length) return;
+    const wrap = document.getElementById('autz-lote-itens');
+    wrap.innerHTML = ids.map(id => {
+      const r = (State.requests || {})[id] || {};
+      const qtd = r.quantidade || r.qty || 1;
+      return `<div class="autz-lote-item" style="border:1px solid var(--surf-border);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+        <div style="font-weight:700;font-size:.82rem;color:var(--ink-900);margin-bottom:6px"><span class="req-seq-badge">SL-${r.seq != null ? r.seq : '—'}</span> ${r.unitName || ''} · ${App.reqSummary(r)}</div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Valor unitário (R$)</label>
+            <input type="number" class="input-field autz-lote-val" data-id="${id}" min="0" step="0.01" value="${r.valor || ''}" placeholder="0,00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantidade</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="number" class="input-field autz-lote-qtd" data-id="${id}" min="1" value="${qtd}" readonly style="background:#f1f5f9">
+              <button type="button" class="btn-ico" title="Clique para editar a quantidade" onclick="App._autzLoteQtdUnlock('${id}')">${App._svg('lock')}</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    App._autzLoteShowStep(2);
+  },
+  _autzLoteQtdUnlock(id) {
+    const inp = document.querySelector(`.autz-lote-qtd[data-id="${id}"]`); if (!inp) return;
+    const estavaTravado = inp.readOnly;
+    inp.readOnly = !estavaTravado;
+    inp.style.background = estavaTravado ? '' : '#f1f5f9';
+    if (estavaTravado) { inp.focus(); inp.select(); }
+  },
+  _autzLoteBackStep1() { App._autzLoteShowStep(1); },
+  _autzLoteBackStep2() { App._autzLoteShowStep(2); },
+
+  // PASSO 3 — gestor + envio
+  _autzLoteStep3() { App._autzLoteRenderGestores(); App._autzLoteShowStep(3); },
+  _autzLoteSelGestor(gid) { App._autzLoteGestor = gid; App._autzLoteRenderGestores(); },
+  _autzLoteSetMode(mode, silent) {
+    App._autzLoteMode = mode;
+    document.getElementById('autz-lote-mode-app')?.classList.toggle('active', mode === 'app');
+    document.getElementById('autz-lote-mode-web')?.classList.toggle('active', mode === 'web');
+    if (!silent) App._autzLoteRenderGestores();
+  },
+  _autzLoteRenderGestores() {
+    const box = document.getElementById('autz-lote-gestores'); if (!box) return;
+    const lista = App._gestoresList();
+    if (!lista.some(g => g.id === App._autzLoteGestor)) App._autzLoteGestor = null;
+    box.innerHTML = lista.map(g => {
+      const sel = g.id === App._autzLoteGestor;
+      return `<button type="button" class="autz-gestor-opt${sel ? ' selected' : ''}" onclick="App._autzLoteSelGestor('${g.id}')">
+        <span class="autz-g-radio">${sel ? App._svg('check') : ''}</span>
+        <span class="autz-g-nome">${g.nome || 'Gestor'}</span>
+        <small class="autz-g-num">${App._fmtNumeroDisplay(g.numero)}</small>
+      </button>`;
+    }).join('');
+    App._autzLoteAtualizar();
+  },
+  // Lê valor/qtd dos inputs do passo 2 (ficam no DOM mesmo no passo 3).
+  _autzLoteColeta() {
+    return [...(App._autzLoteIds || [])].map(id => {
+      const r = (State.requests || {})[id] || {};
+      const val = parseFloat(document.querySelector(`.autz-lote-val[data-id="${id}"]`)?.value) || 0;
+      const qtd = parseFloat(document.querySelector(`.autz-lote-qtd[data-id="${id}"]`)?.value) || (parseFloat(r.quantidade) || 1);
+      return { id, r, val, qtd };
+    });
+  },
+  // Um bloco por solicitação, no mesmo formato do pedido individual, um abaixo do outro.
+  _msgWhatsGestorLote(itens) {
+    const bloco = ({ r, val, qtd }) => {
+      const q = qtd || r.quantidade || r.qty || '';
+      const v = parseFloat(val) || 0;
+      return [
+        '*Solicitação de compra — precisa de autorização*',
+        `*Nº:* ${r.seq != null ? 'SL-' + r.seq : '—'}`,
+        `*Unidade:* ${r.unitName || '—'}`,
+        `*Grupo:* ${r.groupName || '—'}`,
+        `*Subgrupo:* ${r.subgrupo || '—'}`,
+        `*Item:* ${App.reqSummary(r)}`,
+        `*Produto:* ${r.product || '—'}`,
+        q ? `*Quantidade:* ${q}` : '',
+        `*Motivo:* ${r.reason || '—'}`,
+        v > 0 ? `*Valor:* ${App._fmtMoeda(v * (parseFloat(q) || 1))}` : ''
+      ].filter(l => l !== '').join('\n');
+    };
+    return itens.map(bloco).join('\n\n') + '\n\nPode autorizar as compras?';
+  },
+  _autzLoteAtualizar() {
+    const a = document.getElementById('autz-lote-enviar'); if (!a) return;
+    const g = App._gestoresList().find(x => x.id === App._autzLoteGestor);
+    if (!g) { a.classList.add('is-disabled'); a.removeAttribute('href'); a.removeAttribute('target'); a.onclick = null; a.textContent = 'Escolha o gestor'; return; }
+    const itens = App._autzLoteColeta();
+    const msg = App._msgWhatsGestorLote(itens);
+    const mode = App._autzLoteMode || 'app';
+    a.href = mode === 'web' ? `https://wa.me/${g.numero}?text=${encodeURIComponent(msg)}` : `whatsapp://send?phone=${g.numero}&text=${encodeURIComponent(msg)}`;
+    if (mode === 'web') { a.target = '_blank'; a.rel = 'noopener'; } else a.removeAttribute('target');
+    a.classList.remove('is-disabled');
+    a.textContent = `Enviar ${itens.length} p/ ${g.nome || 'gestor'}`;
+    a.onclick = () => App._enviarAutorizacaoLote(g.id);
+  },
+  // Grava: cada uma vira Aguardando + gestor + valor + quantidade (mesma regra do individual).
+  _enviarAutorizacaoLote(gestorId) {
+    const itens = App._autzLoteColeta(); if (!itens.length) return;
+    const g = App._gestoresList().find(x => x.id === gestorId) || {};
+    const ops = [];
+    itens.forEach(({ id, val, qtd }) => {
+      ops.push(DB.set(`requests/${id}/status`, 'Aguardando'));
+      ops.push(DB.set(`requests/${id}/gestorNome`, g.nome || 'Gestor'));
+      ops.push(DB.set(`requests/${id}/gestorNumero`, g.numero || ''));
+      if (val > 0) ops.push(DB.set(`requests/${id}/valor`, val.toFixed(2)));
+      if (qtd > 0) ops.push(DB.set(`requests/${id}/quantidade`, String(qtd)));
+    });
+    Promise.all(ops).then(() => {
+      App._logActivity?.('Solicitações', `Autorização em lote enviada — ${g.nome || 'gestor'}`, `${itens.length} solicitação(ões)`);
+      document.getElementById('autz-lote-modal')?.classList.add('hidden');
+      App.renderRequests(); App.updatePendingBadge?.();
+    });
+  },
+
+  // Decidir → popup com Estoque / Comprado / Negado
+  _abrirDecisaoAutorizacao(id) {
+    const r = (State.requests || {})[id]; if (!r) return;
+    const modal = document.getElementById('autorizacao-modal');
+    if (!modal) return;
+    document.getElementById('autz-resumo').textContent =
+      `${r.seq != null ? 'SL-' + r.seq + ' · ' : ''}${r.unitName || ''} — ${App.reqSummary(r)}`;
+    document.getElementById('autz-autorizado').onclick = () => App._decidirAutorizacao(id, 'Autorizado');
+    document.getElementById('autz-negado').onclick     = () => App._decidirAutorizacao(id, 'Negado');
+    modal.classList.remove('hidden');
+  },
+
+  // Decisão: só Autorizado ou Negado.
+  //  • Negado  → status Negado direto (o gestor já está vinculado do envio).
+  //  • Autorizado → abre SÓ a aba de compra (Comprado/Estoque); o status
+  //    finaliza ao salvar o popup. Pra mudar outros dados → Gerenciar (lápis).
+  _decidirAutorizacao(id, decisao) {
+    const r = (State.requests || {})[id]; if (!r) return;
+    document.getElementById('autorizacao-modal')?.classList.add('hidden');
+    if (decisao === 'Negado') {
+      DB.set(`requests/${id}/status`, 'Negado').then(() => {
+        App._logActivity?.('Solicitações', `Autorização — Negada${r.gestorNome ? ' · ' + r.gestorNome : ''}`, App.reqSummary(r));
+        App.renderRequests(); App.updatePendingBadge?.();
+      });
+    } else {
+      App.openModal(id, { soloCompra: true, preStatus: 'Comprado' });
+    }
+  },
+
+  // Clique no X de uma solicitação negada → volta ao início pra tentar de novo.
+  // Reseta pra Solicitado e limpa o gestor vinculado (nova autorização do zero).
+  _reabrirNegada(id) {
+    const r = (State.requests || {})[id]; if (!r) return;
+    if (!confirm('Voltar esta solicitação ao início para tentar autorizar de novo?')) return;
+    DB.update(`requests/${id}`, { status: 'Solicitado', gestorNome: null, gestorNumero: null }).then(() => {
+      App._logActivity?.('Solicitações', 'Solicitação negada reaberta (voltou ao início)', App.reqSummary(r));
+      App.renderRequests(); App.updatePendingBadge?.();
+    });
+  },
+
+  // ── Configurações — múltiplos gestores ─────────────────────────
+  salvarGestor() {
+    const nomeEl = document.getElementById('gestor-nome-input');
+    const numEl  = document.getElementById('gestor-whats-input');
+    const nome = (nomeEl?.value || '').trim();
+    const num  = (numEl?.value || '').replace(/\D/g, '');
+    if (!num) { toast('Informe o número do gestor.', 'error'); return; }
+    DB.push('config/gestores', { nome: nome || 'Gestor', numero: num }).then(() => {
+      if (nomeEl) nomeEl.value = ''; if (numEl) numEl.value = '';
+      toast('✓ Gestor cadastrado.');
+      App.renderGestores();
+    });
+  },
+  removerGestor(gid) {
+    if (!confirm('Remover este gestor?')) return;
+    DB.remove(`config/gestores/${gid}`).then(() => App.renderGestores());
+  },
+  // Formata o input do número ao vivo (88981765537 → +55 (88) 9 8176-5537)
+  _formatGestorInput() {
+    const el = document.getElementById('gestor-whats-input');
+    if (!el) return;
+    let d = el.value.replace(/\D/g, '').replace(/^0+/, '');
+    if (d.startsWith('55')) d = d.slice(2);
+    d = d.slice(0, 11);
+    if (!d) { el.value = ''; return; }
+    let out = '+55 ';
+    out += '(' + d.slice(0, 2);
+    if (d.length >= 2) out += ')';
+    if (d.length > 2) out += ' ' + d.slice(2, 3);
+    if (d.length > 3) out += ' ' + d.slice(3, 7);
+    if (d.length > 7) out += '-' + d.slice(7, 11);
+    el.value = out;
+  },
+  renderGestores() {
+    const box = document.getElementById('list-gestores');
+    if (!box) return;
+    const arr = App._gestoresList();
+    box.innerHTML = arr.length
+      ? arr.map(g => `<div class="settings-list-item">
+          <span><strong>${g.nome || 'Gestor'}</strong> · ${App._fmtNumeroDisplay(g.numero)}</span>
+          ${g.id !== 'legacy' ? `<button class="btn-ico btn-ico-del" onclick="App.removerGestor('${g.id}')" title="Remover">${App._svg('trash')}</button>` : ''}
+        </div>`).join('')
+      : '<div style="color:var(--gray-500);font-size:.85rem;padding:8px">Nenhum gestor cadastrado.</div>';
+  },
+  _syncGestorField() { App.renderGestores(); },
+
+  // Corrige a grafia do grupo "Concerto" → "Conserto" (idempotente).
+  _migrarGrupoConserto() {
+    const groups = State.groups || {};
+    Object.entries(groups).forEach(([id, name]) => {
+      if (/concerto/i.test(name) && !/conserto/i.test(name)) {
+        const novo = String(name).replace(/concerto/gi, seg => seg[0] === seg[0].toUpperCase() ? 'Conserto' : 'conserto');
+        DB.set(`groups/${id}`, novo);
+      }
+    });
+  },
+
+  // O grupo cadastrado (groups/{id}) já virou "Conserto" há tempos — mas
+  // solicitações antigas guardam uma CÓPIA do nome (groupName) tirada na hora
+  // em que foram criadas, e essa cópia não se atualiza sozinha quando o grupo
+  // é renomeado. Corrige as que ainda têm a grafia velha exata "Concerto".
+  // Idempotente (trava por sessão, só escreve o que ainda estiver errado).
+  _consertoNomeFixFeito: false,
+  _migrarNomeConsertoRequests() {
+    if (App._consertoNomeFixFeito) return;
+    App._consertoNomeFixFeito = true;
+    Object.entries(State.requests || {})
+      .filter(([, r]) => r && r.groupName === 'Concerto')
+      .forEach(([id]) => DB.set(`requests/${id}/groupName`, 'Conserto'));
+  },
+
+  // Puxa o gestor legado (número único antigo em config.gestorWhats) pra dentro
+  // de config/gestores, virando um item normal e deletável no Config. Idempotente.
+  _migrarGestorLegacy() {
+    const cfg = State.config || {};
+    const legacy = (cfg.gestorWhats || '').replace(/\D/g, '');
+    if (!legacy) return;
+    const gestores = cfg.gestores || {};
+    const jaTem = Object.values(gestores).some(v => ((v && v.numero) || '').replace(/\D/g, '') === legacy);
+    if (jaTem) { DB.remove('config/gestorWhats'); return; }
+    DB.push('config/gestores', { nome: cfg.gestorNome || 'Gestor', numero: legacy })
+      .then(() => DB.remove('config/gestorWhats'));
+  },
+
+  // Cor lilás por código de compra — mesma compra = mesmo tom
+  _compraColor(codigo) {
+    const pal = [
+      { b: '#7c52d4', g: '#f5f1fe' },
+      { b: '#9333ea', g: '#f9f2ff' },
+      { b: '#6366f1', g: '#eff0ff' },
+      { b: '#a855f7', g: '#faf4ff' },
+      { b: '#7e22ce', g: '#f6effb' }
+    ];
+    let h = 0;
+    for (const ch of String(codigo || '')) h = (h + ch.charCodeAt(0)) % pal.length;
+    return pal[h];
+  },
+
+  _populateReqFilters() {
+    const units = Object.values(State.units||{});
+    const groups = Object.values(State.groups||{});
+    const fu = document.getElementById('filter-unit-req');
+    const fg = document.getElementById('filter-group-req');
+    if (fu) {
+      const cur=fu.value; fu.innerHTML='<option value="">Todas as unidades</option>';
+      units.forEach(u => { const o=document.createElement('option'); o.value=o.textContent=u; if(u===cur)o.selected=true; fu.appendChild(o); });
+      // "Estoque Central" não é uma unidade cadastrada (State.units) — é só o nome usado
+      // nas entradas criadas direto pela aba Estoque, mas precisa aparecer aqui pra filtrar.
+      const oc = document.createElement('option');
+      oc.value = oc.textContent = 'Estoque Central';
+      if (cur === 'Estoque Central') oc.selected = true;
+      fu.appendChild(oc);
+    }
+    if (fg) {
+      const cur=fg.value; fg.innerHTML='<option value="">Todos os grupos</option>';
+      groups.forEach(g => { const o=document.createElement('option'); o.value=o.textContent=g; if(g===cur)o.selected=true; fg.appendChild(o); });
+    }
+    // Subgrupo: catálogo de State.subgroups (Mapeamento Interno), filtrado pelo
+    // grupo selecionado no filtro (se nenhum grupo escolhido, mostra todos).
+    const fsg = document.getElementById('filter-subgroup-req');
+    if (fsg) {
+      const cur = fsg.value;
+      const fGroupSel = document.getElementById('filter-group-req')?.value || '';
+      const nomes = new Set();
+      Object.entries(State.subgroups||{}).forEach(([gid, list]) => {
+        const gname = State.groups?.[gid] || '';
+        if (fGroupSel && gname !== fGroupSel) return;
+        (list||[]).forEach(sg => { if (sg) nomes.add(sg); });
+      });
+      fsg.innerHTML = '<option value="">Todos</option>';
+      [...nomes].sort((a,b)=>a.localeCompare(b)).forEach(sg => {
+        const o=document.createElement('option'); o.value=o.textContent=sg; if(sg===cur)o.selected=true; fsg.appendChild(o);
+      });
+    }
+  },
+
+  reqSummary(r) {
+    const n = (r.groupName||'').toLowerCase();
+    let text;
+    if (n.includes('tinta') && (r.num||r.nums||r.cor||r.cores)) {
+      const num = r.num||r.nums||''; const cor = r.cor||r.cores||'';
+      text = [num, cor].filter(Boolean).join(' · ') || 'TINTA';
+    } else if (App._isConserto(n) && (r.equipamento||r.batModel||r.modelo)) {
+      // Conserto: equipamento consertado + motivo do conserto (observação fica separada, não entra aqui)
+      const eq = r.equipamento || r.batModel || r.modelo || '';
+      text = [eq, r.reason].filter(Boolean).join(' — ');
+    } else if ((n.includes('pilha')||n.includes('bateria')||n.includes('conserto')||n.includes('concerto')) && (r.batModel||r.batModels||r.modelo)) {
+      if (r.batModel)   text = `${r.batModel} ×${r.qty||1}`;
+      else if (r.batModels) text = r.batModels.map(b=>`${b.modelo} ×${b.qty}`).join(' | ');
+      else text = `${r.modelo||''} ×${r.qty||1}`;
+    } else if (r.product || r.reason) {
+      // Outros: mostra produto e motivo separados por " — "
+      const parts = [r.product, r.reason].filter(Boolean);
+      text = parts.join(' — ') || '—';
+    } else {
+      // Sem campos de tipo (ex.: entrada de estoque) → produto + quantidade, no padrão dos demais
+      text = r.descricao ? `${r.descricao}${r.quantidade ? ' ×' + r.quantidade : ''}` : '—';
+    }
+    return text ? text.toUpperCase() : '—';
+  },
+
+  statusBadge(s) {
+    const m = { Solicitado:'sol',Aguardando:'agu',Comprado:'com',Estoque:'est',Negado:'neg' };
+    return `<span class="badge badge-${m[s]||'sol'}">${s||'Solicitado'}</span>`;
+  },
+
+  /* ── MODAL ────────────────────────────────── */
+  // opts.soloCompra = fluxo de autorização já aprovado → libera só Comprado/Estoque
+  openModal(id, opts = {}) {
+    const r = (State.requests||{})[id]; if (!r) return;
+    if (r.origemEstoque) {
+      toast('Entrada criada pela aba Estoque. Edite grupo/produto/fornecedor/quantidade por lá.', 'error');
+      App.showSolicitacaoView(id);
+      return;
+    }
+    State.editingRequestId = id;
+    State.modalStatus = r.status||'Solicitado';
+
+    // ── Limpar TODOS os campos antes de preencher ──────────────────
+    ['modal-created-date','modal-buy-date','modal-supplier','modal-requester','modal-qty',
+     'modal-val','modal-total','modal-desc','modal-tech-desc',
+     'modal-parcelas-n','modal-parcela-val','modal-ship-date',
+     'modal-qty-enviada','modal-qty-resto',
+     'modal-combo-estoque-qty','modal-combo-estoque-disp'].forEach(fid => {
+      const el = document.getElementById(fid); if (el) el.value = '';
+    });
+    const cchk = document.getElementById('chk-combo-estoque');
+    if (cchk) cchk.checked = false;
+    document.getElementById('combo-estoque-fields')?.classList.add('hidden');
+    document.getElementById('combo-estoque-warn')?.classList.add('hidden');
+    document.getElementById('chk-parcelas').checked = false;
+    document.getElementById('parcelas-wrap').classList.add('hidden');
+    document.getElementById('modal-shipped').value = 'Não';
+    document.getElementById('modal-supplier').style.display = 'none';
+    const fpSel = document.getElementById('modal-forma-pagamento');
+    if (fpSel) fpSel.value = r.formaPagamento || 'dinheiro';
+    // ──────────────────────────────────────────────────────────────
+
+    document.getElementById('modal-title').textContent = `${r.seq != null ? 'SL-'+r.seq+' · ' : ''}${r.unitName} — ${r.groupName}`;
+    document.getElementById('modal-header-badge').innerHTML = App.statusBadge(r.status) +
+      ((parseFloat(r.estoqueComboQty) || 0) > 0 ? ' <span class="badge badge-est">Estoque</span>' : '');
+    // Parse date avoiding UTC timezone shift
+    let d = '—';
+    if (r.createdAt) {
+      const [my, mm, md] = r.createdAt.substring(0,10).split('-');
+      const timeStr = r.createdAt.length > 10
+        ? ' ' + r.createdAt.substring(11,16).replace('T','')
+        : '';
+      d = `${md}/${mm}/${my}${timeStr}`;
+    }
+    // Build extra info for Outros (product+reason) and obs for all
+    const normGrp = (r.groupName||'').toLowerCase();
+    const isOutros = !normGrp.includes('tinta') && !normGrp.includes('pilha') && !normGrp.includes('bateria');
+    const extraLines = [];
+    if (isOutros) {
+      if (r.product) extraLines.push(`<strong>Produto:</strong> ${r.product}`);
+      if (r.reason)  extraLines.push(`<strong>Motivo:</strong> ${r.reason}`);
+    }
+    if (r.obs) extraLines.push(`<strong>Observação:</strong> ${r.obs}`);
+
+    document.getElementById('modal-info').innerHTML = `
+      <strong>Data:</strong> ${d}<br>
+      <strong>Unidade:</strong> ${r.unitName||'—'}<br>
+      <strong>Grupo:</strong> ${r.groupName||'—'}<br>
+      <strong>Resumo:</strong> ${App.reqSummary(r)}<br>
+      ${r.urgent ? '<strong style="color:var(--orange)">🚨 URGENTE</strong><br>' : ''}
+      ${extraLines.length ? extraLines.join('<br>') : ''}
+      ${App._infoAutorizacao(r)}
+    `;
+
+    // Restrição de status: fluxo de autorização aprovado só libera Comprado/Estoque.
+    // Gerenciar normal (sem soloCompra) mostra todos os botões, como sempre.
+    const solo = !!opts.soloCompra;
+    State.modalSolo = solo;   // solo = veio do fluxo do gestor (mantém gestor na tag)
+    if (opts.preStatus) State.modalStatus = opts.preStatus;
+    else if (solo && State.modalStatus !== 'Comprado' && State.modalStatus !== 'Estoque') State.modalStatus = 'Comprado';
+    document.querySelectorAll('.status-btn').forEach(b => {
+      b.style.display = (!solo || b.dataset.s === 'Comprado' || b.dataset.s === 'Estoque') ? '' : 'none';
+    });
+
+    document.querySelectorAll('.status-btn').forEach(b => b.classList.toggle('active', b.dataset.s===State.modalStatus));
+    App.toggleModalFields(State.modalStatus);
+
+    // ── Subgrupo: popular lista filtrada pelo grupo da solicitação ──
+    const sgAlways = document.getElementById('modal-subgroup-always-sel');
+    if (sgAlways) {
+      sgAlways.innerHTML = '<option value="">— Selecione —</option>';
+      Object.entries(State.subgroups||{}).forEach(([gid, list]) => {
+        const gname = State.groups?.[gid]||'';
+        const matchById   = r.groupId   && gid === r.groupId;
+        const matchByName = r.groupName && gname.toLowerCase() === r.groupName.toLowerCase();
+        if (!matchById && !matchByName) return;
+        list.forEach(sg => {
+          const o = document.createElement('option');
+          o.value = sg; o.textContent = sg;
+          sgAlways.appendChild(o);
+        });
+      });
+      // Forçar o valor DEPOIS de popular (evita race com o.selected)
+      sgAlways.value = r.subgrupo || '';
+    }
+    const sgOld = document.getElementById('modal-subgroup');
+    if (sgOld) sgOld.innerHTML = '';
+
+    // ── Fornecedor: popular select e forçar valor ──────────────────
+    App.renderSuppliersAdmin?.();
+    const mSup = document.getElementById('modal-supplier-sel');
+    if (mSup) {
+      // Tenta setar pelo valor direto
+      mSup.value = r.fornecedor || '';
+      if (mSup.value !== (r.fornecedor||'') || mSup.value === '') {
+        // Fornecedor não está na lista → modo manual
+        if (r.fornecedor) {
+          mSup.value = '__manual__';
+          const supInp = document.getElementById('modal-supplier');
+          supInp.style.display = '';
+          supInp.value = r.fornecedor;
+        }
+      }
+    }
+
+    // ── Data da solicitação ────────────────────────────────────────
+    const createdDateEl = document.getElementById('modal-created-date');
+    if (createdDateEl) {
+      // Convert ISO datetime to YYYY-MM-DD for the date input
+      createdDateEl.value = r.createdAt ? r.createdAt.substring(0,10) : '';
+    }
+
+    // ── Campos da compra ───────────────────────────────────────────
+    // Data da compra: só preenche se já existe valor salvo
+    document.getElementById('modal-buy-date').value = r.boughtAt ? r.boughtAt.substring(0,10) : '';
+    App._popularSelectSetor('modal-requester', r.unitId, r.solicitante || '');
+    document.getElementById('modal-qty').value        = r.quantidade  || '';
+    const qEnvEl = document.getElementById('modal-qty-enviada');
+    if (qEnvEl) qEnvEl.value = r.qtdEnviada != null ? r.qtdEnviada : '';
+    document.getElementById('modal-val').value        = r.valor       || '';
+    document.getElementById('modal-desc').value       = r.descricao   || '';
+    document.getElementById('modal-tech-desc').value  = r.descTecnica || '';
+    if (r.valorTotal) {
+      document.getElementById('modal-total').value =
+        'R$ ' + parseFloat(r.valorTotal).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    }
+
+    // ── Parcelas ───────────────────────────────────────────────────
+    const hp = !!(r.parcelas && r.parcelas.length);
+    document.getElementById('chk-parcelas').checked = hp;
+    document.getElementById('parcelas-wrap').classList.toggle('hidden', !hp);
+    if (hp) {
+      document.getElementById('modal-parcelas-n').value = r.parcelas.length;
+      const pv = parseFloat(r.parcelas[0]?.valor||0);
+      if (pv) document.getElementById('modal-parcela-val').value =
+        'R$ ' + pv.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    }
+
+    // ── Envio ──────────────────────────────────────────────────────
+    document.getElementById('modal-shipped').value = r.shippedStatus || 'Não';
+    // Data envio: só preenche se já existe valor salvo
+    document.getElementById('modal-ship-date').value = r.shippedAt ? r.shippedAt.substring(0,10) : '';
+    App.toggleShipDate();
+
+    // ── Combo estoque (Comprado + Estoque) ─────────────────────────
+    const comboChk = document.getElementById('chk-combo-estoque');
+    const comboHas = !!(r.estoqueComboItemId && parseFloat(r.estoqueComboQty) > 0);
+    if (comboChk) {
+      comboChk.checked = comboHas;
+      document.getElementById('combo-estoque-fields')?.classList.toggle('hidden', !comboHas);
+      document.getElementById('combo-estoque-warn')?.classList.add('hidden');
+      if (comboHas) {
+        App.loadComboEstoque();
+        const csel = document.getElementById('modal-combo-estoque-sel');
+        if (csel) { csel.value = r.estoqueComboItemId; App.onComboEstoqueSelChange(); }
+        const cqty = document.getElementById('modal-combo-estoque-qty');
+        if (cqty) cqty.value = r.estoqueComboQty;
+      } else {
+        const csel = document.getElementById('modal-combo-estoque-sel'); if (csel) csel.value = '';
+        const cqty = document.getElementById('modal-combo-estoque-qty'); if (cqty) cqty.value = '';
+        const cdisp = document.getElementById('modal-combo-estoque-disp'); if (cdisp) cdisp.value = '';
+      }
+    }
+
+    // ── Modo somente-leitura (autorização já concluída, botão ✓ da linha) ──
+    // Status continua visível (só trava, não esconde). Quem some por trás de
+    // um "olhinho" — sempre oculto ao abrir — são os Dados da Compra/Estoque.
+    // Trava toda a edição: só o Gerenciar (lápis) permite alterar.
+    const readOnly = !!opts.readOnly;
+    State.modalReadOnly = readOnly;
+    document.getElementById('modal-dados-toggle-row')?.classList.toggle('hidden', !readOnly);
+    const dadosLabel = document.getElementById('modal-dados-toggle-label');
+    if (dadosLabel) dadosLabel.textContent = 'Dados da compra/estoque ocultos';
+    const dadosEye = document.getElementById('modal-dados-eye');
+    if (dadosEye) dadosEye.title = 'Mostrar dados da compra/estoque';
+    ['modal-bought-fields', 'modal-estoque-panel', 'modal-shipping-fields'].forEach(fid => {
+      document.getElementById(fid)?.classList.toggle('dados-readonly-hidden', readOnly);
+    });
+    document.querySelector('#modal-request .modal-card')?.classList.toggle('modal-readonly', readOnly);
+    document.querySelectorAll('#modal-request input, #modal-request select, #modal-request textarea, #modal-request .status-btn').forEach(el => { el.disabled = readOnly; });
+    document.getElementById('modal-btn-delete')?.classList.toggle('hidden', readOnly);
+    document.getElementById('modal-btn-save')?.classList.toggle('hidden', readOnly);
+
+    document.getElementById('modal-request').classList.remove('hidden');
+  },
+
+  // Olhinho dos Dados da Compra/Estoque no modo somente-leitura: sempre começa
+  // oculto ao abrir o modal (só esconde/mostra, não altera nada).
+  toggleModalDadosVisibility() {
+    const bought   = document.getElementById('modal-bought-fields');
+    const estoque  = document.getElementById('modal-estoque-panel');
+    const shipping = document.getElementById('modal-shipping-fields');
+    const label    = document.getElementById('modal-dados-toggle-label');
+    const btn      = document.getElementById('modal-dados-eye');
+    const estavaOculto = bought?.classList.contains('dados-readonly-hidden') || estoque?.classList.contains('dados-readonly-hidden') || shipping?.classList.contains('dados-readonly-hidden');
+    [bought, estoque, shipping].forEach(el => el?.classList.toggle('dados-readonly-hidden', !estavaOculto));
+    if (label) label.textContent = estavaOculto ? 'Dados da compra/estoque visíveis' : 'Dados da compra/estoque ocultos';
+    if (btn) btn.title = estavaOculto ? 'Ocultar dados da compra/estoque' : 'Mostrar dados da compra/estoque';
+  },
+
+  closeModal() {
+    document.getElementById('modal-request').classList.add('hidden');
+    State.editingRequestId = null; State.modalStatus = null;
+  },
+
+  // Campos gravados na compra/envio/estoque — zerados quando solicitação deixa de ser
+  // Comprado/Estoque (troca de status reseta o que sobrou; delete de item de estoque reverte).
+  _camposCompraReset() {
+    return {
+      boughtAt: null, fornecedor: null, valor: null, valorTotal: null, parcelas: null,
+      quantidade: null, descricao: null, descTecnica: null, solicitante: null, formaPagamento: null,
+      qtdEnviada: null, shippedStatus: 'Não', shippedAt: null,
+      estoqueItemId: null, estoqueQtyUsed: null, estoqueMovId: null, estoqueDeduzido: null,
+      estoqueComboItemId: null, estoqueComboQty: null, estoqueProcessado: null,
+      estoqueComboProcessado: null, estoqueComboMovId: null, estoqueComboDeduzido: null
+    };
+  },
+
+  // Remove itens de estoque auto-gerados por uma compra + seus movimentos + a flag.
+  // Usado ao reverter uma solicitação que era Comprado (senão sobra estoque órfão).
+  async _removerEstoqueAutoDoReq(reqId) {
+    const ops = [];
+    Object.entries(State.estoque || {}).forEach(([eid, it]) => {
+      if (it.reqId !== reqId || !it.auto) return;
+      ops.push(DB.remove(`estoque/${eid}`));
+      Object.entries(State.estoqueMov || {}).forEach(([mid, m]) => {
+        if (m.estoqueId === eid) ops.push(DB.remove(`estoqueMov/${mid}`));
+      });
+    });
+    ops.push(DB.remove(`requests/${reqId}/estoqueProcessado`));
+    await Promise.all(ops);
+  },
+
+  confirmDelete(id) {
+    if (!confirm('Tem certeza que deseja apagar esta solicitação? Esta ação não pode ser desfeita.')) return;
+    App._apagarSolicitacaoCascata(id)
+      .then(() => { toast('Solicitação apagada.'); App.renderRequests(); App.renderDashboard(); App.updatePendingBadge(); App.renderEstoque?.(); })
+      .catch(() => toast('Erro ao apagar.','error'));
+  },
+
+  deleteRequest() {
+    const id = State.editingRequestId;
+    if (!id) return;
+    if (!confirm('Tem certeza que deseja apagar esta solicitação? Esta ação não pode ser desfeita.')) return;
+    App._apagarSolicitacaoCascata(id)
+      .then(() => { toast('Solicitação apagada.'); App.closeModal(); App.renderRequests(); App.renderDashboard(); App.updatePendingBadge(); App.renderEstoque?.(); })
+      .catch(() => toast('Erro ao apagar.','error'));
+  },
+
+  // Apaga a solicitação; se veio de uma entrada de estoque (origemEstoque), apaga em cascata
+  // também o item de estoque e as entradas/saídas do mesmo lote (mesma transação, os dois lados somem juntos).
+  // Depois fecha a lacuna de numeração (SL seguintes descem uma posição).
+  async _apagarSolicitacaoCascata(id) {
+    const r = (State.requests || {})[id];
+    const ops = [DB.remove(`requests/${id}`)];
+    if (r?.origemEstoque) {
+      Object.entries(State.estoque || {}).forEach(([eid, it]) => {
+        if (it.reqId !== id) return;
+        ops.push(DB.remove(`estoque/${eid}`));
+        Object.entries(State.estoqueMov || {}).forEach(([mid, m]) => {
+          if (m.estoqueId === eid) ops.push(DB.remove(`estoqueMov/${mid}`));
+        });
+      });
+    }
+    await Promise.all(ops);
+    await App._renumerarSeq([id]);
+    App._logActivity('Solicitações', 'Solicitação excluída', `${r?.unitName||'—'} · ${r?.groupName||'—'}${r?.seq!=null?' · SL-'+r.seq:''}`);
+  },
+
+  setModalStatus(btn) {
+    State.modalStatus = btn.dataset.s;
+    document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    App.toggleModalFields(State.modalStatus);
+    if (State.modalStatus==='Comprado') {
+      // Data da compra = data da solicitação (campo modal-created-date) — sempre atualiza
+      const createdDate = document.getElementById('modal-created-date')?.value || '';
+      const de = document.getElementById('modal-buy-date');
+      de.value = createdDate;
+      // Data do envio = data da compra — sempre atualiza
+      const se = document.getElementById('modal-ship-date');
+      se.value = createdDate;
+      // Quantidade enviada default = quantidade comprada
+      const qEnv = document.getElementById('modal-qty-enviada');
+      const qComp = document.getElementById('modal-qty')?.value || '';
+      if (qEnv && !qEnv.value) qEnv.value = qComp;
+      App.calcRestoEstoque();
+    }
+  },
+
+  toggleModalFields(status) {
+    document.getElementById('modal-bought-fields').classList.toggle('hidden', status!=='Comprado');
+    document.getElementById('modal-shipping-fields').classList.toggle('hidden', status!=='Comprado'&&status!=='Estoque');
+    const ep = document.getElementById('modal-estoque-panel');
+    if (ep) {
+      const show = status === 'Estoque';
+      ep.classList.toggle('hidden', !show);
+      if (show) App.loadEstoqueParaModal();
+    }
+    // Quantidade enviada — só no Comprado
+    const qew = document.getElementById('modal-qty-enviada-wrap');
+    if (qew) {
+      qew.classList.toggle('hidden', status !== 'Comprado');
+      if (status === 'Comprado') App.calcRestoEstoque();
+    }
+    // Combo estoque — só no Comprado
+    const cw = document.getElementById('modal-combo-estoque-wrap');
+    if (cw) cw.classList.toggle('hidden', status !== 'Comprado');
+  },
+
+  // Combo: liga/desliga o bloco "também enviar itens do estoque"
+  toggleComboEstoque() {
+    const on = document.getElementById('chk-combo-estoque')?.checked;
+    document.getElementById('combo-estoque-fields')?.classList.toggle('hidden', !on);
+    if (on) App.loadComboEstoque();
+  },
+
+  // Popula o select do combo com itens de estoque do grupo/subgrupo da solicitação
+  loadComboEstoque() {
+    const r = (State.requests || {})[State.editingRequestId]; if (!r) return;
+    const grupo    = (r.groupName || '').toLowerCase();
+    const subgrupo = (r.subgrupo  || '').toLowerCase();
+    const matches = Object.entries(State.estoque || {}).filter(([, item]) => {
+      const ig = (item.grupo || '').toLowerCase();
+      const is = (item.subgrupo || '').toLowerCase();
+      const grupoOk = ig.includes(grupo) || grupo.includes(ig);
+      const subOk   = !subgrupo || !is || is.includes(subgrupo) || subgrupo.includes(is);
+      return grupoOk && subOk && parseFloat(item.quantidade || 0) > 0;
+    });
+    const sel = document.getElementById('modal-combo-estoque-sel');
+    if (sel) {
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">— Selecione —</option>' +
+        matches.map(([id, item]) =>
+          `<option value="${id}" data-qtd="${item.quantidade}">${item.produto} (${item.quantidade} ${item.unidade||'un'})</option>`
+        ).join('');
+      sel.value = cur && matches.some(([id]) => id === cur) ? cur : '';
+    }
+    App.onComboEstoqueSelChange();
+  },
+
+  onComboEstoqueSelChange() {
+    const sel  = document.getElementById('modal-combo-estoque-sel');
+    const disp = document.getElementById('modal-combo-estoque-disp');
+    if (!sel || !disp) return;
+    const opt = sel.selectedOptions[0];
+    disp.value = opt?.dataset?.qtd ? `${opt.dataset.qtd} disponível(is)` : '';
+    App.validateComboQty();
+  },
+
+  // Valida qtd do combo: não pode passar do disponível em estoque
+  validateComboQty() {
+    const sel  = document.getElementById('modal-combo-estoque-sel');
+    const qtyEl = document.getElementById('modal-combo-estoque-qty');
+    const warn = document.getElementById('combo-estoque-warn');
+    if (!sel || !qtyEl) return true;
+    const disp = parseFloat(sel.selectedOptions[0]?.dataset?.qtd || 0);
+    const want = parseFloat(qtyEl.value || 0);
+    const ok = want <= disp;
+    if (warn) {
+      warn.classList.toggle('hidden', ok);
+      if (!ok) warn.textContent = `Quantidade insuficiente em estoque. Disponível: ${disp}.`;
+    }
+    qtyEl.style.borderColor = ok ? '' : '#d94040';
+    return ok;
+  },
+
+  // Calcula quanto sobra para o estoque (comprado − enviado)
+  calcRestoEstoque() {
+    const comprada = parseFloat(document.getElementById('modal-qty')?.value) || 0;
+    const enviadaEl = document.getElementById('modal-qty-enviada');
+    let enviada = parseFloat(enviadaEl?.value);
+    if (isNaN(enviada)) { enviada = comprada; }
+    const resto = Math.max(0, comprada - enviada);
+    const rEl = document.getElementById('modal-qty-resto');
+    if (rEl) rEl.value = `${resto} un`;
+  },
+
+  toggleParcelas() {
+    document.getElementById('parcelas-wrap').classList.toggle('hidden', !document.getElementById('chk-parcelas').checked);
+    App.calcTotal();
+  },
+
+  toggleShipDate() {
+    document.getElementById('ship-date-wrap').style.display = document.getElementById('modal-shipped').value==='Sim' ? '' : 'none';
+  },
+
+  calcTotal() {
+    const qty = parseFloat(document.getElementById('modal-qty').value)||0;
+    const val = parseFloat(document.getElementById('modal-val').value)||0;
+    const total = qty*val;
+    document.getElementById('modal-total').value = total ? 'R$ '+total.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '';
+    if (document.getElementById('chk-parcelas').checked) {
+      const n = parseInt(document.getElementById('modal-parcelas-n').value)||1;
+      const pv = n>0 ? total/n : 0;
+      document.getElementById('modal-parcela-val').value = 'R$ '+pv.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    }
+    App.calcRestoEstoque();
+  },
+
+  saveModalRequest() {
+    const id = State.editingRequestId; if (!id) return;
+
+    // ── Validações de bloqueio (estoque insuficiente / envio > compra) ──
+    if (State.modalStatus === 'Estoque') {
+      const sel = document.getElementById('modal-estoque-sel');
+      const qtyEl = document.getElementById('modal-estoque-qty');
+      if (sel?.value && qtyEl?.value) {
+        const disp = parseFloat(State.estoque?.[sel.value]?.quantidade || 0);
+        const want = parseFloat(qtyEl.value || 0);
+        if (want > disp) { toast(`Quantidade insuficiente em estoque. Disponível: ${disp}.`, 'error'); return; }
+      }
+    }
+    if (State.modalStatus === 'Comprado') {
+      // Valor é OBRIGATÓRIO pra concluir a compra — só prossegue se tiver valor.
+      // Exceção: "Nova entrada (sem custo)" é Comprado com valor 0 de propósito.
+      const rAtual = (State.requests || {})[id] || {};
+      if (!rAtual.entradaSemCusto) {
+        const valNum = parseFloat(document.getElementById('modal-val')?.value || 0);
+        if (!(valNum > 0)) { toast('Informe o VALOR para concluir a compra.', 'error'); document.getElementById('modal-val')?.focus(); return; }
+      }
+      const comprada = parseFloat(document.getElementById('modal-qty')?.value || 0);
+      const enviada  = parseFloat(document.getElementById('modal-qty-enviada')?.value || 0);
+      if (enviada > comprada) { toast(`Não pode enviar mais do que comprou. Comprado: ${comprada}.`, 'error'); return; }
+      // Combo estoque
+      if (document.getElementById('chk-combo-estoque')?.checked) {
+        const csel = document.getElementById('modal-combo-estoque-sel');
+        const cqty = document.getElementById('modal-combo-estoque-qty');
+        if (csel?.value && cqty?.value) {
+          const disp = parseFloat(State.estoque?.[csel.value]?.quantidade || 0);
+          const want = parseFloat(cqty.value || 0);
+          if (want > disp) { toast(`Estoque insuficiente para o envio combinado. Disponível: ${disp}.`, 'error'); return; }
+        }
+      }
+    }
+
+    const prevR = { ...((State.requests||{})[id] || {}) };   // snapshot antes do update (p/ reverter estoque)
+    const prevStatus = prevR.status;
+    const st = State.modalStatus;
+    const upd = { status: st };
+
+    // Mapeia QUEM concluiu: comprar/negar pelo GERENCIAR (não-solo) é ação do
+    // usuário logado — e limpa o gestor antigo (o usuário assumiu). O fluxo do
+    // gestor (solo) mantém o gestor vinculado na tag.
+    const viaGerenciar = !State.modalSolo;
+    if (st === 'Comprado' || st === 'Estoque' || st === 'Negado') {
+      if (viaGerenciar) {
+        upd.usuarioResp = State.adminUser || '—';
+        upd.usuarioRespAt = new Date().toISOString();
+        upd.gestorNome = null; upd.gestorNumero = null;   // Gerenciar → mostra o usuário, não o gestor antigo
+      } else {
+        upd.usuarioResp = prevR.usuarioResp || State.adminUser || '—';
+        upd.usuarioRespAt = prevR.usuarioRespAt || new Date().toISOString();
+      }
+    } else {
+      upd.usuarioResp = null; upd.usuarioRespAt = null;   // saiu da conclusão → limpa
+    }
+
+    // Troca de status reseta dados que não pertencem ao novo status.
+    // Sem compra (Solicitado/Aguardando/Negado ou indo p/ Estoque) → limpa campos de compra.
+    if (st !== 'Comprado') {
+      Object.assign(upd, {
+        boughtAt: null, fornecedor: null, valor: null, valorTotal: null, parcelas: null,
+        quantidade: null, descricao: null, descTecnica: null, solicitante: null, formaPagamento: null,
+        qtdEnviada: null, estoqueComboItemId: null, estoqueComboQty: null, estoqueProcessado: null
+      });
+    }
+    // Nem Comprado nem Estoque → também limpa envio e referência de estoque usado.
+    if (st !== 'Comprado' && st !== 'Estoque') {
+      Object.assign(upd, { shippedStatus: 'Não', shippedAt: null, estoqueItemId: null, estoqueQtyUsed: null });
+    }
+    // Voltar para SOLICITADO reseta TUDO: dinheiro, tags de autorização e vínculo
+    // de compra combinada — a solicitação recomeça do zero.
+    if (st === 'Solicitado') {
+      Object.assign(upd, {
+        gestorNome: null, gestorNumero: null, usuarioResp: null, usuarioRespAt: null,
+        compraCodigo: null, compraId: null, statusAntesCombinada: null
+      });
+    }
+
+    // Data da solicitação (editável pelo admin)
+    const createdDateEl = document.getElementById('modal-created-date');
+    if (createdDateEl && createdDateEl.value) {
+      // Preserve time portion from original if it exists, else use midnight
+      const r = (State.requests||{})[State.editingRequestId] || {};
+      const origTime = r.createdAt ? r.createdAt.substring(10) : 'T00:00:00.000Z';
+      upd.createdAt = createdDateEl.value + origTime;
+    }
+
+    // Subgrupo: always save from the always-visible selector
+    const sgSel = document.getElementById('modal-subgroup-always-sel');
+    upd.subgrupo = sgSel ? sgSel.value : '';
+    if (State.modalStatus==='Comprado') {
+      upd.boughtAt    = document.getElementById('modal-buy-date').value||new Date().toISOString().substring(0,10);
+      const supSel = document.getElementById('modal-supplier-sel');
+      const supInp = document.getElementById('modal-supplier');
+      upd.fornecedor = (supSel?.value && supSel.value!=='__manual__') ? supSel.value : (supInp?.value||'');
+      upd.solicitante = document.getElementById('modal-requester').value;
+      upd.formaPagamento = document.getElementById('modal-forma-pagamento')?.value || 'dinheiro';
+      // subgrupo já salvo no topo (modal-subgroup-always-sel) — não sobrescreve
+      upd.quantidade  = document.getElementById('modal-qty').value;
+      upd.valor       = document.getElementById('modal-val').value;
+      upd.descricao   = document.getElementById('modal-desc').value;
+      upd.descTecnica = document.getElementById('modal-tech-desc').value;
+      upd.valorTotal  = ((parseFloat(upd.quantidade)||0)*(parseFloat(upd.valor)||0)).toFixed(2);
+      if (document.getElementById('chk-parcelas').checked) {
+        const n  = parseInt(document.getElementById('modal-parcelas-n').value)||2;
+        const pv = parseFloat(upd.valorTotal) / n;
+        // Parse the purchase date parts to avoid timezone shifts
+        const [baseY, baseM, baseD] = upd.boughtAt.split('-').map(Number);
+        upd.parcelas = Array.from({length: n}, (_, i) => {
+          let y = baseY, m = baseM - 1 + i; // month is 0-indexed here
+          y += Math.floor(m / 12);
+          m = m % 12;
+          // Clamp day to last day of target month (handles 31 → 30, etc.)
+          const lastDay = new Date(y, m + 1, 0).getDate();
+          const day     = Math.min(baseD, lastDay);
+          const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+          return {
+            date:  dateStr,                      // full date YYYY-MM-DD
+            month: dateStr.substring(0, 7),      // YYYY-MM (kept for backwards compat)
+            valor: pv.toFixed(2),
+            num:   i + 1,
+            total: n
+          };
+        });
+      } else { upd.parcelas = null; }
+    }
+    if (State.modalStatus==='Comprado'||State.modalStatus==='Estoque') {
+      upd.shippedStatus = document.getElementById('modal-shipped').value;
+      upd.shippedAt = upd.shippedStatus==='Sim' ? document.getElementById('modal-ship-date').value : null;
+    }
+    // Salva referência do item de estoque usado
+    if (State.modalStatus === 'Estoque') {
+      const esel = document.getElementById('modal-estoque-sel');
+      const eqty = document.getElementById('modal-estoque-qty');
+      upd.estoqueItemId  = esel?.value  || null;
+      upd.estoqueQtyUsed = eqty?.value  || null;
+    }
+    // Quantidade enviada (Comprado) — resto vai p/ estoque
+    if (State.modalStatus === 'Comprado') {
+      upd.qtdEnviada = document.getElementById('modal-qty-enviada')?.value || upd.quantidade;
+      // Combo: também enviar itens do estoque
+      if (document.getElementById('chk-combo-estoque')?.checked) {
+        upd.estoqueComboItemId = document.getElementById('modal-combo-estoque-sel')?.value || null;
+        upd.estoqueComboQty    = document.getElementById('modal-combo-estoque-qty')?.value || null;
+      } else {
+        upd.estoqueComboItemId = null;
+        upd.estoqueComboQty    = null;
+      }
+    }
+    DB.update(`requests/${id}`, upd)
+      .then(async () => {
+        // Saiu de Comprado → remove estoque auto-gerado antes (senão vira órfão)
+        if (prevStatus === 'Comprado' && st !== 'Comprado') await App._removerEstoqueAutoDoReq(id);
+        // Mudou de status → devolve ao estoque o que tinha sido deduzido (combo/retirada)
+        if (st !== prevStatus) await App._restaurarEstoqueDeduzido(id, prevR);
+      })
+      .then(() => {
+        if (st === 'Estoque') return App._deductEstoque();
+        if (st === 'Comprado') return App._processarCompraEstoque(id, upd).then(() => App._deductEstoqueCombo(id, upd));
+        return Promise.resolve();
+      })
+      .then(() => {
+        toast('✓ Solicitação atualizada!');
+        const quem = `${prevR.unitName || '—'} · ${prevR.groupName || '—'}${prevR.seq!=null?' · SL-'+prevR.seq:''}`;
+        // Detecta troca de valor do produto (na compra/edição) e registra antes → depois.
+        const fmtR = v => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const antV = parseFloat(prevR.valor ?? prevR.valorTotal ?? 0);
+        const novV = parseFloat(upd.valor ?? upd.valorTotal ?? prevR.valor ?? prevR.valorTotal ?? 0);
+        let acaoLog, detLog = quem;
+        if (st !== prevStatus) { acaoLog = `Status alterado: ${prevStatus||'—'} → ${st}`; }
+        else if (!isNaN(antV) && !isNaN(novV) && novV !== antV && (antV > 0 || novV > 0)) {
+          acaoLog = 'Valor do produto alterado'; detLog = `${quem} · ${fmtR(antV)} → ${fmtR(novV)}`;
+        } else { acaoLog = 'Solicitação editada'; }
+        App._logActivity('Solicitações', acaoLog, detLog);
+        App.closeModal(); App.renderRequests(); App.renderDashboard(); App.updatePendingBadge();
+      })
+      .catch(() => toast('Erro ao salvar.','error'));
+  },
+
+  // Resolve qtd enviada a partir dos dados do pedido (default: tudo enviado se shippedStatus=Sim)
+  _resolverEnviada(d, comprada) {
+    if (d.qtdEnviada != null && d.qtdEnviada !== '') return Math.min(comprada, parseFloat(d.qtdEnviada) || 0);
+    if (d.estoqueQtyUsed != null && d.estoqueQtyUsed !== '') return Math.min(comprada, parseFloat(d.estoqueQtyUsed) || 0);
+    return d.shippedStatus === 'Sim' ? comprada : 0;
+  },
+
+  // Comprado: cria UM item por compra (lote) com código próprio.
+  // Registra entrada (comprada) + saída (enviada); saldo do lote = resto (0 = zerado).
+  // NÃO mescla por nome — compras iguais em lotes diferentes têm códigos diferentes.
+  // loteOverride: usado pelo brinde, que herda o nº de lote da compra que o trouxe
+  // (marcado com REF) em vez de gerar um lote próprio.
+  _processarCompraEstoque(reqId, upd, loteOverride = null) {
+    const r = (State.requests || {})[reqId] || {};
+    if (r.estoqueProcessado) return Promise.resolve();
+    const d = { ...r, ...upd };  // mescla dados salvos + atuais
+
+    const grupo    = d.groupName || '';
+    const comprada = parseFloat(d.quantidade) || parseFloat(d.qty) || 0;
+    if (comprada <= 0) return Promise.resolve();
+    const enviada  = App._resolverEnviada(d, comprada);
+    const resto    = Math.max(0, comprada - enviada);   // saldo do lote (0 = zerado)
+
+    const subgrupo = d.subgrupo || '';
+    const produto  = (d.descricao || App.reqSummary(r) || grupo).trim();
+    const dataMov  = (d.shippedAt || d.boughtAt || (d.createdAt||'').substring(0,10) || new Date().toISOString().substring(0,10)).substring(0,10) + 'T00:00:00.000Z';
+    const lote     = loteOverride || App._gerarLote(d);
+
+    // 1 item de estoque por compra — push gera código único (EST-xxxxx)
+    const ref = DB.push('estoque', {
+      grupo, subgrupo, produto, quantidade: resto,
+      fornecedor: d.fornecedor || '', auto: true, reqId, lote,
+      updatedAt: new Date().toISOString()
+    });
+    const estoqueId = ref.key;
+
+    const itemBase = { produto, grupo, subgrupo, unidade: '', estoqueId, reqId };
+    const ops = [ref];
+    ops.push(App._logMov('entrada', itemBase, comprada, comprada,
+      { origem: `Compra · ${d.fornecedor || '—'}`, lote, data: dataMov, auto: true, estoqueId }));
+    if (enviada > 0) {
+      ops.push(App._logMov('saida', itemBase, enviada, resto,
+        { origem: `Envio · ${r.unitName || '—'}`, destino: r.unitName || '—', data: dataMov, auto: true, estoqueId }));
+    }
+    ops.push(DB.set(`requests/${reqId}/estoqueProcessado`, true));
+    return Promise.all(ops);
+  },
+
+  // Remove movimentos gerados por compra (auto OU legado por origem) + itens auto + reseta flags
+  async _limparImportInterno() {
+    const ehCompra = m => m.auto || /^(Compra|Envio)\s·/.test(m.origem || '');
+    const ops = [];
+    Object.entries(State.estoqueMov || {}).forEach(([mid, m]) => { if (ehCompra(m)) ops.push(DB.remove(`estoqueMov/${mid}`)); });
+    Object.entries(State.estoque   || {}).forEach(([eid, it]) => { if (it.auto)    ops.push(DB.remove(`estoque/${eid}`)); });
+    Object.entries(State.requests  || {}).forEach(([rid, r]) => { if (r.estoqueProcessado) ops.push(DB.remove(`requests/${rid}/estoqueProcessado`)); });
+    await Promise.all(ops);
+    return ops.length;
+  },
+
+  // Botão: limpa entradas/saídas geradas por compras
+  async limparMovimentacoes() {
+    if (!confirm('Apagar todas as ENTRADAS e SAÍDAS geradas por compras?\nItens e movimentos cadastrados manualmente são preservados.')) return;
+    const btn = document.getElementById('btn-limpar-mov');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Limpando…'; btn.disabled = true; }
+    try {
+      const n = await App._limparImportInterno();
+      toast(`✓ Limpo: ${n} registro(s) removido(s).`);
+    } catch (e) {
+      console.error('[limpar] erro', e);
+      toast('Erro ao limpar. Veja o console.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  // Backfill / Rebuild: apaga import anterior (auto) e refaz TODAS as compras → idempotente
+  async backfillEstoqueCompras() {
+    const btn = document.getElementById('btn-importar-compras');
+    const setBtn = (txt, dis) => { if (btn) { btn.innerHTML = txt; btn.disabled = dis; } };
+    const btnOrig = btn ? btn.innerHTML : '';
+
+    // Só Comprado — ignora Negado/Solicitado/Aguardando/Estoque
+    const compras = Object.entries(State.requests || {})
+      .filter(([,r]) => r.status === 'Comprado')
+      .sort((a, b) => ((a[1].boughtAt||a[1].createdAt||'')).localeCompare(b[1].boughtAt||b[1].createdAt||''));
+
+    if (!compras.length) { toast('Nenhuma compra encontrada.'); return; }
+    if (!confirm(`Reconstruir estoque a partir de ${compras.length} compra(s)?\nMovimentos e itens gerados por compras serão refeitos (itens/movimentos manuais são preservados).`)) return;
+
+    setBtn('Importando…', true);
+    let nEnt = 0, nSai = 0, erros = 0;
+
+    try {
+      // 1) Limpa import anterior: movimentos auto OU legados (origem Compra/Envio) + itens auto
+      await App._limparImportInterno();
+
+      let loteSeq = 0;
+
+      // 2) Processa cada compra sequencialmente — 1 item de estoque por compra (lote),
+      //    com código próprio. NÃO mescla por nome.
+      for (const [rid, r] of compras) {
+        try {
+          const grupo    = r.groupName || '';
+          const comprada = parseFloat(r.quantidade) || parseFloat(r.qty) || 1; // fallback p/ não perder o item
+          const enviada  = App._resolverEnviada(r, comprada);
+          const resto    = Math.max(0, comprada - enviada);   // saldo do lote (0 = zerado)
+          const subgrupo = r.subgrupo || '';
+          const produto  = (r.descricao || App.reqSummary(r) || grupo).trim();
+          const dataMov  = (r.shippedAt || r.boughtAt || (r.createdAt||'').substring(0,10) || new Date().toISOString().substring(0,10)).substring(0,10) + 'T00:00:00.000Z';
+          loteSeq++;
+          const lote = App._gerarLote(r);
+
+          // 1 item por compra → push gera código único (EST-xxxxx)
+          const ref = DB.push('estoque', {
+            grupo, subgrupo, produto, quantidade: resto,
+            fornecedor: r.fornecedor || '', auto: true, reqId: rid, lote,
+            updatedAt: new Date().toISOString()
+          });
+          await ref;
+          const estoqueId = ref.key;
+
+          // Movimentos (entrada saldo = comprada; saída saldo = resto)
+          const itemBase = { produto, grupo, subgrupo, unidade: '', estoqueId, reqId: rid };
+          await App._logMov('entrada', itemBase, comprada, comprada,
+            { origem: `Compra · ${r.fornecedor || '—'}`, lote, data: dataMov, auto: true, estoqueId });
+          nEnt++;
+          if (enviada > 0) {
+            await App._logMov('saida', itemBase, enviada, resto,
+              { origem: `Envio · ${r.unitName || '—'}`, destino: r.unitName || '—', data: dataMov, auto: true, estoqueId });
+            nSai++;
+          }
+          await DB.set(`requests/${rid}/estoqueProcessado`, true);
+        } catch (eItem) {
+          erros++;
+          console.error('[backfill] erro no pedido', rid, eItem);
+        }
+      }
+
+      const msg = `✓ Importado: ${nEnt} entrada(s), ${nSai} saída(s)` + (erros ? ` · ${erros} erro(s)` : '');
+      toast(msg, erros ? 'error' : 'success');
+    } catch (e) {
+      console.error('[backfill] falha geral', e);
+      toast('Erro ao importar. Veja o console.', 'error');
+    } finally {
+      setBtn(btnOrig, false);
+    }
+  },
+
+  /* ── CALENDAR ─────────────────────────────── */
+  renderCalendar() {
+    const y = State.calYear, m = State.calMonth;
+    const label = new Date(y,m,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+    const calMonthStr = `${y}-${String(m+1).padStart(2,'0')}`;
+    const fmt = v => 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    document.getElementById('cal-month-label').textContent = label.charAt(0).toUpperCase()+label.slice(1);
+    const grid = document.getElementById('calendar-grid');
+    grid.innerHTML = '';
+    const firstDay = new Date(y,m,1).getDay();
+    const daysInMonth = new Date(y,m+1,0).getDate();
+    const today = new Date();
+
+    // Build day→events map
+    const dayMap = {};
+    Object.values(State.requests||{}).forEach(r => {
+      if (r.status==='Comprado' && r.boughtAt) {
+        const isParceled = r.parcelas && r.parcelas.length > 0;
+        if (!isParceled) {
+          // À vista only — parceladas are handled in the loop below
+          if (r.boughtAt.startsWith(`${y}-${String(m+1).padStart(2,'0')}`)) {
+            const day = parseInt(r.boughtAt.substring(8,10));
+            if (!dayMap[day]) dayMap[day] = [];
+            dayMap[day].push({ type:'direta', label: r.unitName||'?', val: r.valorTotal, unit: r.unitName, desc: (r.compraCodigo?`[${r.compraCodigo}] `:'')+(r.descricao||r.product||r.groupName), compra: r.compraCodigo||null });
+          }
+        }
+      }
+      // Parcelas — use p.date (full) when available, else p.month day-1
+      if (r.parcelas) {
+        r.parcelas.forEach(p => {
+          const pMonthStr = `${y}-${String(m+1).padStart(2,'0')}`;
+          const pDate  = p.date || (p.month + '-01');
+          if (!pDate.startsWith(pMonthStr)) return; // not this month
+          // Skip if this is also a direct-buy day (already added above)
+          const day = parseInt(pDate.substring(8,10)) || 1;
+          if (!dayMap[day]) dayMap[day] = [];
+          const label = p.num ? `Parcela ${p.num}/${p.total}` : 'Parcela';
+          dayMap[day].push({
+            type: 'parcela',
+            label: r.unitName||'?',
+            val: p.valor,
+            unit: r.unitName,
+            desc: `${r.compraCodigo?`[${r.compraCodigo}] `:''}${label} — ${r.descricao||r.groupName||'Compra'}`,
+            compra: r.compraCodigo||null
+          });
+        });
+      }
+    });
+
+    // Empty cells before first day
+    for (let i=0;i<firstDay;i++) { const d=document.createElement('div'); d.className='cal-day inactive'; grid.appendChild(d); }
+    for (let day=1;day<=daysInMonth;day++) {
+      const cell = document.createElement('div');
+      cell.className = 'cal-day';
+      const isToday = today.getFullYear()===y && today.getMonth()===m && today.getDate()===day;
+      if (isToday) cell.classList.add('today');
+      const events = dayMap[day]||[];
+      const numEl = document.createElement('div'); numEl.className='cal-day-num'; numEl.textContent=day; cell.appendChild(numEl);
+      if (events.length) {
+        const evWrap = document.createElement('div'); evWrap.className='cal-day-events';
+        events.slice(0,3).forEach(ev => {
+          const e=document.createElement('div'); e.className=`cal-event ${ev.type}`;
+          e.textContent=`${ev.unit} R$ ${parseFloat(ev.val||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}`; evWrap.appendChild(e);
+        });
+        if (events.length>3) { const more=document.createElement('div'); more.className='cal-event'; more.style='color:var(--gray-400);background:none'; more.textContent=`+${events.length-3}`; evWrap.appendChild(more); }
+        cell.appendChild(evWrap);
+      }
+      cell.onclick = (e) => App.showCalDay(day, events, e);
+      grid.appendChild(cell);
+    }
+    document.getElementById('cal-day-detail').classList.add('hidden');
+    // Remove any old summary card
+    const oldSummary = document.getElementById('cal-month-summary');
+    if (oldSummary) oldSummary.remove();
+  },
+
+  showCalDay(day, events, e) {
+    document.querySelectorAll('.cal-popup').forEach(p=>p.remove());
+    if (!events.length) return;
+    const fmt = v => 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const popup = document.createElement('div');
+    popup.className = 'cal-popup';
+    popup.innerHTML = `
+      <div class="cal-popup-header" id="cal-popup-drag-handle">
+        <span>📅 ${day}/${State.calMonth+1}/${State.calYear} — ${events.length} evento(s)</span>
+        <button onclick="this.closest('.cal-popup').remove()">✕</button>
+      </div>
+      <div class="cal-popup-items">${events.map(ev=>`
+        <div class="cal-detail-item">
+          <div class="cal-detail-dot" style="background:${ev.type==='parcela'?'#e879b0':'var(--green)'}"></div>
+          <div class="cal-detail-info">
+            <div class="cal-detail-desc">${ev.desc}</div>
+            <div class="cal-detail-un">${ev.unit} · ${ev.type==='parcela'?'Parcela':'Compra Direta'}</div>
+          </div>
+          <div class="cal-detail-val">${fmt(ev.val)}</div>
+        </div>`).join('')}
+      </div>`;
+    // Center on screen
+    popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:200;';
+    document.body.appendChild(popup);
+    // Make draggable from header
+    const handle = popup.querySelector('#cal-popup-drag-handle');
+    let ox=0,oy=0,sx=0,sy=0;
+    handle.style.cursor='move';
+    handle.addEventListener('mousedown', function(ev){
+      ev.preventDefault();
+      // Get current position (after any previous drag)
+      const s = popup.style;
+      const rect = popup.getBoundingClientRect();
+      // Switch from transform to explicit top/left
+      s.transform='none';
+      s.top  = rect.top+'px';
+      s.left = rect.left+'px';
+      sx=ev.clientX; sy=ev.clientY;
+      ox=rect.left; oy=rect.top;
+      function onMove(mv){
+        s.left=(ox+mv.clientX-sx)+'px';
+        s.top =(oy+mv.clientY-sy)+'px';
+      }
+      function onUp(){ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); }
+      document.addEventListener('mousemove',onMove);
+      document.addEventListener('mouseup',onUp);
+    });
+    // Close on outside click
+    setTimeout(()=>{ document.addEventListener('click', function h(ev){ if(!popup.contains(ev.target)){popup.remove();document.removeEventListener('click',h);} }); },50);
+  },
+
+  calPrev() { if (State.calMonth===0) { State.calMonth=11; State.calYear--; } else State.calMonth--; App.renderCalendar(); },
+  calNext() { if (State.calMonth===11) { State.calMonth=0; State.calYear++; } else State.calMonth++; App.renderCalendar(); },
+
+  /* ── SETTINGS ─────────────────────────────── */
+  renderSettings() {
+    App.renderGroupsAdmin();
+    App.renderSubgroupsAdmin();
+    App.renderSuppliersAdmin();
+    App.renderAdminsCards();
+    App.populateGroupSelects();
+    App.populateSubgroupFilterSel();
+    App.renderCodigosTab();
+    App._syncGestorField();
+  },
+
+  // ── Prefixo de lote pelo nome do grupo ──────
+  _grupoPrefix(groupName) {
+    const g = (groupName || '').toLowerCase();
+    if (g.includes('tinta') || g.includes('ink'))          return 'TIN';
+    if (g.includes('pilha') || g.includes('bateria'))      return 'PIL';
+    if (g.includes('outro') || g.includes('other'))        return 'OUT';
+    return (groupName || 'GEN').replace(/[^a-zA-Z]/g,'').substring(0,3).toUpperCase() || 'GEN';
+  },
+
+  // ── Código de lote determinístico ───────────
+  // Aceita request (groupName/unitName/seq) OU item manual (grupo/unidade).
+  // Padrão: PREFIX-diaCompra+diaEnvio-unidade+seq
+  // Formato: PREFIXO-{dia solicitação}{dia envio}-{nº solicitação}
+  _gerarLote(d = {}) {
+    const prefix   = App._grupoPrefix(d.groupName || d.grupo);
+    const diaSolic = (d.createdAt || d.boughtAt || '').substring(8,10) || '00';
+    const diaEnvio = (d.shippedAt || '').substring(8,10) || '00';
+    let num;
+    if (d.seq != null && d.seq !== '') {
+      num = parseInt(d.seq) || d.seq;
+    } else {
+      num = Object.values(State.estoqueMov || {}).filter(m => m.tipo === 'entrada').length + 1;
+    }
+    return `${prefix}-${diaSolic}${diaEnvio}-${num}`;
+  },
+
+  // Lote p/ exibição: usa formato novo; se faltar ou for LOTE-000N antigo, recalcula
+  _loteDisplay(it) {
+    if (!it) return '—';
+    if (it.lote && !/^LOTE-/i.test(it.lote)) return it.lote;
+    const req = it.reqId ? (State.requests || {})[it.reqId] : null;
+    if (req) return App._gerarLote(req);
+    return App._gerarLote({ grupo: it.grupo, boughtAt: it.boughtAt, shippedAt: it.shippedAt, unidade: it.unidade });
+  },
+
+  renderCodigosTab() {
+    const reqs = Object.entries(State.requests || {});
+    const fmt = v => v ? (() => { const [y,m,d]=v.substring(0,10).split('-'); return `${d}/${m}/${y}`; })() : '—';
+    const fmtR = v => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const inc = (txt, termo) => !termo || (txt||'').toLowerCase().includes(termo);
+
+    // ── LOTES (1 por entrada de estoque) ─────
+    const buscaLote = (document.getElementById('codigos-lotes-search')?.value || '').toLowerCase();
+    const itensEstoque = Object.entries(State.estoque || {})
+      .map(([eid, it]) => ({ eid, ...it }))
+      .filter(it => it.lote)
+      .sort((a, b) => (a.lote||'').localeCompare(b.lote||''));
+    const lotesEl = document.getElementById('codigos-lotes-list');
+    const lotesCount = document.getElementById('codigos-lotes-count');
+    if (lotesEl) {
+      const fil = itensEstoque.filter(it => inc(`${App._loteDisplay(it)} ${it.lote} ${it.produto} ${it.grupo} ${it.subgrupo}`, buscaLote));
+      lotesEl.innerHTML = fil.length ? fil.map(it => {
+        const qtd = parseFloat(it.quantidade || 0);
+        const zer = qtd <= 0 ? '<span class="codigos-status" data-s="Zerado">ZERADO</span>' : `<span class="codigos-item-date">saldo ${qtd}</span>`;
+        // Parcelas do request de origem OU do próprio item (parcelada criada direto no estoque)
+        const reqLote = it.reqId ? (State.requests || {})[it.reqId] : null;
+        const parcelasLote = (reqLote && reqLote.parcelas && reqLote.parcelas.length) ? reqLote.parcelas
+                           : (it.parcelas && it.parcelas.length) ? it.parcelas : null;
+        const tagParc = parcelasLote ? ' ' + App._tagParceladaInfo(parcelasLote) : '';
+        return `<div class="codigos-item codigos-cmp-row" onclick="App.showLoteInfo('${it.eid}')" title="Ver info do estoque">
+          <span class="codigos-badge lote">${App._loteDisplay(it)}</span>
+          <span class="codigos-item-info">${it.produto||'—'} · ${it.grupo||'—'}${tagParc}</span>
+          ${zer}
+        </div>`;
+      }).join('') : `<div class="codigos-empty">${buscaLote ? 'Nada encontrado.' : 'Nenhum lote cadastrado.'}</div>`;
+      if (lotesCount) lotesCount.textContent = itensEstoque.length;
+    }
+
+    // ── SL (solicitações) ─────────────────────
+    const buscaSeq = (document.getElementById('codigos-seq-search')?.value || '').toLowerCase();
+    const comSeq = reqs.filter(([,r]) => r.seq != null).sort(([,a],[,b]) => (parseInt(a.seq)||0) - (parseInt(b.seq)||0));
+    const seqEl = document.getElementById('codigos-seq-list');
+    const seqCount = document.getElementById('codigos-seq-count');
+    if (seqEl) {
+      const fil = comSeq.filter(([,r]) => inc(`SL-${r.seq} ${r.unitName} ${r.groupName} ${App.reqSummary(r)}`, buscaSeq));
+      seqEl.innerHTML = fil.length ? fil.map(([id,r]) => `
+        <div class="codigos-item codigos-cmp-row" onclick="App.showSolicitacaoView('${id}')" title="Ver solicitação">
+          <span class="codigos-badge seq">SL-${r.seq}</span>
+          <span class="codigos-item-info">${r.unitName||'—'} · ${r.groupName||'—'} · ${App.reqSummary(r)}</span>
+          <span class="codigos-item-date codigos-status" data-s="${r.status||''}">${r.status||'—'}</span>
+        </div>`).join('') : `<div class="codigos-empty">${buscaSeq ? 'Nada encontrado.' : 'Nenhuma SL cadastrada.'}</div>`;
+      if (seqCount) seqCount.textContent = comSeq.length;
+    }
+
+    // ── PARCELADAS / COMBINADAS ───────────────
+    // Combinadas: agrupadas por compraCodigo. Parceladas sozinhas: parcelas sem compraCodigo.
+    const buscaCmp = (document.getElementById('codigos-cmp-search')?.value || '').toLowerCase();
+    const cmpMap = {};
+    const parceladasSozinhas = [];
+    reqs.forEach(([id,r]) => {
+      if (r.compraCodigo) {
+        (cmpMap[r.compraCodigo] = cmpMap[r.compraCodigo] || []).push(r);
+      } else if (r.parcelas && r.parcelas.length) {
+        parceladasSozinhas.push([id, r]);
+      }
+    });
+    const cmpEl = document.getElementById('codigos-cmp-list');
+    const cmpCount = document.getElementById('codigos-cmp-count');
+    if (cmpEl) {
+      const linhasCmp = Object.keys(cmpMap).sort().map(codigo => {
+        const items = cmpMap[codigo];
+        const itemComParc = items.find(r => r.parcelas && r.parcelas.length);
+        const tagParcCmp = itemComParc ? App._tagParcelaStatus(itemComParc.parcelas) : '';
+        const total = items.reduce((s,r) => s + (parseFloat(r.valorTotal)||0), 0);
+        const txt = `${codigo} ${items.map(r=>r.unitName).join(' ')}`;
+        if (!inc(txt, buscaCmp)) return '';
+        return `<div class="codigos-item codigos-cmp-row" onclick="App.showCompraDetalhe('${codigo}')" title="Ver detalhes">
+          <span class="codigos-badge cmp">${codigo}</span>
+          <span class="codigos-item-info">${items.length} pedido(s) · ${fmtR(total)}${tagParcCmp ? ' · ' + tagParcCmp : ''}</span>
+          <span class="codigos-item-date">${fmt(items[0]?.boughtAt)}</span>
+          <svg viewBox="0 0 24 24" fill="none" style="width:14px;flex-shrink:0;color:#8898b8"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2"/></svg>
+        </div>`;
+      });
+      const linhasSozinhas = parceladasSozinhas
+        .sort(([,a],[,b]) => (parseInt(a.seq)||0)-(parseInt(b.seq)||0))
+        .map(([id,r]) => {
+          const txt = `SL-${r.seq} ${r.unitName} ${r.groupName}`;
+          if (!inc(txt, buscaCmp)) return '';
+          return `<div class="codigos-item codigos-cmp-row" onclick="App.showParceladaInfo('${id}')" title="Ver detalhes">
+            <span class="codigos-badge seq">SL-${r.seq}</span>
+            <span class="codigos-item-info">${r.unitName||'—'} · ${r.parcelas.length}× de ${fmtR(r.parcelas[0]?.valor||0)} ${App._tagParcelaStatus(r.parcelas)}</span>
+            <span class="codigos-item-date">${fmt(r.boughtAt)}</span>
+            <svg viewBox="0 0 24 24" fill="none" style="width:14px;flex-shrink:0;color:#8898b8"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2"/></svg>
+          </div>`;
+        });
+      // Parceladas criadas direto no estoque (item único, sem request)
+      const estoqueParc = Object.entries(State.estoque || {})
+        .filter(([,it]) => it.parcelas && it.parcelas.length)
+        .sort(([,a],[,b]) => (a.lote||'').localeCompare(b.lote||''));
+      const linhasEstoque = estoqueParc.map(([eid,it]) => {
+        const txt = `${App._loteDisplay(it)} ${it.lote} ${it.produto} ${it.grupo}`;
+        if (!inc(txt, buscaCmp)) return '';
+        return `<div class="codigos-item codigos-cmp-row" onclick="App.showLoteInfo('${eid}')" title="Ver detalhes">
+          <span class="codigos-badge lote">${App._loteDisplay(it)}</span>
+          <span class="codigos-item-info">${it.produto||'—'} · ${it.parcelas.length}× de ${fmtR(it.parcelas[0]?.valor||0)} ${App._tagParcelaStatus(it.parcelas)}</span>
+          <span class="codigos-item-date">${fmt(it.boughtAt)}</span>
+          <svg viewBox="0 0 24 24" fill="none" style="width:14px;flex-shrink:0;color:#8898b8"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2"/></svg>
+        </div>`;
+      });
+      const html = [...linhasCmp, ...linhasSozinhas, ...linhasEstoque].filter(Boolean).join('');
+      cmpEl.innerHTML = html || `<div class="codigos-empty">${buscaCmp ? 'Nada encontrado.' : 'Nenhuma parcelada/combinada.'}</div>`;
+      if (cmpCount) cmpCount.textContent = Object.keys(cmpMap).length + parceladasSozinhas.length + estoqueParc.length;
+    }
+  },
+
+  // Popup: info de estoque de um lote (qtd, entradas, saídas, zerado)
+  showLoteInfo(estoqueId) {
+    const it = (State.estoque || {})[estoqueId]; if (!it) return;
+    const fmtD = v => v ? (() => { const [y,m,d]=v.substring(0,10).split('-'); return `${d}/${m}/${y}`; })() : '—';
+    const movs = Object.values(State.estoqueMov || {}).filter(m => m.estoqueId === estoqueId)
+      .sort((a,b) => (a.data||'').localeCompare(b.data||''));
+    const entradas = movs.filter(m => m.tipo === 'entrada');
+    const saidas   = movs.filter(m => m.tipo === 'saida');
+    const totalEnt = entradas.reduce((s,m) => s + (parseFloat(m.qtd)||0), 0);
+    const totalSai = saidas.reduce((s,m) => s + (parseFloat(m.qtd)||0), 0);
+    const qtd = parseFloat(it.quantidade || 0);
+    const statusTag = qtd <= 0
+      ? '<span class="codigos-status" data-s="Zerado">ZERADO</span>'
+      : `<span class="codigos-status" data-s="OK">EM ESTOQUE</span>`;
+    const req = it.reqId ? (State.requests || {})[it.reqId] : null;
+    const fmtR = v => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    // parcelas do request OU do próprio item (parcelada criada no estoque)
+    const parcelas = (req && req.parcelas && req.parcelas.length) ? req.parcelas
+                   : (it.parcelas && it.parcelas.length) ? it.parcelas : null;
+    const parc = parcelas
+      ? `<div style="margin-top:10px;display:flex;align-items:center;gap:8px">${parcelas.length}× parcelas ${App._tagParcelaStatus(parcelas)}</div>
+         <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px">
+           ${parcelas.map(p => App._parcelaRowHtml(p)).join('')}
+         </div>` : '';
+
+    document.getElementById('lote-info-titulo').textContent = `Lote ${App._loteDisplay(it)}`;
+    document.getElementById('lote-info-body').innerHTML = `
+      <div class="compra-detalhe-meta">
+        <div><span class="cdm-label">Produto</span><span class="cdm-val">${it.produto||'—'}</span></div>
+        <div><span class="cdm-label">Grupo</span><span class="cdm-val">${it.grupo||'—'}${it.subgrupo?' · '+it.subgrupo:''}</span></div>
+        <div><span class="cdm-label">Saldo atual</span><span class="cdm-val">${qtd} ${statusTag}</span></div>
+        <div><span class="cdm-label">Fornecedor</span><span class="cdm-val">${it.fornecedor||'—'}</span></div>
+        <div><span class="cdm-label">Total entrou</span><span class="cdm-val" style="color:#1db87a">+${totalEnt}</span></div>
+        <div><span class="cdm-label">Total saiu</span><span class="cdm-val" style="color:#e8830a">−${totalSai}</span></div>
+      </div>
+      ${parc}
+      <div style="margin-top:14px;font-size:.8rem;font-weight:700;color:#1a3a6b">Movimentações</div>
+      <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px">
+        ${movs.length ? movs.map(m => `
+          <div class="compra-detalhe-item" style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:.78rem">${m.tipo === 'entrada' ? '⬇ Entrada' : '⬆ Saída'} · ${fmtD(m.data)} · ${m.origem||(m.destino||'—')}</span>
+            <strong style="color:${m.tipo==='entrada'?'#1db87a':'#e8830a'}">${m.tipo==='entrada'?'+':'−'}${m.qtd}</strong>
+          </div>`).join('') : '<div class="codigos-empty">Sem movimentações.</div>'}
+      </div>`;
+    document.getElementById('lote-info-modal').classList.remove('hidden');
+  },
+
+  // Popup: detalhe de uma parcelada sozinha (sem compra combinada)
+  showParceladaInfo(reqId) {
+    const r = (State.requests || {})[reqId]; if (!r) return;
+    const fmt = v => v ? (() => { const [y,m,d]=v.substring(0,10).split('-'); return `${d}/${m}/${y}`; })() : '—';
+    const fmtR = v => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    document.getElementById('compra-detalhe-titulo').textContent = `Parcelada SL-${r.seq ?? '—'}`;
+    document.getElementById('compra-detalhe-body').innerHTML = `
+      <div class="compra-detalhe-meta">
+        <div><span class="cdm-label">Unidade</span><span class="cdm-val">${r.unitName||'—'}</span></div>
+        <div><span class="cdm-label">Forma de Pagamento</span><span class="cdm-val">${App._pagLabel(r.formaPagamento)}</span></div>
+        <div><span class="cdm-label">Fornecedor</span><span class="cdm-val">${r.fornecedor||'—'}</span></div>
+        <div><span class="cdm-label">Data</span><span class="cdm-val">${fmt(r.boughtAt)}</span></div>
+        <div><span class="cdm-label">Total</span><span class="cdm-val" style="color:#1a7a4a;font-weight:700">${fmtR(r.valorTotal)}</span></div>
+      </div>
+      <div style="margin-top:10px;font-size:.8rem;color:#334155">${App.reqSummary(r)}</div>
+      <div style="margin-top:4px;font-size:.8rem;color:#334155;display:flex;gap:12px;flex-wrap:wrap">
+        <span>Qtd: <strong>${r.quantidade||'—'}</strong></span>
+        <span>Unit: <strong>${r.valor ? fmtR(r.valor) : '—'}</strong></span>
+      </div>
+      <div class="form-row-3" style="margin-top:12px">
+        <div class="form-group">
+          <label class="form-label">Grupo</label>
+          <input type="text" class="input-field" value="${r.groupName || '—'}" readonly style="background:#f8fafc">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subgrupo</label>
+          <select id="pinfo-subgrupo" class="input-field select-styled">${App._compraSubgroupOpts(r)}</select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Solicitante</label>
+          <input type="text" id="pinfo-solicitante" class="input-field" value="${r.solicitante || ''}" placeholder="Nome do solicitante">
+        </div>
+      </div>
+      <div class="form-row-2" style="margin-top:8px">
+        <div class="form-group">
+          <label class="form-label">Descrição</label>
+          <input type="text" id="pinfo-desc" class="input-field" value="${r.descricao || ''}" placeholder="Descrição">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descrição Técnica</label>
+          <input type="text" id="pinfo-desctec" class="input-field" value="${r.descTecnica || ''}" placeholder="Descrição técnica">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:10px">
+        <button class="btn-secondary" onclick="App.saveParceladaSubinfo('${reqId}')">Salvar</button>
+      </div>
+      <div style="margin-top:14px;font-size:.8rem;font-weight:700;color:#1a3a6b;display:flex;align-items:center;gap:8px">${r.parcelas.length}× parcelas ${App._tagParcelaStatus(r.parcelas)}</div>
+      <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px">
+        ${r.parcelas.map(p => App._parcelaRowHtml(p)).join('')}
+      </div>`;
+    // Pré-seleciona o subgrupo já gravado (depois de popular as opções, evita race com o.selected)
+    const sel = document.getElementById('pinfo-subgrupo');
+    if (sel) sel.value = r.subgrupo || '';
+    document.getElementById('compra-detalhe-modal').classList.remove('hidden');
+  },
+
+  // Salva Subgrupo/Solicitante/Descrição/Descrição Técnica de uma parcelada avulsa a
+  // partir do popup de detalhe (showParceladaInfo) — os únicos campos editáveis ali;
+  // o Grupo e a Forma de Pagamento são fixos e não mudam por aqui.
+  saveParceladaSubinfo(reqId) {
+    const r = (State.requests || {})[reqId]; if (!r) return;
+    const subgrupo     = document.getElementById('pinfo-subgrupo')?.value    || '';
+    const solicitante  = document.getElementById('pinfo-solicitante')?.value || '';
+    const descricao    = document.getElementById('pinfo-desc')?.value        || '';
+    const descTecnica  = document.getElementById('pinfo-desctec')?.value     || '';
+    DB.update(`requests/${reqId}`, { subgrupo, solicitante, descricao, descTecnica })
+      .then(() => {
+        toast('✓ Dados atualizados.');
+        App._logActivity('Solicitações', 'Subgrupo/descrição atualizados', `SL-${r.seq ?? reqId}`);
+      })
+      .catch(() => toast('Erro ao salvar.', 'error'));
+  },
+
+  showCompraDetalhe(codigo) {
+    const reqs = Object.values(State.requests || {}).filter(r => r.compraCodigo === codigo);
+    const fmt = v => v ? (() => { const [y,m,d]=v.substring(0,10).split('-'); return `${d}/${m}/${y}`; })() : '—';
+    const fmtR = v => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const grandTotal = reqs.reduce((s,r) => s + (parseFloat(r.valorTotal)||0), 0);
+    const primeiraCompra = reqs[0] || {};
+    const hasParc = reqs.some(r => r.parcelas && r.parcelas.length);
+
+    document.getElementById('compra-detalhe-titulo').textContent = `Compra ${codigo}`;
+    document.getElementById('compra-detalhe-body').innerHTML = `
+      <div class="compra-detalhe-meta">
+        <div><span class="cdm-label">Fornecedor</span><span class="cdm-val">${primeiraCompra.fornecedor || '—'}</span></div>
+        <div><span class="cdm-label">Data</span><span class="cdm-val">${fmt(primeiraCompra.boughtAt)}</span></div>
+        <div><span class="cdm-label">Forma de Pagamento</span><span class="cdm-val">${App._pagLabel(primeiraCompra.formaPagamento)}</span></div>
+        <div><span class="cdm-label">Parcelas</span><span class="cdm-val">${hasParc ? `${reqs[0]?.parcelas?.length}× parcelas ${App._tagParcelaStatus(reqs[0]?.parcelas)}` : 'À vista'}</span></div>
+        <div><span class="cdm-label">Total Geral</span><span class="cdm-val" style="color:#1a7a4a;font-weight:700">${fmtR(grandTotal)}</span></div>
+      </div>
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+        ${reqs.sort((a,b)=>(parseInt(a.seq)||0)-(parseInt(b.seq)||0)).map(r => {
+          const lote = App._gerarLote(r);
+          const parLine = r.parcelas?.length
+            ? `<span style="font-size:.72rem;color:#7c52d4;font-weight:600">${r.parcelas.length}× de ${fmtR(r.parcelas[0]?.valor||0)}/mês</span> ${App._tagParcelaStatus(r.parcelas)}`
+            : '';
+          return `<div class="compra-detalhe-item">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <span class="req-seq-badge">SL-${r.seq ?? '—'}</span>
+              <strong style="font-size:.84rem;color:#111827">${r.unitName||'—'}</strong>
+              <span style="font-size:.78rem;color:#6680a0">${r.groupName||''}${r.subgrupo ? ' · '+r.subgrupo : ''}</span>
+              <span class="codigos-badge lote" style="font-size:.65rem;padding:1px 6px">${lote}</span>
+            </div>
+            <div style="margin-top:2px;font-size:.8rem;color:#334155">${App.reqSummary(r)}</div>
+            <div style="margin-top:4px;font-size:.8rem;color:#334155;display:flex;gap:12px;flex-wrap:wrap">
+              <span>Qtd: <strong>${r.quantidade||'—'}</strong></span>
+              <span>Unit: <strong>${r.valor ? fmtR(r.valor) : '—'}</strong></span>
+              <span>Total: <strong style="color:#1a7a4a">${fmtR(r.valorTotal)}</strong></span>
+              ${r.solicitante ? `<span>Solicitante: <strong>${r.solicitante}</strong></span>` : ''}
+              ${parLine}
+            </div>
+            ${r.descricao ? `<div style="font-size:.76rem;color:#6680a0;margin-top:2px">${r.descricao}</div>` : ''}
+            ${r.descTecnica ? `<div style="font-size:.76rem;color:#8898b8;margin-top:2px"><em>Téc.:</em> ${r.descTecnica}</div>` : ''}
+            ${r.parcelas?.length ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">
+              ${[...r.parcelas].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(p => {
+                const paga = App._parcelaPaga([p]);
+                return `<span style="font-size:.68rem;font-weight:600;padding:2px 9px;border-radius:100px;white-space:nowrap;
+                  background:${paga?'#e9f9f1':'#f3edff'};color:${paga?'#059669':'#7c52d4'};border:1px solid ${paga?'#b7ecd4':'#e0d0fb'}"
+                  title="Parcela ${p.num}/${p.total} · ${fmtR(p.valor)}">${p.num}/${p.total} · ${fmt(p.date)}${paga ? ' ✓ paga' : ' pendente'}</span>`;
+              }).join('')}
+            </div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
+    document.getElementById('compra-detalhe-modal').classList.remove('hidden');
+  },
+
+  // Popup somente-leitura de uma solicitação (card Config → não edita)
+  showSolicitacaoView(id) {
+    const r = (State.requests || {})[id]; if (!r) return;
+    const fmt = v => v ? (() => { const [y,m,d]=v.substring(0,10).split('-'); return `${d}/${m}/${y}`; })() : '—';
+    const fmtR = v => (v==null||v==='') ? '—' : 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const linha = (lbl, val) => `<div><span class="cdm-label">${lbl}</span><span class="cdm-val">${val}</span></div>`;
+    const parc = r.parcelas && r.parcelas.length
+      ? `<div style="margin-top:10px">${App._parcelaPaga(r.parcelas) ? '<span class="mov-tag-pago" title="Todas as parcelas já venceram">✓ PAGO</span>' : `<span class="mov-tag-parcelada">PARCELADA ${r.parcelas.length}×</span>`} de ${fmtR(r.parcelas[0]?.valor)}</div>` : '';
+    document.getElementById('sol-view-titulo').textContent = `Solicitação SL-${r.seq ?? '—'}`;
+    document.getElementById('sol-view-body').innerHTML = `
+      ${App._infoAutorizacao(r)}
+      <div class="compra-detalhe-meta">
+        ${linha('Status', r.status || '—')}
+        ${linha('Unidade', r.unitName || '—')}
+        ${linha('Grupo', r.groupName || '—')}
+        ${linha('Subgrupo', r.subgrupo || '—')}
+        ${linha('Lote', `<span class="estoque-lote">${App._gerarLote(r)}</span>`)}
+        ${linha('Resumo', App.reqSummary(r))}
+        ${linha('Solicitante', r.solicitante || '—')}
+        ${linha('Fornecedor', r.fornecedor || '—')}
+        ${r.status === 'Comprado' ? linha('Forma de Pagamento', App._pagLabel(r.formaPagamento)) : ''}
+        ${linha('Data solicitação', fmt(r.createdAt))}
+        ${linha('Data compra', fmt(r.boughtAt))}
+        ${linha('Quantidade', r.quantidade || '—')}
+        ${linha('Valor unit.', fmtR(r.valor))}
+        ${linha('Valor total', `<span style="color:#1a7a4a;font-weight:700">${fmtR(r.valorTotal)}</span>`)}
+        ${r.compraCodigo ? linha('Compra', r.compraCodigo) : ''}
+      </div>
+      ${parc}
+      ${r.descricao ? `<div style="margin-top:10px;font-size:.8rem;color:#334155"><strong>Descrição:</strong> ${r.descricao}</div>` : ''}
+      ${r.descTecnica ? `<div style="margin-top:4px;font-size:.8rem;color:#334155"><strong>Téc.:</strong> ${r.descTecnica}</div>` : ''}
+      ${r.obs ? `<div style="margin-top:4px;font-size:.8rem;color:#6680a0"><strong>Obs:</strong> ${r.obs}</div>` : ''}`;
+    document.getElementById('sol-view-modal').classList.remove('hidden');
+  },
+
+  /* ── ADICIONAR COMPRA (chooser) ─────────────── */
+  _fromChooser: false,
+  openAddCompraChooser() { document.getElementById('add-compra-chooser').classList.remove('hidden'); },
+  escolherCombinada() {
+    document.getElementById('add-compra-chooser').classList.add('hidden');
+    App.openCompraModal();
+    App._fromChooser = true;   // veio do chooser → ESC volta p/ ele
+  },
+  escolherParcelada() {
+    document.getElementById('add-compra-chooser').classList.add('hidden');
+    App.openAddParcelada();
+    App._fromChooser = true;
+  },
+  // Fecha modal; se veio do chooser, reabre o chooser em vez de fechar tudo
+  _voltaChooserOuFecha(modalId, closeFn) {
+    closeFn();
+    if (App._fromChooser) {
+      App._fromChooser = false;
+      document.getElementById('add-compra-chooser').classList.remove('hidden');
+    }
+  },
+
+  openAddParcelada() {
+    App._fromChooser = false;
+    // popula selects reutilizando dados do estoque
+    const gSel = document.getElementById('parc-grupo');
+    if (gSel) gSel.innerHTML = '<option value="">— Selecione —</option>' +
+      Object.values(State.groups || {}).map(g => `<option value="${g}">${g}</option>`).join('');
+    const fSel = document.getElementById('parc-fornecedor');
+    if (fSel) fSel.innerHTML = '<option value="">— Selecione —</option>' +
+      Object.values(State.suppliers || {}).map(s => `<option value="${s}">${s}</option>`).join('');
+    ['parc-subgrupo'].forEach(id => { const e=document.getElementById(id); if(e) e.innerHTML='<option value="">— Selecione —</option>'; });
+    ['parc-produto','parc-qtd','parc-valor','parc-n'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; });
+    const hoje = new Date().toISOString().substring(0,10);
+    const dC = document.getElementById('parc-data'); if (dC) dC.value = hoje;
+    const dE = document.getElementById('parc-envio'); if (dE) dE.value = hoje;
+    const fpSelParc = document.getElementById('parc-forma-pagamento');
+    if (fpSelParc) fpSelParc.value = 'boleto';
+    const res = document.getElementById('parc-resumo'); if (res) res.style.display = 'none';
+    document.getElementById('parcelada-add-modal').classList.remove('hidden');
+  },
+
+  onParcGrupoChange() {
+    const grupo = document.getElementById('parc-grupo')?.value || '';
+    const subSel = document.getElementById('parc-subgrupo'); if (!subSel) return;
+    const norm = grupo.toLowerCase();
+    const gid = Object.keys(State.groups || {}).find(k => (State.groups[k] || '').toLowerCase() === norm);
+    const subgrupos = (gid && State.subgroups?.[gid]) ? [...State.subgroups[gid]] : [];
+    subSel.innerHTML = '<option value="">— Selecione —</option>' +
+      [...new Set(subgrupos.filter(Boolean))].map(v => `<option value="${v}">${v}</option>`).join('');
+  },
+
+  calcParcResumo() {
+    const res = document.getElementById('parc-resumo'); if (!res) return;
+    const valor = parseFloat(document.getElementById('parc-valor')?.value) || 0;
+    const n     = parseInt(document.getElementById('parc-n')?.value) || 0;
+    const fmtR = v => 'R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+    if (valor > 0 && n >= 2) {
+      res.style.display = '';
+      res.innerHTML = `<div class="compra-resumo-line">${n}× de <strong style="color:#7c52d4">${fmtR(valor/n)}</strong> · Total ${fmtR(valor)}</div>`;
+    } else {
+      res.style.display = 'none';
+    }
+  },
+
+  async saveParceladaItem() {
+    const grupo   = document.getElementById('parc-grupo')?.value.trim() || '';
+    const subgrupo= document.getElementById('parc-subgrupo')?.value.trim() || '';
+    const produto = document.getElementById('parc-produto')?.value.trim() || '';
+    const fornecedor = document.getElementById('parc-fornecedor')?.value.trim() || '';
+    const qtd     = parseFloat(document.getElementById('parc-qtd')?.value) || 0;
+    const valor   = parseFloat(document.getElementById('parc-valor')?.value) || 0;
+    const n       = parseInt(document.getElementById('parc-n')?.value) || 0;
+    const dataC   = document.getElementById('parc-data')?.value || new Date().toISOString().substring(0,10);
+    const dataE   = document.getElementById('parc-envio')?.value || dataC;
+    const formaPagamento = document.getElementById('parc-forma-pagamento')?.value || 'boleto';
+    if (!grupo || !produto) { toast('Preencha grupo e produto.', 'error'); return; }
+    if (qtd <= 0) { toast('Quantidade deve ser > 0.', 'error'); return; }
+    if (valor <= 0) { toast('Informe o valor total.', 'error'); return; }
+    if (n < 2) { toast('Nº de parcelas deve ser ≥ 2.', 'error'); return; }
+
+    try {
+      const parcelas = App._buildParcelas(dataC, n, valor);
+      const lote = App._gerarLote({ grupo, boughtAt: dataC, shippedAt: dataE });
+      const ref = DB.push('estoque', {
+        grupo, subgrupo, produto, quantidade: qtd,
+        fornecedor, lote, parcelas, valorTotal: valor.toFixed(2), formaPagamento,
+        boughtAt: dataC, shippedAt: dataE,
+        updatedAt: new Date().toISOString()
+      });
+      await ref;
+      const estoqueId = ref.key;
+      const dataMov = dataC.substring(0,10) + 'T00:00:00.000Z';
+      await App._logMov('entrada', { produto, grupo, subgrupo, unidade: '', estoqueId }, qtd, qtd,
+        { origem: `Compra parcelada · ${fornecedor || '—'}`, lote, data: dataMov, estoqueId });
+      toast(`✓ Entrada parcelada registrada · lote ${lote}.`);
+      document.getElementById('parcelada-add-modal').classList.add('hidden');
+      App.renderCodigosTab(); App.renderEstoque?.();
+    } catch (e) {
+      console.error('[saveParceladaItem]', e);
+      toast('Erro ao registrar parcelada.', 'error');
+    }
+  },
+
+  renderSuppliersAdmin() {
+    const wrap = document.getElementById('list-suppliers-admin'); if(!wrap) return;
+    wrap.innerHTML='';
+    Object.entries(State.suppliers||{}).forEach(([id,name]) => {
+      const el=document.createElement('div'); el.className='settings-item';
+      el.innerHTML=`<span class="settings-item-name">🏢 ${name}</span>
+        <div class="settings-item-actions">
+          <button class="btn-icon-sm edit" onclick="App.openEditModal('Renomear Fornecedor','${name.replace(/'/g,"\'")}',v=>DB.set('suppliers/${id}',v))">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+          <button class="btn-icon-sm" onclick="App.removeItem('suppliers','${id}')">
+            <svg viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+        </div>`;
+      wrap.appendChild(el);
+    });
+    // Also populate supplier dropdown in modal
+    const mSup = document.getElementById('modal-supplier-sel');
+    if (mSup) {
+      const cur = mSup.value;
+      mSup.innerHTML = '<option value="">— Selecione —</option><option value="__manual__">Digitar manualmente</option>';
+      Object.values(State.suppliers||{}).forEach(name => {
+        const o=document.createElement('option'); o.value=name; o.textContent=name;
+        if(name===cur) o.selected=true;
+        mSup.appendChild(o);
+      });
+    }
+  },
+
+  addSupplier() {
+    const inp = document.getElementById('inp-supplier'); const name=inp.value.trim(); if(!name) return;
+    DB.push('suppliers', name).then(()=>{ inp.value=''; toast('Fornecedor adicionado!'); App._logActivity('Configurações', 'Fornecedor adicionado', name); });
+  },
+
+  // UNITS — gerenciar (renomear/adicionar/remover) migrou pra Home → Configurações.
+  // Financeiro continua só CONSUMINDO State.units (dropdown, selects, relatórios etc.),
+  // por isso renderUnitsDropdown() acima permanece intocado.
+
+  // GROUPS
+  _cfgSelGroup: null,
+  openGroupEdit(gid) {
+    App._cfgSelGroup = gid;
+    ['sel-group-sub', 'sel-subgroup-filter', 'sel-subgroup-group'].forEach(id => { const s = document.getElementById(id); if (s) s.value = gid; });
+    const key = document.getElementById('sel-subopt-key'); if (key) key.value = 'numeracoes';
+    App.loadSubOpts();
+    App.renderSubgroupsAdmin();
+    const t = document.getElementById('cfg-detail-title'); if (t) t.textContent = State.groups?.[gid] || 'Grupo';
+    document.getElementById('modal-grupo-edit').classList.remove('hidden');
+  },
+  closeGroupEdit() {
+    App._cfgSelGroup = null;
+    document.getElementById('modal-grupo-edit').classList.add('hidden');
+  },
+
+  renderGroupsAdmin() {
+    const wrap=document.getElementById('list-groups-admin'); wrap.innerHTML='';
+    Object.entries(State.groups||{}).forEach(([id,name]) => {
+      const el=document.createElement('div'); el.className='settings-item cfg-grp-item'; el.dataset.gid=id;
+      el.innerHTML=`<span class="settings-item-name cfg-grp-click" onclick="App.openGroupEdit('${id}')" title="Editar sub-opções e subgrupos">${name}</span>
+        <div class="settings-item-actions">
+          <label class="grp-internal-toggle" title="Interno: só aparece na Nova Solicitação do admin, não para as unidades">
+            <input type="checkbox" ${App._isGroupInternal(id)?'checked':''} onchange="App.toggleGroupInternal('${id}',this.checked)"/> interno
+          </label>
+          <button class="btn-icon-sm edit" onclick="App.openEditModal('Renomear Grupo','${name}',v=>DB.set('groups/${id}',v))">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+          <button class="btn-icon-sm" onclick="App.removeItem('groups','${id}')">
+            <svg viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+        </div>`;
+      wrap.appendChild(el);
+    });
+  },
+
+  addGroup() {
+    const inp=document.getElementById('inp-group'); const name=inp.value.trim(); if(!name) return;
+    DB.push('groups',name).then(()=>{inp.value=''; App.populateGroupSelects(); toast('Grupo adicionado!'); App._logActivity('Configurações', 'Grupo adicionado', name); });
+  },
+
+  // SUB-OPTS
+  populateGroupSelects() {
+    const groups=State.groups||{};
+    ['sel-group-sub','sel-subgroup-group','sel-subgroup-filter'].forEach(sid => {
+      const sel=document.getElementById(sid); if(!sel) return;
+      const cur=sel.value;
+      sel.innerHTML='<option value="">'+( sid==='sel-subgroup-filter'?'Todos os grupos':'Selecione um grupo')+'</option>';
+      Object.entries(groups).forEach(([id,name]) => { const o=document.createElement('option'); o.value=id; o.textContent=name; if(id===cur) o.selected=true; sel.appendChild(o); });
+    });
+  },
+
+  loadSubOpts() {
+    const gid=document.getElementById('sel-group-sub').value;
+    const wrap=document.getElementById('list-subopts-admin'); wrap.innerHTML='';
+    const addRow=document.getElementById('add-subopt-row');
+    const keySelect=document.getElementById('sel-subopt-key');
+    if (!gid) { addRow.style.display='none'; keySelect.style.display='none'; return; }
+    const opts=(State.subOpts||{})[gid]||{};
+    const norm=(State.groups?.[gid]||'').toLowerCase();
+    if (norm.includes('tinta')) {
+      keySelect.style.display=''; keySelect.value=keySelect.value||'numeracoes';
+      const key=keySelect.value; const items=opts[key]||[];
+      App._renderSubOptList(wrap, gid, key, items);
+      addRow.style.display='flex';
+    } else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) {
+      keySelect.style.display='none';
+      App._renderSubOptList(wrap, gid, 'modelos', opts.modelos||[]);
+      addRow.style.display='flex';
+    } else {
+      keySelect.style.display='none';
+      wrap.innerHTML='<p style="color:var(--gray-500);font-size:.82rem;padding:8px">Campo de texto livre — sem sub-opções editáveis.</p>';
+      addRow.style.display='none';
+    }
+  },
+
+  _renderSubOptList(wrap, gid, key, items) {
+    if (!items.length) { wrap.innerHTML='<p style="color:var(--gray-500);font-size:.82rem;padding:8px">Nenhuma sub-opção cadastrada.</p>'; return; }
+    items.forEach((item,idx) => {
+      const el=document.createElement('div'); el.className='settings-item';
+      el.innerHTML=`<span class="settings-item-name">${item}</span>
+        <div class="settings-item-actions">
+          <button class="btn-icon-sm edit" onclick="App.openEditModal('Editar Sub-opção','${item.replace(/'/g,"\\'")}',v=>App.updateSubOpt('${gid}','${key}',${idx},v))">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+          <button class="btn-icon-sm" onclick="App.removeSubOpt('${gid}','${key}',${idx})">
+            <svg viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+        </div>`;
+      wrap.appendChild(el);
+    });
+  },
+
+  updateSubOpt(gid, key, idx, newVal) {
+    const items=[].concat(((State.subOpts||{})[gid]||{})[key]||[]);
+    items[idx]=newVal;
+    DB.set(`subOpts/${gid}/${key}`,items).then(()=>App.loadSubOpts());
+  },
+
+  addSubOpt() {
+    const gid=document.getElementById('sel-group-sub').value;
+    const val=document.getElementById('inp-subopt').value.trim();
+    if (!gid||!val) return;
+    const norm=(State.groups?.[gid]||'').toLowerCase();
+    let key;
+    const keySelect=document.getElementById('sel-subopt-key');
+    if (norm.includes('tinta')) key=keySelect.value||'numeracoes';
+    else if (norm.includes('pilha')||norm.includes('bateria')||norm.includes('conserto')||norm.includes('concerto')) key='modelos';
+    else return;
+    const current=[].concat(((State.subOpts||{})[gid]||{})[key]||[]);
+    current.push(val);
+    DB.set(`subOpts/${gid}/${key}`,current).then(()=>{document.getElementById('inp-subopt').value=''; App.loadSubOpts(); toast('Sub-opção adicionada!');});
+  },
+
+  removeSubOpt(gid, key, idx) {
+    const items=[].concat(((State.subOpts||{})[gid]||{})[key]||[]);
+    items.splice(idx,1);
+    DB.set(`subOpts/${gid}/${key}`,items).then(()=>App.loadSubOpts());
+  },
+
+  // SUBGROUPS
+  populateSubgroupFilterSel() {
+    App.populateGroupSelects();
+  },
+
+  filterSubgroupsView() { App.renderSubgroupsAdmin(); },
+
+  renderSubgroupsAdmin() {
+    const wrap=document.getElementById('list-subgroups-admin'); wrap.innerHTML='';
+    const subs=State.subgroups||{}, groups=State.groups||{};
+    const filter=document.getElementById('sel-subgroup-filter')?.value||'';
+    let hasAny = false;
+    Object.entries(subs).forEach(([gid,list]) => {
+      if (filter && gid!==filter) return;
+      const gname=groups[gid]||gid;
+      list.forEach((sg,idx) => {
+        hasAny=true;
+        const el=document.createElement('div'); el.className='settings-item';
+        el.innerHTML=`
+          <span class="settings-item-sub">${gname} ›</span>
+          <span class="settings-item-name">${sg}</span>
+          <div class="settings-item-actions">
+            <button class="btn-icon-sm edit" onclick="App.openEditModal('Editar Subgrupo','${sg.replace(/'/g,"\\'")}',v=>App.updateSubgroup('${gid}',${idx},v))">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+            <button class="btn-icon-sm" onclick="App.removeSubgroup('${gid}',${idx})">
+              <svg viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+          </div>`;
+        wrap.appendChild(el);
+      });
+    });
+    if (!hasAny) wrap.innerHTML='<p style="color:var(--gray-500);font-size:.82rem;padding:8px">Nenhum subgrupo cadastrado.</p>';
+  },
+
+  addSubgroup() {
+    const gid=document.getElementById('sel-subgroup-group').value;
+    const name=document.getElementById('inp-subgroup').value.trim();
+    if (!gid||!name) { toast('Selecione o grupo e informe o nome.','error'); return; }
+    const current=[].concat((State.subgroups||{})[gid]||[]);
+    current.push(name);
+    DB.set(`subgroups/${gid}`,current).then(()=>{document.getElementById('inp-subgroup').value=''; App.renderSubgroupsAdmin(); toast('Subgrupo adicionado!');});
+  },
+
+  updateSubgroup(gid, idx, newVal) {
+    const items=[].concat((State.subgroups||{})[gid]||[]);
+    items[idx]=newVal;
+    DB.set(`subgroups/${gid}`,items).then(()=>App.renderSubgroupsAdmin());
+  },
+
+  removeSubgroup(gid, idx) {
+    const items=[].concat((State.subgroups||{})[gid]||[]);
+    items.splice(idx,1);
+    DB.set(`subgroups/${gid}`,items).then(()=>App.renderSubgroupsAdmin());
+  },
+
+  // ADMINS cards
+  renderAdminsCards() {
+    // Atualiza o contador de logs no card de Ferramentas (mesma aba)
+    const logCountEl = document.getElementById('config-logs-count');
+    if (logCountEl) {
+      const n = Object.keys(State.activityLog || {}).length;
+      // Sem logs, mantém a descrição do card — antes ficava um espaço vazio
+      logCountEl.textContent = n ? `${n} registro${n!==1?'s':''} no total` : 'Quem fez o quê e quando, dia a dia';
+    }
+    // A gestão de administradores saiu daqui: passou para Configurações da Home.
+    // Sem o elemento na tela, a rotina apenas não faz nada.
+    const wrap=document.getElementById('admin-cards-grid'); if (!wrap) return; wrap.innerHTML='';
+    const admins=State.admins||{};
+    if (!Object.keys(admins).length) { wrap.innerHTML='<p style="color:var(--gray-500);font-size:.82rem">Nenhum administrador cadastrado.</p>'; return; }
+    Object.keys(admins).forEach(user => {
+      const rec = admins[user];
+      const nome = (rec && typeof rec === 'object' ? rec.nome : '') || '';
+      const letter=(nome || user)[0].toUpperCase();
+      const isCurrent = user===State.adminUser;
+      const card=document.createElement('div');
+      card.className=`admin-card${isCurrent?' current-user':''}`;
+      card.innerHTML=`
+        ${isCurrent ? '<div class="current-badge">Você</div>' : ''}
+        <div class="admin-card-avatar">${letter}</div>
+        <div class="admin-card-name">${nome || user}</div>
+        <div class="admin-card-role">@${user}</div>
+        <div class="admin-card-actions">
+          ${!isCurrent ? `<button class="btn-icon-sm" title="Remover" onclick="App.removeAdmin('${user}')">
+            <svg viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2"/></svg>
+          </button>` : ''}
+        </div>`;
+      wrap.appendChild(card);
+    });
+  },
+
+  addAdmin() {
+    // Formulário movido para Configurações da Home; aqui só resta o guard.
+    const elUser=document.getElementById('inp-admin-user');
+    const elPass=document.getElementById('inp-admin-pass');
+    if (!elUser || !elPass) return;
+    const nome=document.getElementById('inp-admin-nome')?.value.trim() || '';
+    const user=elUser.value.trim();
+    const pass=elPass.value;
+    if (!user||!pass) { toast('Preencha usuário e senha.','error'); return; }
+    DB.set(`admins/${user}`, { pass, nome }).then(()=>{
+      const n=document.getElementById('inp-admin-nome'); if(n) n.value='';
+      elUser.value='';
+      elPass.value='';
+      toast('✓ Administrador cadastrado!');
+      App._logActivity('Configurações', 'Administrador cadastrado', nome ? `${nome} (${user})` : user);
+    });
+  },
+
+  removeAdmin(user) {
+    if (user===State.adminUser) { toast('Não é possível remover o admin atual.','error'); return; }
+    DB.remove(`admins/${user}`).then(()=>{ toast('Admin removido.'); App._logActivity('Configurações', 'Administrador removido', user); });
+  },
+
+  // GENERIC
+  removeItem(col, id) {
+    const nomes = { units: 'Unidade', groups: 'Grupo', suppliers: 'Fornecedor' };
+    const nome = State[col]?.[id] || id;
+    DB.remove(`${col}/${id}`).then(() => App._logActivity('Configurações', `${nomes[col] || col} removido`, nome));
+  },
+
+  /* ── EDIT MODAL ───────────────────────────── */
+  openEditModal(title, currentVal, callback) {
+    document.getElementById('edit-modal-title').textContent = title;
+    document.getElementById('edit-item-value').value = currentVal;
+    State.editCallback = callback;
+    document.getElementById('modal-edit-item').classList.remove('hidden');
+    setTimeout(() => document.getElementById('edit-item-value').focus(), 50);
+  },
+
+  closeEditModal() {
+    document.getElementById('modal-edit-item').classList.add('hidden');
+    State.editCallback = null;
+  },
+
+  confirmEditItem() {
+    const val = document.getElementById('edit-item-value').value.trim();
+    if (!val) { toast('Informe um nome válido.','error'); return; }
+    if (State.editCallback) {
+      State.editCallback(val);
+      toast('✓ Alterado com sucesso!');
+    }
+    App.closeEditModal();
+  },
+
+  /* ══════════════════════════════════════════════
+     ESTOQUE
+  ══════════════════════════════════════════════ */
+
+  verZerados: false,
+  estoquePagina: 1,
+  estoquePorPagina: 10,
+
+  estoquePage(dir) {
+    App.estoquePagina += (dir === 'next' ? 1 : -1);
+    if (App.estoquePagina < 1) App.estoquePagina = 1;
+    App.renderEstoque();
+  },
+
+  renderEstoque() {
+    const tbody = document.getElementById('estoque-tbody'); if (!tbody) return;
+    const fGrupo    = document.getElementById('estoque-filter-grupo')?.value || '';
+    const fSubgrupo = document.getElementById('estoque-filter-subgrupo')?.value || '';
+    const fSearch = (document.getElementById('estoque-search')?.value || '').toLowerCase();
+    tbody.innerHTML = '';
+
+    // Popula filtro grupo
+    const grupoSel = document.getElementById('estoque-filter-grupo');
+    if (grupoSel) {
+      const cur = grupoSel.value;
+      grupoSel.innerHTML = '<option value="">Todos os grupos</option>' +
+        Object.values(State.groups || {}).map(g => `<option value="${g}">${g}</option>`).join('');
+      grupoSel.value = cur;
+    }
+
+    // Popula filtro subgrupo — depende do grupo escolhido (State.subgroups[gid]);
+    // sem grupo escolhido, junta os subgrupos de todos os grupos (deduplicado).
+    const subSel = document.getElementById('estoque-filter-subgrupo');
+    if (subSel) {
+      const cur = subSel.value;
+      let listaSub;
+      if (fGrupo) {
+        const gid = Object.entries(State.groups || {}).find(([, n]) => n === fGrupo)?.[0];
+        listaSub = gid ? (State.subgroups?.[gid] || []) : [];
+      } else {
+        const set = new Set();
+        Object.values(State.subgroups || {}).forEach(arr => (arr || []).forEach(sg => set.add(sg)));
+        listaSub = [...set].sort();
+      }
+      subSel.innerHTML = '<option value="">Todos</option>' + listaSub.map(sg => `<option value="${sg}">${sg}</option>`).join('');
+      subSel.value = listaSub.includes(cur) ? cur : '';
+    }
+
+    const items = Object.entries(State.estoque || {});
+    const filtered = items.filter(([,i]) => {
+      if (fGrupo    && i.grupo !== fGrupo) return false;
+      if (fSubgrupo && i.subgrupo !== fSubgrupo) return false;
+      if (fSearch && !( (i.produto||'').toLowerCase().includes(fSearch) ||
+                        (i.subgrupo||'').toLowerCase().includes(fSearch) ||
+                        (i.grupo||'').toLowerCase().includes(fSearch) ||
+                        App._loteDisplay(i).toLowerCase().includes(fSearch) )) return false;
+      return true;
+    });
+
+    // Separa zerados — somem da lista por padrão
+    const zerados   = filtered.filter(([,i]) => parseFloat(i.quantidade || 0) <= 0);
+    const visiveis  = App.verZerados ? filtered : filtered.filter(([,i]) => parseFloat(i.quantidade || 0) > 0);
+
+    const invSection = document.getElementById('estoque-inv-section');
+    if (invSection) invSection.classList.toggle('hidden', filtered.length === 0);
+
+    // Paginação — 10 por página
+    const porPag    = App.estoquePorPagina;
+    const totalPags = Math.max(1, Math.ceil(visiveis.length / porPag));
+    if (App.estoquePagina > totalPags) App.estoquePagina = totalPags;
+    if (App.estoquePagina < 1)         App.estoquePagina = 1;
+    const ini      = (App.estoquePagina - 1) * porPag;
+    const pagItens = visiveis.slice(ini, ini + porPag);
+
+    pagItens.forEach(([id, item]) => {
+      const qtd = parseFloat(item.quantidade || 0);
+      const qtdCls = qtd <= 0 ? 'style="color:#d94040;font-weight:700"' : qtd <= 5 ? 'style="color:#e8830a;font-weight:700"' : 'style="color:#1db87a;font-weight:700"';
+      const zeradoTag = qtd <= 0 ? ' <span class="estoque-zerado-tag">ZERADO</span>' : '';
+      const itemReq = item.reqId ? (State.requests || {})[item.reqId] : null;
+      const nParc = (itemReq && itemReq.parcelas && itemReq.parcelas.length) || (item.parcelas && item.parcelas.length) || 0;
+      const parcTag = nParc
+        ? ` <span class="mov-tag-parcelada" title="Compra parcelada em ${nParc}×">PARCELADA ${nParc}×</span>` : '';
+      const ehBrinde = App._isBrindeEstoque(item);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="estoque-lote${ehBrinde ? ' lote-brinde' : ''}"${ehBrinde ? ' title="Brinde: veio junto na compra do lote de mesmo número"' : ''}>${App._loteDisplay(item)}</span></td>
+        <td style="font-weight:600">${item.produto || '—'}${zeradoTag}${parcTag}</td>
+        <td>${item.grupo || '—'}</td>
+        <td>${item.subgrupo || '—'}</td>
+        <td ${qtdCls}>${qtd}</td>
+        <td style="white-space:nowrap">
+          <button class="btn-action" onclick="App.editEstoqueItem('${id}')" style="margin-right:6px">Editar</button>
+          <button class="btn-delete" onclick="App.deleteEstoqueItem('${id}')">Remover</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+
+    // Botão "Ver zerados"
+    const btnZer = document.getElementById('btn-ver-zerados');
+    if (btnZer) {
+      btnZer.classList.toggle('hidden', zerados.length === 0);
+      btnZer.textContent = App.verZerados ? `Ocultar zerados (${zerados.length})` : `Ver zerados (${zerados.length})`;
+      btnZer.classList.toggle('active', App.verZerados);
+    }
+
+    // Controles de paginação
+    const pager = document.getElementById('estoque-pager');
+    if (pager) {
+      pager.classList.toggle('hidden', visiveis.length <= porPag);
+      const info = document.getElementById('estoque-pager-info');
+      if (info) info.textContent = `${App.estoquePagina} / ${totalPags}`;
+      const prev = document.getElementById('estoque-prev');
+      const next = document.getElementById('estoque-next');
+      if (prev) prev.disabled = App.estoquePagina <= 1;
+      if (next) next.disabled = App.estoquePagina >= totalPags;
+    }
+
+    // Cards entrada/saída — respeitam o filtro de grupo
+    const nEnt = App._renderMovList('entrada', fGrupo);
+    const nSai = App._renderMovList('saida', fGrupo);
+    App._renderResumo(filtered, zerados.length);
+
+    const resumoCard = document.getElementById('estoque-resumo-card');
+    if (resumoCard) resumoCard.classList.remove('hidden');
+    const cardsGrid = document.getElementById('estoque-cards-grid');
+    if (cardsGrid) cardsGrid.classList.remove('hidden');
+    const emptyAll = document.getElementById('estoque-empty-all');
+    if (emptyAll) emptyAll.classList.toggle('hidden', filtered.length > 0 || nEnt > 0 || nSai > 0);
+  },
+
+  toggleVerZerados() { App.verZerados = !App.verZerados; App.estoquePagina = 1; App.renderEstoque(); },
+
+  _estoqueCodigo(id) { return 'EST-' + String(id).slice(-5).toUpperCase(); },
+
+  _renderResumo(filtered, nZerados) {
+    const movs = Object.values(State.estoqueMov || {});
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('resumo-entradas', movs.filter(m => m.tipo === 'entrada').length);
+    set('resumo-saidas',   movs.filter(m => m.tipo === 'saida').length);
+    set('resumo-saldo',    filtered.reduce((s, [,i]) => s + (parseFloat(i.quantidade) || 0), 0));
+    set('resumo-zerados',  nZerados);
+  },
+
+  // Coleta movimentos de um tipo (inclui saídas legadas). Guarda em cache p/ histórico.
+  _coletarMovs(tipo, fGrupo = '') {
+    let rows = Object.entries(State.estoqueMov || {})
+      .filter(([,m]) => m.tipo === tipo)
+      .map(([mid, m]) => ({ ...m, movId: mid }));
+
+    if (tipo === 'saida') {
+      Object.entries(State.requests || {})
+        .filter(([,r]) => r.status === 'Estoque' && !r.estoqueItemId)
+        .forEach(([rid, r]) => rows.push({
+          data: r.shippedAt || r.createdAt, produto: App.reqSummary(r), grupo: r.groupName,
+          qtd: r.estoqueQtyUsed || r.qty || '—', unidade: '', destino: r.unitName || '—',
+          saldo: null, origem: 'Solicitação (legado)', movId: null, reqId: rid
+        }));
+    }
+    if (fGrupo) rows = rows.filter(x => x.grupo === fGrupo);
+    const dir = App.movSort[tipo] || 'desc';
+    rows.sort((a, b) => {
+      const cmp = (a.data || '').localeCompare(b.data || '');
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    rows.forEach((r, i) => { r._idx = i; });   // índice estável p/ click (sobrevive a busca/paginação)
+    App._movCache[tipo] = rows;
+    return rows;
+  },
+
+  // Solicitação ligada ao movimento (via reqId direto ou via estoqueId→item→reqId)
+  _movReq(x) {
+    let rid = x.reqId;
+    if (!rid && x.estoqueId) rid = (State.estoque || {})[x.estoqueId]?.reqId;
+    return rid ? (State.requests || {})[rid] : null;
+  },
+  // Movimento veio de compra parcelada?
+  _movParcelada(x) {
+    const r = App._movReq(x);
+    return !!(r && r.parcelas && r.parcelas.length);
+  },
+  _tagParcelada(x) {
+    const r = App._movReq(x);
+    if (!r || !r.parcelas || !r.parcelas.length) return '';
+    return `<span class="mov-tag-parcelada" title="Compra parcelada em ${r.parcelas.length}×">PARCELADA ${r.parcelas.length}×</span>`;
+  },
+
+  // Aplica termo de busca a uma lista de movimentos
+  _filtraMovBusca(rows, termo) {
+    if (!termo) return rows;
+    const t = termo.toLowerCase();
+    return rows.filter(x => {
+      const item = x.estoqueId ? (State.estoque || {})[x.estoqueId] : null;
+      const loteShow = item ? App._loteDisplay(item) : (x.lote || '');
+      return [x.produto, x.grupo, x.subgrupo, x.destino, x.lote, loteShow, x.origem]
+        .filter(Boolean).join(' ').toLowerCase().includes(t);
+    });
+  },
+
+  _movCache: { entrada: [], saida: [] },
+  movSort: { entrada: 'desc', saida: 'desc' },
+  movSearch: { entrada: '', saida: '' },
+  movHist: { tipo: 'saida', page: 1, search: '', perPage: 8 },
+
+  setMovSearch(tipo, val) {
+    App.movSearch[tipo] = val || '';
+    const fGrupo = document.getElementById('estoque-filter-grupo')?.value || '';
+    App._renderMovList(tipo, fGrupo);
+  },
+
+  clearMovSearch(tipo) {
+    const input = document.getElementById(tipo === 'entrada' ? 'estoque-entradas-search' : 'estoque-saidas-search');
+    if (input) input.value = '';
+    App.setMovSearch(tipo, '');
+  },
+
+  setMovSort(tipo, dir, btn) {
+    App.movSort[tipo] = dir;
+    const pre = tipo === 'entrada' ? 'sort-ent-' : 'sort-sai-';
+    ['asc','desc'].forEach(d => document.getElementById(pre + d)?.classList.toggle('active', d === dir));
+    const fGrupo = document.getElementById('estoque-filter-grupo')?.value || '';
+    App._renderMovList(tipo, fGrupo);
+  },
+
+  // Renderiza preview (max 5) no card. Retorna total.
+  _renderMovList(tipo, fGrupo = '') {
+    const listEl = document.getElementById(tipo === 'entrada' ? 'estoque-entradas-list' : 'estoque-saidas-list');
+    const badge  = document.getElementById(tipo === 'entrada' ? 'estoque-entradas-count' : 'estoque-saidas-count');
+    if (!listEl) return 0;
+
+    const all = App._coletarMovs(tipo, fGrupo);
+    const rows = App._filtraMovBusca(all, App.movSearch[tipo]);
+    if (badge) badge.textContent = all.length;
+
+    if (!rows.length) {
+      listEl.innerHTML = `<div class="emc-empty">${App.movSearch[tipo] ? 'Nada encontrado.' : 'Nenhuma movimentação.'}</div>`;
+      return all.length;
+    }
+
+    const isEnt = tipo === 'entrada';
+    listEl.innerHTML = rows.map(x => {
+      const parc = App._tagParcelada(x);
+      return `
+      <div class="emc-item" onclick="App.openMovDetail('${tipo}', ${x._idx})">
+        <div class="emc-item-main">
+          <span class="emc-item-prod">${x.produto || '—'}${parc}</span>
+          <span class="emc-item-meta">${App._fmtDate(x.data)} · ${isEnt ? ((x.estoqueId&&(State.estoque||{})[x.estoqueId])?App._loteDisplay((State.estoque||{})[x.estoqueId]):(x.lote||'—')) : (x.destino||'—')}</span>
+        </div>
+        <span class="emc-item-qtd" style="color:${isEnt?'#1db87a':'#e8830a'}">${isEnt?'+':'−'}${x.qtd} ${x.unidade||''}</span>
+      </div>`;
+    }).join('');
+    return all.length;
+  },
+
+  // Histórico completo (modal) — busca + paginação fixa 8/página
+  openMovHist(tipo) {
+    App.movHist.tipo = tipo;
+    App.movHist.page = 1;
+    App.movHist.search = '';
+    const si = document.getElementById('mov-hist-search'); if (si) si.value = '';
+    document.getElementById('mov-hist-title').textContent =
+      tipo === 'entrada' ? 'Histórico de Entradas' : 'Histórico de Saídas';
+    App._renderMovHist();
+    document.getElementById('mov-hist-modal').classList.remove('hidden');
+  },
+
+  setMovHistSearch(val) { App.movHist.search = val || ''; App.movHist.page = 1; App._renderMovHist(); },
+  movHistPage(dir) {
+    App.movHist.page += (dir === 'next' ? 1 : -1);
+    if (App.movHist.page < 1) App.movHist.page = 1;
+    App._renderMovHist();
+  },
+
+  _renderMovHist() {
+    const tipo = App.movHist.tipo;
+    const isEnt = tipo === 'entrada';
+    const all = App._movCache[tipo] || [];
+    const rows = App._filtraMovBusca(all, App.movHist.search);
+
+    const per = App.movHist.perPage;
+    const totalPags = Math.max(1, Math.ceil(rows.length / per));
+    if (App.movHist.page > totalPags) App.movHist.page = totalPags;
+    const ini = (App.movHist.page - 1) * per;
+    const pag = rows.slice(ini, ini + per);
+
+    const thead = document.getElementById('mov-hist-thead');
+    const tbody = document.getElementById('mov-hist-tbody');
+    thead.innerHTML = isEnt
+      ? '<tr><th>Data</th><th>Lote</th><th>Produto</th><th>Grupo</th><th>Qtd</th><th>Saldo</th><th>Origem</th><th>Ações</th></tr>'
+      : '<tr><th>Data</th><th>Produto</th><th>Grupo</th><th>Qtd</th><th>Destino</th><th>Saldo</th><th>Ações</th></tr>';
+    if (!pag.length) {
+      tbody.innerHTML = `<tr><td colspan="${isEnt ? 8 : 7}" style="text-align:center;color:#8898b8;padding:20px">${App.movHist.search ? 'Nada encontrado.' : 'Nenhuma movimentação.'}</td></tr>`;
+    } else {
+      tbody.innerHTML = pag.map(x => {
+        const acao = x.movId ? `<button class="btn-action" onclick="App.openMovDate('${x.movId}')">Data</button>` : '—';
+        const det  = `<button class="btn-action" onclick="App.openMovDetail('${tipo}', ${x._idx})" style="margin-right:6px">Ver</button>`;
+        const parc = App._tagParcelada(x);
+        return isEnt
+          ? `<tr><td>${App._fmtDate(x.data)}</td><td><span class="estoque-lote">${(x.estoqueId&&(State.estoque||{})[x.estoqueId])?App._loteDisplay((State.estoque||{})[x.estoqueId]):(x.lote||'—')}</span></td><td style="font-weight:600">${x.produto||'—'}${parc}</td><td>${x.grupo||'—'}</td><td style="font-weight:700;color:#1db87a">+${x.qtd} ${x.unidade||''}</td><td>${x.saldo!=null?x.saldo:'—'}</td><td style="font-size:.8rem;color:#6680a0">${x.origem||'—'}</td><td style="white-space:nowrap">${det}${acao}</td></tr>`
+          : `<tr><td>${App._fmtDate(x.data)}</td><td style="font-weight:600">${x.produto||'—'}${parc}</td><td>${x.grupo||'—'}</td><td style="font-weight:700;color:#e8830a">−${x.qtd} ${x.unidade||''}</td><td><span class="estoque-destino">${x.destino||'—'}</span></td><td>${x.saldo!=null?x.saldo:'—'}</td><td style="white-space:nowrap">${det}${acao}</td></tr>`;
+      }).join('');
+    }
+
+    const info = document.getElementById('mov-hist-pager-info');
+    if (info) info.textContent = `${App.movHist.page} / ${totalPags} · ${rows.length} registro(s)`;
+    const prev = document.getElementById('mov-hist-prev');
+    const next = document.getElementById('mov-hist-next');
+    if (prev) prev.disabled = App.movHist.page <= 1;
+    if (next) next.disabled = App.movHist.page >= totalPags;
+  },
+
+  closeMovHist() { document.getElementById('mov-hist-modal').classList.add('hidden'); },
+
+  // Detalhe de uma movimentação — mostra solicitação se houver. Visual no
+  // padrão do pop-up de auditoria dos cards de consumo (.audit-grid/.audit-side/
+  // .audit-main): painel escuro à esquerda com o essencial (tipo/qtd/produto),
+  // solicitação vinculada (ou origem no estoque) ao LADO — não embaixo — e as
+  // 2 datas de referência numa faixa full-width no final (entrada esquerda,
+  // saída direita).
+  _movDetailCur: null,
+  openMovDetail(tipo, idx) {
+    const x = (App._movCache[tipo] || [])[idx]; if (!x) return;
+    App._movDetailCur = x;
+    const isEnt = tipo === 'entrada';
+    const loteOuDestino = isEnt
+      ? ((x.estoqueId && (State.estoque||{})[x.estoqueId]) ? App._loteDisplay((State.estoque||{})[x.estoqueId]) : (x.lote || '—'))
+      : (x.destino || '—');
+
+    // Liga à solicitação (saída via pedido)
+    let solHtml = '';
+    const reqId = x.reqId || App._acharReqPorMov(x);
+    if (reqId) {
+      const r = State.requests[reqId];
+      if (r) {
+        solHtml = `
+          <div class="mov-detail-sol">
+            <div class="mov-detail-sol-title">Solicitação vinculada</div>
+            <div class="mov-detail-grid">
+              <div><span>Unidade</span><strong>${r.unitName || '—'}</strong></div>
+              <div><span>Status</span><strong>${r.status || '—'}</strong></div>
+              <div><span>Resumo</span><strong>${App.reqSummary(r)}</strong></div>
+              <div><span>Solicitado em</span><strong>${App._fmtDate(r.createdAt)}</strong></div>
+              <div><span>Enviado em</span><strong>${r.shippedAt ? App._fmtDate(r.shippedAt) : '—'}</strong></div>
+            </div>
+          </div>`;
+      }
+    }
+
+    // Fonte do estoque (só saída) — de qual lote/compra o item saiu, p/ mapeamento
+    let fonteHtml = '';
+    if (!isEnt) {
+      const f = App._movFonteEstoque(x);
+      if (f.lote || f.compra || f.entradaData) {
+        fonteHtml = `
+          <div class="mov-detail-sol">
+            <div class="mov-detail-sol-title">Origem no estoque</div>
+            <div class="mov-detail-grid">
+              <div><span>Lote</span><strong>${f.lote || '—'}</strong></div>
+              <div><span>Compra</span><strong>${f.compra || '—'}</strong></div>
+              <div><span>Entrada em</span><strong>${f.entradaData ? App._fmtDate(f.entradaData) : '—'}</strong></div>
+            </div>
+          </div>`;
+      }
+    }
+    const mainHtml = (solHtml || fonteHtml)
+      ? `${solHtml}${fonteHtml}`
+      : `<div class="mov-detail-empty">Movimento manual — sem solicitação vinculada.</div>`;
+
+    // Datas de referência: entrada (verde) e saída (laranja) — sempre no final, full-width
+    const { dEnt, dSai } = App._movDatasRef(x);
+    const datasHtml = `
+      <div class="mov-detail-datas">
+        <div class="mov-data-ref entrada"><span>Data de entrada</span><strong>${dEnt ? App._fmtDate(dEnt) : '—'}</strong></div>
+        <div class="mov-data-ref saida"><span>Data de saída</span><strong>${dSai ? App._fmtDate(dSai) : '—'}</strong></div>
+      </div>`;
+
+    document.getElementById('mov-detail-body').innerHTML = `
+      <div class="audit-grid">
+        <div class="audit-side">
+          <span class="audit-side-tag ${isEnt ? 'mov-ent' : 'mov-sai'}">${isEnt ? 'ENTRADA' : 'SAÍDA'}</span>
+          <div class="audit-side-big">${isEnt ? '+' : '−'}${x.qtd} <small>${x.unidade || ''}</small></div>
+          <div class="audit-side-lbl">Produto</div>
+          <div class="audit-side-produto">${x.produto || '—'}</div>
+          <div class="audit-side-divider"></div>
+          <div class="audit-side-row"><span>Grupo</span><strong>${x.grupo || '—'}</strong></div>
+          <div class="audit-side-row"><span>Subgrupo</span><strong>${x.subgrupo || '—'}</strong></div>
+          <div class="audit-side-row"><span>Saldo após</span><strong>${x.saldo != null ? x.saldo : '—'}</strong></div>
+          <div class="audit-side-row"><span>Data</span><strong>${App._fmtDate(x.data)}</strong></div>
+          <div class="audit-side-row"><span>${isEnt ? 'Lote' : 'Destino'}</span><strong>${loteOuDestino}</strong></div>
+          <div class="audit-side-row"><span>Origem</span><strong>${x.origem || '—'}</strong></div>
+        </div>
+        <div class="audit-main">${mainHtml}</div>
+      </div>
+      ${datasHtml}`;
+    document.getElementById('mov-detail-date-btn').style.display = x.movId ? '' : 'none';
+    const delBtn = document.getElementById('mov-detail-del-btn');
+    if (delBtn) delBtn.style.display = x.movId ? '' : 'none';
+    document.getElementById('mov-detail-modal').classList.remove('hidden');
+  },
+  // Resolve datas de referência de um movimento: entrada (compra) e saída (envio)
+  _movDatasRef(x) {
+    let dEnt = null, dSai = null;
+    // 1) Solicitação vinculada — fonte mais confiável
+    const reqId = x.reqId || App._acharReqPorMov(x);
+    const r = reqId ? (State.requests || {})[reqId] : null;
+    if (r) {
+      dEnt = r.boughtAt || r.createdAt || null;
+      dSai = r.shippedAt || null;
+    }
+    // 2) Fallback: movimentos do mesmo item de estoque
+    if ((!dEnt || !dSai) && x.estoqueId) {
+      const movs = Object.values(State.estoqueMov || {}).filter(m => m.estoqueId === x.estoqueId);
+      if (!dEnt) dEnt = movs.find(m => m.tipo === 'entrada')?.data || null;
+      if (!dSai) dSai = movs.find(m => m.tipo === 'saida')?.data   || null;
+    }
+    // 3) Último fallback: a própria data conforme o tipo
+    if (!dEnt && x.tipo === 'entrada') dEnt = x.data;
+    if (!dSai && x.tipo === 'saida')   dSai = x.data;
+    return { dEnt, dSai };
+  },
+
+  // De qual lote/compra do estoque a saída veio (p/ mapeamento)
+  _movFonteEstoque(x) {
+    let lote = null, compra = null, entradaData = null;
+    const eid = x.estoqueId;
+    if (eid) {
+      const item = (State.estoque || {})[eid];
+      if (item) lote = App._loteDisplay(item);
+      // data de entrada do mesmo item
+      const ent = Object.values(State.estoqueMov || {})
+        .find(m => m.estoqueId === eid && m.tipo === 'entrada');
+      if (ent) entradaData = ent.data || null;
+      // item → request de origem → código da compra / SL
+      const rid = item?.reqId;
+      const r = rid ? (State.requests || {})[rid] : null;
+      if (r) compra = r.compraCodigo || (r.seq != null ? 'SL-' + r.seq : null);
+    }
+    if (!lote) lote = x.lote ? App._loteDisplay({ lote: x.lote }) : null;
+    return { lote, compra, entradaData };
+  },
+
+  closeMovDetail() { document.getElementById('mov-detail-modal').classList.add('hidden'); },
+
+  // Apaga movimento (entrada/saída). Se vinculado a um item de estoque (estoqueId),
+  // apaga TAMBÉM o item + o par entrada/saída do mesmo lote. Não toca em financeiro.
+  async deleteMovimento() {
+    const x = App._movDetailCur;
+    if (!x?.movId) { toast('Movimento legado não pode ser apagado aqui.', 'error'); return; }
+
+    const estoqueId = x.estoqueId;
+    const item = estoqueId ? (State.estoque || {})[estoqueId] : null;
+
+    try {
+      if (estoqueId) {
+        // Cascata: apaga item + entrada e saída do lote
+        if (!confirm('Apagar este movimento?\nO item de estoque vinculado e a ENTRADA/SAÍDA do mesmo lote também serão apagados.')) return;
+        const nMov = await App._apagarEstoqueCascata(estoqueId, item);
+        toast(`Movimento e item apagados (${nMov} movimento(s)).`);
+      } else {
+        // Movimento avulso sem item vinculado → apaga só ele
+        if (!confirm('Apagar este movimento?')) return;
+        await DB.remove(`estoqueMov/${x.movId}`);
+        toast('Movimento apagado.');
+      }
+      App.closeMovDetail();
+    } catch (e) {
+      console.error('[deleteMovimento] erro', e);
+      toast('Erro ao apagar.', 'error');
+    }
+  },
+  movDetailEditDate() {
+    const x = App._movDetailCur; if (!x?.movId) return;
+    App.closeMovDetail();
+    App.openMovDate(x.movId);
+  },
+
+  // Tenta achar solicitação por destino+produto (saídas estruturadas)
+  _acharReqPorMov(x) {
+    if (x.tipo !== 'saida' || !x.destino) return null;
+    const hit = Object.entries(State.requests || {}).find(([,r]) =>
+      r.status === 'Estoque' && r.unitName === x.destino &&
+      (x.data || '').substring(0,10) === (r.shippedAt || '').substring(0,10));
+    return hit ? hit[0] : null;
+  },
+
+  // Editar data da movimentação
+  openMovDate(mid) {
+    const m = State.estoqueMov?.[mid]; if (!m) return;
+    document.getElementById('mov-date-id').value = mid;
+    document.getElementById('mov-date-input').value = (m.data || '').substring(0, 10);
+    document.getElementById('mov-date-modal').classList.remove('hidden');
+  },
+  closeMovDate() { document.getElementById('mov-date-modal').classList.add('hidden'); },
+  saveMovDate() {
+    const mid = document.getElementById('mov-date-id').value;
+    const val = document.getElementById('mov-date-input').value;
+    if (!mid || !val) { App.closeMovDate(); return; }
+    const movProd = State.estoqueMov?.[mid]?.produto || '';
+    DB.set(`estoqueMov/${mid}/data`, val + 'T00:00:00.000Z')
+      .then(() => { toast('Data atualizada.'); App.closeMovDate(); App._logActivity('Calendário', 'Data de movimentação alterada', movProd ? `${movProd} → ${val}` : val); })
+      .catch(() => toast('Erro ao salvar.', 'error'));
+  },
+
+  // Dispatcher do botão "Editar" — edita conforme a origem do item de estoque:
+  //  · Novo Item (request origemEstoque) → formulário de estoque como novo item (campos de compra).
+  //  · Solicitação / Compra normal (request sem origemEstoque) → modal da solicitação/compra.
+  //  · Item manual / parcelada direto (sem request) → formulário de estoque simples (reposição).
+  editEstoqueItem(id) {
+    const item = (State.estoque || {})[id]; if (!item) return;
+    const r = item.reqId ? (State.requests || {})[item.reqId] : null;
+    if (r && !r.origemEstoque) { App.openModal(item.reqId); return; }
+    App.openEstoqueForm(id);
+  },
+
+  // Passo 1: escolher se é Nova compra (conta gasto) ou Nova entrada (sem custo)
+  escolherTipoEstoque() {
+    document.getElementById('estoque-tipo-modal')?.classList.remove('hidden');
+  },
+
+  _estoqueEntradaMode: 'compra',   // 'compra' = conta gasto | 'entrada' = sem custo
+  openEstoqueForm(id = null, modo = 'compra') {
+    document.getElementById('estoque-tipo-modal')?.classList.add('hidden');
+    document.getElementById('estoque-modal').classList.remove('hidden');
+    document.getElementById('estoque-edit-id').value = id || '';
+    App._populateEstoqueGrupoSel();
+    App._populateEstoqueFornecedor();
+    App._populateEstoqueUnidade();
+    App._populateEstoqueBrindeGrupoSel();
+    App._popularSelectSetor('estoque-solicitante', null, '');
+
+    const item = id ? (State.estoque[id] || {}) : {};
+    const reqLig = item.reqId ? (State.requests || {})[item.reqId] : null;
+    const ehNovoItem = !!(reqLig && reqLig.origemEstoque);  // veio de "Novo Item" → edita como novo item
+
+    // Modo: ao criar vem do chooser; ao editar deriva da flag da solicitação.
+    const ehEntrada = id ? !!(reqLig && reqLig.entradaSemCusto) : (modo === 'entrada');
+    App._estoqueEntradaMode = ehEntrada ? 'entrada' : 'compra';
+
+    document.getElementById('estoque-form-title').textContent =
+      id ? 'Editar Item' : (ehEntrada ? 'Nova Entrada (sem custo)' : 'Nova Compra em Estoque');
+
+    // Campos de compra (unidade/data) aparecem ao criar OU ao editar um Novo Item.
+    // Item manual (sem request) editado → só ajusta saldo do lote (Reposição/Ajuste manual).
+    const mostrarCompra = !id || ehNovoItem;
+    const compraFields = document.getElementById('estoque-compra-fields');
+    if (compraFields) compraFields.style.display = mostrarCompra ? '' : 'none';
+    // Campos de DINHEIRO (valor/fornecedor/parcelas/forma pgto) somem na Nova entrada.
+    const showMoney = mostrarCompra && !ehEntrada;
+    document.querySelectorAll('.estoque-money').forEach(el => { el.style.display = showMoney ? '' : 'none'; });
+    // Brinde: só faz sentido numa Nova Compra criada do zero (não em Nova Entrada, nem editando).
+    const showBrinde = !id && !ehEntrada;
+    document.getElementById('estoque-brinde-wrap')?.classList.toggle('hidden', !showBrinde);
+    const dataLabel = document.getElementById('estoque-data-label');
+    if (dataLabel) dataLabel.textContent = !mostrarCompra ? 'Data da movimentação' : (ehEntrada ? 'Data da entrada' : 'Data da compra');
+
+    const hoje = new Date().toISOString().substring(0,10);
+    if (id) {
+      document.getElementById('estoque-grupo').value    = item.grupo    || '';
+      App.onEstoqueGrupoChange();
+      document.getElementById('estoque-subgrupo').value  = item.subgrupo   || '';
+      const prodSelEd = document.getElementById('estoque-produto-select');
+      if (prodSelEd && !prodSelEd.classList.contains('hidden')) prodSelEd.value = item.produto || '';
+      else document.getElementById('estoque-produto').value = item.produto || '';
+      document.getElementById('estoque-fornecedor').value = item.fornecedor || '';
+      document.getElementById('estoque-qtd').value       = item.quantidade != null ? item.quantidade : '';
+      const dEl = document.getElementById('estoque-data');
+
+      if (ehNovoItem) {
+        // Reidrata campos de compra a partir da solicitação vinculada
+        const uSel = document.getElementById('estoque-unidade-destino');
+        if (uSel) uSel.value = reqLig.unitName === 'Estoque Central' ? '__central__' : (reqLig.unitId || '');
+        const vEl = document.getElementById('estoque-valor'); if (vEl) vEl.value = reqLig.valor || '';
+        App._popularSelectSetor('estoque-solicitante', reqLig.unitId || null, reqLig.solicitante || '');
+        const temParc = !!(reqLig.parcelas && reqLig.parcelas.length);
+        document.getElementById('chk-estoque-parcelas').checked = temParc;
+        document.getElementById('estoque-parcelas-wrap').style.display = temParc ? '' : 'none';
+        document.getElementById('estoque-parcelas-n').value = temParc ? reqLig.parcelas.length : '';
+        const fpSelEst = document.getElementById('estoque-forma-pagamento');
+        if (fpSelEst) fpSelEst.value = reqLig.formaPagamento || 'dinheiro';
+        App.calcEstoqueValorTotal();
+        if (dEl) dEl.value = (reqLig.boughtAt || '').substring(0,10) || hoje;
+      } else {
+        if (dEl) dEl.value = (item.updatedAt || '').substring(0,10) || hoje;
+      }
+    } else {
+      ['estoque-grupo','estoque-subgrupo','estoque-produto','estoque-produto-select','estoque-fornecedor','estoque-qtd',
+       'estoque-unidade-destino','estoque-valor','estoque-valor-total','estoque-parcelas-n','estoque-solicitante',
+       'estoque-brinde-grupo','estoque-brinde-subgrupo','estoque-brinde-produto','estoque-brinde-qtd']
+        .forEach(fid => { const el = document.getElementById(fid); if (el) el.value = ''; });
+      document.getElementById('chk-estoque-parcelas').checked = false;
+      document.getElementById('estoque-parcelas-wrap').style.display = 'none';
+      document.getElementById('chk-estoque-brinde').checked = false;
+      document.getElementById('estoque-brinde-fields').style.display = 'none';
+      App.onEstoqueBrindeGrupoChange();   // limpa subgrupos do brinde da sessão anterior
+      const fpSelNovo = document.getElementById('estoque-forma-pagamento');
+      if (fpSelNovo) fpSelNovo.value = 'dinheiro';
+      const dEl = document.getElementById('estoque-data');
+      if (dEl) dEl.value = hoje;
+      App.onEstoqueGrupoChange();
+    }
+  },
+
+  closeEstoqueForm() {
+    document.getElementById('estoque-modal').classList.add('hidden');
+  },
+
+  _populateEstoqueGrupoSel() {
+    const sel = document.getElementById('estoque-grupo'); if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Selecione —</option>' +
+      Object.values(State.groups || {}).map(g => `<option value="${g}">${g}</option>`).join('');
+    sel.value = cur;
+  },
+
+  onEstoqueGrupoChange() {
+    const grupo = document.getElementById('estoque-grupo')?.value || '';
+    const subSel = document.getElementById('estoque-subgrupo'); if (!subSel) return;
+    const norm = grupo.toLowerCase();
+    const isOutros = norm.includes('outro');
+
+    const gid = Object.keys(State.groups || {}).find(k => (State.groups[k] || '').toLowerCase() === norm);
+
+    // Subgrupos — Mapeamento Interno (sempre)
+    let subgrupos = (gid && State.subgroups?.[gid]) ? [...State.subgroups[gid]] : [];
+
+    // Sub-opções por Grupo (subOpts) — incluídas no Outros (ou se grupo tem)
+    let subopts = [];
+    if (gid) Object.values((State.subOpts || {})[gid] || {}).forEach(v => { if (Array.isArray(v)) subopts.push(...v); });
+
+    // Subgrupo select = mapeamento interno; Outros também recebe sub-opções
+    let subValores = isOutros ? [...subgrupos, ...subopts] : [...subgrupos];
+    subValores = [...new Set(subValores.filter(Boolean))];
+    subSel.innerHTML = '<option value="">— Selecione —</option>' +
+      subValores.map(v => `<option value="${v}">${v}</option>`).join('');
+
+    // Produto/Descrição: grupos com Sub-opções por Grupo cadastradas (Tinta/Pilha) →
+    // seleção travada num select; "Outros" (ou grupo sem sub-opções) → texto livre.
+    const subOptsUnicos = [...new Set(subopts.filter(Boolean))];
+    const prodInput  = document.getElementById('estoque-produto');
+    const prodSelect = document.getElementById('estoque-produto-select');
+    if (prodInput && prodSelect) {
+      if (!isOutros && subOptsUnicos.length) {
+        prodSelect.innerHTML = '<option value="">— Selecione —</option>' +
+          subOptsUnicos.map(v => `<option value="${v}">${v}</option>`).join('');
+        prodSelect.classList.remove('hidden');
+        prodInput.classList.add('hidden');
+        prodInput.value = '';
+      } else {
+        prodSelect.classList.add('hidden');
+        prodSelect.value = '';
+        prodInput.classList.remove('hidden');
+      }
+    }
+    const dl = document.getElementById('estoque-produto-list');
+    if (dl) dl.innerHTML = subOptsUnicos.map(s => `<option value="${s}">`).join('');
+  },
+
+  /* ── Brinde (item extra sem custo, vinculado à Nova Compra) ─────── */
+  toggleEstoqueBrinde() {
+    const on = document.getElementById('chk-estoque-brinde')?.checked;
+    document.getElementById('estoque-brinde-fields').style.display = on ? '' : 'none';
+  },
+
+  _populateEstoqueBrindeGrupoSel() {
+    const sel = document.getElementById('estoque-brinde-grupo'); if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Selecione —</option>' +
+      Object.values(State.groups || {}).map(g => `<option value="${g}">${g}</option>`).join('');
+    sel.value = cur;
+  },
+
+  // Subgrupo do brinde: cascata simples pelo Mapeamento Interno do grupo (sem as
+  // sub-opções especiais de Tinta/Pilha — o produto do brinde é sempre texto livre).
+  onEstoqueBrindeGrupoChange() {
+    const grupo = document.getElementById('estoque-brinde-grupo')?.value || '';
+    const subSel = document.getElementById('estoque-brinde-subgrupo'); if (!subSel) return;
+    const gid = Object.keys(State.groups || {}).find(k => (State.groups[k] || '').toLowerCase() === grupo.toLowerCase());
+    const subgrupos = (gid && State.subgroups?.[gid]) ? [...State.subgroups[gid]] : [];
+    const cur = subSel.value;
+    subSel.innerHTML = '<option value="">— Selecione —</option>' +
+      subgrupos.map(v => `<option value="${v}">${v}</option>`).join('');
+    subSel.value = cur;
+  },
+
+  _populateEstoqueFornecedor() {
+    const sel = document.getElementById('estoque-fornecedor'); if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— Selecione —</option>' +
+      Object.values(State.suppliers || {}).map(s => `<option value="${s}">${s}</option>`).join('');
+    sel.value = cur;
+  },
+
+  _populateEstoqueUnidade() {
+    const sel = document.getElementById('estoque-unidade-destino'); if (!sel) return;
+    const cur = sel.value;
+    const opts = Object.entries(State.units || {}).map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+    sel.innerHTML = '<option value="">— Selecione —</option>' + opts +
+      '<option value="__central__">Estoque Central (uso geral)</option>';
+    sel.value = cur;
+  },
+
+  toggleEstoqueParcelas() {
+    const on = document.getElementById('chk-estoque-parcelas').checked;
+    document.getElementById('estoque-parcelas-wrap').style.display = on ? '' : 'none';
+    App.calcEstoqueValorTotal();
+  },
+
+  // Valor total = quantidade × valor unitário; mostra prévia de parcelas se marcado
+  calcEstoqueValorTotal() {
+    const totalEl = document.getElementById('estoque-valor-total'); if (!totalEl) return;
+    const qtd   = parseFloat(document.getElementById('estoque-qtd')?.value) || 0;
+    const valor = parseFloat(document.getElementById('estoque-valor')?.value) || 0;
+    const total = qtd * valor;
+    const fmtR = v => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const parcelar = document.getElementById('chk-estoque-parcelas')?.checked;
+    const n = parcelar ? (parseInt(document.getElementById('estoque-parcelas-n')?.value) || 0) : 0;
+    totalEl.value = total > 0
+      ? (parcelar && n >= 2 ? `${fmtR(total)} (${n}× de ${fmtR(total / n)})` : fmtR(total))
+      : '';
+  },
+
+  saveEstoqueItem() {
+    const id      = document.getElementById('estoque-edit-id').value;
+    const grupo   = document.getElementById('estoque-grupo').value.trim();
+    const prodSelect = document.getElementById('estoque-produto-select');
+    const produto = (prodSelect && !prodSelect.classList.contains('hidden') ? prodSelect.value : document.getElementById('estoque-produto').value).trim();
+    const qtd     = document.getElementById('estoque-qtd').value;
+    if (!grupo || !produto || qtd === '') { toast('Preencha grupo, produto e quantidade.', 'error'); return; }
+
+    const novaQtd = parseFloat(qtd) || 0;
+    const subgrupo   = document.getElementById('estoque-subgrupo').value.trim();
+    const fornecedor = document.getElementById('estoque-fornecedor')?.value.trim() || '';
+    const data = {
+      grupo, subgrupo, produto, fornecedor,
+      quantidade: novaQtd,
+      updatedAt:  new Date().toISOString()
+    };
+
+    // Delta para registrar movimentação de entrada
+    const qtdAntiga = id ? parseFloat(State.estoque[id]?.quantidade || 0) : 0;
+    const delta = novaQtd - qtdAntiga;
+
+    // Data da movimentação/compra escolhida (default: hoje)
+    const dataSel = document.getElementById('estoque-data')?.value || new Date().toISOString().substring(0,10);
+    const dataMov = dataSel.substring(0,10) + 'T00:00:00.000Z';
+
+    // Item NOVO com entrada > 0 → registra a entrada como compra completa
+    // (solicitação status Comprado, respeitando fornecedor/valor/parcelas), reaproveitando
+    // o mesmo pipeline usado nas compras vindas de solicitação (_processarCompraEstoque).
+    if (!id && novaQtd > 0) {
+      if (App._estoqueEntradaMode === 'entrada')
+        App._saveEstoqueComoEntrada({ grupo, subgrupo, produto, qtd: novaQtd, data: dataSel });
+      else
+        App._saveEstoqueComoCompra({ grupo, subgrupo, produto, fornecedor, qtd: novaQtd, data: dataSel });
+      return;
+    }
+    // Edição de item que veio de "Novo Item" → atualiza a solicitação + reconstrói o lote.
+    const reqLigId = id ? State.estoque[id]?.reqId : null;
+    const reqLig = reqLigId ? (State.requests || {})[reqLigId] : null;
+    if (id && reqLig?.origemEstoque && novaQtd > 0) {
+      App._updateEstoqueComoCompra(reqLigId, { grupo, subgrupo, produto, fornecedor, qtd: novaQtd, data: dataSel });
+      return;
+    }
+
+    const ref = id ? DB.set(`estoque/${id}`, data) : DB.push('estoque', data);
+    const estoqueId = id || ref.key;   // id existente ou key do novo push
+    Promise.resolve(ref).then(() => {
+      const itemBase = { produto, grupo, subgrupo, unidade: '', estoqueId };
+      if (delta > 0) {
+        App._logMov('entrada', itemBase, delta, novaQtd,
+          { origem: id ? 'Reposição manual' : 'Cadastro inicial', lote: App._gerarLote({ grupo, unidade: subgrupo }), data: dataMov, estoqueId });
+      } else if (delta < 0) {
+        App._logMov('saida', itemBase, Math.abs(delta), novaQtd, { origem: 'Ajuste manual', destino: 'Ajuste interno', data: dataMov, estoqueId });
+      }
+      toast('Item salvo!'); App.closeEstoqueForm();
+      const detMov = delta > 0 ? `${produto} · +${delta} un. (total ${novaQtd})`
+                   : delta < 0 ? `${produto} · ${delta} un. (total ${novaQtd})`
+                   : produto;
+      App._logActivity('Estoque', id ? 'Item de estoque editado' : 'Item de estoque criado', detMov);
+    }).catch(() => toast('Erro ao salvar.', 'error'));
+  },
+
+  // Registra uma nova entrada de estoque como solicitação Comprado completa (fornecedor,
+  // valor, valorTotal, parcelas) e delega a criação do item/lote de estoque ao mesmo
+  // pipeline usado para compras vindas de solicitação (_processarCompraEstoque).
+  // NÃO gera código de compra combinada (CMP-xxxx) — fica marcada só como "Entrada de estoque".
+  // Não há envio: o produto entra direto no estoque central, sem data de envio.
+  async _saveEstoqueComoCompra({ grupo, subgrupo, produto, fornecedor, qtd, data }) {
+    const unidadeSel = document.getElementById('estoque-unidade-destino')?.value || '';
+    const valor = parseFloat(document.getElementById('estoque-valor')?.value) || 0;
+    if (!unidadeSel) { toast('Selecione a unidade de destino.', 'error'); return; }
+    if (valor <= 0)  { toast('Informe o valor unitário da compra.', 'error'); return; }
+
+    const parcelar = document.getElementById('chk-estoque-parcelas')?.checked;
+    const n = parcelar ? (parseInt(document.getElementById('estoque-parcelas-n')?.value) || 0) : 0;
+    if (parcelar && n < 2) { toast('Nº de parcelas deve ser ≥ 2.', 'error'); return; }
+
+    // "Estoque Central" só existe como nomenclatura aqui: compra de item novo direto p/ estoque.
+    const unitId   = unidadeSel === '__central__' ? null : unidadeSel;
+    const unitName = unidadeSel === '__central__' ? 'Estoque Central' : (State.units?.[unidadeSel] || '—');
+    const solicitante = document.getElementById('estoque-solicitante')?.value.trim() || '';
+    const formaPagamento = document.getElementById('estoque-forma-pagamento')?.value || 'dinheiro';
+    const valorTotal = (qtd * valor).toFixed(2);
+
+    const btn = document.getElementById('estoque-modal')?.querySelector('.btn-primary');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Salvando…'; btn.disabled = true; }
+    try {
+      const seqTx = await DB.tx('meta/lastSeq', cur => (cur || 0) + 1);
+      const seq = seqTx?.snapshot?.val() || null;
+
+      const reqData = {
+        seq, unitId, unitName,
+        groupName: grupo, subgrupo, descricao: produto, solicitante, formaPagamento,
+        status: 'Comprado', createdAt: data + 'T00:00:00.000Z',   // data da solicitação = data da compra
+        boughtAt: data, fornecedor, quantidade: String(qtd),
+        valor: valor.toFixed(2), valorTotal,
+        parcelas: parcelar ? App._buildParcelas(data, n, parseFloat(valorTotal)) : null,
+        shippedStatus: 'Não', shippedAt: null,   // sem envio: entra direto no estoque
+        origemEstoque: true,  // marca: entrada criada direto pela aba Estoque (só esse rótulo, sem CMP)
+        usuarioResp: State.adminUser || '—', usuarioRespAt: new Date().toISOString()   // quem registrou a compra
+      };
+      const reqRef = DB.push('requests', reqData);
+      await reqRef;
+      const reqId = reqRef.key;
+
+      await App._processarCompraEstoque(reqId, reqData);
+      // Brinde que veio junto na mesma compra (opcional) — entrada sem custo própria
+      const brindeOk = await App._salvarBrindeDaCompra(reqId, reqData);
+
+      toast(`✓ Entrada de estoque registrada${seq != null ? ' · SL-' + seq : ''}${brindeOk ? ' + brinde' : ''}.`);
+      App.closeEstoqueForm();
+      App.renderRequests(); App.renderDashboard(); App.updatePendingBadge(); App.renderEstoque?.();
+    } catch (e) {
+      console.error('[_saveEstoqueComoCompra] erro', e);
+      toast('Erro ao registrar entrada. Veja o console.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  /* ── Brinde da compra ────────────────────────────────────────────
+     Item extra que veio junto na MESMA compra (ex.: comprei 1 alicate e vieram
+     20 pregos). O valor pago é do conjunto, não dá pra separar — então o brinde
+     entra como ENTRADA SEM CUSTO (valor 0, entradaSemCusto: true → fora do total
+     gasto), herdando fornecedor, unidade de destino, solicitante e data da compra.
+     Fica ligado à compra por brindeDeReqId e recebe o MESMO nº de lote com "REF".
+     Não ganha parcelas próprias: sem custo não há o que parcelar — criar parcelas
+     de R$ 0,00 poluiria o card "Compras Parceladas" com um lançamento fantasma.
+     Retorna true se um brinde foi realmente criado. */
+  async _salvarBrindeDaCompra(reqPaiId, reqPai) {
+    if (!document.getElementById('chk-estoque-brinde')?.checked) return false;
+    const grupo    = document.getElementById('estoque-brinde-grupo')?.value.trim()    || '';
+    const subgrupo = document.getElementById('estoque-brinde-subgrupo')?.value.trim() || '';
+    const produto  = document.getElementById('estoque-brinde-produto')?.value.trim()  || '';
+    const qtd      = parseFloat(document.getElementById('estoque-brinde-qtd')?.value) || 0;
+    if (!grupo || !produto || qtd <= 0) {
+      toast('Brinde não registrado: preencha grupo, produto e quantidade.', 'error');
+      return false;
+    }
+    const seqTx = await DB.tx('meta/lastSeq', cur => (cur || 0) + 1);
+    const seq = seqTx?.snapshot?.val() || null;
+
+    const reqData = {
+      seq, unitId: reqPai.unitId, unitName: reqPai.unitName,
+      groupName: grupo, subgrupo, descricao: produto,
+      solicitante: reqPai.solicitante || '', formaPagamento: reqPai.formaPagamento || 'dinheiro',
+      status: 'Comprado', createdAt: reqPai.createdAt,
+      boughtAt: reqPai.boughtAt, fornecedor: reqPai.fornecedor || '',
+      quantidade: String(qtd),
+      valor: '0.00', valorTotal: '0.00', parcelas: null,
+      shippedStatus: 'Não', shippedAt: null,
+      origemEstoque: true, entradaSemCusto: true,
+      brindeDeReqId: reqPaiId,
+      usuarioResp: State.adminUser || '—', usuarioRespAt: new Date().toISOString()
+    };
+    const reqRef = DB.push('requests', reqData);
+    await reqRef;
+    await App._processarCompraEstoque(reqRef.key, reqData, App._loteBrinde(App._gerarLote(reqPai)));
+    return true;
+  },
+
+  // Lote do brinde: mesmo número da compra + marca REF
+  _loteBrinde(lotePai) { return `${lotePai} REF`; },
+
+  // Item de estoque que entrou como brinde de uma compra (badge de lote roxo)
+  _isBrindeEstoque(item) {
+    const r = item?.reqId ? (State.requests || {})[item.reqId] : null;
+    return !!(r && r.brindeDeReqId);
+  },
+
+  // Nova ENTRADA (sem custo): item que já existe fisicamente, não foi comprado.
+  // Segue o mesmo pipeline (solicitação + lote de estoque), MAS com valor 0 e flag
+  // entradaSemCusto → NÃO entra no total gasto do dashboard.
+  async _saveEstoqueComoEntrada({ grupo, subgrupo, produto, qtd, data }) {
+    const unidadeSel = document.getElementById('estoque-unidade-destino')?.value || '';
+    if (!unidadeSel) { toast('Selecione a unidade onde o item está.', 'error'); return; }
+
+    const unitId   = unidadeSel === '__central__' ? null : unidadeSel;
+    const unitName = unidadeSel === '__central__' ? 'Estoque Central' : (State.units?.[unidadeSel] || '—');
+    const solicitante = document.getElementById('estoque-solicitante')?.value.trim() || '';
+
+    const btn = document.getElementById('estoque-modal')?.querySelector('.btn-primary');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Salvando…'; btn.disabled = true; }
+    try {
+      const seqTx = await DB.tx('meta/lastSeq', cur => (cur || 0) + 1);
+      const seq = seqTx?.snapshot?.val() || null;
+
+      const reqData = {
+        seq, unitId, unitName,
+        groupName: grupo, subgrupo, descricao: produto, solicitante, formaPagamento: 'dinheiro',
+        status: 'Comprado', createdAt: data + 'T00:00:00.000Z',
+        boughtAt: data, fornecedor: '', quantidade: String(qtd),
+        valor: '0.00', valorTotal: '0.00', parcelas: null,   // sem custo
+        shippedStatus: 'Não', shippedAt: null,
+        origemEstoque: true, entradaSemCusto: true,   // marca: entrada sem compra → fora do total gasto
+        usuarioResp: State.adminUser || '—', usuarioRespAt: new Date().toISOString()
+      };
+      const reqRef = DB.push('requests', reqData);
+      await reqRef;
+      const reqId = reqRef.key;
+
+      await App._processarCompraEstoque(reqId, reqData);
+
+      toast(`✓ Entrada (sem custo) registrada${seq != null ? ' · SL-' + seq : ''}.`);
+      App.closeEstoqueForm();
+      App.renderRequests(); App.renderDashboard(); App.updatePendingBadge(); App.renderEstoque?.();
+    } catch (e) {
+      console.error('[_saveEstoqueComoEntrada] erro', e);
+      toast('Erro ao registrar entrada. Veja o console.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  // Edição de uma entrada "Novo Item": atualiza a solicitação vinculada com os novos
+  // dados (unidade/qtd) e reconstrói o lote de estoque (remove o antigo, recria via
+  // _processarCompraEstoque). Mantém a mesma solicitação (não cria outra SL).
+  // DINHEIRO CONGELADO: valor/valorTotal/parcelas NÃO são recalculados aqui — mudar a
+  // quantidade nunca altera o total gasto do dashboard (corrige só a contagem física).
+  async _updateEstoqueComoCompra(reqId, { grupo, subgrupo, produto, fornecedor, qtd, data }) {
+    const unidadeSel = document.getElementById('estoque-unidade-destino')?.value || '';
+    if (!unidadeSel) { toast('Selecione a unidade de destino.', 'error'); return; }
+
+    const unitId   = unidadeSel === '__central__' ? null : unidadeSel;
+    const unitName = unidadeSel === '__central__' ? 'Estoque Central' : (State.units?.[unidadeSel] || '—');
+    const solicitante = document.getElementById('estoque-solicitante')?.value.trim() || '';
+
+    const btn = document.getElementById('estoque-modal')?.querySelector('.btn-primary');
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Salvando…'; btn.disabled = true; }
+    try {
+      // Dinheiro CONGELADO: mantém valor/valorTotal/parcelas/formaPagamento da solicitação
+      // original — mudar a quantidade não recalcula nem soma nada no dashboard.
+      const reqUpd = {
+        unitId, unitName, groupName: grupo, subgrupo, descricao: produto, solicitante,
+        createdAt: data + 'T00:00:00.000Z', boughtAt: data, fornecedor, quantidade: String(qtd)
+        // valor, valorTotal, parcelas, formaPagamento: NÃO tocados (dinheiro travado)
+      };
+      await DB.update(`requests/${reqId}`, reqUpd);
+      // Reconstrói o lote: remove estoque auto antigo + flag, recria com dados novos
+      await App._removerEstoqueAutoDoReq(reqId);
+      if (State.requests?.[reqId]) State.requests[reqId].estoqueProcessado = null;  // evita race do listener
+      const rFull = { ...(State.requests || {})[reqId], ...reqUpd, status: 'Comprado', origemEstoque: true };
+      await App._processarCompraEstoque(reqId, rFull);
+
+      toast('✓ Entrada de estoque atualizada.');
+      App.closeEstoqueForm();
+      App.renderRequests(); App.renderDashboard(); App.updatePendingBadge(); App.renderEstoque?.();
+    } catch (e) {
+      console.error('[_updateEstoqueComoCompra] erro', e);
+      toast('Erro ao atualizar entrada. Veja o console.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
+
+  // Registra movimentação. opts = { origem, lote, destino, data, auto, estoqueId }
+  _logMov(tipo, item, qtd, saldo, opts = {}) {
+    return DB.push('estoqueMov', {
+      tipo,                          // 'entrada' | 'saida'
+      produto:  item.produto || '—',
+      grupo:    item.grupo    || '',
+      subgrupo: item.subgrupo || '',
+      unidade:  item.unidade  || 'un',
+      qtd:      qtd,
+      saldo:    saldo,
+      origem:   opts.origem  || '',
+      lote:     opts.lote    || null,
+      destino:  opts.destino || null,
+      auto:     opts.auto    || false,   // gerado por compra (rebuild apaga e refaz)
+      estoqueId: opts.estoqueId || item.estoqueId || null,  // liga ao item p/ exclusão robusta
+      reqId:    item.reqId   || null,    // liga à solicitação (p/ info parcelas)
+      data:     opts.data    || new Date().toISOString()
+    });
+  },
+
+  // Cascata: apaga o item de estoque + TODAS as entradas/saídas vinculadas (mesmo lote).
+  // Usado nos dois sentidos: apagar item → apaga movimentos; apagar movimento → apaga item.
+  // Se o item veio de uma entrada de estoque (origemEstoque), apaga também a solicitação
+  // vinculada (vice-versa do que _apagarSolicitacaoCascata faz). Compras normais não são afetadas.
+  async _apagarEstoqueCascata(id, item) {
+    const norm = s => (s || '').toLowerCase().trim();
+    // Movimento COM estoqueId → casa só por ele (cada lote tem código próprio).
+    // Movimento legado SEM estoqueId → cai no match por nome (se houver item).
+    const casa = m => m.estoqueId
+      ? m.estoqueId === id
+      : (item &&
+         norm(m.produto)  === norm(item.produto) &&
+         norm(m.grupo)    === norm(item.grupo) &&
+         norm(m.subgrupo) === norm(item.subgrupo));
+
+    const ops = [];
+    if (id && (State.estoque || {})[id]) ops.push(DB.remove(`estoque/${id}`));
+    let nMov = 0;
+    Object.entries(State.estoqueMov || {}).forEach(([mid, m]) => {
+      if (casa(m)) { ops.push(DB.remove(`estoqueMov/${mid}`)); nMov++; }
+    });
+    const reqVinculada = item?.reqId ? (State.requests || {})[item.reqId] : null;
+    if (reqVinculada?.origemEstoque) {
+      // Entrada criada direto pela aba Estoque → some junto com o item.
+      ops.push(DB.remove(`requests/${item.reqId}`));
+    } else if (reqVinculada) {
+      // Solicitação normal que gerou/referenciou este lote → volta p/ Solicitado
+      // (perde tag Estoque/Comprado e todos os dados de compra/envio).
+      ops.push(DB.update(`requests/${item.reqId}`, { status: 'Solicitado', ...App._camposCompraReset() }));
+    }
+    await Promise.all(ops);
+    if (reqVinculada?.origemEstoque) await App._renumerarSeq([item.reqId]);
+    return nMov;
+  },
+
+  async deleteEstoqueItem(id) {
+    const item = (State.estoque || {})[id]; if (!item) return;
+    if (!confirm('Remover este item do estoque?\nAs ENTRADAS e SAÍDAS deste lote também serão apagadas.')) return;
+    try {
+      const nMov = await App._apagarEstoqueCascata(id, item);
+      toast(`Item removido (${nMov} movimento(s) apagado(s)).`);
+      App._logActivity('Estoque', 'Item de estoque removido', item.produto || '');
+      App.renderRequests?.(); App.renderDashboard?.(); App.updatePendingBadge?.();
+    } catch (e) {
+      console.error('[deleteEstoque] erro', e);
+      toast('Erro ao remover.', 'error');
+    }
+  },
+
+  // Chamado ao abrir o modal quando status = Estoque
+  loadEstoqueParaModal() {
+    const r = (State.requests || {})[State.editingRequestId]; if (!r) return;
+
+    // Retirada já processada (tem item vinculado) → mostra só o resumo + botão
+    // cancelar, em vez do select (reabrir e escolher de novo deduziria outra vez).
+    const jaRetiradoBox = document.getElementById('modal-estoque-ja-retirado');
+    const selecaoWrap   = document.getElementById('modal-estoque-selecao-wrap');
+    const itemUsado = r.estoqueItemId ? (State.estoque || {})[r.estoqueItemId] : null;
+    if (itemUsado) {
+      const qtdUsada = r.estoqueDeduzido || r.estoqueQtyUsed || '—';
+      const info = document.getElementById('modal-estoque-ja-retirado-info');
+      if (info) info.textContent = `${itemUsado.produto || '—'} · ${qtdUsada} ${itemUsado.unidade || 'un'}`;
+      jaRetiradoBox?.classList.remove('hidden');
+      selecaoWrap?.classList.add('hidden');
+      return;
+    }
+    jaRetiradoBox?.classList.add('hidden');
+    selecaoWrap?.classList.remove('hidden');
+
+    const grupo    = (r.groupName || '').toLowerCase();
+    const subgrupo = (r.subgrupo  || '').toLowerCase();
+
+    // Filtra itens de estoque pelo grupo e opcionalmente subgrupo
+    const matches = Object.entries(State.estoque || {}).filter(([, item]) => {
+      const ig = (item.grupo    || '').toLowerCase();
+      const is = (item.subgrupo || '').toLowerCase();
+      const grupoOk = ig.includes(grupo) || grupo.includes(ig);
+      const subOk   = !subgrupo || !is || is.includes(subgrupo) || subgrupo.includes(is);
+      return grupoOk && subOk && parseFloat(item.quantidade || 0) > 0;
+    });
+
+    const lista  = document.getElementById('modal-estoque-lista');
+    const selEl  = document.getElementById('modal-estoque-sel');
+    const dispEl = document.getElementById('modal-estoque-disp');
+    const qtyEl  = document.getElementById('modal-estoque-qty');
+
+    if (lista) {
+      lista.innerHTML = matches.length === 0
+        ? '<div class="estoque-modal-empty">Nenhum item em estoque para este grupo/subgrupo.</div>'
+        : matches.map(([id, item]) => `
+            <div class="estoque-modal-item ${parseFloat(item.quantidade)<=0?'eqd-zero':''}">
+              <span class="estoque-modal-prod">${item.produto}</span>
+              <span class="estoque-modal-sub">${item.subgrupo||item.grupo}</span>
+              <span class="estoque-modal-qtd ${parseFloat(item.quantidade)<=5?'qtd-baixo':''}">${item.quantidade} ${item.unidade||'un'}</span>
+            </div>`).join('');
+    }
+
+    if (selEl) {
+      selEl.innerHTML = '<option value="">— Selecione o item —</option>' +
+        matches.map(([id, item]) =>
+          `<option value="${id}" data-qtd="${item.quantidade}">${item.produto} (${item.quantidade} ${item.unidade||'un'})</option>`
+        ).join('');
+      selEl.value = '';
+    }
+    if (dispEl) dispEl.value = '';
+    if (qtyEl)  qtyEl.value  = '';
+  },
+
+  // Cancela uma retirada de estoque já processada: devolve a quantidade ao item,
+  // apaga o movimento de saída e libera o painel pra escolher outro item (ou nenhum).
+  async cancelarRetiradaEstoque() {
+    const reqId = State.editingRequestId; if (!reqId) return;
+    const r = (State.requests || {})[reqId]; if (!r?.estoqueItemId) return;
+    if (!confirm('Cancelar esta retirada?\nA quantidade volta pro estoque e você poderá escolher outro item.')) return;
+    try {
+      const itemId = r.estoqueItemId;
+      const qtd = parseFloat(r.estoqueDeduzido || r.estoqueQtyUsed) || 0;
+      if (qtd > 0 && State.estoque?.[itemId]) {
+        const raw = await DB.get(`estoque/${itemId}/quantidade`);
+        const atual = parseFloat(raw != null ? raw : State.estoque[itemId].quantidade || 0);
+        await DB.set(`estoque/${itemId}/quantidade`, atual + qtd);
+      }
+      if (r.estoqueMovId) await DB.remove(`estoqueMov/${r.estoqueMovId}`);
+      await DB.update(`requests/${reqId}`, {
+        estoqueItemId: null, estoqueQtyUsed: null, estoqueMovId: null, estoqueDeduzido: null
+      });
+      // Corrige o cache local na hora p/ o painel já reabrir com a seleção livre
+      if (State.requests?.[reqId]) {
+        State.requests[reqId].estoqueItemId = null;
+        State.requests[reqId].estoqueQtyUsed = null;
+        State.requests[reqId].estoqueMovId = null;
+        State.requests[reqId].estoqueDeduzido = null;
+      }
+      toast('Retirada cancelada — quantidade devolvida ao estoque.');
+      App.loadEstoqueParaModal();
+    } catch (e) {
+      console.error('[cancelarRetiradaEstoque] erro', e);
+      toast('Erro ao cancelar retirada.', 'error');
+    }
+  },
+
+  onEstoqueSelChange() {
+    const sel  = document.getElementById('modal-estoque-sel');
+    const disp = document.getElementById('modal-estoque-disp');
+    if (!sel || !disp) return;
+    const opt = sel.selectedOptions[0];
+    disp.value = opt?.dataset?.qtd ? `${opt.dataset.qtd} disponível(is)` : '';
+    App.validateRetiradaQty();
+  },
+
+  // Valida retirada do estoque: não pode passar do disponível
+  validateRetiradaQty() {
+    const sel   = document.getElementById('modal-estoque-sel');
+    const qtyEl = document.getElementById('modal-estoque-qty');
+    const warn  = document.getElementById('estoque-retirada-warn');
+    if (!sel || !qtyEl) return true;
+    const disp = parseFloat(sel.selectedOptions[0]?.dataset?.qtd || 0);
+    const want = parseFloat(qtyEl.value || 0);
+    const ok = want <= disp;
+    if (warn) {
+      warn.classList.toggle('hidden', ok);
+      if (!ok) warn.textContent = `Quantidade insuficiente em estoque. Disponível: ${disp}.`;
+    }
+    qtyEl.style.borderColor = ok ? '' : '#d94040';
+    return ok;
+  },
+
+  // Devolve ao estoque o que foi deduzido por uma solicitação (retirada de estoque OU
+  // combo Comprado+estoque) quando ela muda de status. Usa o snapshot anterior (prevR).
+  async _restaurarEstoqueDeduzido(reqId, prevR) {
+    const r = prevR || (State.requests || {})[reqId] || {};
+    const devolver = async (itemId, qtd, movId) => {
+      qtd = parseFloat(qtd) || 0;
+      if (itemId && qtd > 0 && State.estoque?.[itemId]) {
+        const raw = await DB.get(`estoque/${itemId}/quantidade`);
+        const atual = parseFloat(raw != null ? raw : State.estoque[itemId].quantidade || 0);
+        await DB.set(`estoque/${itemId}/quantidade`, atual + qtd);
+      }
+      if (movId) await DB.remove(`estoqueMov/${movId}`);
+    };
+    // Combo (Comprado + envio do estoque existente)
+    if (r.estoqueComboProcessado) {
+      await devolver(r.estoqueComboItemId, r.estoqueComboDeduzido || r.estoqueComboQty, r.estoqueComboMovId);
+      await DB.update(`requests/${reqId}`, {
+        estoqueComboProcessado: null, estoqueComboMovId: null, estoqueComboDeduzido: null
+      });
+      // Corrige o cache local na hora — senão o próximo passo (nova dedução) lê a flag
+      // antiga antes do listener do Firebase atualizar State.requests (race condition).
+      if (State.requests?.[reqId]) State.requests[reqId].estoqueComboProcessado = null;
+    }
+    // Retirada direta de estoque (status Estoque)
+    if (r.estoqueItemId && (r.estoqueDeduzido || r.estoqueQtyUsed)) {
+      await devolver(r.estoqueItemId, r.estoqueDeduzido || r.estoqueQtyUsed, r.estoqueMovId);
+      await DB.update(`requests/${reqId}`, { estoqueMovId: null, estoqueDeduzido: null });
+    }
+  },
+
+  _deductEstoque() {
+    const sel = document.getElementById('modal-estoque-sel');
+    const qty = document.getElementById('modal-estoque-qty');
+    if (!sel?.value || !qty?.value) return Promise.resolve();
+
+    const id   = sel.value;
+    const item = State.estoque[id];
+    if (!item) return Promise.resolve();
+
+    const usado   = parseFloat(qty.value || 0);
+    const novaQtd = Math.max(0, parseFloat(item.quantidade || 0) - usado);
+    const r = (State.requests || {})[State.editingRequestId] || {};
+    // Regra: data da retirada = data do envio (campo do form), senão hoje
+    const shipVal = document.getElementById('modal-ship-date')?.value || r.shippedAt || '';
+    const dataMov = shipVal ? shipVal.substring(0,10) + 'T00:00:00.000Z' : new Date().toISOString();
+    const reqId = State.editingRequestId;
+    return DB.set(`estoque/${id}/quantidade`, novaQtd).then(() => {
+      const movRef = App._logMov('saida',
+        { produto: item.produto, grupo: item.grupo, subgrupo: item.subgrupo, unidade: item.unidade, estoqueId: id },
+        usado, novaQtd,
+        { origem: `Solicitação · ${r.groupName || ''}`, destino: r.unitName || '—', data: dataMov, estoqueId: id });
+      // Guarda o que foi deduzido p/ poder devolver se o status mudar
+      return DB.update(`requests/${reqId}`, { estoqueMovId: movRef.key, estoqueDeduzido: String(usado) });
+    });
+  },
+
+  // Combo (Comprado + Estoque): deduz a parte que saiu do estoque já existente.
+  // Idempotente via flag estoqueComboProcessado — não toca dados financeiros.
+  async _deductEstoqueCombo(reqId, upd) {
+    const r = (State.requests || {})[reqId] || {};
+    if (r.estoqueComboProcessado) return;
+    const itemId = upd.estoqueComboItemId || r.estoqueComboItemId;
+    const qtd    = parseFloat(upd.estoqueComboQty || r.estoqueComboQty) || 0;
+    if (!itemId || qtd <= 0) return;
+    const item = State.estoque?.[itemId];
+    if (!item) return;
+
+    // Lê saldo atual do servidor (evita race com a entrada/saída da compra no mesmo item)
+    const dispRaw = await DB.get(`estoque/${itemId}/quantidade`);
+    const disp    = parseFloat(dispRaw != null ? dispRaw : item.quantidade || 0);
+    const usado   = Math.min(qtd, disp);            // nunca deduz mais do que tem
+    const novaQtd = Math.max(0, disp - usado);
+    const shipVal = upd.shippedAt || r.shippedAt || '';
+    const dataMov = shipVal ? shipVal.substring(0,10) + 'T00:00:00.000Z' : new Date().toISOString();
+
+    await DB.set(`estoque/${itemId}/quantidade`, novaQtd);
+    const movRef = App._logMov('saida',
+      { produto: item.produto, grupo: item.grupo, subgrupo: item.subgrupo, unidade: item.unidade, estoqueId: itemId },
+      usado, novaQtd,
+      { origem: `Solicitação (estoque) · ${r.groupName || ''}`, destino: r.unitName || '—', data: dataMov, estoqueId: itemId });
+    await movRef;
+    // Guarda o que foi deduzido (item, qtd, movimento) p/ devolver se o status mudar
+    await DB.update(`requests/${reqId}`, {
+      estoqueComboProcessado: true, estoqueComboMovId: movRef.key, estoqueComboDeduzido: String(usado)
+    });
+  },
+
+  /* ── FIREBASE LISTENERS ───────────────────── */
+  // Fecha o popup aberto mais específico ao apertar ESC
+  _initEscClose() {
+    if (App._escBound) return; App._escBound = true;
+    const hide = id => () => document.getElementById(id)?.classList.add('hidden');
+    const ordem = [
+      ['parcelada-add-modal', () => App._voltaChooserOuFecha('parcelada-add-modal', hide('parcelada-add-modal'))],
+      ['compra-modal',     () => App._voltaChooserOuFecha('compra-modal', () => App.closeCompraModal())],
+      ['add-compra-chooser',  hide('add-compra-chooser')],
+      ['autz-send-modal',     hide('autz-send-modal')],
+      ['autz-lote-modal',     hide('autz-lote-modal')],
+      ['autorizacao-modal',   hide('autorizacao-modal')],
+      ['sol-view-modal',      hide('sol-view-modal')],
+      ['lote-info-modal',     hide('lote-info-modal')],
+      ['compra-detalhe-modal',hide('compra-detalhe-modal')],
+      ['mov-date-modal',   () => App.closeMovDate()],
+      ['mov-detail-modal', () => App.closeMovDetail()],
+      ['mov-hist-modal',   () => App.closeMovHist()],
+      ['estoque-modal',    () => App.closeEstoqueForm()],
+      ['estoque-tipo-modal', hide('estoque-tipo-modal')]
+    ];
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      for (const [id, close] of ordem) {
+        const el = document.getElementById(id);
+        if (el && !el.classList.contains('hidden')) { close(); break; }
+      }
+    });
+  },
+
+  initListeners() {
+    App._initEscClose();
+    // Redesenha as linhas do KPI ring quando a janela muda de tamanho —
+    // as posições dos cards/rosca mudam, as linhas ficariam desalinhadas.
+    let _kpiConnResizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(_kpiConnResizeTimer);
+      _kpiConnResizeTimer = setTimeout(() => App._renderKpiConnectors?.(), 150);
+    });
+    const safeListener = (path, cb) => {
+      try {
+        const r = window._ref(window._db, path);
+        window._onValue(r, snap => {
+          App._setConnStatus(true);
+          cb(snap.val());
+        }, err => {
+          console.error(`Firebase error on [${path}]:`, err.message);
+          App._setConnStatus(false, err.message);
+        });
+      } catch(e) {
+        console.error('Listener setup error:', e);
+        App._setConnStatus(false, e.message);
+      }
+    };
+
+    safeListener('units',     v => {
+      State.units = v||{};
+      App.renderUnitsDropdown();
+      // Unidade: no boot o topbar mostra o nome antes dos dados chegarem do Firebase
+      // (mesma razão do comentário de 'groups' logo abaixo) — corrige assim que chegam.
+      if (!State.adminUser && State.currentUnit) {
+        const nome = document.getElementById('topbar-unit-name');
+        if (nome) nome.textContent = State.units[State.currentUnit] || '—';
+      }
+    });
+    safeListener('unitSetores', v => {
+      State.unitSetores = v || {};
+      // Mesma razão do listener de 'groups': no boot (unidade recarregando a página) o
+      // formulário monta antes dos setores chegarem do Firebase — repopula quando chegam.
+      if (!State.adminUser && State.currentUnit && document.getElementById('screen-request')?.classList.contains('active')) {
+        const cur = document.getElementById('req-setor')?.value || '';
+        App._popularSelectSetor('req-setor', State.currentUnit, cur);
+      }
+    });
+    safeListener('groups',    v => {
+      State.groups = v||{};
+      App._migrarGrupoConserto?.();
+      App.populateGroupSelects?.();
+      if (State.adminUser) App.renderGroupsAdmin?.();
+      // Unidade: o boot chama buildRequestPanel() antes dos grupos chegarem do
+      // Firebase (listener é assíncrono), então o painel nasce vazio. Remonta
+      // aqui quando os dados chegam — só se nada foi escolhido ainda, pra não
+      // perder a seleção em andamento do usuário.
+      else if (!State.currentType) App.buildRequestPanel?.();
+    });
+    safeListener('groupMeta', v => {
+      State.groupMeta = v||{};
+      if (State.adminUser) App.renderGroupsAdmin?.();
+      // Mesma razão do listener de 'groups': o painel da unidade é montado no boot,
+      // antes deste listener responder. Sem remontar aqui, grupo marcado como
+      // "interno" (que só o admin pode solicitar) continua aparecendo pra unidade.
+      else if (!State.currentType) App.buildRequestPanel?.();
+    });
+    safeListener('subOpts',   v => { State.subOpts  =v||{}; });
+    safeListener('subgroups', v => { State.subgroups=v||{}; if(State.adminUser) App.renderSubgroupsAdmin?.(); });
+    safeListener('admins',    v => { State.admins   =v||{}; if(State.adminUser) App.renderAdminsCards?.(); });
+    safeListener('suppliers', v => { State.suppliers=v||{}; if(State.adminUser) App.renderSuppliersAdmin?.(); });
+    safeListener('config',    v => { State.config   =v||{}; App._migrarGestorLegacy?.(); App._syncGestorField?.(); });
+    safeListener('requests',  v => {
+      State.requests=v||{};
+      App._migrarNomeConsertoRequests?.();
+      App.updatePendingBadge();
+      App.populateDashFilters();
+      if (State.adminUser) {
+        App.renderDashboard();
+        const tab=document.querySelector('.tab-panel.active');
+        if (tab?.id==='tab-requests')  App.renderRequests();
+        if (tab?.id==='tab-calendar')  App.renderCalendar();
+        if (tab?.id==='tab-settings')  App.renderCodigosTab();
+      }
+      App._maybeFixCompras?.();
+    });
+    safeListener('estoque', v => {
+      State.estoque = v || {};
+      const tab = document.querySelector('.tab-panel.active');
+      if (tab?.id === 'tab-estoque') App.renderEstoque();
+      if (tab?.id === 'tab-settings') App.renderCodigosTab();
+    });
+    safeListener('estoqueMov', v => {
+      State.estoqueMov = v || {};
+      const tab = document.querySelector('.tab-panel.active');
+      if (tab?.id === 'tab-estoque') App.renderEstoque();
+      if (tab?.id === 'tab-settings') App.renderCodigosTab();
+    });
+    safeListener('compras', v => {
+      State.compras = v || {};
+      if (State.adminUser) {
+        const tab = document.querySelector('.tab-panel.active');
+        if (tab?.id === 'tab-requests') App.renderRequests();
+      }
+      App._maybeFixCompras?.();
+    });
+    safeListener('activityLog', v => {
+      State.activityLog = v || {};
+      if (State.adminUser) {
+        const tab = document.querySelector('.tab-panel.active');
+        if (tab?.id === 'tab-dashboard') { App.renderNovasSolicitacoes(); App.renderActivityLog(); }
+      }
+    });
+    safeListener('metas', v => {
+      State.metas = v || {};
+      if (State.adminUser) {
+        const tab = document.querySelector('.tab-panel.active');
+        if (tab?.id === 'tab-dashboard') App.updateCompareCard();
+      }
+    });
+  },
+
+  // Registra uma ação no log de auditoria (Estoque/Configurações/Calendário/Solicitações).
+  // Nunca deixa a auditoria quebrar a ação principal — erro aqui só vai pro console.
+  async _logActivity(modulo, acao, detalhe = '', extra = null) {
+    try {
+      const isAdmin = !!State.adminUser;
+      const unitName = !isAdmin ? (State.units?.[State.currentUnit] || null) : null;
+      const ator = isAdmin ? State.adminUser : (unitName || 'Unidade');
+      await DB.push('activityLog', {
+        ts: new Date().toISOString(),
+        ator, atorTipo: isAdmin ? 'admin' : 'unidade', unitName,
+        modulo, acao, detalhe,
+        ...(extra || {})   // ex.: { alvo, mudancas: [{campo, de, para}] }
+      });
+    } catch (e) { console.error('[_logActivity] erro', e); }
+  },
+
+  /* ── Backup do sistema inteiro (export / import) ──────────── */
+  _BACKUP_COLS: ['requests','estoque','estoqueMov','compras','units','groups','subOpts','subgroups','admins','suppliers','activityLog','metas'],
+
+  async exportBackupSistema() {
+    try {
+      const dados = { app: 'ti-compras', versao: 1, ts: new Date().toISOString() };
+      App._BACKUP_COLS.forEach(c => { dados[c] = State[c] || {}; });
+      dados.meta = (await DB.get('meta')) || {};   // lastSeq / lastCompra
+      const blob = new Blob([JSON.stringify(dados)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `backup-ti-compras-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      toast('Backup baixado.');
+    } catch (e) { console.error(e); toast('Erro ao gerar backup.', 'error'); }
+  },
+
+  importBackupSistema(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!confirm('Restaurar vai SUBSTITUIR todos os dados atuais pelos do backup.\n\nDeseja continuar?')) { event.target.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const d = JSON.parse(e.target.result);
+        if (d.app && d.app !== 'ti-compras') {
+          if (!confirm('Este arquivo não parece ser um backup deste sistema. Restaurar mesmo assim?')) { event.target.value=''; return; }
+        }
+        const ops = [];
+        App._BACKUP_COLS.forEach(c => { if (d[c] !== undefined) ops.push(DB.set(c, d[c] || {})); });
+        if (d.meta !== undefined) ops.push(DB.set('meta', d.meta || {}));
+        await Promise.all(ops);
+        App._logActivity('Configurações', 'Backup restaurado', file.name);
+        toast('Backup restaurado. Os dados vão recarregar.');
+      } catch (err) { console.error(err); toast('Arquivo de backup inválido.', 'error'); }
+      finally { event.target.value = ''; }
+    };
+    reader.readAsText(file);
+  },
+
+  // Baixa todos os logs num arquivo CSV (abre no Excel).
+  baixarLogs() {
+    const logs = Object.values(State.activityLog || {}).sort((a, b) => (a.ts || '').localeCompare(b.ts || ''));
+    if (!logs.length) { toast('Nenhum log para baixar.', 'error'); return; }
+    const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const linhas = [['Data/Hora', 'Quem', 'Tipo', 'Módulo', 'Ação', 'Detalhe'].join(';')];
+    logs.forEach(l => {
+      const dh = l.ts ? new Date(l.ts).toLocaleString('pt-BR') : '';
+      const quem = l.ator + (l.unitName ? ` (${l.unitName})` : (l.atorTipo === 'admin' ? ' (Admin)' : ''));
+      let det = l.detalhe || '';
+      if (Array.isArray(l.mudancas) && l.mudancas.length) det += ' || ' + l.mudancas.map(m => `${m.campo}: ${m.de} -> ${m.para}`).join(' ; ');
+      linhas.push([dh, quem, l.atorTipo || '', l.modulo || '', l.acao || '', det].map(esc).join(';'));
+    });
+    const csv = '﻿' + linhas.join('\r\n');   // BOM p/ acentos no Excel
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `logs-atividade-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast('Logs baixados.');
+  },
+
+  // Modal de logs com NAVEGAÇÃO POR DIA (setas), sem scroll longo.
+  _logsPorDia: {},
+  _logsDias: [],
+  _logsDiaIdx: 0,
+
+  showLogsCompletos() {
+    const porDia = {};
+    Object.entries(State.activityLog || {}).forEach(([id, l]) => {
+      const dia = (l.ts || '').substring(0, 10);
+      (porDia[dia] = porDia[dia] || []).push({ id, ...l });
+    });
+    Object.values(porDia).forEach(arr => arr.sort((a, b) => (b.ts || '').localeCompare(a.ts || '')));
+    App._logsPorDia = porDia;
+    App._logsDias = Object.keys(porDia).sort((a, b) => b.localeCompare(a));   // mais recente primeiro
+    App._logsDiaIdx = 0;
+    App._renderLogsDia();
+    const foot = document.getElementById('logs-full-footer');
+    if (foot) foot.style.display = State.adminUser ? 'flex' : 'none';   // apagar só p/ admin
+    document.getElementById('logs-full-modal').classList.remove('hidden');
+  },
+
+  apagarLogs() {
+    if (!State.adminUser) { toast('Apenas administradores podem apagar os logs.', 'error'); return; }
+    const n = Object.keys(State.activityLog || {}).length;
+    if (!n) { toast('Nenhum log para apagar.', 'error'); return; }
+    if (!confirm(`Apagar TODOS os ${n} registro(s) de log? Esta ação não pode ser desfeita.`)) return;
+    DB.remove('activityLog').then(() => {
+      toast('Logs apagados.');
+      document.getElementById('logs-full-modal').classList.add('hidden');
+    }).catch(() => toast('Erro ao apagar logs.', 'error'));
+  },
+
+  navLogsDia(dir) {
+    const max = App._logsDias.length - 1;
+    App._logsDiaIdx = Math.max(0, Math.min(max, App._logsDiaIdx + dir));
+    App._renderLogsDia();
+  },
+
+  _renderLogsDia() {
+    const body = document.getElementById('logs-full-body'); if (!body) return;
+    const dias = App._logsDias;
+    if (!dias.length) { body.innerHTML = '<div class="mgmt-empty" style="padding:30px">Nenhum registro ainda.</div>'; return; }
+    const idx = App._logsDiaIdx;
+    const dia = dias[idx];
+    const itens = App._logsPorDia[dia] || [];
+    const icones = { 'Estoque': '📦', 'Configurações': '⚙️', 'Calendário': '📅', 'Solicitações': '🧾' };
+    body.innerHTML = `
+      <div class="logs-nav">
+        <button class="logs-nav-btn" ${idx >= dias.length - 1 ? 'disabled' : ''} onclick="App.navLogsDia(1)" title="Dia anterior">‹</button>
+        <div class="logs-nav-dia">${App._labelDia(dia)} <span class="log-dia-count">${itens.length}</span></div>
+        <button class="logs-nav-btn" ${idx <= 0 ? 'disabled' : ''} onclick="App.navLogsDia(-1)" title="Dia seguinte">›</button>
+      </div>
+      <div class="logs-nav-pos">${idx + 1} de ${dias.length} dia(s)</div>
+      <div class="logs-dia-lista">
+        ${itens.map(l => {
+          const quem = l.ator + (l.unitName ? ` (${l.unitName})` : (l.atorTipo === 'admin' ? ' (Admin)' : ''));
+          const hora = l.ts && l.ts.length > 10 ? l.ts.substring(11, 16) : '';
+          return `<div class="logf-item logf-click" onclick="App.showActivityDetail('${l.id}')" title="Clique para o detalhamento completo">
+            <span class="logf-ico" title="${l.modulo || '—'}">${icones[l.modulo] || '•'}</span>
+            <div class="logf-body">
+              <div class="logf-title"><strong>${quem}</strong> — ${l.acao || '—'}</div>
+              ${l.detalhe ? `<div class="logf-sub">${l.detalhe}</div>` : ''}
+            </div>
+            <span class="logf-hora">${hora}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+  },
+
+  _setConnStatus(ok, msg) {
+    let bar = document.getElementById('conn-status-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'conn-status-bar';
+      bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:8px 20px;font-size:.82rem;font-weight:600;text-align:center;transition:all .3s';
+      document.body.appendChild(bar);
+    }
+    if (ok) {
+      bar.style.display = 'none';
+    } else {
+      bar.style.cssText += ';background:#d94040;color:#fff;display:block';
+      bar.innerHTML = `⚠️ Erro de conexão com o Firebase: ${msg||'verifique as regras do banco e a conexão'}
+        <a href="https://console.firebase.google.com/project/lamicdadosti/database/lamicdadosti-default-rtdb/rules"
+           target="_blank" style="color:#fff;margin-left:12px;text-decoration:underline">Abrir Regras →</a>`;
+    }
+  },
+
+  async seedDefaults() {
+    const ue=await DB.get('units');    if (!ue) for (const u of DEFAULTS.units)  await DB.push('units',u);
+    const ge=await DB.get('groups');   if (!ge) for (const g of DEFAULTS.groups) await DB.push('groups',g);
+    const ae=await DB.get('admins');   if (!ae) for (const [u,p] of Object.entries(DEFAULTS.admins)) await DB.set(`admins/${u}`,p);
+  },
+
+  init() {
+    ['battery-qty','other-product','other-reason','req-obs'].forEach(id => {
+      const el=document.getElementById(id); if (el) el.addEventListener('input',()=>App.saveRequestForm());
+    });
+    document.getElementById('chk-urgency').addEventListener('change',()=>App.saveRequestForm());
+    const au=LS.load('adminUser'); if (au) { State.adminUser=au; const l=document.getElementById('sad-avatar-letter'); const n=document.getElementById('sad-name-text'); if(l) l.textContent=au[0]?.toUpperCase()||'A'; if(n) n.textContent=au; }
+    const su=LS.load('currentUnit'); if (su) State.currentUnit=su;
+    // Close modals on overlay click
+    document.getElementById('modal-request').addEventListener('click',e=>{ if(e.target===e.currentTarget) App.closeModal(); });
+    // ship-date sempre acompanha buy-date quando alterado
+    document.getElementById('modal-buy-date').addEventListener('change', function() {
+      document.getElementById('modal-ship-date').value = this.value;
+    });
+    document.getElementById('modal-edit-item').addEventListener('click',e=>{ if(e.target===e.currentTarget) App.closeEditModal(); });
+    // Edit item enter key
+    document.getElementById('edit-item-value').addEventListener('keydown',e=>{ if(e.key==='Enter') App.confirmEditItem(); });
+
+    // ESC em cascata: passo 1 fecha o pop-up aberto; passo 2 sai da aba atual (volta ao Dashboard);
+    // passo 3, sem pop-up e já no Dashboard, volta para a UniLAMIC TI
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+
+      // Menu de conta na sidebar
+      const userMenu = document.getElementById('sb-user-menu');
+      if (userMenu && !userMenu.classList.contains('hidden')) { App.closeUserMenu(); return; }
+
+      // Popovers com padrão .open (filtro do dashboard, etc.)
+      const popoverAberto = document.querySelector('.open');
+      if (popoverAberto) { document.querySelectorAll('.open').forEach(el => el.classList.remove('open')); return; }
+
+      // Popup flutuante do calendário
+      const popup = document.querySelector('.cal-popup');
+      if (popup) { popup.remove(); return; }
+
+      // Modais com fechamento próprio (fazem mais que só esconder)
+      const editModal = document.getElementById('modal-edit-item');
+      if (editModal && !editModal.classList.contains('hidden')) { App.closeEditModal(); return; }
+      const reqModal = document.getElementById('modal-request');
+      if (reqModal && !reqModal.classList.contains('hidden')) { App.closeModal(); return; }
+
+      // Qualquer outro modal ainda aberto (todos usam o mesmo padrão .modal-overlay)
+      const modal = document.querySelector('.modal-overlay:not(.hidden)');
+      if (modal) { modal.classList.add('hidden'); return; }
+
+      // Sem pop-up: se estiver numa aba diferente do Dashboard, sai dela e volta pro Dashboard
+      const painel = document.querySelector('.tab-panel.active');
+      if (painel && painel.id !== 'tab-dashboard') {
+        const dashBtn = document.querySelector('.nav-item[data-tab="tab-dashboard"]');
+        if (dashBtn) App.adminTab(dashBtn);
+        return;
+      }
+
+      // Já no Dashboard sem pop-up: sai do Financeiro e volta para a UniLAMIC TI
+      App.backToCompras();
+    });
+
+    App.startIdleWatch();   // auto-logout por inatividade
+
+    // Fecha o menu de conta ao clicar fora dele
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.sidebar-account')) App.closeUserMenu();
+    });
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Este arquivo é um módulo: quem faz login é a casca (index.html).
+  // Sem sessão de admin nem unidade escolhida, devolve para lá.
+  const emIframe = window.parent && window.parent !== window;
+  if (emIframe) document.querySelector('.admin-layout')?.classList.add('em-iframe');
+
+  const temAdmin  = !!LS.load('adminUser');
+  const temUnidade = !!LS.load('currentUnit');
+  if (!temAdmin && !temUnidade) {
+    if (emIframe) { try { window.parent.postMessage('fecharFinanceiro', '*'); } catch (e) {} }
+    else window.location.href = 'index.html';
+    return;
+  }
+
+  App.init();
+  const boot = () => {
+    App.initListeners();
+    App.seedDefaults();
+    if (State.adminUser) {
+      App.goTo('screen-admin'); App.renderAdminPanels(); App._restoreAdminTab(); App.resetIdle();
+    } else {
+      // Unidade escolhida na casca: monta e abre o formulário direto
+      const nome = document.getElementById('topbar-unit-name');
+      if (nome) nome.textContent = State.units?.[State.currentUnit] || '—';
+      App._popularSelectSetor?.('req-setor', State.currentUnit, '');
+      App.buildRequestPanel?.();
+      App.goTo('screen-request');
+      App.restoreRequestForm?.();
+    }
+  };
+  if (window._firebaseReady) boot();
+  else document.addEventListener('firebaseReady', boot);
+});
+// Cola esta linha na última linha do teu script.js para dar permissão ao iframe
+
+// Substitua a última linha do script.js por este ouvinte de mensagens seguro:
+window.addEventListener('message', function(event) {
+  if (event.data === 'fecharInventario' || event.data === 'fecharGeradorPDF') {
+    App.backToCompras();
+  }
+});
+
+window.App = App;
+
+/* ══════════════════════════════════════════════
+   NOVOS RECURSOS v3 — sem alterar lógica existente
+══════════════════════════════════════════════ */
+
+/* ── Sidebar hambúrguer ──────────────────────── */
+App.toggleSidebar = function() {
+  const sb   = document.getElementById('main-sidebar');
+  const main = document.querySelector('.admin-main');
+  if (!sb) return;
+  sb.classList.toggle('sb-collapsed');
+  if (main) {
+    main.classList.toggle('main-expanded', sb.classList.contains('sb-collapsed'));
+  }
+};
+
+/* Sincroniza badge do tooltip com nav-badge-pending */
+(function() {
+  const obs = new MutationObserver(() => {
+    const b  = document.getElementById('nav-badge-pending');
+    const bt = document.getElementById('ni-tip-badge');
+    if (b && bt) bt.textContent = b.textContent;
+  });
+  const init = () => {
+    const b = document.getElementById('nav-badge-pending');
+    if (b) obs.observe(b, { childList: true, characterData: true, subtree: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+
+/* ── Live search + mini-KPIs em Solicitações ─── */
+(function() {
+  /* Wrap renderRequests: chama o original e depois aplica busca e KPIs */
+  const _orig = App.renderRequests.bind(App);
+  App.renderRequests = function() {
+    _orig();   // já aplica a busca ao vivo (req-live-search) no próprio conjunto filtrado
+    _updateReqKpis();
+  };
+
+  function _updateReqKpis() {
+    const all = Object.values(State.requests || {});
+    if (!all.length) return;
+
+    /* Respeita filtro de data */
+    const from = document.getElementById('req-date-from')?.value || '';
+    const to   = document.getElementById('req-date-to')?.value   || '';
+    let reqs = all;
+    if (from) reqs = reqs.filter(r => (r.createdAt||'').substring(0,10) >= from);
+    if (to)   reqs = reqs.filter(r => (r.createdAt||'').substring(0,10) <= to);
+
+    /* Solicitações por unidade */
+    const byUnit = {};
+    reqs.forEach(r => { const u = r.unitName||'?'; byUnit[u] = (byUnit[u]||0)+1; });
+    const uArr = Object.entries(byUnit).sort((a,b) => b[1]-a[1]);
+    _s('rk-sol-max',   uArr[0]?.[0]     || '—');
+    _s('rk-sol-max-n', uArr[0]    ? uArr[0][1]    + ' solicitações' : '');
+    _s('rk-sol-min',   uArr.at(-1)?.[0] || '—');
+    _s('rk-sol-min-n', uArr.at(-1) ? uArr.at(-1)[1] + ' solicitação(ões)' : '');
+
+    /* Compras por unidade */
+    const bought = reqs.filter(r => r.status === 'Comprado');
+    const byBuy  = {};
+    bought.forEach(r => { const u = r.unitName||'?'; byBuy[u] = (byBuy[u]||0)+1; });
+    const bArr = Object.entries(byBuy).sort((a,b) => b[1]-a[1]);
+    _s('rk-buy-max',   bArr[0]?.[0]     || '—');
+    _s('rk-buy-max-n', bArr[0]    ? bArr[0][1]    + ' compras' : '');
+    _s('rk-buy-min',   bArr.at(-1)?.[0] || '—');
+    _s('rk-buy-min-n', bArr.at(-1) ? bArr.at(-1)[1] + ' compra(s)' : '');
+
+    /* Grupo mais solicitado */
+    const byGrp = {};
+    reqs.forEach(r => { const g = App._displayGroupName(r.groupName); byGrp[g] = (byGrp[g]||0)+1; });
+    const gArr = Object.entries(byGrp).sort((a,b) => b[1]-a[1]);
+    _s('rk-grp-top',   gArr[0]?.[0] || '—');
+    _s('rk-grp-top-n', gArr[0] ? gArr[0][1] + ' solicitações' : '');
+
+    /* Fornecedor com mais compras */
+    const bySup = {};
+    bought.forEach(r => {
+      const s = r.fornecedor || r.supplier || '—';
+      if (s && s !== '—') bySup[s] = (bySup[s]||0)+1;
+    });
+    const sArr = Object.entries(bySup).sort((a,b) => b[1]-a[1]);
+    _s('rk-sup-top',   sArr[0]?.[0] || '—');
+    _s('rk-sup-top-n', sArr[0] ? sArr[0][1] + ' compra(s)' : '');
+
+    /* Forma de pagamento mais/menos usada (compras). Sem valor salvo = Dinheiro (default). */
+    const lblPag = { dinheiro: 'Dinheiro', boleto: 'Boleto', cartao: 'Cartão' };
+    const byPag = {};
+    bought.forEach(r => { const p = r.formaPagamento || 'dinheiro'; byPag[p] = (byPag[p]||0)+1; });
+    const pArr = Object.entries(byPag).sort((a,b) => b[1]-a[1]);
+    _s('rk-pag-max',   pArr[0]    ? lblPag[pArr[0][0]]    || pArr[0][0]    : '—');
+    _s('rk-pag-max-n', pArr[0]    ? pArr[0][1]    + ' compra(s)' : '');
+    _s('rk-pag-min',   pArr.at(-1) ? lblPag[pArr.at(-1)[0]] || pArr.at(-1)[0] : '—');
+    _s('rk-pag-min-n', pArr.at(-1) ? pArr.at(-1)[1] + ' compra(s)' : '');
+  }
+
+  function _s(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  }
+})();

@@ -1118,14 +1118,22 @@ function removerContato(i) {
     _renderContatosLista();
 }
 
-// ESC dentro de qualquer modelo/tela volta pra seleção de modelos (menu)
+// ESC em cascata: passo 1 fecha o preview aberto; passo 2 sai do modelo/tela (volta pro menu);
+// passo 3, sem preview e já no menu, volta para a UniLAMIC TI
 document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+
     const preview = document.getElementById('barra-preview');
     const previewAberto = preview && preview.style.display && preview.style.display !== 'none';
+    if (previewAberto) { e.preventDefault(); fecharPreview(); return; }
+
     const telaAberta = ['tela-comunicado','tela-relatorio','tela-os','tela-atualizacao','tela-contatos','tela-formulario']
         .some(id => { const el = document.getElementById(id); return el && el.style.display && el.style.display !== 'none'; });
-    if (previewAberto || telaAberta) { e.preventDefault(); voltarMenuDe(); }
+    if (telaAberta) { e.preventDefault(); voltarMenuDe(); return; }
+
+    // Já no menu, sem preview aberto: sai do Gerador de PDFs e volta para a UniLAMIC TI
+    e.preventDefault();
+    voltarDashboard();
 });
 
 function _renderContatosLista() {
