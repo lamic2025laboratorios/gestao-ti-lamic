@@ -5307,7 +5307,7 @@ const App = {
     // Barra "De N pedidos" — reflete o conjunto já filtrado/pesquisado acima
     App._renderReqStats(reqs, 'dash-stats-bar', 'dash-negados-bar');
     if (!reqs.length) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--gray-500);padding:32px">Nenhuma solicitação encontrada.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--gray-500);padding:32px">Nenhuma solicitação encontrada.</td></tr>';
       return;
     }
     reqs.forEach(([id,r]) => {
@@ -5352,6 +5352,7 @@ const App = {
             : `<span style="display:inline-block;margin-top:3px;font-size:.68rem;font-weight:700;color:#7c52d4;background:#f0ebfc;border:1px solid #ede9fe;border-radius:4px;padding:1px 7px">📦 ${r.parcelas.length}× parcelas · ${r.parcelas[0]?.valor ? 'R$ '+parseFloat(r.parcelas[0].valor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'/mês' : ''}</span>`) : ''}
           ${r.compraCodigo ? `<span class="compra-codigo-tag" title="Compra combinada ${r.compraCodigo}">${r.compraCodigo}</span>` : ''}
         </td>
+        <td style="text-align:center;font-weight:600" title="Quantidade solicitada — se alterada na confirmação da compra, mostra a quantidade comprada">${r.quantidade || r.qty || '—'}</td>
         <td>${r.urgent?`<span class="badge-urgent-ico" title="Urgente">${App._svg('alert')}</span>`:'<span style="color:var(--gray-500)">—</span>'}</td>
         <td>${envioDisplay}${(r.obs||(isOutros&&(r.product||r.reason))) ? `<span title="${[r.product,r.reason,r.obs].filter(Boolean).join(' | ')}" style=""</span>` : ''}</td>
         <td>${badge}</td>
