@@ -8061,9 +8061,35 @@ const App = {
           </div>`;
       }
     }
+    // Histórico de Saídas deste mesmo lote — toda retirada já feita dele,
+    // indo subtraindo (data/hora, pra onde, quanto saiu, quanto restou).
+    // Aparece tanto abrindo pela Entrada quanto por qualquer Saída puxada
+    // do mesmo lote (as 2 usam o mesmo estoqueId).
+    const saidasDoItem = App._movSaidasDoItem(x.estoqueId);
+    let histHtml = '';
+    if (saidasDoItem.length) {
+      histHtml = `
+        <div class="mov-detail-sol mov-hist-saidas">
+          <div class="mov-detail-sol-title">Histórico de Saídas deste Lote</div>
+          <div class="mov-hist-saidas-list">
+            ${saidasDoItem.map(m => {
+              const hora = App._fmtHora(m.data);
+              return `<div class="mov-hist-saida-row">
+                <div class="mov-hist-saida-data">${App._fmtDate(m.data)}${hora ? ' · ' + hora : ''}</div>
+                <div class="mov-hist-saida-info">
+                  <span class="mov-hist-saida-qtd">−${m.qtd} ${m.unidade || ''}</span>
+                  <span class="mov-hist-saida-dest">→ ${m.destino || '—'}</span>
+                </div>
+                <div class="mov-hist-saida-saldo">restou ${m.saldo != null ? m.saldo : '—'}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+    }
+
     const mainHtml = (solHtml || fonteHtml)
-      ? `${solHtml}${fonteHtml}`
-      : `<div class="mov-detail-empty">Movimento manual — sem solicitação vinculada.</div>`;
+      ? `${solHtml}${fonteHtml}${histHtml}`
+      : `<div class="mov-detail-empty">Movimento manual — sem solicitação vinculada.</div>${histHtml}`;
 
     // Datas de referência: entrada (verde) e saída (laranja) — sempre no final, full-width
     const { dEnt, dSai } = App._movDatasRef(x);
@@ -8096,6 +8122,24 @@ const App = {
     if (delBtn) delBtn.style.display = x.movId ? '' : 'none';
     document.getElementById('mov-detail-modal').classList.remove('hidden');
   },
+  // Todas as saídas já feitas de um mesmo item de estoque (lote), mais
+  // antiga primeiro — a "vida" daquele lote sendo consumido aos poucos.
+  _movSaidasDoItem(estoqueId) {
+    if (!estoqueId) return [];
+    return Object.entries(State.estoqueMov || {})
+      .filter(([, m]) => m.tipo === 'saida' && m.estoqueId === estoqueId)
+      .map(([mid, m]) => ({ mid, ...m }))
+      .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+  },
+
+  // Hora (HH:MM) de um ISO de movimento — vazio quando é só data (meia-noite
+  // exata, marcador de "sem hora real registrada"), pra não fingir precisão.
+  _fmtHora(iso) {
+    if (!iso || iso.length < 16) return '';
+    const hh = iso.substring(11, 16);
+    return hh && hh !== '00:00' ? hh : '';
+  },
+
   // Resolve datas de referência de um movimento: entrada (compra) e saída (envio)
   _movDatasRef(x) {
     let dEnt = null, dSai = null;

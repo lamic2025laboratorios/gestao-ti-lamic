@@ -1684,6 +1684,23 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .mov-detail-grid span { color: #6680a0; }
 .mov-detail-grid strong { color: #1a3a6b; text-align: right; }
 
+/* Histórico de Saídas deste Lote — abaixo de .mov-detail-sol, vermelho leve,
+   "indo subtraindo" (cada linha mostra quanto saiu e quanto restou). Aparece
+   tanto abrindo pela Entrada quanto por qualquer Saída puxada do mesmo lote. */
+.mov-hist-saidas { background: #fff5f5; border-color: #f8caca; }
+.mov-hist-saidas .mov-detail-sol-title { color: #b13a3a; }
+.mov-hist-saidas-list { display: flex; flex-direction: column; gap: 0; max-height: 220px; overflow-y: auto; }
+.mov-hist-saida-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 2px; border-bottom: 1px dashed #f3d3d3; font-size: .8rem;
+}
+.mov-hist-saida-row:last-child { border-bottom: none; }
+.mov-hist-saida-data { color: #b88; font-size: .74rem; font-weight: 600; flex-shrink: 0; min-width: 108px; }
+.mov-hist-saida-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.mov-hist-saida-qtd { color: #c23a3a; font-weight: 800; }
+.mov-hist-saida-dest { color: #8898b8; font-size: .74rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mov-hist-saida-saldo { color: #6680a0; font-size: .74rem; font-weight: 600; text-align: right; flex-shrink: 0; }
+
 /* Movimentações (legado) */
 .estoque-mov-filter { display: inline-flex; gap: 0; margin-left: auto; border: 1.5px solid #d0d9ea; border-radius: 8px; overflow: hidden; }
 .mov-filter-btn {
