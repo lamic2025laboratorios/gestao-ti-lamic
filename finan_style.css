@@ -1360,6 +1360,9 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
   flex: 1; min-height: 0; overflow-y: auto;
 }
 .consumo-bd-title { font-size: .72rem; font-weight: 700; color: #6680a0; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.consumo-bd-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.consumo-bd-head .consumo-bd-title { margin-bottom: 0; }
+.consumo-bd-mode-toggle { transform: scale(.88); transform-origin: right center; }
 .consumo-bd-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .consumo-bd-name { font-size: .8rem; font-weight: 600; color: #1a3a6b; min-width: 80px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .consumo-bd-track { flex: 1; height: 7px; background: #eef3fb; border-radius: 4px; overflow: hidden; }

@@ -2570,6 +2570,17 @@ const App = {
   // Dia escolhido pro filtro "Semana" (a semana é os 7 dias terminando nele) — YYYY-MM-DD
   consWeek: (() => { const t = new Date().toISOString().substring(0,10); return { ink: t, bat: t, outros: t, concerto: t }; })(),
 
+  // Modo do ranking "Por modelo" de Pilhas & Baterias: 'qtd' soma as unidades
+  // compradas (padrão); 'sol' conta 1 por solicitação, pra ver quantos
+  // PEDIDOS cada modelo gerou (não quantas pilhas vieram em cada um).
+  consBdMode: { bat: 'qtd' },
+  setConsumoBdMode(kind, mode, btn) {
+    App.consBdMode[kind] = mode;
+    document.querySelectorAll(`.consumo-bd-mode-btn[data-kind="${kind}"]`).forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    App.renderConsumoCards();
+    if (App._auditKind === kind) App._renderConsumoAudit();
+  },
+
   setConsPeriod(kind, period, btn) {
     App.consPeriod[kind] = period;
     if (btn) {
@@ -2812,7 +2823,13 @@ const App = {
 
     // Ranking em gráfico de barra horizontal com eixo (igual ao modelo enviado —
     // linhas de grade e escala embaixo, em vez das barrinhas de CSS do card pequeno).
-    setTxt('audit-bd-title', cfg.breakdownTitle);
+    const bdSuffixo = kind === 'bat' ? (App.consBdMode.bat === 'sol' ? ' (solicitações)' : ' (quantidade)') : '';
+    setTxt('audit-bd-title', (cfg.breakdownTitle || '') + bdSuffixo);
+    const bdToggle = document.getElementById('audit-bd-mode-toggle');
+    if (bdToggle) {
+      bdToggle.classList.toggle('hidden', kind !== 'bat');
+      bdToggle.querySelectorAll('.consumo-bd-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === App.consBdMode.bat));
+    }
     App._renderAuditBreakdownChart(kind, s.topSorted);
 
     // Caixa azul: % da meta anual configurada que esse material já consumiu
@@ -3577,7 +3594,13 @@ const App = {
       // (ou sub-opção reconfigurada em outro momento) podem ter guardado
       // "azul" em vez de "Azul", virando um balde duplicado no gráfico.
       if (kind === 'ink') key = App._inkCanonColor(key);
-      topMap[key] = (topMap[key] || 0) + App._qtyComprada(r);
+      // "Outros" é sempre por SOLICITAÇÃO (1 por pedido) — o que importa aqui é
+      // qual subgrupo é mais PEDIDO, não quantas unidades vieram em cada pedido
+      // (ex.: 1 pedido de 50 cabos não deve pesar mais que 50 pedidos de 1 item).
+      // "Pilhas & Baterias" alterna entre quantidade (padrão) e solicitação,
+      // via o toggle do card/pop-up (App.consBdMode.bat).
+      const porSolicitacao = kind === 'outros' || (kind === 'bat' && App.consBdMode.bat === 'sol');
+      topMap[key] = (topMap[key] || 0) + (porSolicitacao ? 1 : App._qtyComprada(r));
     });
     let topSorted = Object.entries(topMap).sort((a, b) => b[1] - a[1]);
     const top = topSorted[0];
@@ -3660,16 +3683,27 @@ const App = {
       trendEl.textContent = s.trend.txt;
     }
 
-    // Breakdown (lista de cores/modelos)
+    // Breakdown (lista de cores/modelos) — Pilhas & Baterias ganha um toggle
+    // Quantidade/Solicitações (App.consBdMode.bat) pra escolher como o ranking
+    // "Por modelo" conta cada compra.
     const bd = document.getElementById(`${kind}-breakdown`);
     if (bd) {
+      const modeToggle = kind === 'bat' ? `
+        <div class="consumo-period-toggle consumo-bd-mode-toggle" style="float:right;">
+          <button class="cons-per-btn consumo-bd-mode-btn${App.consBdMode.bat === 'qtd' ? ' active' : ''}" data-kind="bat" data-mode="qtd" onclick="App.setConsumoBdMode('bat','qtd',this)">Quantidade</button>
+          <button class="cons-per-btn consumo-bd-mode-btn${App.consBdMode.bat === 'sol' ? ' active' : ''}" data-kind="bat" data-mode="sol" onclick="App.setConsumoBdMode('bat','sol',this)">Solicitações</button>
+        </div>` : '';
+      const bdTitulo = `<div class="consumo-bd-head">
+          <div class="consumo-bd-title" style="margin-bottom:0;">${cfg.breakdownTitle}${kind === 'bat' ? (App.consBdMode.bat === 'sol' ? ' (solicitações)' : ' (quantidade)') : ''}</div>
+          ${modeToggle}
+        </div>`;
       if (!s.topSorted.length) {
-        bd.innerHTML = `<div class="consumo-bd-empty">Nenhuma compra no período</div>`;
+        bd.innerHTML = bdTitulo + `<div class="consumo-bd-empty">Nenhuma compra no período</div>`;
       } else {
         const shown = s.topSorted.slice(0, 6);
         const total = s.topSorted.reduce((sum, [, n]) => sum + n, 0) || 1;
         const palette = ['#d9a520', '#2a68d4', '#1db87a', '#e8830a', '#7c52d4', '#d94040'];
-        bd.innerHTML = `<div class="consumo-bd-title">${cfg.breakdownTitle}</div>` +
+        bd.innerHTML = bdTitulo +
           shown.map(([name, n], i) => {
             const pct = Math.round(n / total * 100);
             const w = Math.max(pct, 14); // largura mínima p/ o texto caber

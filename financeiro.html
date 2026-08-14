@@ -960,7 +960,13 @@
                     <div class="audit-stat"><span id="audit-sol-lbl">Maior solicitante</span><strong id="audit-top-sol">—</strong></div>
                   </div>
                   <div class="audit-bd">
-                    <div class="consumo-bd-title" id="audit-bd-title">Por item</div>
+                    <div class="consumo-bd-head">
+                      <div class="consumo-bd-title" id="audit-bd-title">Por item</div>
+                      <div class="consumo-period-toggle hidden" id="audit-bd-mode-toggle">
+                        <button class="cons-per-btn consumo-bd-mode-btn active" data-kind="bat" data-mode="qtd" onclick="App.setConsumoBdMode('bat','qtd',this)">Quantidade</button>
+                        <button class="cons-per-btn consumo-bd-mode-btn" data-kind="bat" data-mode="sol" onclick="App.setConsumoBdMode('bat','sol',this)">Solicitações</button>
+                      </div>
+                    </div>
                     <div class="audit-bd-chart-wrap"><canvas id="audit-breakdown-chart"></canvas></div>
                     <div class="consumo-bd-empty hidden" id="audit-breakdown-empty">Nenhuma compra no período</div>
                   </div>
