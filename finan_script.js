@@ -8646,58 +8646,112 @@ const App = {
   // a compra-mãe, em vez de ganhar um código próprio).
   _loteBrinde(lotePai) { return `REF${lotePai}`; },
 
-  // Agrupa itens de estoque por código de lote (ignora os de brinde, "REF...",
-  // que compartilham código de propósito) — devolve só os grupos com 2+ itens.
-  _agruparLotesDuplicados() {
-    const itens = Object.entries(State.estoque || {}).filter(([, it]) => it.lote && !/^REF/i.test(it.lote));
+  // Levanta tudo que precisa de ajuste no código de lote: itens ainda com
+  // hífen (formato antigo) e grupos de 2+ itens NÃO-brinde com o mesmo
+  // código (duplicado de verdade). Brinde é identificado pela solicitação
+  // (r.brindeDeReqId), não pelo texto do lote — o formato antigo salvava
+  // "REF" como SUFIXO ("CODIGO REF"), o novo salva como PREFIXO ("REFCODIGO"),
+  // então checar só o prefixo deixaria passar brinde velho como duplicado.
+  _analisarLotes() {
+    const todos = Object.entries(State.estoque || {}).filter(([, it]) => it.lote);
+    const naoBrinde = todos.filter(([, it]) => !App._isBrindeEstoque(it));
     const porLote = {};
-    itens.forEach(([id, it]) => { (porLote[it.lote] = porLote[it.lote] || []).push([id, it]); });
+    naoBrinde.forEach(([id, it]) => { (porLote[it.lote] = porLote[it.lote] || []).push([id, it]); });
     const grupos = Object.values(porLote).filter(g => g.length > 1);
-    const total  = grupos.reduce((s, g) => s + g.length - 1, 0); // quantos vão trocar de código
-    return { grupos, total };
+    const comHifen = todos.filter(([, it]) => it.lote.includes('-'));
+    return { grupos, comHifen };
   },
 
-  // Corrige lotes DUPLICADOS já existentes: o item mais antigo de cada grupo
-  // mantém o código atual; os demais recebem um código novo (já no formato
-  // sem hífen, único). Atualiza também a movimentação de entrada ligada pelo
-  // mesmo estoqueId, pra não sobrar o código antigo espalhado em 2 lugares.
-  // Não mexe em valor, quantidade nem em nenhuma outra movimentação.
+  // Corrige os códigos de lote já existentes em 3 passos — Passo 1: duplicado
+  // NÃO-brinde — o mais antigo do grupo só perde o hífen (se tiver), os
+  // demais ganham código novo (a partir da própria solicitação, quando tem).
+  // Passo 2: o que sobrar com hífen (não duplicado) só perde o hífen.
+  // Passo 3: brinde é sempre realinhado com o código FINAL do item que o
+  // trouxe (já decidido nos passos anteriores), no formato novo, REF na
+  // frente. Atualiza também a movimentação de entrada ligada pelo mesmo
+  // estoqueId, pra não sobrar código velho espalhado. Não mexe em valor,
+  // quantidade nem em nenhuma outra movimentação.
   async corrigirLotesDuplicados() {
     const btn = document.getElementById('btn-corrigir-lotes');
-    const { grupos, total } = App._agruparLotesDuplicados();
-    if (!total) { toast('Nenhum lote duplicado encontrado.'); return; }
-    if (!confirm(`Encontrado(s) ${grupos.length} código(s) de lote duplicado(s), afetando ${total} item(ns).\n\nO item mais antigo de cada grupo mantém o código atual; os demais recebem um código novo (sem hífen, nunca repetido). Nenhum valor, quantidade ou movimentação é apagada — só o código do lote muda.\n\nCorrigir agora?`)) return;
+    const { grupos, comHifen } = App._analisarLotes();
+    if (!grupos.length && !comHifen.length) { toast('Nenhum lote duplicado ou com hífen encontrado.'); return; }
+
+    const totalDup = grupos.reduce((s, g) => s + g.length - 1, 0);
+    const partes = [];
+    if (totalDup) partes.push(`${grupos.length} código(s) duplicado(s) (${totalDup} item(ns))`);
+    if (comHifen.length) partes.push(`${comHifen.length} item(ns) com hífen no código`);
+    if (!confirm(`Encontrado: ${partes.join(' · ')}.\n\nCódigos com hífen ficam só letras/números; duplicados ganham código novo (o mais antigo do grupo muda menos). Brindes são realinhados com o código atual da compra que os trouxe. Nenhum valor, quantidade ou movimentação é apagada — só o código do lote muda.\n\nCorrigir agora?`)) return;
 
     const orig = btn ? btn.innerHTML : '';
     if (btn) { btn.innerHTML = 'Corrigindo…'; btn.disabled = true; }
     try {
-      const todosLotes = new Set(Object.values(State.estoque || {}).map(it => it.lote).filter(Boolean));
-      const ops = [];
-      let n = 0;
+      const estoque = State.estoque || {};
+      const ocupados = new Set(Object.values(estoque).map(it => it.lote).filter(Boolean));
+      const targets = {}; // id do item de estoque -> código final (só quem MUDA entra aqui)
+
+      const gerarUnico = base => {
+        let novo = App._gerarLote(base);
+        let tent = 0;
+        while (ocupados.has(novo) && tent < 9) { tent++; novo = App._gerarLote(base) + tent; }
+        ocupados.add(novo);
+        return novo;
+      };
+
+      // Passo 1: duplicados (não-brinde)
       grupos.forEach(grupo => {
         grupo.sort((a, b) => (a[1].updatedAt || '').localeCompare(b[1].updatedAt || ''));
+        const [idBase, itBase] = grupo[0];
+        if (itBase.lote.includes('-')) targets[idBase] = itBase.lote.replace(/-/g, '');
         grupo.slice(1).forEach(([id, it]) => {
           const req  = it.reqId ? (State.requests || {})[it.reqId] : null;
           const base = req || { grupo: it.grupo, boughtAt: it.boughtAt, shippedAt: it.shippedAt };
-          let novo = App._gerarLote(base);
-          let tent = 0;
-          while (todosLotes.has(novo) && tent < 9) { tent++; novo = App._gerarLote(base) + tent; }
-          todosLotes.add(novo);
-
-          ops.push(DB.set(`estoque/${id}/lote`, novo));
-          Object.entries(State.estoqueMov || {})
-            .filter(([, m]) => m.estoqueId === id)
-            .forEach(([mid]) => ops.push(DB.set(`estoqueMov/${mid}/lote`, novo)));
-          n++;
+          targets[id] = gerarUnico(base);
         });
       });
+
+      // Passo 2: resto com hífen (não-brinde, ainda sem alvo) — só tira o
+      // hífen. Remover hífen não junta 2 códigos diferentes (posição é
+      // sempre a mesma no formato PREFIXO-DDDD-NÚMERO), então não precisa
+      // checar colisão aqui.
+      Object.entries(estoque).forEach(([id, it]) => {
+        if (!it.lote || targets[id] || App._isBrindeEstoque(it)) return;
+        if (it.lote.includes('-')) targets[id] = it.lote.replace(/-/g, '');
+      });
+
+      // Passo 3: brindes — sempre realinhados com o código FINAL do item-pai
+      // (o que foi decidido acima, ou o atual, se o pai não mudou).
+      const porReqId = {};
+      Object.entries(estoque).forEach(([id, it]) => { if (it.reqId) porReqId[it.reqId] = id; });
+      Object.entries(estoque).forEach(([id, it]) => {
+        if (!App._isBrindeEstoque(it)) return;
+        const r = it.reqId ? (State.requests || {})[it.reqId] : null;
+        const parentEstId = r?.brindeDeReqId ? porReqId[r.brindeDeReqId] : null;
+        if (!parentEstId) return; // sem pai identificável — não mexe
+        const parentLoteFinal = targets[parentEstId] || (estoque[parentEstId] || {}).lote;
+        if (!parentLoteFinal) return;
+        const alvo = App._loteBrinde(parentLoteFinal);
+        if (it.lote !== alvo) targets[id] = alvo;
+      });
+
+      const ids = Object.keys(targets);
+      if (!ids.length) { toast('Nada pra corrigir.'); return; }
+
+      const ops = [];
+      ids.forEach(id => {
+        const novo = targets[id];
+        ops.push(DB.set(`estoque/${id}/lote`, novo));
+        Object.entries(State.estoqueMov || {})
+          .filter(([, m]) => m.estoqueId === id)
+          .forEach(([mid]) => ops.push(DB.set(`estoqueMov/${mid}/lote`, novo)));
+      });
       await Promise.all(ops);
-      toast(`✓ ${n} lote(s) corrigido(s).`);
-      App._logActivity?.('Estoque', 'Lotes duplicados corrigidos', `${n} item(ns)`);
+
+      toast(`✓ ${ids.length} lote(s) corrigido(s).`);
+      App._logActivity?.('Estoque', 'Códigos de lote corrigidos', `${ids.length} item(ns)`);
       App.renderCodigosTab?.();
       App.renderEstoque?.();
     } catch (e) {
-      console.error('[lotes] erro ao corrigir duplicados', e);
+      console.error('[lotes] erro ao corrigir', e);
       toast('Erro ao corrigir lotes. Veja o console.', 'error');
     } finally {
       if (btn) { btn.innerHTML = orig; btn.disabled = false; }
