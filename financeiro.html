@@ -385,7 +385,7 @@
 
         <!-- KPI Detail Modal -->
         <div id="kpi-list-modal" class="modal-overlay hidden">
-          <div class="modal-card form-modal" style="max-width:1200px">
+          <div class="modal-card form-modal" style="max-width:1320px">
             <div class="form-modal-header">
               <div class="eqd-header-left">
                 <div class="eqd-header-icon-box">
@@ -412,7 +412,11 @@
                 <div class="extrato-periodo-picker" id="kpi-list-periodo-picker">
                   <select id="kpi-list-ano-select" class="input-field extrato-picker-input" style="display:none" onchange="App._renderKpiList()"></select>
                   <input type="month" id="kpi-list-mes-input" class="input-field extrato-picker-input" style="display:none" onchange="App._renderKpiList()" />
-                  <input type="date" id="kpi-list-dia-input" class="input-field extrato-picker-input" style="display:none" onchange="App._renderKpiList()" />
+                  <div class="extrato-dia-picker" id="kpi-list-dia-wrap" style="display:none">
+                    <button type="button" class="extrato-dia-nav" onclick="App.kpiListDiaMover(-1)" title="Dia anterior">‹</button>
+                    <input type="date" id="kpi-list-dia-input" class="input-field extrato-picker-input" onchange="App._renderKpiList()" />
+                    <button type="button" class="extrato-dia-nav" onclick="App.kpiListDiaMover(1)" title="Próximo dia">›</button>
+                  </div>
                 </div>
                 <select id="kpi-list-grupo-select" class="filter-select extrato-picker-input" onchange="App._onKpiListGrupoChange()">
                   <option value="">Grupo: Todos</option>
@@ -420,14 +424,17 @@
                 <select id="kpi-list-subgrupo-select" class="filter-select extrato-picker-input" onchange="App.onKpiListSubgrupoChange()">
                   <option value="">Subgrupo: Todos</option>
                 </select>
+                <select id="kpi-list-modelo-select" class="filter-select extrato-picker-input" style="display:none" onchange="App.onKpiListModeloChange()">
+                  <option value="">Todos</option>
+                </select>
               </div>
               <div class="table-wrap"><table class="data-table">
                 <thead id="kpi-list-thead"><tr><th>Data</th><th>Unidade</th><th>Grupo</th><th>Subgrupo</th><th>Resumo</th><th>Fornecedor</th><th>Status</th><th>Valor</th></tr></thead>
                 <tbody id="kpi-list-tbody"></tbody>
               </table></div>
-              <div class="kpi-list-total-box" id="kpi-list-total-box" style="display:none"></div>
             </div>
             </div>
+            <div class="kpi-list-total-box" id="kpi-list-total-box" style="display:none"></div>
           </div>
         </div>
 

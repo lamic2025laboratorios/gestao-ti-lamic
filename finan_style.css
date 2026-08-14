@@ -2576,7 +2576,12 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .extrato-per-btn:hover { background: #eef4ff; color: #3a7ee8; }
 .extrato-per-btn.active { background: var(--blue-500, #2a68d4); color: #fff; }
 .extrato-periodo-picker { display: flex; align-items: center; gap: 8px; }
-.extrato-picker-input { height: 34px; padding: 6px 10px; font-size: .82rem; }
+.extrato-picker-input { height: 34px; min-width: 150px; padding: 6px 10px; font-size: .82rem; box-sizing: border-box; }
+/* Ano/Mês/Dia (calendário nativo) têm tamanho fixo, sem depender do valor —
+   fica sempre do mesmo tamanho, alternando entre eles ou pra "Todos". */
+#kpi-list-ano-select, #kpi-list-mes-input, #kpi-list-dia-wrap #kpi-list-dia-input,
+#extrato-ano-select, #extrato-mes-input, #extrato-dia-wrap #extrato-dia-input,
+#extrato-semana-wrap #extrato-semana-input { width: 150px; }
 
 /* Barra de total — abaixo dos filtros, em linha própria, visual "cartão" */
 .extrato-resumo-bar {
@@ -2611,11 +2616,14 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .kpi-list-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .kpi-list-toolbar .filter-select.extrato-picker-input { height: 34px; min-width: 150px; }
 
-/* Caixa azul com o total (qtd + R$) do que foi filtrado */
+/* Caixa azul com o total (qtd + R$) do que foi filtrado — fica FORA da área
+   que rola (irmã de .form-modal-scroll dentro do .modal-card, que é flex-
+   column), então some fixa na parte de baixo do pop-up mesmo com a tabela
+   rolando por cima dela. */
 .kpi-list-total-box {
-  margin-top: 14px; padding: 12px 18px; border-radius: var(--r-md);
+  flex-shrink: 0; margin: 0; padding: 12px 26px; border-radius: 0 0 var(--r-xl) var(--r-xl);
   background: linear-gradient(135deg, #1a5bbf, #2a68d4);
-  box-shadow: 0 4px 14px rgba(26,91,191,.35);
+  box-shadow: 0 -4px 14px rgba(26,91,191,.2);
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
 }
 .kpi-list-total-box .klt-label { font-size: .72rem; font-weight: 600; color: rgba(255,255,255,.8); text-transform: uppercase; letter-spacing: .03em; }

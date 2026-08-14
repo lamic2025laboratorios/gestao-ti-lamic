@@ -3916,7 +3916,6 @@ const App = {
     const tbody = document.getElementById('kpi-list-tbody');
     const thead = document.getElementById('kpi-list-thead');
     const filters = App._getKpiFilters();
-    const { fUnit, fGroup, fFrom, fTo } = filters;
 
     let reqs = App._applyKpiFilters(Object.values(State.requests||{}), filters);
 
@@ -3925,9 +3924,9 @@ const App = {
     reqs.forEach(r=>{ byUnit[r.unitName||'?']=(byUnit[r.unitName||'?']||0)+1; });
     const sorted = Object.entries(byUnit).sort((a,b)=>b[1]-a[1]);
 
-    const rangeStr = (fFrom||fTo) ? ` · ${App._fmtDate(fFrom)} → ${App._fmtDate(fTo)}` : '';
-    const filterDesc = [fUnit||'Todas as unidades', fGroup||'Todos os grupos'].join(' · ') + rangeStr;
-    title.textContent = `Total Solicitado — ${filterDesc}`;
+    // Título simples — os filtros ativos (unidade/grupo/período) já estão
+    // visíveis na barra de filtro do dashboard, não precisa repetir aqui.
+    title.textContent = 'Solicitado';
 
     // Este modal é compartilhado com showKpiList('Comprado') — a barra de
     // filtro interna (calendário + grupo/subgrupo) é só de lá, então some aqui.
@@ -4165,23 +4164,27 @@ const App = {
     }).join('');
   },
 
-  // Filtro interno do pop-up (calendário + grupo/subgrupo) — só existe pra 'Comprado'.
+  // Filtro interno do pop-up (calendário + grupo/subgrupo/modelo) — existe
+  // pra 'Comprado' e 'Negado' (os 2 status com volume suficiente pra valer
+  // a pena recortar por período/grupo dentro do próprio pop-up).
   _kpiListStatus: null,
-  _kpiListInternal: { periodo: 'todos', grupo: '', subgrupo: '' },
+  _kpiListInternal: { periodo: 'todos', grupo: '', subgrupo: '', modelo: '' },
+  _kpiListUsaFiltro(status) { return status === 'Comprado' || status === 'Negado'; },
 
   showKpiList(status) {
     App._kpiListStatus = status;
-    App._kpiListInternal = { periodo: 'todos', grupo: '', subgrupo: '' };
+    App._kpiListInternal = { periodo: 'todos', grupo: '', subgrupo: '', modelo: '' };
     const toolbar = document.getElementById('kpi-list-toolbar');
     const totalBox = document.getElementById('kpi-list-total-box');
-    const isComprado = status === 'Comprado';
-    if (toolbar)  toolbar.style.display  = isComprado ? '' : 'none';
+    const usaFiltro = App._kpiListUsaFiltro(status);
+    if (toolbar)  toolbar.style.display  = usaFiltro ? '' : 'none';
     if (totalBox) totalBox.style.display = 'none';
-    if (isComprado) {
+    if (usaFiltro) {
       document.querySelectorAll('.kpi-list-per-btn').forEach(b => b.classList.toggle('active', b.dataset.per === 'todos'));
       App._showKpiListPicker('todos');
       App._populateKpiListGrupos();
       App._populateKpiListSubgrupos('');
+      App._populateKpiListModelo('');
     }
     App._renderKpiList();
     document.getElementById('kpi-list-modal').classList.remove('hidden');
@@ -4195,15 +4198,27 @@ const App = {
     const selAno = document.getElementById('kpi-list-ano-select');
     const inpMes = document.getElementById('kpi-list-mes-input');
     const inpDia = document.getElementById('kpi-list-dia-input');
-    [selAno, inpMes, inpDia].forEach(el => { if (el) el.style.display = 'none'; });
+    const wrapDia = document.getElementById('kpi-list-dia-wrap');
+    [selAno, inpMes, wrapDia].forEach(el => { if (el) el.style.display = 'none'; });
     if (per === 'ano') {
       App._populateKpiListAnos();
       if (selAno) { selAno.style.display = ''; if (!selAno.value) selAno.value = String(hoje.getFullYear()); }
     } else if (per === 'mes') {
       if (inpMes) { inpMes.style.display = ''; if (!inpMes.value) inpMes.value = hojeStr.substring(0, 7); }
     } else if (per === 'dia') {
-      if (inpDia) { inpDia.style.display = ''; if (!inpDia.value) inpDia.value = hojeStr; }
+      if (wrapDia) { wrapDia.style.display = ''; if (inpDia && !inpDia.value) inpDia.value = hojeStr; }
     }
+  },
+
+  // Dia: seta anterior/próximo, igual ao Extrato — parte do dia atualmente
+  // escolhido (padrão: hoje), pra dar pra passar dia por dia sem reabrir o calendário.
+  kpiListDiaMover(delta) {
+    const inp = document.getElementById('kpi-list-dia-input'); if (!inp) return;
+    const base = inp.value ? new Date(inp.value + 'T00:00:00') : new Date();
+    base.setDate(base.getDate() + delta);
+    const pad = n => String(n).padStart(2, '0');
+    inp.value = `${base.getFullYear()}-${pad(base.getMonth()+1)}-${pad(base.getDate())}`;
+    App._renderKpiList();
   },
 
   _populateKpiListAnos() {
@@ -4236,7 +4251,9 @@ const App = {
     const gname = document.getElementById('kpi-list-grupo-select')?.value || '';
     App._kpiListInternal.grupo = gname;
     App._kpiListInternal.subgrupo = '';
+    App._kpiListInternal.modelo = '';
     App._populateKpiListSubgrupos(gname);
+    App._populateKpiListModelo(gname);
     App._renderKpiList();
   },
 
@@ -4250,18 +4267,48 @@ const App = {
     list.forEach(sg => { const o=document.createElement('option'); o.value=o.textContent=sg; sel.appendChild(o); });
   },
 
+  // Cor (Tinta) ou Modelo (Pilhas/Baterias) — some pros demais grupos, que não
+  // têm sub-opções nesse formato. Aparece do lado do Subgrupo, independente
+  // de qual subgrupo tiver escolhido (a cor/modelo é do grupo todo).
+  _populateKpiListModelo(gname) {
+    const sel = document.getElementById('kpi-list-modelo-select'); if (!sel) return;
+    const g = (gname || '').toLowerCase();
+    const isInk = g.includes('tinta');
+    const isBat = g.includes('pilha') || g.includes('bateria');
+    sel.innerHTML = '';
+    if (!isInk && !isBat) { sel.style.display = 'none'; return; }
+    const gid = Object.entries(State.groups||{}).find(([,n]) => n === gname)?.[0];
+    const opts = gid ? (State.subOpts?.[gid] || {}) : {};
+    const list = isInk ? (opts.cores || []) : (opts.modelos || []);
+    const optTodos = document.createElement('option');
+    optTodos.value = ''; optTodos.textContent = (isInk ? 'Cor' : 'Modelo') + ': Todos';
+    sel.appendChild(optTodos);
+    list.forEach(v => { const o = document.createElement('option'); o.value = o.textContent = v; sel.appendChild(o); });
+    sel.style.display = list.length ? '' : 'none';
+  },
+
+  onKpiListModeloChange() {
+    App._kpiListInternal.modelo = document.getElementById('kpi-list-modelo-select')?.value || '';
+    App._renderKpiList();
+  },
+
   onKpiListSubgrupoChange() {
     App._kpiListInternal.subgrupo = document.getElementById('kpi-list-subgrupo-select')?.value || '';
     App._renderKpiList();
   },
 
-  // Aplica o filtro interno do pop-up (calendário + grupo/subgrupo) em cima do
-  // que já passou pelo filtro do dashboard (_applyKpiFilters).
+  // Aplica o filtro interno do pop-up (calendário + grupo/subgrupo/modelo) em
+  // cima do que já passou pelo filtro do dashboard (_applyKpiFilters).
   _applyKpiListInternalFilters(reqs) {
     const st = App._kpiListInternal || {};
     return reqs.filter(r => {
       if (st.grupo && r.groupName !== st.grupo) return false;
       if (st.subgrupo && r.subgrupo !== st.subgrupo) return false;
+      if (st.modelo) {
+        const isInk = (st.grupo || '').toLowerCase().includes('tinta');
+        const raw = (isInk ? (r.cor || r.cores || '') : (r.modelo || r.produto || r.batModel || '')).toString();
+        if (raw.toLowerCase().trim() !== st.modelo.toLowerCase().trim()) return false;
+      }
       if (st.periodo && st.periodo !== 'todos') {
         const ds = (r.createdAt||'').substring(0,10);
         if (!ds) return false;
@@ -4288,7 +4335,6 @@ const App = {
     const thead = document.getElementById('kpi-list-thead');
     const totalBox = document.getElementById('kpi-list-total-box');
     const filters = App._getKpiFilters();
-    const { fUnit, fGroup, fFrom, fTo } = filters;
     const fmt = v => v ? 'R$ '+parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
 
     let reqs = App._applyKpiFilters(
@@ -4297,23 +4343,15 @@ const App = {
     );
 
     const isComprado = status === 'Comprado';
-    if (isComprado) reqs = App._applyKpiListInternalFilters(reqs);
+    const usaFiltro  = App._kpiListUsaFiltro(status);
+    if (usaFiltro) reqs = App._applyKpiListInternalFilters(reqs);
 
     reqs.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
 
-    const rangeStr = (fFrom||fTo) ? ` · ${App._fmtDate(fFrom)} → ${App._fmtDate(fTo)}` : '';
-    let filterDesc = [fUnit||'Todas as unidades', fGroup||'Todos os grupos'].join(' · ') + rangeStr;
-    if (isComprado) {
-      const st = App._kpiListInternal;
-      const extra = [];
-      if (st.grupo) extra.push(st.grupo);
-      if (st.subgrupo) extra.push(st.subgrupo);
-      if (st.periodo === 'ano') { const v = document.getElementById('kpi-list-ano-select')?.value; if (v) extra.push(v); }
-      if (st.periodo === 'mes') { const v = document.getElementById('kpi-list-mes-input')?.value; if (v) { const [y,m]=v.split('-'); extra.push(`${m}/${y}`); } }
-      if (st.periodo === 'dia') { const v = document.getElementById('kpi-list-dia-input')?.value; if (v) extra.push(App._fmtDate(v)); }
-      if (extra.length) filterDesc += ' · ' + extra.join(' · ');
-    }
-    title.textContent = `${status} — ${filterDesc} (${reqs.length})`;
+    // Título simples — sem o resumo de filtros (a própria barra do pop-up já
+    // mostra o que está ativo, não precisa repetir tudo no cabeçalho).
+    const tituloSimples = { Comprado: 'Total Comprados', Negado: 'Total Negados' }[status] || status;
+    title.textContent = `${tituloSimples} (${reqs.length})`;
 
     tbody.innerHTML = '';
 
@@ -4364,17 +4402,19 @@ const App = {
       }
     }
 
-    // Caixa azul com o total (qtd + R$) referente ao filtro aplicado — só
-    // aparece quando algum filtro interno (calendário/grupo/subgrupo) está ativo.
-    if (isComprado && totalBox) {
+    // Caixa azul com o total (qtd + R$) referente ao filtro aplicado — fica
+    // fixa na base do pop-up (fora da área que rola) e só aparece quando
+    // algum filtro interno (calendário/grupo/subgrupo/modelo) está ativo.
+    if (usaFiltro && totalBox) {
       const st = App._kpiListInternal;
-      const hasFilter = (st.periodo && st.periodo !== 'todos') || st.grupo || st.subgrupo;
+      const hasFilter = (st.periodo && st.periodo !== 'todos') || st.grupo || st.subgrupo || st.modelo;
       if (hasFilter) {
         const totalQtd = reqs.reduce((s,r) => s + App._qtyComprada(r), 0);
         const totalVal = reqs.reduce((s,r) => s + (parseFloat(r.valorTotal)||0), 0);
+        const rotulo = isComprado ? 'comprado' : 'negado';
         totalBox.style.display = '';
         totalBox.innerHTML = `
-          <div><span class="klt-label">Referente à pesquisa</span><div class="klt-qty">${totalQtd} ite${totalQtd===1?'m':'ns'} comprado${totalQtd===1?'':'s'}</div></div>
+          <div><span class="klt-label">Referente à pesquisa</span><div class="klt-qty">${totalQtd} ite${totalQtd===1?'m':'ns'} ${rotulo}${totalQtd===1?'':'s'}</div></div>
           <div class="klt-val">${fmt(totalVal)}</div>`;
       } else {
         totalBox.style.display = 'none';
