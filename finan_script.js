@@ -5802,6 +5802,42 @@ const App = {
       .forEach(([id]) => DB.set(`requests/${id}/groupName`, 'Conserto'));
   },
 
+  // Correção pontual (idempotente, trava por sessão) de 4 solicitações de
+  // Conserto identificadas com nomenclatura errada: SL-98 foi cadastrada
+  // ANTES de "Conserto" virar grupo próprio (ficou em Outros/Concerto com o
+  // defeito descrito no campo de modelo); SL-125/126/127 (compra combinada
+  // CMP-0005) têm o motivo salvo com acento corrompido/caixa baixa. Cada
+  // campo só é escrito se o valor atual bater exatamente com o valor
+  // "errado" já conferido — não mexe em valor, valorTotal nem parcelas.
+  _consertoPontualFixFeito: false,
+  _migrarSolicitacoesConsertoPontuais() {
+    if (App._consertoPontualFixFeito) return;
+    App._consertoPontualFixFeito = true;
+    const reqs = State.requests || {};
+
+    const r98 = reqs['-OuC8oke59DdydlEDdd_'];
+    if (r98 && r98.seq === 98 && r98.groupName === 'Outros' && r98.subgrupo === 'Concerto' && r98.product === 'IMPRESSORA COM DEFEITO') {
+      DB.set('requests/-OuC8oke59DdydlEDdd_/groupId',   '-OxB0wjCkXhd5_ZulAOb');
+      DB.set('requests/-OuC8oke59DdydlEDdd_/groupName', 'Conserto');
+      DB.set('requests/-OuC8oke59DdydlEDdd_/subgrupo',  'Impressora');
+      DB.set('requests/-OuC8oke59DdydlEDdd_/product',   'Epson L375');
+    }
+
+    const motivoOk = 'RECONDICIONAMENTO + TINTA PRETA + MANUTENÇÃO';
+    const r125 = reqs['-OxCp7C0Jc_DVET3IKbA'];
+    if (r125 && r125.seq === 125 && r125.reason && r125.reason.indexOf('Ã') !== -1) {
+      DB.set('requests/-OxCp7C0Jc_DVET3IKbA/reason', motivoOk);
+    }
+    const r126 = reqs['-OxCp9XWgYJN2kReLSb3'];
+    if (r126 && r126.seq === 126 && r126.reason && r126.reason.indexOf('Ã') !== -1) {
+      DB.set('requests/-OxCp9XWgYJN2kReLSb3/reason', motivoOk);
+    }
+    const r127 = reqs['-OxCpDy6-nf6L4g0eFfE'];
+    if (r127 && r127.seq === 127 && r127.reason === 'Destrava e limpeza das almofadas de tinta') {
+      DB.set('requests/-OxCpDy6-nf6L4g0eFfE/reason', 'DESTRAVA E LIMPEZA DAS ALMOFADAS DE TINTA');
+    }
+  },
+
   // Puxa o gestor legado (número único antigo em config.gestorWhats) pra dentro
   // de config/gestores, virando um item normal e deletável no Config. Idempotente.
   _migrarGestorLegacy() {
@@ -8892,6 +8928,7 @@ const App = {
     safeListener('requests',  v => {
       State.requests=v||{};
       App._migrarNomeConsertoRequests?.();
+      App._migrarSolicitacoesConsertoPontuais?.();
       App.updatePendingBadge();
       App.populateDashFilters();
       if (State.adminUser) {
