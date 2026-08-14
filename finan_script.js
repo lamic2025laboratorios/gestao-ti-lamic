@@ -2934,11 +2934,11 @@ const App = {
   },
 
   // Comparativo de Gastos do pop-up de auditoria (Tintas/Pilhas/Conserto/
-  // Outros) — a linha de Tendência saiu (média a direção geral, mas não dizia
-  // se UM período específico gastou mais ou menos que o anterior). No lugar,
-  // cada barra fica colorida pela variação vs. o período anterior (vermelho
-  // = gastou mais, verde = gastou menos) — é a métrica de "subiu/desceu" na
-  // prática, direto no gráfico, e o tooltip mostra o % da variação.
+  // Outros) — linha em vez de coluna, no estilo de gráfico de mercado
+  // financeiro: cada TRECHO da linha (e o ponto) fica vermelho quando o
+  // gasto subiu vs. o período anterior, verde quando caiu — a subida/descida
+  // fica visível na própria linha, sem precisar olhar tabela. Tooltip mostra
+  // o % da variação.
   _renderAuditChart() {
     const canvas = document.getElementById('audit-chart'); if (!canvas) return;
     const kind = App._auditKind; const def = App._CONSUMO_CFG[kind]; if (!def) return;
@@ -2948,19 +2948,36 @@ const App = {
     const fmtR = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     let ultimoValido = null;
-    const barColors = vals.map(v => {
-      let cor = '#2a68d4cc';
-      if (ultimoValido != null && ultimoValido > 0) cor = v > ultimoValido ? '#d94040cc' : v < ultimoValido ? '#1db87acc' : '#2a68d4cc';
+    const pointColors = vals.map(v => {
+      let cor = '#2a68d4';
+      if (ultimoValido != null && ultimoValido > 0) cor = v > ultimoValido ? '#d94040' : v < ultimoValido ? '#1db87a' : '#2a68d4';
       ultimoValido = v;
       return cor;
     });
+    // Cor do trecho ENTRE 2 pontos consecutivos — mesma regra (sobe=vermelho/desce=verde).
+    const segColor = ctx => {
+      const y0 = ctx.p0.parsed.y, y1 = ctx.p1.parsed.y;
+      return y1 > y0 ? '#d94040' : y1 < y0 ? '#1db87a' : '#2a68d4';
+    };
+
+    const ctx2d = canvas.getContext('2d');
+    const gradient = ctx2d.createLinearGradient(0, 0, 0, canvas.clientHeight || 260);
+    gradient.addColorStop(0, '#2a68d43d');
+    gradient.addColorStop(1, '#2a68d400');
 
     App._destroyChart('audit-chart');
     State.charts['audit-chart'] = new Chart(canvas, {
       data: {
         labels,
         datasets: [
-          { type: 'bar', label: 'Gastos', data: vals, backgroundColor: barColors, borderRadius: 6, order: 2 },
+          {
+            type: 'line', label: 'Gastos', data: vals,
+            borderColor: '#2a68d4', backgroundColor: gradient, segment: { borderColor: segColor },
+            pointBackgroundColor: pointColors, pointBorderColor: '#fff', pointBorderWidth: 2,
+            pointRadius: 4, pointHoverRadius: 6,
+            borderWidth: 2.5, tension: 0.35, fill: true, cubicInterpolationMode: 'monotone',
+            spanGaps: true, order: 2
+          },
           { type: 'line', label: 'Média', data: avgLine, borderColor: '#7c52d4', borderWidth: 2, borderDash: [2, 3], pointRadius: 0, fill: false, tension: 0, order: 1 }
         ]
       },
