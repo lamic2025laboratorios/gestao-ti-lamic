@@ -5945,9 +5945,9 @@ const App = {
   // Conserto identificadas com nomenclatura errada: SL-98 foi cadastrada
   // ANTES de "Conserto" virar grupo próprio (ficou em Outros/Concerto com o
   // defeito descrito no campo de modelo); SL-125/126/127 (compra combinada
-  // CMP-0005) têm o motivo salvo com acento corrompido/caixa baixa. Cada
-  // campo só é escrito se o valor atual bater exatamente com o valor
-  // "errado" já conferido — não mexe em valor, valorTotal nem parcelas.
+  // CMP-0005) têm o motivo salvo em caixa baixa (o pedido era caixa alta).
+  // Cada campo só é escrito se o valor atual ainda não bater com o valor
+  // final desejado — não mexe em valor, valorTotal nem parcelas.
   _consertoPontualFixFeito: false,
   _migrarSolicitacoesConsertoPontuais() {
     if (App._consertoPontualFixFeito) return;
@@ -5964,11 +5964,11 @@ const App = {
 
     const motivoOk = 'RECONDICIONAMENTO + TINTA PRETA + MANUTENÇÃO';
     const r125 = reqs['-OxCp7C0Jc_DVET3IKbA'];
-    if (r125 && r125.seq === 125 && r125.reason && r125.reason.indexOf('Ã') !== -1) {
+    if (r125 && r125.seq === 125 && r125.reason && r125.reason !== motivoOk) {
       DB.set('requests/-OxCp7C0Jc_DVET3IKbA/reason', motivoOk);
     }
     const r126 = reqs['-OxCp9XWgYJN2kReLSb3'];
-    if (r126 && r126.seq === 126 && r126.reason && r126.reason.indexOf('Ã') !== -1) {
+    if (r126 && r126.seq === 126 && r126.reason && r126.reason !== motivoOk) {
       DB.set('requests/-OxCp9XWgYJN2kReLSb3/reason', motivoOk);
     }
     const r127 = reqs['-OxCpDy6-nf6L4g0eFfE'];
