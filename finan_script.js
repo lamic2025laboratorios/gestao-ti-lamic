@@ -2933,23 +2933,35 @@ const App = {
     });
   },
 
+  // Comparativo de Gastos do pop-up de auditoria (Tintas/Pilhas/Conserto/
+  // Outros) — a linha de Tendência saiu (média a direção geral, mas não dizia
+  // se UM período específico gastou mais ou menos que o anterior). No lugar,
+  // cada barra fica colorida pela variação vs. o período anterior (vermelho
+  // = gastou mais, verde = gastou menos) — é a métrica de "subiu/desceu" na
+  // prática, direto no gráfico, e o tooltip mostra o % da variação.
   _renderAuditChart() {
     const canvas = document.getElementById('audit-chart'); if (!canvas) return;
     const kind = App._auditKind; const def = App._CONSUMO_CFG[kind]; if (!def) return;
     const gran = App._auditGran || 'month';
     const { labels, vals } = App._consumoSeries(def.keywords, def.cfg.exclude, gran);
-    const trendLine = App._calcTrendLine(vals);
-    const avgLine   = App._calcAvgLine(vals);
+    const avgLine = App._calcAvgLine(vals);
     const fmtR = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    let ultimoValido = null;
+    const barColors = vals.map(v => {
+      let cor = '#2a68d4cc';
+      if (ultimoValido != null && ultimoValido > 0) cor = v > ultimoValido ? '#d94040cc' : v < ultimoValido ? '#1db87acc' : '#2a68d4cc';
+      ultimoValido = v;
+      return cor;
+    });
 
     App._destroyChart('audit-chart');
     State.charts['audit-chart'] = new Chart(canvas, {
       data: {
         labels,
         datasets: [
-          { type: 'bar', label: 'Gastos', data: vals, backgroundColor: '#2a68d4cc', borderColor: '#2a68d4', borderWidth: 1.5, borderRadius: 6, order: 3 },
-          { type: 'line', label: 'Tendência', data: trendLine, borderColor: '#e8830a', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0, order: 1 },
-          { type: 'line', label: 'Média', data: avgLine, borderColor: '#7c52d4', borderWidth: 2, borderDash: [2, 3], pointRadius: 0, fill: false, tension: 0, order: 2 }
+          { type: 'bar', label: 'Gastos', data: vals, backgroundColor: barColors, borderRadius: 6, order: 2 },
+          { type: 'line', label: 'Média', data: avgLine, borderColor: '#7c52d4', borderWidth: 2, borderDash: [2, 3], pointRadius: 0, fill: false, tension: 0, order: 1 }
         ]
       },
       options: {
@@ -2960,7 +2972,18 @@ const App = {
             enabled: true, backgroundColor: '#0f1e35', cornerRadius: 10, padding: 10,
             titleFont: { size: 12, weight: '700' }, titleColor: '#fff',
             bodyFont: { size: 11, weight: '600' }, bodyColor: 'rgba(255,255,255,.85)',
-            callbacks: { label: item => `${item.dataset.label}: ${fmtR(item.raw)}` }
+            callbacks: {
+              label: item => {
+                if (item.dataset.label !== 'Gastos') return `${item.dataset.label}: ${fmtR(item.raw)}`;
+                const i = item.dataIndex, prev = vals[i - 1];
+                let variacao = '';
+                if (i > 0 && prev > 0) {
+                  const diff = (vals[i] - prev) / prev * 100;
+                  variacao = ` (${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff).toFixed(0)}% vs anterior)`;
+                }
+                return `Gastos: ${fmtR(item.raw)}${variacao}`;
+              }
+            }
           }
         },
         scales: {
@@ -3318,13 +3341,21 @@ const App = {
     return { value: 0, source: 'none' };
   },
 
+  // Ícones do status da meta — SVG monocromático (stroke=currentColor, segue
+  // a cor do texto do badge que o usa), sem emoji.
+  _metaStatusIcons: {
+    none: '<svg viewBox="0 0 24 24" fill="none" width="13" height="13"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    ok:   '<svg viewBox="0 0 24 24" fill="none" width="13" height="13"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12.5l2.5 2.5L16 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    warn: '<svg viewBox="0 0 24 24" fill="none" width="13" height="13"><path d="M12 3.5l9.5 16.5H2.5L12 3.5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    over: '<svg viewBox="0 0 24 24" fill="none" width="13" height="13"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7.5v6M12 16.5h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
+  },
   // Status da meta a partir de projeção x alvo. green/yellow/red.
   _metaStatus(projection, target) {
-    if (!target) return { key: 'none', color: '', icon: 'ℹ️', txt: 'Sem meta definida.' };
+    if (!target) return { key: 'none', color: '', icon: App._metaStatusIcons.none, txt: 'Sem meta definida.' };
     const ratio = projection / target;
-    if (ratio <= 1.0)  return { key: 'ok',   color: 'var(--status-com)', icon: '✅', txt: 'Dentro da meta.' };
-    if (ratio <= 1.10) return { key: 'warn', color: 'var(--orange)',     icon: '⚠️', txt: 'Quase estourando a meta.' };
-    return { key: 'over', color: 'var(--red)', icon: '🚨', txt: 'Meta estourada.' };
+    if (ratio <= 1.0)  return { key: 'ok',   color: 'var(--status-com)', icon: App._metaStatusIcons.ok,   txt: 'Dentro da meta.' };
+    if (ratio <= 1.10) return { key: 'warn', color: 'var(--orange)',     icon: App._metaStatusIcons.warn, txt: 'Quase estourando a meta.' };
+    return { key: 'over', color: 'var(--red)', icon: App._metaStatusIcons.over, txt: 'Meta estourada.' };
   },
 
   openMetaModal() {
@@ -3839,8 +3870,10 @@ const App = {
     const metricsEl = $('cmp-status-metrics');
     if (!tagEl) return;
 
-    if (iconEl) iconEl.textContent = st.icon;
+    if (iconEl) iconEl.innerHTML = st.icon;
     tagEl.className = 'cmp-status-tag cmp-status-tag--' + st.key;
+    const rowEl = document.getElementById('cmp-status-row');
+    if (rowEl) rowEl.className = 'compare-status-row compare-status-row--' + st.key;
     if (tagTxtEl) tagTxtEl.textContent = !hasRef
       ? 'Sem dados para comparar'
       : st.key === 'ok'   ? (hasMeta ? 'Dentro da meta' : 'Abaixo do ano anterior')
@@ -5083,11 +5116,14 @@ const App = {
     }
   },
 
-  // Gastos por Período — colunas, com linha de Tendência e linha de Média
-  // sobrepostas (clica no nome delas na legenda pra mostrar/esconder, igual
-  // o Chart.js já faz nativamente com qualquer dataset). Os valores em si
-  // (o "data" recebido) continuam vindo de _buildSpendMap, sem mudar nada
-  // no cálculo — só troca o tipo de gráfico e soma 2 séries derivadas dele.
+  // Gastos por Período — linha, com Média e Meta (teto mensal) sobrepostas
+  // (clica no nome delas na legenda pra mostrar/esconder, igual o Chart.js já
+  // faz nativamente com qualquer dataset). Os valores em si (o "data"
+  // recebido) continuam vindo de _buildSpendMap, sem mudar nada no cálculo.
+  //
+  // A linha de Tendência (regressão linear) saiu — media a direção geral dos
+  // pontos, mas não dizia se um mês específico estourou ou não o orçamento,
+  // que é o que realmente importa aqui. No lugar entrou a linha de Meta.
   _drawLine(id, data, color) {
     const canvas = document.getElementById(id); if (!canvas) return;
     App._destroyChart(id);
@@ -5098,20 +5134,30 @@ const App = {
     const media = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
     const mediaLine = vals.map(() => media);
 
-    // Linha de Tendência: regressão linear simples (mínimos quadrados) sobre os pontos
-    let trendLine = vals.slice();
-    const n = vals.length;
-    if (n >= 2) {
-      const xs = vals.map((_, i) => i);
-      const sumX  = xs.reduce((a, b) => a + b, 0);
-      const sumY  = vals.reduce((a, b) => a + b, 0);
-      const sumXY = xs.reduce((s, x, i) => s + x * vals[i], 0);
-      const sumXX = xs.reduce((s, x) => s + x * x, 0);
-      const denom = (n * sumXX - sumX * sumX) || 1;
-      const slope = (n * sumXY - sumX * sumY) / denom;
-      const intercept = (sumY - slope * sumX) / n;
-      trendLine = xs.map(x => slope * x + intercept);
-    }
+    // Linha de Meta: teto mensal — só quando o gráfico está agrupado por mês
+    // (chave "AAAA-MM"; no recorte por dia não tem um teto diário configurado).
+    // Cada mês usa a Meta ANUAL cadastrada em Configurações → Meta pro ano
+    // dele (gasto do ano anterior × (1 − % de redução)) dividida por 12 — é
+    // quanto dá pra gastar POR MÊS sem estourar a meta anual. Ano sem meta
+    // cadastrada fica null naquele trecho (linha simplesmente não aparece ali).
+    const isMonthly = sorted.length > 0 && sorted.every(k => /^\d{4}-\d{2}$/.test(k));
+    const metaLine = isMonthly ? sorted.map(k => {
+      const year = parseInt(k.substring(0, 4));
+      const meta = State.metas?.[year];
+      if (!meta) return null;
+      const prevEff = App._prevYearEffective(year, meta);
+      const target = prevEff.value * (1 - (meta.reductionPct || 0) / 100);
+      return target > 0 ? target / 12 : null;
+    }) : null;
+    const temMeta = metaLine && metaLine.some(v => v != null);
+
+    // Cor de cada ponto da linha real: vermelho se estourou o teto do mês,
+    // verde se ficou dentro — é o "subiu/desceu vs. estimativa" na prática.
+    const pointColors = vals.map((v, i) => {
+      const teto = temMeta ? metaLine[i] : null;
+      if (teto == null) return color;
+      return v > teto ? '#d94040' : '#1db87a';
+    });
 
     const fmtR = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -5122,21 +5168,22 @@ const App = {
     gradient.addColorStop(0, color + '3d');
     gradient.addColorStop(1, color + '00');
 
-    State.charts[id] = new Chart(canvas, {
-      data: {
-        labels: sorted,
-        datasets: [
-          {
-            type: 'line', label: 'Gastos', data: vals,
-            borderColor: color, backgroundColor: gradient,
-            borderWidth: 2.5, tension: 0.45, fill: true, cubicInterpolationMode: 'monotone',
-            pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 2,
-            pointRadius: 3.5, pointHoverRadius: 6, order: 3
-          },
-          { type: 'line', label: 'Tendência', data: trendLine, borderColor: '#e8830a', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0, order: 1 },
-          { type: 'line', label: 'Média', data: mediaLine, borderColor: '#7c52d4', borderWidth: 2, borderDash: [2, 3], pointRadius: 0, fill: false, tension: 0, order: 2 }
-        ]
+    const datasets = [
+      {
+        type: 'line', label: 'Gastos', data: vals,
+        borderColor: color, backgroundColor: gradient,
+        borderWidth: 2.5, tension: 0.45, fill: true, cubicInterpolationMode: 'monotone',
+        pointBackgroundColor: temMeta ? pointColors : color, pointBorderColor: '#fff', pointBorderWidth: 2,
+        pointRadius: 3.5, pointHoverRadius: 6, order: 3
       },
+      { type: 'line', label: 'Média', data: mediaLine, borderColor: '#7c52d4', borderWidth: 2, borderDash: [2, 3], pointRadius: 0, fill: false, tension: 0, order: 2 }
+    ];
+    if (temMeta) {
+      datasets.push({ type: 'line', label: 'Meta (teto mensal)', data: metaLine, borderColor: '#d94040', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0, spanGaps: true, order: 1 });
+    }
+
+    State.charts[id] = new Chart(canvas, {
+      data: { labels: sorted, datasets },
       plugins: [App._verticalGuidePlugin],
       options: {
         responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },

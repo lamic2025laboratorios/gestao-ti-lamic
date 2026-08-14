@@ -1149,27 +1149,38 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 }
 .btn-meta-config:hover { border-color: #3a7ee8; color: #3a7ee8; background: #eef4ff; }
 /* ── Velocímetro central do card Comparativo ── */
-.cmp-gauge-section { display: flex; justify-content: center; margin: 6px 0 4px; }
-.cmp-gauge-wrap { position: relative; width: 132px; height: 132px; }
+.cmp-gauge-section { display: flex; justify-content: center; margin: 8px 0 6px; }
+.cmp-gauge-wrap {
+  position: relative; width: 132px; height: 132px; border-radius: 50%;
+  filter: drop-shadow(0 6px 14px rgba(26,58,107,.14));
+}
 .cmp-gauge-wrap canvas { width: 132px !important; height: 132px !important; }
 .cmp-gauge-center {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; pointer-events: none;
 }
-.cmp-gauge-pct { font-family: 'Rajdhani', sans-serif; font-size: 1.85rem; font-weight: 700; line-height: 1; color: #0f1e35; }
-.cmp-gauge-lbl { font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #8898b8; margin-top: 2px; }
+.cmp-gauge-pct { font-family: 'Rajdhani', sans-serif; font-size: 1.95rem; font-weight: 800; line-height: 1; color: #0f1e35; }
+.cmp-gauge-lbl { font-size: .64rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #8898b8; margin-top: 3px; }
 
-.cmp-years-row { display: flex; gap: 12px; margin: 14px 0 4px; }
+.cmp-years-row { display: flex; gap: 12px; margin: 16px 0 4px; }
 .cmp-year-card {
-  flex: 1; min-width: 0; padding: 11px 12px; border-radius: var(--r-md);
+  position: relative; flex: 1; min-width: 0; padding: 12px 13px 12px 15px; border-radius: var(--r-md);
   background: var(--surf-1, #f8fafd); border: 1px solid var(--surf-border-soft, #eef2f8);
+  box-shadow: 0 1px 3px rgba(26,58,107,.05);
+  transition: box-shadow .15s, transform .15s;
 }
-.cmp-year-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
-.cmp-year-num { font-family: 'Rajdhani', sans-serif; font-size: 1.05rem; font-weight: 700; color: #1a3050; }
+.cmp-year-card::before {
+  content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 100px;
+  background: linear-gradient(180deg, var(--blue-500), var(--blue-300));
+}
+.cmp-year-card--prev::before { background: var(--gray-300); }
+.cmp-year-card:hover { box-shadow: 0 4px 12px rgba(26,58,107,.1); transform: translateY(-1px); }
+.cmp-year-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.cmp-year-num { font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; font-weight: 800; color: #1a3050; letter-spacing: .01em; }
 .cmp-year-card--prev .cmp-year-num { color: #6680a0; }
 .cmp-year-tag { font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 2px 7px; border-radius: 100px; background: #eef4ff; color: #3a7ee8; }
 .cmp-year-tag--prev { background: rgba(100,116,139,.12); color: var(--gray-400); }
-.cmp-year-val { font-size: .95rem; font-weight: 800; color: #1a3050; margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-year-val { font-size: .98rem; font-weight: 800; color: #1a3050; margin-bottom: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmp-year-card--prev .cmp-year-val { color: #4a6080; }
 
 /* ── Modal config de meta ── */
@@ -3118,16 +3129,24 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 
 .compare-status-row {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
-  margin-top: 12px; padding: 12px;
+  margin-top: 14px; padding: 13px;
   border-radius: var(--r-md); background: var(--surf-1, #f8fafd);
   border: 1px solid var(--surf-border-soft, #eef2f8);
+  transition: background .2s, border-color .2s;
 }
+/* Fundo levemente colorido de acordo com o status — reforça visualmente
+   "passou ou não da meta" sem depender só da tag pequena. */
+.compare-status-row--ok   { background: #f2fbf7; border-color: rgba(21,150,102,.18); }
+.compare-status-row--warn { background: #fff8ef; border-color: rgba(194,112,10,.18); }
+.compare-status-row--over { background: #fdf2f2; border-color: rgba(194,58,58,.18); }
+.compare-status-row--none { background: var(--surf-1, #f8fafd); }
 .cmp-status-tag {
-  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
-  padding: 5px 11px; border-radius: 100px;
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 5px 12px; border-radius: 100px;
   font-size: .74rem; font-weight: 800;
   background: #eef2f8; color: #6680a0;
 }
+#cmp-status-icon { display: inline-flex; }
 .cmp-status-tag--ok   { background: #eafaf3; color: #159666; }
 .cmp-status-tag--warn { background: #fff3e6; color: #c2700a; }
 .cmp-status-tag--over { background: #fdeaea; color: #c23a3a; }
