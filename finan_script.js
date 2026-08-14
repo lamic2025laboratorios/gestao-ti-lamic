@@ -6743,8 +6743,6 @@ const App = {
       // 1) Limpa import anterior: movimentos auto OU legados (origem Compra/Envio) + itens auto
       await App._limparImportInterno();
 
-      let loteSeq = 0;
-
       // 2) Processa cada compra sequencialmente — 1 item de estoque por compra (lote),
       //    com código próprio. NÃO mescla por nome.
       for (const [rid, r] of compras) {
@@ -6756,7 +6754,6 @@ const App = {
           const subgrupo = r.subgrupo || '';
           const produto  = (r.descricao || App.reqSummary(r) || grupo).trim();
           const dataMov  = (r.shippedAt || r.boughtAt || (r.createdAt||'').substring(0,10) || new Date().toISOString().substring(0,10)).substring(0,10) + 'T00:00:00.000Z';
-          loteSeq++;
           const lote = App._gerarLote(r);
 
           // 1 item por compra → push gera código único (EST-xxxxx)
@@ -6948,19 +6945,22 @@ const App = {
 
   // ── Código de lote determinístico ───────────
   // Aceita request (groupName/unitName/seq) OU item manual (grupo/unidade).
-  // Padrão: PREFIX-diaCompra+diaEnvio-unidade+seq
-  // Formato: PREFIXO-{dia solicitação}{dia envio}-{nº solicitação}
+  // Formato: PREFIXOdiaSolicitaçãodiaEnvioNÚMERO — só letras e números, sem
+  // hífen. O NÚMERO é sempre algo único no sistema todo, pra nunca repetir:
+  // o seq da solicitação (SL-nº) quando o lote veio de uma compra — já é
+  // único e permanente, nunca reaproveitado. Sem solicitação associada
+  // (entrada/reposição cadastrada direto no Estoque, sem passar por uma
+  // solicitação), cai num trecho do timestamp da criação (base-36) — nunca
+  // colide entre 2 cliques reais, ao contrário de um contador que dependia
+  // da quantidade de movimentações na hora (esse sim repetia).
   _gerarLote(d = {}) {
     const prefix   = App._grupoPrefix(d.groupName || d.grupo);
     const diaSolic = (d.createdAt || d.boughtAt || '').substring(8,10) || '00';
     const diaEnvio = (d.shippedAt || '').substring(8,10) || '00';
-    let num;
-    if (d.seq != null && d.seq !== '') {
-      num = parseInt(d.seq) || d.seq;
-    } else {
-      num = Object.values(State.estoqueMov || {}).filter(m => m.tipo === 'entrada').length + 1;
-    }
-    return `${prefix}-${diaSolic}${diaEnvio}-${num}`;
+    const num = (d.seq != null && d.seq !== '')
+      ? (parseInt(d.seq) || d.seq)
+      : Date.now().toString(36).toUpperCase().slice(-5);
+    return `${prefix}${diaSolic}${diaEnvio}${num}`;
   },
 
   // Lote p/ exibição: usa formato novo; se faltar ou for LOTE-000N antigo, recalcula
@@ -8579,8 +8579,69 @@ const App = {
     return true;
   },
 
-  // Lote do brinde: mesmo número da compra + marca REF
-  _loteBrinde(lotePai) { return `${lotePai} REF`; },
+  // Brinde: mesmo código do lote que trouxe (a compra que gerou o brinde
+  // junto), com "REF" NA FRENTE — é a única situação em que 2 itens de
+  // estoque compartilham o mesmo código de propósito (o brinde referencia
+  // a compra-mãe, em vez de ganhar um código próprio).
+  _loteBrinde(lotePai) { return `REF${lotePai}`; },
+
+  // Agrupa itens de estoque por código de lote (ignora os de brinde, "REF...",
+  // que compartilham código de propósito) — devolve só os grupos com 2+ itens.
+  _agruparLotesDuplicados() {
+    const itens = Object.entries(State.estoque || {}).filter(([, it]) => it.lote && !/^REF/i.test(it.lote));
+    const porLote = {};
+    itens.forEach(([id, it]) => { (porLote[it.lote] = porLote[it.lote] || []).push([id, it]); });
+    const grupos = Object.values(porLote).filter(g => g.length > 1);
+    const total  = grupos.reduce((s, g) => s + g.length - 1, 0); // quantos vão trocar de código
+    return { grupos, total };
+  },
+
+  // Corrige lotes DUPLICADOS já existentes: o item mais antigo de cada grupo
+  // mantém o código atual; os demais recebem um código novo (já no formato
+  // sem hífen, único). Atualiza também a movimentação de entrada ligada pelo
+  // mesmo estoqueId, pra não sobrar o código antigo espalhado em 2 lugares.
+  // Não mexe em valor, quantidade nem em nenhuma outra movimentação.
+  async corrigirLotesDuplicados() {
+    const btn = document.getElementById('btn-corrigir-lotes');
+    const { grupos, total } = App._agruparLotesDuplicados();
+    if (!total) { toast('Nenhum lote duplicado encontrado.'); return; }
+    if (!confirm(`Encontrado(s) ${grupos.length} código(s) de lote duplicado(s), afetando ${total} item(ns).\n\nO item mais antigo de cada grupo mantém o código atual; os demais recebem um código novo (sem hífen, nunca repetido). Nenhum valor, quantidade ou movimentação é apagada — só o código do lote muda.\n\nCorrigir agora?`)) return;
+
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.innerHTML = 'Corrigindo…'; btn.disabled = true; }
+    try {
+      const todosLotes = new Set(Object.values(State.estoque || {}).map(it => it.lote).filter(Boolean));
+      const ops = [];
+      let n = 0;
+      grupos.forEach(grupo => {
+        grupo.sort((a, b) => (a[1].updatedAt || '').localeCompare(b[1].updatedAt || ''));
+        grupo.slice(1).forEach(([id, it]) => {
+          const req  = it.reqId ? (State.requests || {})[it.reqId] : null;
+          const base = req || { grupo: it.grupo, boughtAt: it.boughtAt, shippedAt: it.shippedAt };
+          let novo = App._gerarLote(base);
+          let tent = 0;
+          while (todosLotes.has(novo) && tent < 9) { tent++; novo = App._gerarLote(base) + tent; }
+          todosLotes.add(novo);
+
+          ops.push(DB.set(`estoque/${id}/lote`, novo));
+          Object.entries(State.estoqueMov || {})
+            .filter(([, m]) => m.estoqueId === id)
+            .forEach(([mid]) => ops.push(DB.set(`estoqueMov/${mid}/lote`, novo)));
+          n++;
+        });
+      });
+      await Promise.all(ops);
+      toast(`✓ ${n} lote(s) corrigido(s).`);
+      App._logActivity?.('Estoque', 'Lotes duplicados corrigidos', `${n} item(ns)`);
+      App.renderCodigosTab?.();
+      App.renderEstoque?.();
+    } catch (e) {
+      console.error('[lotes] erro ao corrigir duplicados', e);
+      toast('Erro ao corrigir lotes. Veja o console.', 'error');
+    } finally {
+      if (btn) { btn.innerHTML = orig; btn.disabled = false; }
+    }
+  },
 
   // Item de estoque que entrou como brinde de uma compra (badge de lote roxo)
   _isBrindeEstoque(item) {
