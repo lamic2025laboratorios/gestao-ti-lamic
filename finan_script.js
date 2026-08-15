@@ -6346,13 +6346,31 @@ const App = {
 
   // Remove itens de estoque auto-gerados por uma compra + seus movimentos + a flag.
   // Usado ao reverter uma solicitação que era Comprado (senão sobra estoque órfão).
+  // Quantas unidades JÁ SAÍRAM de um lote por consumo real (envio a partir do
+  // estoque, feito por outra solicitação) — ou seja, saídas que NÃO foram
+  // geradas pela própria compra (essas vêm com auto:true). É o que não pode
+  // ser apagado quando a entrada é reconstruída.
+  _saidasExternasDoLote(estoqueId) {
+    if (!estoqueId) return { movs: [], total: 0 };
+    const movs = Object.entries(State.estoqueMov || {})
+      .filter(([, m]) => m.estoqueId === estoqueId && m.tipo === 'saida' && !m.auto)
+      .map(([mid, m]) => ({ mid, ...m }));
+    return { movs, total: movs.reduce((s, m) => s + (parseFloat(m.qtd) || 0), 0) };
+  },
+
+  // Remove o item de estoque + movimentos gerados AUTOMATICAMENTE por uma
+  // compra, pra ela poder ser reconstruída. Preserva as saídas de consumo
+  // real (sem auto) — antes elas eram apagadas junto, e editar uma entrada
+  // apagava o histórico de tudo que já tinha saído daquele lote.
   async _removerEstoqueAutoDoReq(reqId) {
     const ops = [];
     Object.entries(State.estoque || {}).forEach(([eid, it]) => {
       if (it.reqId !== reqId || !it.auto) return;
       ops.push(DB.remove(`estoque/${eid}`));
       Object.entries(State.estoqueMov || {}).forEach(([mid, m]) => {
-        if (m.estoqueId === eid) ops.push(DB.remove(`estoqueMov/${mid}`));
+        if (m.estoqueId !== eid) return;
+        if (m.tipo === 'saida' && !m.auto) return;   // consumo real: não apaga
+        ops.push(DB.remove(`estoqueMov/${mid}`));
       });
     });
     ops.push(DB.remove(`requests/${reqId}/estoqueProcessado`));
@@ -8366,7 +8384,31 @@ const App = {
       if (prodSelEd && !prodSelEd.classList.contains('hidden')) prodSelEd.value = item.produto || '';
       else document.getElementById('estoque-produto').value = item.produto || '';
       document.getElementById('estoque-fornecedor').value = item.fornecedor || '';
-      document.getElementById('estoque-qtd').value       = item.quantidade != null ? item.quantidade : '';
+      // Item que veio de "Novo Item": o campo é a quantidade COMPRADA (o que
+      // entrou no lote), não o saldo atual — se já saiu coisa dele, os dois
+      // números são diferentes e mostrar o saldo aqui fazia a próxima gravação
+      // regravar a compra com o valor errado (ex.: comprou 50, saíram 8, o
+      // form abria com 42 e ao salvar a compra virava "42"). Item manual
+      // (sem solicitação) continua editando o saldo direto, que é o certo lá.
+      document.getElementById('estoque-qtd').value = ehNovoItem
+        ? (reqLig.quantidade != null ? reqLig.quantidade : (item.quantidade != null ? item.quantidade : ''))
+        : (item.quantidade != null ? item.quantidade : '');
+      // Deixa explícito na tela o que aquele número significa e, se o lote já
+      // teve consumo, quanto saiu / quanto restou — assim ninguém "corrige"
+      // a compra achando que o campo era o saldo.
+      const qtdLbl  = document.getElementById('estoque-qtd-label');
+      const qtdHint = document.getElementById('estoque-qtd-hint');
+      const jaSaiuEd = App._saidasExternasDoLote(id).total;
+      if (qtdLbl) qtdLbl.textContent = ehNovoItem ? 'Quantidade comprada *' : 'Quantidade (saldo) *';
+      if (qtdHint) {
+        if (ehNovoItem && jaSaiuEd > 0) {
+          qtdHint.style.display = '';
+          qtdHint.textContent = `Já saíram ${jaSaiuEd} un. deste lote · saldo atual ${item.quantidade != null ? item.quantidade : 0}. Informe aqui o total COMPRADO — o saldo é recalculado sozinho.`;
+        } else {
+          qtdHint.style.display = 'none';
+          qtdHint.textContent = '';
+        }
+      }
       const dEl = document.getElementById('estoque-data');
 
       if (ehNovoItem) {
@@ -8391,6 +8433,10 @@ const App = {
        'estoque-unidade-destino','estoque-valor','estoque-valor-total','estoque-parcelas-n','estoque-solicitante',
        'estoque-brinde-grupo','estoque-brinde-subgrupo','estoque-brinde-produto','estoque-brinde-qtd']
         .forEach(fid => { const el = document.getElementById(fid); if (el) el.value = ''; });
+      const qtdLblNovo  = document.getElementById('estoque-qtd-label');
+      const qtdHintNovo = document.getElementById('estoque-qtd-hint');
+      if (qtdLblNovo)  qtdLblNovo.textContent = 'Quantidade *';
+      if (qtdHintNovo) { qtdHintNovo.style.display = 'none'; qtdHintNovo.textContent = ''; }
       document.getElementById('chk-estoque-parcelas').checked = false;
       document.getElementById('estoque-parcelas-wrap').style.display = 'none';
       document.getElementById('chk-estoque-brinde').checked = false;
@@ -8907,11 +8953,44 @@ const App = {
         // valor, valorTotal, parcelas, formaPagamento: NÃO tocados (dinheiro travado)
       };
       await DB.update(`requests/${reqId}`, reqUpd);
-      // Reconstrói o lote: remove estoque auto antigo + flag, recria com dados novos
-      await App._removerEstoqueAutoDoReq(reqId);
-      if (State.requests?.[reqId]) State.requests[reqId].estoqueProcessado = null;  // evita race do listener
-      const rFull = { ...(State.requests || {})[reqId], ...reqUpd, status: 'Comprado', origemEstoque: true };
-      await App._processarCompraEstoque(reqId, rFull);
+
+      // Se o lote JÁ TEVE consumo real (alguma solicitação enviou item a
+      // partir dele), não dá pra derrubar e recriar: o item de estoque
+      // ganharia um id novo e todas essas saídas ficariam órfãs (foi assim
+      // que um lote de 50 pilhas com 8 enviadas virou "entrada de 42, zero
+      // saídas"). Nesse caso atualiza o lote NO LUGAR, mantendo o mesmo id:
+      // o histórico continua ligado e o saldo é recalculado como
+      // comprado − já saiu.
+      const eidExistente = Object.entries(State.estoque || {})
+        .find(([, it]) => it.reqId === reqId && it.auto)?.[0] || null;
+      const { total: jaSaiu } = App._saidasExternasDoLote(eidExistente);
+
+      if (eidExistente && jaSaiu > 0) {
+        const comprada = parseFloat(qtd) || 0;
+        const saldo    = Math.max(0, comprada - jaSaiu);
+        await DB.update(`estoque/${eidExistente}`, {
+          grupo, subgrupo, produto, fornecedor, quantidade: saldo,
+          updatedAt: new Date().toISOString()
+        });
+        // Realinha o movimento de ENTRADA (quantidade comprada) sem tocar nas saídas
+        const entradaMov = Object.entries(State.estoqueMov || {})
+          .find(([, m]) => m.estoqueId === eidExistente && m.tipo === 'entrada');
+        if (entradaMov) {
+          await DB.update(`estoqueMov/${entradaMov[0]}`, {
+            qtd: comprada, saldo: comprada, produto, grupo, subgrupo,
+            data: data + 'T00:00:00.000Z'
+          });
+        }
+        if (jaSaiu > comprada) {
+          toast(`Atenção: já saíram ${jaSaiu} un. deste lote, mais que as ${comprada} informadas.`, 'error');
+        }
+      } else {
+        // Sem consumo: reconstrói do zero, como antes.
+        await App._removerEstoqueAutoDoReq(reqId);
+        if (State.requests?.[reqId]) State.requests[reqId].estoqueProcessado = null;  // evita race do listener
+        const rFull = { ...(State.requests || {})[reqId], ...reqUpd, status: 'Comprado', origemEstoque: true };
+        await App._processarCompraEstoque(reqId, rFull);
+      }
 
       toast('✓ Entrada de estoque atualizada.');
       App.closeEstoqueForm();
