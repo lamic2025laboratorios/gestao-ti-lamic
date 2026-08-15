@@ -1433,6 +1433,16 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 }
 .form-modal-stripe { height: 4px; flex-shrink: 0; background: linear-gradient(90deg, #38bdf8, #0d6efd); }
 .form-modal-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+/* Altura padronizada dos pop-ups de listagem (Total Comprados/Negados/
+   Solicitado e Extrato de Compras): o tamanho passa a ser o mesmo em
+   Todos/Ano/Mês/Semana/Dia, independente de quantos registros o filtro
+   devolveu — antes, escolher "Dia" (com poucos ou nenhum lançamento)
+   encolhia a caixa inteira e a tela "pulava" a cada troca de período.
+   Continua crescendo até 90vh quando a lista é longa, e o min cede em
+   tela baixa (o vh do min() evita estourar em notebook pequeno). */
+#kpi-list-modal .modal-card.form-modal,
+#extrato-modal  .modal-card.form-modal { min-height: min(620px, 88vh); }
 .eqd-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .eqd-header-icon-box {
   width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
