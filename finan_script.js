@@ -1834,7 +1834,7 @@ const App = {
     ['filter-status','filter-unit-req','filter-group-req','filter-subgroup-req'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
-    ['req-filter-unit-vis','req-filter-group-vis','req-filter-subgroup-vis'].forEach(id => {
+    ['req-filter-unit-vis','req-filter-group-vis','req-filter-subgroup-vis','req-filter-modelo'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     // Reativa todos os chips rosca (escopado — .req-status-chip é reaproveitada
@@ -5305,11 +5305,20 @@ const App = {
     const fReqFrom = document.getElementById('req-date-from')?.value || '';
     const fReqTo   = document.getElementById('req-date-to')?.value   || '';
 
+    // Lido depois de _populateReqFilters(), que é quem monta/repovoa esse select
+    const fModelo = document.getElementById('req-filter-modelo')?.value || '';
+
     let reqs = Object.entries(State.requests||{});
     if (fStatus) reqs = reqs.filter(([,r]) => r.status===fStatus);
     if (fUnit)   reqs = reqs.filter(([,r]) => r.unitName===fUnit);
     if (fGroup)  reqs = reqs.filter(([,r]) => r.groupName===fGroup);
     if (fSubgroup) reqs = reqs.filter(([,r]) => r.subgrupo===fSubgroup);
+    // Modelo/Cor: compara sem diferenciar caixa/espaços — o mesmo modelo pode
+    // ter sido salvo como "EPSON L3250" numa solicitação e "Epson L3250" noutra.
+    if (fModelo) {
+      const alvo = fModelo.toLowerCase().trim();
+      reqs = reqs.filter(([,r]) => App._reqModeloValor(r).toLowerCase().trim() === alvo);
+    }
     if (fReqFrom || fReqTo) {
       reqs = reqs.filter(([,r]) => {
         const ds = (r.createdAt||'').substring(0,10);
@@ -6125,6 +6134,47 @@ const App = {
         const o=document.createElement('option'); o.value=o.textContent=sg; if(sg===cur)o.selected=true; fsg.appendChild(o);
       });
     }
+    App._populateReqFilterModelo();
+  },
+
+  // Modelo/Cor no filtro de Solicitações — só aparece quando o grupo escolhido
+  // tem sub-opções desse tipo (Tinta → cores, Pilhas/Conserto → modelos). Sem
+  // grupo escolhido, junta o que existir de todos os grupos, pra ainda dar pra
+  // buscar por um modelo específico sem precisar saber o grupo dele.
+  _populateReqFilterModelo() {
+    const sel  = document.getElementById('req-filter-modelo');
+    const wrap = document.getElementById('req-filter-modelo-wrap');
+    const lbl  = document.getElementById('req-filter-modelo-label');
+    if (!sel || !wrap) return;
+    const cur = sel.value;
+    const gSel = document.getElementById('filter-group-req')?.value || '';
+
+    const nomes = new Set();
+    let temCor = false, temModelo = false;
+    Object.entries(State.subOpts || {}).forEach(([gid, opts]) => {
+      const gname = State.groups?.[gid] || '';
+      if (gSel && gname !== gSel) return;
+      (opts?.cores   || []).forEach(v => { if (v) { nomes.add(v); temCor = true; } });
+      (opts?.modelos || []).forEach(v => { if (v) { nomes.add(v); temModelo = true; } });
+    });
+
+    if (!nomes.size) { wrap.style.display = 'none'; sel.value = ''; return; }
+    wrap.style.display = '';
+    if (lbl) lbl.textContent = (temCor && !temModelo) ? 'Cor' : (temModelo && !temCor) ? 'Modelo' : 'Modelo / Cor';
+    sel.innerHTML = '<option value="">Todos</option>';
+    [...nomes].sort((a, b) => a.localeCompare(b)).forEach(v => {
+      const o = document.createElement('option'); o.value = o.textContent = v;
+      if (v === cur) o.selected = true;
+      sel.appendChild(o);
+    });
+    if (sel.value !== cur) sel.value = [...nomes].includes(cur) ? cur : '';
+  },
+
+  // Valor de modelo/cor de uma solicitação, olhando todos os campos onde isso
+  // pode ter sido salvo ao longo do tempo (cor/cores da tinta, modelo/batModel
+  // da pilha, product do Conserto antigo, produto de entrada pelo Estoque).
+  _reqModeloValor(r) {
+    return (r.modelo || r.batModel || r.cor || r.cores || r.product || r.produto || '').toString();
   },
 
   reqSummary(r) {
