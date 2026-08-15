@@ -3575,6 +3575,21 @@ const App = {
     return n;
   },
 
+  // Mesmo problema do _inkCanonColor, mas pra Modelo (Conserto/Pilhas):
+  // solicitações antigas guardaram "EPSON L3250" e as novas "Epson L3250" —
+  // sem normalizar viram 2 baldes no gráfico "Por modelo". Casa com a lista
+  // cadastrada em Configurações (State.subOpts) ignorando caixa/espaços e
+  // devolve a grafia oficial. Modelo fora do cadastro fica como veio (só
+  // aparado) — não inventa nome que não existe.
+  _canonModelo(groupName, valor) {
+    const v = (valor || '').trim();
+    if (!v) return v;
+    const gid = Object.entries(State.groups || {}).find(([, n]) => n === groupName)?.[0];
+    const lista = gid ? ((State.subOpts?.[gid] || {}).modelos || []) : [];
+    const alvo = v.toLowerCase();
+    return lista.find(m => String(m).trim().toLowerCase() === alvo) || v;
+  },
+
   // Calcula tudo que os cards de consumo mostram (extraído do render pra poder
   // ser reusado também no popup de auditoria — mesmos números nos dois lugares,
   // sem duplicar a lógica). Não muda nenhuma conta, só separa cálculo de DOM.
@@ -3635,13 +3650,20 @@ const App = {
       // guardado com outro nome de campo por ter vindo de outra tela.
       // Fallback pro equipamento/subgrupo é só do Conserto (às vezes só tem o
       // equipamento marcado, sem "modelo" — cai pro subgrupo, ex. "Impressora").
-      let key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || r.produto || '').toString();
+      // r.product: Conserto cadastrado pelo fluxo ANTIGO (quando era subgrupo
+      // de "Outros") guarda o modelo aí em vez de em "modelo" — sem esse
+      // fallback essas solicitações caíam todas no balde do subgrupo
+      // ("Impressora") em vez de cada modelo Epson.
+      let key = (r[cfg.topField] || r[cfg.topField + 'es'] || r.batModel || r.produto || (kind === 'concerto' ? r.product : '') || '').toString();
       if (!key && kind === 'concerto') key = (r.equipamento || r.subgrupo || '').toString();
       if (!key) return;
       // Normaliza maiúscula/minúscula da cor da tinta — solicitações antigas
       // (ou sub-opção reconfigurada em outro momento) podem ter guardado
       // "azul" em vez de "Azul", virando um balde duplicado no gráfico.
       if (kind === 'ink') key = App._inkCanonColor(key);
+      // Mesma normalização pro Modelo (Conserto/Pilhas): "EPSON L3250" e
+      // "Epson L3250" precisam cair no MESMO balde.
+      if (kind === 'concerto' || kind === 'bat') key = App._canonModelo(r.groupName, key);
       // "Outros" é sempre por SOLICITAÇÃO (1 por pedido) — o que importa aqui é
       // qual subgrupo é mais PEDIDO, não quantas unidades vieram em cada pedido
       // (ex.: 1 pedido de 50 cabos não deve pesar mais que 50 pedidos de 1 item).
@@ -5945,7 +5967,7 @@ const App = {
   // Conserto identificadas com nomenclatura errada: SL-98 foi cadastrada
   // ANTES de "Conserto" virar grupo próprio (ficou em Outros/Concerto com o
   // defeito descrito no campo de modelo); SL-125/126/127 (compra combinada
-  // CMP-0005) têm o motivo salvo em caixa baixa (o pedido era caixa alta).
+  // CMP-0005) tinham o motivo salvo em caixa baixa (o pedido era caixa alta).
   // Cada campo só é escrito se o valor atual ainda não bater com o valor
   // final desejado — não mexe em valor, valorTotal nem parcelas.
   _consertoPontualFixFeito: false,
@@ -5953,28 +5975,50 @@ const App = {
     if (App._consertoPontualFixFeito) return;
     App._consertoPontualFixFeito = true;
     const reqs = State.requests || {};
+    // Só escreve o que ainda está diferente do alvo (idempotente de verdade:
+    // compara com o valor FINAL, não com o valor "errado" de origem — assim
+    // continua funcionando mesmo depois de uma correção parcial).
+    const fix = (id, campo, alvo) => {
+      const r = reqs[id];
+      if (r && r[campo] !== alvo) DB.set(`requests/${id}/${campo}`, alvo);
+    };
 
-    const r98 = reqs['-OuC8oke59DdydlEDdd_'];
-    if (r98 && r98.seq === 98 && r98.groupName === 'Outros' && r98.subgrupo === 'Concerto' && r98.product === 'IMPRESSORA COM DEFEITO') {
-      DB.set('requests/-OuC8oke59DdydlEDdd_/groupId',   '-OxB0wjCkXhd5_ZulAOb');
-      DB.set('requests/-OuC8oke59DdydlEDdd_/groupName', 'Conserto');
-      DB.set('requests/-OuC8oke59DdydlEDdd_/subgrupo',  'Impressora');
-      DB.set('requests/-OuC8oke59DdydlEDdd_/product',   'Epson L375');
-    }
+    const MOTIVO_RECOND = 'RECONDICIONAMENTO + TINTA PRETA + MANUTENÇÃO';
+    const alvos = {
+      '-OuC8oke59DdydlEDdd_': { seq: 98,  modelo: 'Epson L375',  reason: 'DEVIDO A UMA PANE, O TANQUE DE TINTA ESTOUROU BEM COMO O SENSOR APARENTA TER SIDO DANIFICADO' },
+      '-OxCp7C0Jc_DVET3IKbA': { seq: 125, modelo: 'Epson L3250', reason: MOTIVO_RECOND },
+      '-OxCp9XWgYJN2kReLSb3': { seq: 126, modelo: 'Epson L375',  reason: MOTIVO_RECOND },
+      '-OxCpDy6-nf6L4g0eFfE': { seq: 127, modelo: 'Epson L3250', reason: 'DESTRAVA E LIMPEZA DAS ALMOFADAS DE TINTA' }
+    };
+    Object.entries(alvos).forEach(([id, alvo]) => {
+      const r = reqs[id];
+      if (!r || r.seq !== alvo.seq) return;   // trava de segurança: só age no registro certo
+      fix(id, 'groupId',   '-OxB0wjCkXhd5_ZulAOb');
+      fix(id, 'groupName', 'Conserto');
+      fix(id, 'subgrupo',  'Impressora');
+      // modelo é o campo que o gráfico "Por modelo" lê; product fica como
+      // está (é o que a tela de Outros/WhatsApp/calendário ainda mostram).
+      fix(id, 'modelo',    alvo.modelo);
+      fix(id, 'reason',    alvo.reason);
+    });
+  },
 
-    const motivoOk = 'RECONDICIONAMENTO + TINTA PRETA + MANUTENÇÃO';
-    const r125 = reqs['-OxCp7C0Jc_DVET3IKbA'];
-    if (r125 && r125.seq === 125 && r125.reason && r125.reason !== motivoOk) {
-      DB.set('requests/-OxCp7C0Jc_DVET3IKbA/reason', motivoOk);
-    }
-    const r126 = reqs['-OxCp9XWgYJN2kReLSb3'];
-    if (r126 && r126.seq === 126 && r126.reason && r126.reason !== motivoOk) {
-      DB.set('requests/-OxCp9XWgYJN2kReLSb3/reason', motivoOk);
-    }
-    const r127 = reqs['-OxCpDy6-nf6L4g0eFfE'];
-    if (r127 && r127.seq === 127 && r127.reason === 'Destrava e limpeza das almofadas de tinta') {
-      DB.set('requests/-OxCpDy6-nf6L4g0eFfE/reason', 'DESTRAVA E LIMPEZA DAS ALMOFADAS DE TINTA');
-    }
+  // Solicitações de Conserto criadas pelo fluxo ANTIGO (quando Conserto ainda
+  // era um subgrupo de "Outros") guardam o modelo do equipamento em `product`,
+  // não em `modelo` — e o gráfico "Por modelo" do card Conserto lê `modelo`.
+  // Sem isso, essas solicitações caíam no fallback e apareciam todas juntas
+  // como "Impressora" (o subgrupo) em vez de cada modelo Epson. Copia
+  // product → modelo (mantendo product, que outras telas ainda usam).
+  // Idempotente: só escreve quem tem product e ainda não tem modelo.
+  _consertoModeloFixFeito: false,
+  _migrarModeloConserto() {
+    if (App._consertoModeloFixFeito) return;
+    App._consertoModeloFixFeito = true;
+    Object.entries(State.requests || {}).forEach(([id, r]) => {
+      if (!r || !App._isConserto((r.groupName || '').toLowerCase())) return;
+      if (r.modelo || !r.product) return;
+      DB.set(`requests/${id}/modelo`, r.product);
+    });
   },
 
   // Puxa o gestor legado (número único antigo em config.gestorWhats) pra dentro
@@ -9227,6 +9271,7 @@ const App = {
       State.requests=v||{};
       App._migrarNomeConsertoRequests?.();
       App._migrarSolicitacoesConsertoPontuais?.();
+      App._migrarModeloConserto?.();
       App.updatePendingBadge();
       App.populateDashFilters();
       if (State.adminUser) {
