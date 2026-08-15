@@ -6071,6 +6071,92 @@ const App = {
     });
   },
 
+  // ── Reparo pontual: lote de Pilha AA (SL-120) ────────────────────────────
+  // O bug de "editar entrada apaga o histórico" (corrigido em _removerEstoque
+  // AutoDoReq/_updateEstoqueComoCompra) destruiu o rastro deste lote:
+  //  · a compra era de 50 un. (valorTotal 50,00 a R$1,00) mas a solicitação
+  //    ficou com quantidade "42" (o saldo da época gravado como se fosse a
+  //    quantidade comprada);
+  //  · as 2 saídas por consumo real foram apagadas — SL-116 (6 un. p/ Unidade
+  //    16, 08/07) e SL-130 (2 un. p/ Unidade 97, 18/07);
+  //  · o item de estoque foi recriado com id novo, então as duas solicitações
+  //    ainda apontam pro id antigo (-OwT9GA9o9vfAfRjtgg1), que não existe mais.
+  // Confere: 50 − 6 − 2 = 42, exatamente o saldo atual do lote.
+  // Idempotente: cada parte só roda se ainda estiver faltando, e a trava de
+  // segurança exige que o lote esteja no estado exato descrito acima.
+  _pilhaAAFixFeito: false,
+  async _repararLotePilhaAA() {
+    if (App._pilhaAAFixFeito) return;
+
+    const EST_ID   = '-OzQqh_0ESQqGjWKmkSp';   // item de estoque atual (Pilha AA)
+    const REQ_COMPRA = '-OwT9G71jaY_pNNLlNUN'; // SL-120 (a compra)
+    // Os 3 nós são carregados por listeners diferentes, e 'requests' chega
+    // antes de 'estoque'/'estoqueMov'. Sem dados ainda, sai SEM marcar a trava
+    // — senão a primeira chamada (com o estoque vazio) queimaria a única
+    // tentativa da sessão. Quem chamar de novo depois é que executa.
+    if (!Object.keys(State.estoque || {}).length)    return;
+    if (!Object.keys(State.estoqueMov || {}).length) return;
+    if (!Object.keys(State.requests || {}).length)   return;
+
+    const item = (State.estoque || {})[EST_ID];
+    const rCompra = (State.requests || {})[REQ_COMPRA];
+    if (!item || !rCompra || rCompra.seq !== 120) { App._pilhaAAFixFeito = true; return; }  // não é o cenário esperado
+    if (String(item.produto || '').toLowerCase() !== 'pilha aa') { App._pilhaAAFixFeito = true; return; }
+    App._pilhaAAFixFeito = true;
+
+    const saidas = [
+      { reqId: '-Ovu_HlbXHBWUmitI5nj', seq: 116, qtd: 6, destino: 'Unidade 16', data: '2026-07-08', saldo: 44 },
+      { reqId: '-OxkNc4WPiTzA_7yJWqC', seq: 130, qtd: 2, destino: 'Unidade 97', data: '2026-07-18', saldo: 42 }
+    ];
+
+    const ops = [];
+
+    // Passo 1: quantidade COMPRADA volta a ser 50 (valor/valorTotal/parcelas intactos)
+    if (rCompra.quantidade !== '50') ops.push(DB.set(`requests/${REQ_COMPRA}/quantidade`, '50'));
+
+    // Passo 2: movimento de ENTRADA volta a refletir as 50 compradas
+    const entradaMov = Object.entries(State.estoqueMov || {})
+      .find(([, m]) => m.estoqueId === EST_ID && m.tipo === 'entrada');
+    if (entradaMov && (parseFloat(entradaMov[1].qtd) || 0) !== 50) {
+      ops.push(DB.update(`estoqueMov/${entradaMov[0]}`, { qtd: 50, saldo: 50 }));
+    }
+
+    // Passo 3: recria as saídas que sumiram e reaponta as solicitações pro item atual
+    for (const s of saidas) {
+      const r = (State.requests || {})[s.reqId];
+      if (!r || r.seq !== s.seq) continue;
+      const jaExiste = Object.values(State.estoqueMov || {}).some(m =>
+        m.estoqueId === EST_ID && m.tipo === 'saida' && m.reqId === s.reqId);
+      if (jaExiste) continue;
+
+      const movRef = DB.push('estoqueMov', {
+        tipo: 'saida',
+        produto: item.produto, grupo: item.grupo, subgrupo: item.subgrupo, unidade: 'un',
+        qtd: s.qtd, saldo: s.saldo,
+        origem: `Solicitação (estoque) · ${r.groupName || ''}`,
+        lote: item.lote || null,
+        destino: s.destino,
+        auto: false,
+        estoqueId: EST_ID,
+        reqId: s.reqId,
+        data: s.data + 'T00:00:00.000Z'
+      });
+      ops.push(movRef);
+      await movRef;
+      // Solicitação volta a apontar pro item/movimento que existem de fato
+      ops.push(DB.update(`requests/${s.reqId}`, { estoqueItemId: EST_ID, estoqueMovId: movRef.key }));
+    }
+
+    if (!ops.length) return;
+    try {
+      await Promise.all(ops);
+      App._logActivity?.('Estoque', 'Histórico do lote de Pilha AA restaurado', 'SL-120 · 50 un. · saídas SL-116 e SL-130');
+      App.renderEstoque?.();
+    } catch (e) {
+      console.error('[reparo Pilha AA] erro', e);
+    }
+  },
+
   // Puxa o gestor legado (número único antigo em config.gestorWhats) pra dentro
   // de config/gestores, virando um item normal e deletável no Config. Idempotente.
   _migrarGestorLegacy() {
@@ -9489,6 +9575,7 @@ const App = {
       App._migrarNomeConsertoRequests?.();
       App._migrarSolicitacoesConsertoPontuais?.();
       App._migrarModeloConserto?.();
+      App._repararLotePilhaAA?.();
       App.updatePendingBadge();
       App.populateDashFilters();
       if (State.adminUser) {
@@ -9508,6 +9595,9 @@ const App = {
     });
     safeListener('estoqueMov', v => {
       State.estoqueMov = v || {};
+      // Último dos 3 nós que o reparo do lote de Pilha AA precisa (requests
+      // chega antes de estoque/estoqueMov) — daqui ele consegue rodar de fato.
+      App._repararLotePilhaAA?.();
       const tab = document.querySelector('.tab-panel.active');
       if (tab?.id === 'tab-estoque') App.renderEstoque();
       if (tab?.id === 'tab-settings') App.renderCodigosTab();
