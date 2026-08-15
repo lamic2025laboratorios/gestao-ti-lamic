@@ -8291,18 +8291,19 @@ const App = {
         <div class="mov-detail-grid">${linhas}</div>
       </div>`;
 
+    // Solicitação ligada: reqId direto no movimento → item de estoque
+    // (_movReq) → varredura por destino/data (só saída, movimento legado).
+    const reqIdLegado = App._acharReqPorMov(x);
+    const r = App._movReq(x) || (reqIdLegado ? (State.requests || {})[reqIdLegado] : null);
     let solHtml = '';
-    const reqId = x.reqId || App._acharReqPorMov(x);
-    if (reqId) {
-      const r = State.requests[reqId];
-      if (r) {
-        solHtml = bloco('Solicitação vinculada', `
-          <div><span>Unidade</span><strong>${r.unitName || '—'}</strong></div>
-          <div><span>Status</span><strong>${r.status || '—'}</strong></div>
-          <div><span>Resumo</span><strong>${App.reqSummary(r)}</strong></div>
-          <div><span>Solicitado em</span><strong>${App._fmtDate(r.createdAt)}</strong></div>
-          <div><span>Enviado em</span><strong>${r.shippedAt ? App._fmtDate(r.shippedAt) : '—'}</strong></div>`);
-      }
+    if (r) {
+      solHtml = bloco('Solicitação vinculada', `
+        <div><span>Solicitação</span><strong>${r.seq != null ? `<span class="req-seq-badge">SL-${r.seq}</span>` : '—'}</strong></div>
+        <div><span>Unidade</span><strong>${r.unitName || '—'}</strong></div>
+        <div><span>Status</span><strong>${r.status || '—'}</strong></div>
+        <div><span>Resumo</span><strong>${App.reqSummary(r)}</strong></div>
+        <div><span>Solicitado em</span><strong>${App._fmtDate(r.createdAt)}</strong></div>
+        <div><span>Enviado em</span><strong>${r.shippedAt ? App._fmtDate(r.shippedAt) : '—'}</strong></div>`);
     }
 
     // Fonte do estoque (só saída) — de qual lote/compra o item saiu, p/ mapeamento
