@@ -8354,8 +8354,17 @@ const App = {
         </div>`;
     }
 
+    // Na SAÍDA, quando existem os dois blocos de contexto (solicitação
+    // vinculada + origem no estoque), eles ficam LADO A LADO numa linha só —
+    // assim o histórico embaixo pega a largura inteira e cabe mais cartão sem
+    // rolar. Com um bloco só (ou na entrada, que não tem "origem no estoque"),
+    // ele ocupa a linha inteira normalmente.
+    const topoHtml = (solHtml && fonteHtml)
+      ? `<div class="mov-detail-topo">${solHtml}${fonteHtml}</div>`
+      : `${solHtml}${fonteHtml}`;
+
     const mainHtml = (solHtml || fonteHtml)
-      ? `${solHtml}${fonteHtml}${histHtml}`
+      ? `${topoHtml}${histHtml}`
       : `${histHtml || '<div class="mov-detail-empty">Movimento manual — sem solicitação vinculada.</div>'}`;
 
     // A data do movimento fica logo abaixo do rótulo ENTRADA/SAÍDA, dentro do

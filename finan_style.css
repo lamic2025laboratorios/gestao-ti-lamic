@@ -1701,6 +1701,13 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .mov-detail-grid span { color: #6680a0; }
 .mov-detail-grid strong { color: #1a3a6b; text-align: right; }
 
+/* Saída: "Solicitação vinculada" e "Origem no estoque" lado a lado numa
+   linha só, pra sobrar a largura inteira pro histórico logo abaixo. Em tela
+   estreita voltam a empilhar. */
+.mov-detail-topo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.mov-detail-topo > .mov-detail-sol { margin: 0; min-width: 0; }
+@media (max-width: 700px) { .mov-detail-topo { grid-template-columns: 1fr; } }
+
 /* Data do movimento dentro do painel escuro, logo abaixo do rótulo
    ENTRADA/SAÍDA (substituiu os 2 cartões de data que ficavam no rodapé). */
 .mov-side-data {
@@ -1720,7 +1727,7 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .mov-hist-saidas-total { font-size: .72rem; font-weight: 700; color: #c9807f; }
 .mov-hist-saidas-list {
   display: flex; flex-direction: column; gap: 7px;
-  max-height: 240px; overflow-y: auto; padding-right: 4px;
+  max-height: 320px; overflow-y: auto; padding-right: 4px;
 }
 .mov-hist-saidas-list::-webkit-scrollbar { width: 7px; }
 .mov-hist-saidas-list::-webkit-scrollbar-thumb { background: #edc3c3; border-radius: 100px; }
