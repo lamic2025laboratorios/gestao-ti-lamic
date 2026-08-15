@@ -1704,12 +1704,20 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 /* Saída: "Solicitação vinculada" e "Origem no estoque" lado a lado numa
    linha só, pra sobrar a largura inteira pro histórico logo abaixo. Em tela
    estreita voltam a empilhar. */
-/* align-items:stretch (padrão do grid, explícito aqui) faz os dois cards
-   terminarem na mesma altura mesmo tendo nº de linhas diferente — o de
-   Origem no estoque tem 3 campos e o de Solicitação vinculada 5. */
-.mov-detail-topo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
-.mov-detail-topo > .mov-detail-sol { margin: 0; min-width: 0; display: flex; flex-direction: column; }
-@media (max-width: 700px) { .mov-detail-topo { grid-template-columns: 1fr; } }
+/* Saída: "Solicitação vinculada" e "Origem no estoque" dentro do MESMO card,
+   lado a lado, com uma linha divisória no meio. Como é um card só, os dois
+   lados terminam sempre na mesma altura, mesmo tendo nº de campos diferente
+   (5 x 3). Com um bloco só, o card sai sem divisor e ocupa tudo. */
+.mov-detail-topo.tem-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0; align-items: stretch; padding: 0; }
+.mov-detail-topo.tem-2 > .mov-detail-bloco { padding: 12px 14px; min-width: 0; }
+/* A linha do meio é a borda do primeiro bloco — como os 2 são células do
+   mesmo grid com align-items:stretch, ela vai de ponta a ponta e os dois
+   lados terminam na mesma altura. */
+.mov-detail-topo.tem-2 > .mov-detail-bloco:first-child { border-right: 1px solid #c5d8f7; }
+@media (max-width: 700px) {
+  .mov-detail-topo.tem-2 { grid-template-columns: 1fr; }
+  .mov-detail-topo.tem-2 > .mov-detail-bloco:first-child { border-right: none; border-bottom: 1px solid #c5d8f7; }
+}
 
 /* Data do movimento dentro do painel escuro, logo abaixo do rótulo
    ENTRADA/SAÍDA (substituiu os 2 cartões de data que ficavam no rodapé). */

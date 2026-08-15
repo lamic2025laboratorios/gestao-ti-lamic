@@ -8282,22 +8282,26 @@ const App = {
       : (x.destino || '—');
 
     // Liga à solicitação (saída via pedido)
+    // Miolo (título + linhas) de cada bloco de contexto — gerado sem o card
+    // em volta, porque quando os dois existem eles entram no MESMO card,
+    // separados por uma linha divisória no meio.
+    const bloco = (titulo, linhas) => `
+      <div class="mov-detail-bloco">
+        <div class="mov-detail-sol-title">${titulo}</div>
+        <div class="mov-detail-grid">${linhas}</div>
+      </div>`;
+
     let solHtml = '';
     const reqId = x.reqId || App._acharReqPorMov(x);
     if (reqId) {
       const r = State.requests[reqId];
       if (r) {
-        solHtml = `
-          <div class="mov-detail-sol">
-            <div class="mov-detail-sol-title">Solicitação vinculada</div>
-            <div class="mov-detail-grid">
-              <div><span>Unidade</span><strong>${r.unitName || '—'}</strong></div>
-              <div><span>Status</span><strong>${r.status || '—'}</strong></div>
-              <div><span>Resumo</span><strong>${App.reqSummary(r)}</strong></div>
-              <div><span>Solicitado em</span><strong>${App._fmtDate(r.createdAt)}</strong></div>
-              <div><span>Enviado em</span><strong>${r.shippedAt ? App._fmtDate(r.shippedAt) : '—'}</strong></div>
-            </div>
-          </div>`;
+        solHtml = bloco('Solicitação vinculada', `
+          <div><span>Unidade</span><strong>${r.unitName || '—'}</strong></div>
+          <div><span>Status</span><strong>${r.status || '—'}</strong></div>
+          <div><span>Resumo</span><strong>${App.reqSummary(r)}</strong></div>
+          <div><span>Solicitado em</span><strong>${App._fmtDate(r.createdAt)}</strong></div>
+          <div><span>Enviado em</span><strong>${r.shippedAt ? App._fmtDate(r.shippedAt) : '—'}</strong></div>`);
       }
     }
 
@@ -8306,15 +8310,10 @@ const App = {
     if (!isEnt) {
       const f = App._movFonteEstoque(x);
       if (f.lote || f.compra || f.entradaData) {
-        fonteHtml = `
-          <div class="mov-detail-sol">
-            <div class="mov-detail-sol-title">Origem no estoque</div>
-            <div class="mov-detail-grid">
-              <div><span>Lote</span><strong>${f.lote || '—'}</strong></div>
-              <div><span>Compra</span><strong>${f.compra || '—'}</strong></div>
-              <div><span>Entrada em</span><strong>${f.entradaData ? App._fmtDate(f.entradaData) : '—'}</strong></div>
-            </div>
-          </div>`;
+        fonteHtml = bloco('Origem no estoque', `
+          <div><span>Lote</span><strong>${f.lote || '—'}</strong></div>
+          <div><span>Compra</span><strong>${f.compra || '—'}</strong></div>
+          <div><span>Entrada em</span><strong>${f.entradaData ? App._fmtDate(f.entradaData) : '—'}</strong></div>`);
       }
     }
     // Histórico de Saídas deste mesmo lote — toda retirada já feita dele,
@@ -8354,16 +8353,17 @@ const App = {
         </div>`;
     }
 
-    // Na SAÍDA, quando existem os dois blocos de contexto (solicitação
-    // vinculada + origem no estoque), eles ficam LADO A LADO numa linha só —
-    // assim o histórico embaixo pega a largura inteira e cabe mais cartão sem
-    // rolar. Com um bloco só (ou na entrada, que não tem "origem no estoque"),
-    // ele ocupa a linha inteira normalmente.
-    const topoHtml = (solHtml && fonteHtml)
-      ? `<div class="mov-detail-topo">${solHtml}${fonteHtml}</div>`
-      : `${solHtml}${fonteHtml}`;
+    // Na SAÍDA os dois blocos de contexto (solicitação vinculada + origem no
+    // estoque) ficam dentro de UM ÚNICO card, lado a lado, com uma linha
+    // divisória no meio separando os dois — assim o histórico embaixo pega a
+    // largura inteira e cabe mais cartão sem rolar. Com um bloco só (ou na
+    // entrada, que não tem "origem no estoque") o card sai sem divisor.
+    const temTopo = !!(solHtml || fonteHtml);
+    const topoHtml = temTopo
+      ? `<div class="mov-detail-sol mov-detail-topo${(solHtml && fonteHtml) ? ' tem-2' : ''}">${solHtml}${fonteHtml}</div>`
+      : '';
 
-    const mainHtml = (solHtml || fonteHtml)
+    const mainHtml = temTopo
       ? `${topoHtml}${histHtml}`
       : `${histHtml || '<div class="mov-detail-empty">Movimento manual — sem solicitação vinculada.</div>'}`;
 
