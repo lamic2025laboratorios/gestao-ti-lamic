@@ -8232,26 +8232,37 @@ const App = {
       }
     }
     // Histórico de Saídas deste mesmo lote — toda retirada já feita dele,
-    // indo subtraindo (data/hora, pra onde, quanto saiu, quanto restou).
-    // Aparece tanto abrindo pela Entrada quanto por qualquer Saída puxada
-    // do mesmo lote (as 2 usam o mesmo estoqueId).
+    // indo subtraindo (data/hora, pra onde, quanto saiu, quanto restou), em
+    // cartões clicáveis com scroll próprio (a lista cresce a cada nova
+    // movimentação; o pop-up não pode crescer junto). Aparece tanto abrindo
+    // pela Entrada quanto por qualquer Saída do mesmo lote (mesmo estoqueId),
+    // e o cartão da saída que está aberta agora fica destacado.
     const saidasDoItem = App._movSaidasDoItem(x.estoqueId);
     let histHtml = '';
     if (saidasDoItem.length) {
+      const totalSaiu = saidasDoItem.reduce((s, m) => s + (parseFloat(m.qtd) || 0), 0);
       histHtml = `
         <div class="mov-detail-sol mov-hist-saidas">
-          <div class="mov-detail-sol-title">Histórico de Saídas deste Lote</div>
+          <div class="mov-detail-sol-title">
+            Histórico de Saídas deste Lote
+            <span class="mov-hist-saidas-total">${saidasDoItem.length} saída${saidasDoItem.length === 1 ? '' : 's'} · −${totalSaiu} un.</span>
+          </div>
           <div class="mov-hist-saidas-list">
             ${saidasDoItem.map(m => {
               const hora = App._fmtHora(m.data);
-              return `<div class="mov-hist-saida-row">
-                <div class="mov-hist-saida-data">${App._fmtDate(m.data)}${hora ? ' · ' + hora : ''}</div>
-                <div class="mov-hist-saida-info">
+              const atual = m.mid && x.movId && m.mid === x.movId;
+              const idxNoCache = App._idxNoCachePorMovId('saida', m.mid);
+              const onClick = (idxNoCache != null && !atual) ? ` onclick="App.openMovDetail('saida', ${idxNoCache})"` : '';
+              return `<button type="button" class="mov-hist-saida-card${atual ? ' is-atual' : ''}"${onClick}${atual ? ' disabled' : ''} title="${atual ? 'Movimentação aberta agora' : 'Abrir o detalhe desta saída'}">
+                <span class="mov-hist-saida-topo">
+                  <span class="mov-hist-saida-data">${App._fmtDate(m.data)}${hora ? ' · ' + hora : ''}</span>
                   <span class="mov-hist-saida-qtd">−${m.qtd} ${m.unidade || ''}</span>
-                  <span class="mov-hist-saida-dest">→ ${m.destino || '—'}</span>
-                </div>
-                <div class="mov-hist-saida-saldo">restou ${m.saldo != null ? m.saldo : '—'}</div>
-              </div>`;
+                </span>
+                <span class="mov-hist-saida-base">
+                  <span class="mov-hist-saida-dest">${m.destino || '—'}</span>
+                  <span class="mov-hist-saida-saldo">restou ${m.saldo != null ? m.saldo : '—'}</span>
+                </span>
+              </button>`;
             }).join('')}
           </div>
         </div>`;
@@ -8259,20 +8270,18 @@ const App = {
 
     const mainHtml = (solHtml || fonteHtml)
       ? `${solHtml}${fonteHtml}${histHtml}`
-      : `<div class="mov-detail-empty">Movimento manual — sem solicitação vinculada.</div>${histHtml}`;
+      : `${histHtml || '<div class="mov-detail-empty">Movimento manual — sem solicitação vinculada.</div>'}`;
 
-    // Datas de referência: entrada (verde) e saída (laranja) — sempre no final, full-width
-    const { dEnt, dSai } = App._movDatasRef(x);
-    const datasHtml = `
-      <div class="mov-detail-datas">
-        <div class="mov-data-ref entrada"><span>Data de entrada</span><strong>${dEnt ? App._fmtDate(dEnt) : '—'}</strong></div>
-        <div class="mov-data-ref saida"><span>Data de saída</span><strong>${dSai ? App._fmtDate(dSai) : '—'}</strong></div>
-      </div>`;
-
+    // A data do movimento fica logo abaixo do rótulo ENTRADA/SAÍDA, dentro do
+    // painel escuro — os 2 cartões "Data de entrada / Data de saída" que
+    // ficavam numa faixa no rodapé saíram (repetiam informação e empurravam o
+    // histórico pra fora da área visível).
+    const horaMov = App._fmtHora(x.data);
     document.getElementById('mov-detail-body').innerHTML = `
       <div class="audit-grid">
         <div class="audit-side">
           <span class="audit-side-tag ${isEnt ? 'mov-ent' : 'mov-sai'}">${isEnt ? 'ENTRADA' : 'SAÍDA'}</span>
+          <div class="mov-side-data">${App._fmtDate(x.data)}${horaMov ? ' · ' + horaMov : ''}</div>
           <div class="audit-side-big">${isEnt ? '+' : '−'}${x.qtd} <small>${x.unidade || ''}</small></div>
           <div class="audit-side-lbl">Produto</div>
           <div class="audit-side-produto">${x.produto || '—'}</div>
@@ -8280,18 +8289,27 @@ const App = {
           <div class="audit-side-row"><span>Grupo</span><strong>${x.grupo || '—'}</strong></div>
           <div class="audit-side-row"><span>Subgrupo</span><strong>${x.subgrupo || '—'}</strong></div>
           <div class="audit-side-row"><span>Saldo após</span><strong>${x.saldo != null ? x.saldo : '—'}</strong></div>
-          <div class="audit-side-row"><span>Data</span><strong>${App._fmtDate(x.data)}</strong></div>
           <div class="audit-side-row"><span>${isEnt ? 'Lote' : 'Destino'}</span><strong>${loteOuDestino}</strong></div>
           <div class="audit-side-row"><span>Origem</span><strong>${x.origem || '—'}</strong></div>
         </div>
         <div class="audit-main">${mainHtml}</div>
-      </div>
-      ${datasHtml}`;
+      </div>`;
     document.getElementById('mov-detail-date-btn').style.display = x.movId ? '' : 'none';
     const delBtn = document.getElementById('mov-detail-del-btn');
     if (delBtn) delBtn.style.display = x.movId ? '' : 'none';
     document.getElementById('mov-detail-modal').classList.remove('hidden');
   },
+  // Índice de um movimento dentro do cache da aba (o mesmo _idx que os botões
+  // "Ver" usam) a partir do id dele — pra um cartão do histórico conseguir
+  // abrir o detalhe daquela saída. null quando o movimento não está no cache
+  // (filtro de grupo ativo, por exemplo): aí o cartão fica só informativo.
+  _idxNoCachePorMovId(tipo, movId) {
+    if (!movId) return null;
+    const lista = App._movCache[tipo] || [];
+    const achado = lista.find(m => m.movId === movId);
+    return achado && achado._idx != null ? achado._idx : null;
+  },
+
   // Todas as saídas já feitas de um mesmo item de estoque (lote), mais
   // antiga primeiro — a "vida" daquele lote sendo consumido aos poucos.
   _movSaidasDoItem(estoqueId) {

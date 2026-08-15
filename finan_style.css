@@ -1701,22 +1701,49 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .mov-detail-grid span { color: #6680a0; }
 .mov-detail-grid strong { color: #1a3a6b; text-align: right; }
 
-/* Histórico de Saídas deste Lote — abaixo de .mov-detail-sol, vermelho leve,
-   "indo subtraindo" (cada linha mostra quanto saiu e quanto restou). Aparece
-   tanto abrindo pela Entrada quanto por qualquer Saída puxada do mesmo lote. */
-.mov-hist-saidas { background: #fff5f5; border-color: #f8caca; }
-.mov-hist-saidas .mov-detail-sol-title { color: #b13a3a; }
-.mov-hist-saidas-list { display: flex; flex-direction: column; gap: 0; max-height: 220px; overflow-y: auto; }
-.mov-hist-saida-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 8px 2px; border-bottom: 1px dashed #f3d3d3; font-size: .8rem;
+/* Data do movimento dentro do painel escuro, logo abaixo do rótulo
+   ENTRADA/SAÍDA (substituiu os 2 cartões de data que ficavam no rodapé). */
+.mov-side-data {
+  margin-top: 6px; font-size: .78rem; font-weight: 700; letter-spacing: .01em;
+  color: rgba(255,255,255,.72);
 }
-.mov-hist-saida-row:last-child { border-bottom: none; }
-.mov-hist-saida-data { color: #b88; font-size: .74rem; font-weight: 600; flex-shrink: 0; min-width: 108px; }
-.mov-hist-saida-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
-.mov-hist-saida-qtd { color: #c23a3a; font-weight: 800; }
-.mov-hist-saida-dest { color: #8898b8; font-size: .74rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mov-hist-saida-saldo { color: #6680a0; font-size: .74rem; font-weight: 600; text-align: right; flex-shrink: 0; }
+
+/* Histórico de Saídas deste Lote — abaixo de .mov-detail-sol, vermelho leve,
+   "indo subtraindo" (cada cartão mostra quanto saiu e quanto restou). Aparece
+   tanto abrindo pela Entrada quanto por qualquer Saída do mesmo lote. A lista
+   cresce a cada movimentação, então ela rola por dentro em vez de esticar o
+   pop-up. */
+.mov-hist-saidas { background: #fff5f5; border-color: #f8caca; }
+.mov-hist-saidas .mov-detail-sol-title {
+  color: #b13a3a; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+}
+.mov-hist-saidas-total { font-size: .72rem; font-weight: 700; color: #c9807f; }
+.mov-hist-saidas-list {
+  display: flex; flex-direction: column; gap: 7px;
+  max-height: 240px; overflow-y: auto; padding-right: 4px;
+}
+.mov-hist-saidas-list::-webkit-scrollbar { width: 7px; }
+.mov-hist-saidas-list::-webkit-scrollbar-thumb { background: #edc3c3; border-radius: 100px; }
+.mov-hist-saidas-list::-webkit-scrollbar-track { background: transparent; }
+
+.mov-hist-saida-card {
+  display: flex; flex-direction: column; gap: 4px; width: 100%;
+  padding: 9px 11px; border-radius: 9px;
+  border: 1.5px solid #f3d3d3; background: #fff;
+  font-family: inherit; text-align: left; cursor: pointer;
+  transition: border-color .15s var(--ease), box-shadow .15s var(--ease), transform .15s var(--ease);
+}
+.mov-hist-saida-card:hover:not(:disabled) {
+  border-color: #e58a8a; box-shadow: 0 3px 10px rgba(194,58,58,.16); transform: translateY(-1px);
+}
+.mov-hist-saida-card:disabled { cursor: default; }
+/* Cartão da saída que está aberta agora — some o efeito de clique e destaca */
+.mov-hist-saida-card.is-atual { background: #fdeaea; border-color: #e58a8a; }
+.mov-hist-saida-topo, .mov-hist-saida-base { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mov-hist-saida-data { color: #a06a6a; font-size: .74rem; font-weight: 700; }
+.mov-hist-saida-qtd { color: #c23a3a; font-weight: 800; font-size: .84rem; white-space: nowrap; }
+.mov-hist-saida-dest { color: #4a6080; font-size: .78rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mov-hist-saida-saldo { color: #6680a0; font-size: .73rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 
 /* Movimentações (legado) */
 .estoque-mov-filter { display: inline-flex; gap: 0; margin-left: auto; border: 1.5px solid #d0d9ea; border-radius: 8px; overflow: hidden; }
