@@ -690,15 +690,29 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 /* ── Filtro padronizado (Estoque + Solicitações): mesma grade de campo
    rotulado (label em cima, controle embaixo), reaproveitada nos dois —
    antes eram visuais bem diferentes (popover minúsculo x painel corrido). ── */
-.filt-panel { min-width: 300px; }
-.filt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+.filt-panel { min-width: 280px; box-sizing: border-box; }
+/* Painel de filtro de SOLICITAÇÕES — largura fluida: nunca passa da janela
+   (com folga pras bordas) e nunca fica menor que o mínimo legível. A largura
+   vinha fixa em px no HTML e estourava em tela menor, cortando as pontas e
+   criando scroll horizontal. Escopado ao #req-filter-panel de propósito: a
+   mesma classe .filt-panel é usada no popover de filtro do Estoque, que é
+   estreito e se ajusta ao conteúdo — não pode herdar essa largura. */
+#req-filter-panel .filt-panel { width: min(900px, calc(100vw - 48px)); padding: 16px 18px; }
+.filt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px 16px; }
 .filt-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .filt-field-full { grid-column: 1 / -1; }
+/* Intervalo de datas ocupa 2 colunas: são 2 calendários + a seta no meio,
+   não cabe na mesma largura de um select simples. */
+.filt-field-wide { grid-column: span 2; }
 .filt-field > label { font-size: .66rem; font-weight: 800; letter-spacing: .06em; color: #8898b8; text-transform: uppercase; }
-.filt-field .filter-select, .filt-field .req-filter-select { width: 100%; }
-.filt-field-daterange { display: flex; align-items: center; gap: 8px; }
-.filt-field-daterange .req-filter-date { flex: 1 1 0; }
+.filt-field .filter-select, .filt-field .req-filter-select { width: 100%; min-width: 0; }
+.filt-field-daterange { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* min-width:0 + width:100% é o que faz o input[type=date] poder encolher —
+   sem isso ele mantém a largura intrínseca do calendário nativo e empurra a
+   coluna do grid pra fora do painel. */
+.filt-field-daterange .req-filter-date { flex: 1 1 0; min-width: 0; width: 100%; }
 .filt-field-daterange span { color: #8898b8; font-size: .8rem; flex-shrink: 0; }
+@media (max-width: 720px) { .filt-field-wide { grid-column: 1 / -1; } }
 .filt-toggle-row { display: flex; gap: 6px; }
 .filt-toggle-row .req-sort-btn { flex: 1 1 0; justify-content: center; }
 .filt-divider { grid-column: 1 / -1; height: 1px; background: var(--surf-border); margin: 2px 0; }
@@ -947,7 +961,8 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .req-filter-panel {
   display: none;
   position: absolute; top: calc(100% + 8px); right: 0; z-index: 100;
-  width: max-content; max-width: min(960px, 95vw); max-height: 70vh; overflow-y: auto;
+  width: max-content; max-width: min(940px, calc(100vw - 32px));
+  max-height: 70vh; overflow-y: auto; overflow-x: hidden;
   background: linear-gradient(180deg, #f8faff, #f2f6fd);
   border: 1.5px solid var(--surf-border); border-radius: var(--r-lg);
   box-shadow: var(--shadow-pop);
@@ -998,6 +1013,7 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .req-filter-date {
   padding: 6px 9px; border-radius: var(--r-sm); border: 1.5px solid var(--surf-border);
   background: var(--surf-0); color: #1a3a6b; font-size: .82rem;
+  min-width: 0; box-sizing: border-box;
 }
 .btn-req-clear-all {
   display: inline-flex; align-items: center; gap: 6px;

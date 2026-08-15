@@ -1902,7 +1902,7 @@
             <!-- ── Filtro completo — grade padronizada (label em cima, controle
                  embaixo), mesma estética do filtro de Estoque ── -->
             <div id="req-filter-panel" class="req-filter-panel">
-              <div class="filt-panel" style="width:860px">
+              <div class="filt-panel">
                 <div class="filt-grid">
                   <div class="filt-field filt-field-full">
                     <label>Status</label>
@@ -1974,7 +1974,7 @@
                       </button>
                     </div>
                   </div>
-                  <div class="filt-field">
+                  <div class="filt-field filt-field-wide">
                     <label>Data solicitação</label>
                     <div class="filt-field-daterange">
                       <input type="date" id="req-date-from" class="req-filter-date" onchange="App.renderRequests()">
@@ -1982,7 +1982,7 @@
                       <input type="date" id="req-date-to" class="req-filter-date" onchange="App.renderRequests()">
                     </div>
                   </div>
-                  <div class="filt-field">
+                  <div class="filt-field filt-field-wide">
                     <label>Data envio</label>
                     <div class="filt-field-daterange">
                       <input type="date" id="req-sent-from" class="req-filter-date" onchange="App.renderRequests()">
