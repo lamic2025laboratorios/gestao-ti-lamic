@@ -2771,8 +2771,8 @@ const App = {
   /* ── Popup de Auditoria dos cards de consumo ────────────────────────
      Reusa App._consumoStats (mesmos números que já aparecem no card),
      só que "de forma mais bonita" com gráfico de comparativo semanal/
-     mensal/anual (Tendência + Média, como no Gastos por Período) e uma
-     caixa mostrando quanto da meta anual esse tipo de material já consumiu. ── */
+     mensal/anual (linha subindo/descendo + Média) e uma caixa mostrando
+     quanto da meta anual esse tipo de material já consumiu. ── */
   _auditKind: null,
   _auditGran: 'month',
 

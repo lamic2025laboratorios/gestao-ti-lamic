@@ -2605,10 +2605,18 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .extrato-per-btn.active { background: var(--blue-500, #2a68d4); color: #fff; }
 .extrato-periodo-picker { display: flex; align-items: center; gap: 8px; }
 .extrato-picker-input { height: 34px; min-width: 150px; padding: 6px 10px; font-size: .82rem; box-sizing: border-box; }
-/* Ano/Mês/Dia (calendário nativo) têm tamanho fixo, sem depender do valor —
-   fica sempre do mesmo tamanho, alternando entre eles ou pra "Todos". */
-#kpi-list-ano-select, #kpi-list-mes-input, #kpi-list-dia-wrap #kpi-list-dia-input,
-#extrato-ano-select, #extrato-mes-input, #extrato-dia-wrap #extrato-dia-input,
+/* Ano/Mês/Dia (calendário nativo) têm LARGURA TOTAL fixa e igual, sem
+   depender do valor mostrado nem do navegador — trocar entre Todos/Ano/Mês/
+   Dia não muda o tamanho do controle. No caso do Dia, quem tem os 150px é o
+   wrapper inteiro (input + as 2 setas), não só o input: senão as setas
+   somariam por fora e a caixa do Dia ficaria maior que a do Ano. */
+#kpi-list-ano-select, #kpi-list-mes-input,
+#extrato-ano-select, #extrato-mes-input { width: 150px; }
+#kpi-list-dia-wrap, #extrato-dia-wrap { width: 150px; box-sizing: border-box; }
+#kpi-list-dia-wrap #kpi-list-dia-input,
+#extrato-dia-wrap #extrato-dia-input { flex: 1 1 auto; width: auto; min-width: 0; }
+/* Semana fica de fora do travamento: além do input tem o rótulo do intervalo
+   ("05/08 → 11/08") ao lado, que precisa de espaço próprio pra não espremer. */
 #extrato-semana-wrap #extrato-semana-input { width: 150px; }
 
 /* Barra de total — abaixo dos filtros, em linha própria, visual "cartão" */
