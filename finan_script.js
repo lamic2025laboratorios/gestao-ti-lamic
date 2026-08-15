@@ -3602,20 +3602,38 @@ const App = {
     // Respeita filtro de unidade do dashboard (não o de data, pois usamos janela própria)
     const fUnit = document.getElementById('dash-filter-unit')?.value || '';
 
-    // Todos os pedidos Comprados do tipo (cfg.exclude=true → "Outros": tudo que NÃO bate com as keywords)
-    const matches = Object.values(State.requests || {}).filter(r => {
+    // Ranking por SOLICITAÇÃO (quantos pedidos cada item gerou) em vez de por
+    // quantidade: "Outros" é sempre assim, "Pilhas & Baterias" quando o toggle
+    // do card está em Solicitações.
+    const porSolicitacao = kind === 'outros' || (kind === 'bat' && App.consBdMode.bat === 'sol');
+
+    const doTipo = r => {
       const g = (r.groupName || '').toLowerCase();
-      if (r.status !== 'Comprado') return false;
       if (fUnit && r.unitName !== fUnit) return false;
       const hit = keywords.some(k => g.includes(k));
       return cfg.exclude ? !hit : hit;
-    });
+    };
+
+    // Todos os pedidos Comprados do tipo (cfg.exclude=true → "Outros": tudo que NÃO bate com as keywords)
+    const matches = Object.values(State.requests || {}).filter(r => r.status === 'Comprado' && doTipo(r));
 
     const win  = App._periodWindow(period, 0, baseYear, baseMonth, baseWeek);
     const prev = App._periodWindow(period, 1, baseYear, baseMonth, baseWeek);
 
     const inCur  = matches.filter(r => { const d = App._purchaseDate(r); return d && d >= win.from  && d <= win.to;  });
     const inPrev = matches.filter(r => { const d = App._purchaseDate(r); return d && d >= prev.from && d <= prev.to; });
+
+    // Base do RANKING. No modo por solicitação entram também os pedidos
+    // atendidos direto do ESTOQUE (status 'Estoque'): o pedido daquele modelo
+    // existiu do mesmo jeito, só não gerou compra nova — sem isso o ranking
+    // ignora tudo que saiu de um lote já comprado (ex.: pilhas enviadas às
+    // unidades a partir do estoque). Fica só no ranking de propósito: contagem
+    // total, gasto e tendência do card continuam medindo COMPRA.
+    const baseRanking = porSolicitacao
+      ? Object.values(State.requests || {})
+          .filter(r => (r.status === 'Comprado' || r.status === 'Estoque') && doTipo(r))
+          .filter(r => { const d = App._purchaseDate(r); return d && d >= win.from && d <= win.to; })
+      : inCur;
 
     const qty = list => list.reduce((s, r) => s + App._qtyComprada(r), 0);
 
@@ -3628,7 +3646,7 @@ const App = {
     // equipamento marcado (sem "modelo" propriamente) ou nem isso — nesse caso
     // cai pro subgrupo (ex: "Impressora"), pra não sumir da métrica.
     const topMap = {};
-    inCur.forEach(r => {
+    baseRanking.forEach(r => {
       // Tinta "Kit 4 cores": conta 1 kit no balde "Kit 4 cores" (nº de kits
       // comprados, sem o ×4) E soma +1×kits em CADA cor (Preta/Azul/Amarela/
       // Vermelha), já que cada kit físico traz 1 de cada — assim dá pra ver
@@ -3664,12 +3682,9 @@ const App = {
       // Mesma normalização pro Modelo (Conserto/Pilhas): "EPSON L3250" e
       // "Epson L3250" precisam cair no MESMO balde.
       if (kind === 'concerto' || kind === 'bat') key = App._canonModelo(r.groupName, key);
-      // "Outros" é sempre por SOLICITAÇÃO (1 por pedido) — o que importa aqui é
-      // qual subgrupo é mais PEDIDO, não quantas unidades vieram em cada pedido
-      // (ex.: 1 pedido de 50 cabos não deve pesar mais que 50 pedidos de 1 item).
-      // "Pilhas & Baterias" alterna entre quantidade (padrão) e solicitação,
-      // via o toggle do card/pop-up (App.consBdMode.bat).
-      const porSolicitacao = kind === 'outros' || (kind === 'bat' && App.consBdMode.bat === 'sol');
+      // porSolicitacao (definido no topo): 1 por pedido — o que importa é qual
+      // item é mais PEDIDO, não quantas unidades vieram em cada pedido (ex.: 1
+      // pedido de 50 cabos não deve pesar mais que 50 pedidos de 1 item).
       topMap[key] = (topMap[key] || 0) + (porSolicitacao ? 1 : App._qtyComprada(r));
     });
     let topSorted = Object.entries(topMap).sort((a, b) => b[1] - a[1]);
@@ -4481,12 +4496,21 @@ const App = {
       const st = App._kpiListInternal;
       const hasFilter = (st.periodo && st.periodo !== 'todos') || st.grupo || st.subgrupo || st.modelo;
       if (hasFilter) {
-        const totalQtd = reqs.reduce((s,r) => s + App._qtyComprada(r), 0);
         const totalVal = reqs.reduce((s,r) => s + (parseFloat(r.valorTotal)||0), 0);
-        const rotulo = isComprado ? 'comprado' : 'negado';
+        // Comprado conta ITENS (quantidade comprada — é o volume que entrou);
+        // Negado conta SOLICITAÇÕES (o pedido foi recusado inteiro, não faz
+        // sentido somar a quantidade de um item que nunca chegou).
+        let qtdTxt;
+        if (isComprado) {
+          const totalQtd = reqs.reduce((s,r) => s + App._qtyComprada(r), 0);
+          qtdTxt = `${totalQtd} ite${totalQtd===1?'m':'ns'} comprado${totalQtd===1?'':'s'}`;
+        } else {
+          const n = reqs.length;
+          qtdTxt = `${n} solicitaç${n===1?'ão':'ões'} negada${n===1?'':'s'}`;
+        }
         totalBox.style.display = '';
         totalBox.innerHTML = `
-          <div><span class="klt-label">Referente à pesquisa</span><div class="klt-qty">${totalQtd} ite${totalQtd===1?'m':'ns'} ${rotulo}${totalQtd===1?'':'s'}</div></div>
+          <div><span class="klt-label">Referente à pesquisa</span><div class="klt-qty">${qtdTxt}</div></div>
           <div class="klt-val">${fmt(totalVal)}</div>`;
       } else {
         totalBox.style.display = 'none';
@@ -5190,13 +5214,21 @@ const App = {
     }) : null;
     const temMeta = metaLine && metaLine.some(v => v != null);
 
-    // Cor de cada ponto da linha real: vermelho se estourou o teto do mês,
-    // verde se ficou dentro — é o "subiu/desceu vs. estimativa" na prática.
-    const pointColors = vals.map((v, i) => {
-      const teto = temMeta ? metaLine[i] : null;
-      if (teto == null) return color;
-      return v > teto ? '#d94040' : '#1db87a';
+    // Cor por ALTA/QUEDA vs. o período anterior — mesmo esquema dos cards de
+    // consumo (Tintas/Pilhas/etc.): vermelho gastou mais que o mês passado,
+    // verde gastou menos. O ponto colore e o TRECHO da linha até ele também,
+    // então a subida/descida se lê direto no traçado.
+    let ultimoValido = null;
+    const pointColors = vals.map(v => {
+      let cor = color;
+      if (ultimoValido != null && ultimoValido > 0) cor = v > ultimoValido ? '#d94040' : v < ultimoValido ? '#1db87a' : color;
+      ultimoValido = v;
+      return cor;
     });
+    const segColor = ctxSeg => {
+      const y0 = ctxSeg.p0.parsed.y, y1 = ctxSeg.p1.parsed.y;
+      return y1 > y0 ? '#d94040' : y1 < y0 ? '#1db87a' : color;
+    };
 
     const fmtR = v => 'R$ ' + (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -5210,9 +5242,9 @@ const App = {
     const datasets = [
       {
         type: 'line', label: 'Gastos', data: vals,
-        borderColor: color, backgroundColor: gradient,
+        borderColor: color, backgroundColor: gradient, segment: { borderColor: segColor },
         borderWidth: 2.5, tension: 0.45, fill: true, cubicInterpolationMode: 'monotone',
-        pointBackgroundColor: temMeta ? pointColors : color, pointBorderColor: '#fff', pointBorderWidth: 2,
+        pointBackgroundColor: pointColors, pointBorderColor: '#fff', pointBorderWidth: 2,
         pointRadius: 3.5, pointHoverRadius: 6, order: 3
       },
       { type: 'line', label: 'Média', data: mediaLine, borderColor: '#7c52d4', borderWidth: 2, borderDash: [2, 3], pointRadius: 0, fill: false, tension: 0, order: 2 }
@@ -5238,7 +5270,16 @@ const App = {
             bodyFont: { size: 11, weight: '600' }, bodyColor: 'rgba(255,255,255,.85)',
             callbacks: {
               title: items => App._fmtLineKey(items[0].label),
-              label: item => `${item.dataset.label}: ${fmtR(item.raw)}`
+              label: item => {
+                if (item.dataset.label !== 'Gastos') return `${item.dataset.label}: ${fmtR(item.raw)}`;
+                const i = item.dataIndex, prev = vals[i - 1];
+                let variacao = '';
+                if (i > 0 && prev > 0) {
+                  const diff = (vals[i] - prev) / prev * 100;
+                  variacao = ` (${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff).toFixed(0)}% vs anterior)`;
+                }
+                return `Gastos: ${fmtR(item.raw)}${variacao}`;
+              }
             }
           }
         },
