@@ -3893,7 +3893,7 @@ const App = {
     const hasMeta   = meta && metaTarget > 0;
     const refTarget = hasMeta ? metaTarget : prevSpend;
     const hasRef    = refTarget > 0;
-    const st        = hasRef ? App._metaStatus(projection, refTarget) : { key: 'none', color: '', icon: 'ℹ️' };
+    const st        = hasRef ? App._metaStatus(projection, refTarget) : { key: 'none', color: '', icon: App._metaStatusIcons.none };
     const ratio     = hasRef ? Math.min(curSpend / refTarget, 1) : 0;
 
     App._drawCmpGauge(ratio, st.key);
@@ -8690,20 +8690,28 @@ const App = {
   // a compra-mãe, em vez de ganhar um código próprio).
   _loteBrinde(lotePai) { return `REF${lotePai}`; },
 
-  // Levanta tudo que precisa de ajuste no código de lote: itens ainda com
-  // hífen (formato antigo) e grupos de 2+ itens NÃO-brinde com o mesmo
-  // código (duplicado de verdade). Brinde é identificado pela solicitação
-  // (r.brindeDeReqId), não pelo texto do lote — o formato antigo salvava
-  // "REF" como SUFIXO ("CODIGO REF"), o novo salva como PREFIXO ("REFCODIGO"),
-  // então checar só o prefixo deixaria passar brinde velho como duplicado.
+  // Um código de lote só está "no formato final" se for puro letra+número
+  // (sem hífen, espaço ou qualquer separador).
+  _loteFormatoOk(lote) { return !!lote && /^[A-Za-z0-9]+$/.test(lote); },
+
+  // Levanta tudo que precisa de ajuste no código de lote: itens fora do
+  // formato final (com hífen/espaço, no legado "LOTE-000N", ou SEM código
+  // nenhum — item criado por "Cadastro inicial" antigo) e grupos de 2+ itens
+  // NÃO-brinde com o mesmo código (duplicado de verdade). Brinde é
+  // identificado pela solicitação (r.brindeDeReqId), não pelo texto do lote —
+  // o formato antigo salvava "REF" como SUFIXO ("CODIGO REF"), o novo salva
+  // como PREFIXO ("REFCODIGO"), então checar só o prefixo deixaria passar
+  // brinde velho como se fosse duplicado.
   _analisarLotes() {
-    const todos = Object.entries(State.estoque || {}).filter(([, it]) => it.lote);
-    const naoBrinde = todos.filter(([, it]) => !App._isBrindeEstoque(it));
+    const todos = Object.entries(State.estoque || {});
+    const comLote = todos.filter(([, it]) => it.lote);
+    const naoBrinde = comLote.filter(([, it]) => !App._isBrindeEstoque(it));
     const porLote = {};
     naoBrinde.forEach(([id, it]) => { (porLote[it.lote] = porLote[it.lote] || []).push([id, it]); });
     const grupos = Object.values(porLote).filter(g => g.length > 1);
-    const comHifen = todos.filter(([, it]) => it.lote.includes('-'));
-    return { grupos, comHifen };
+    // Fora do padrão: com separador, no legado, ou sem código nenhum.
+    const foraPadrao = todos.filter(([, it]) => !App._loteFormatoOk(it.lote));
+    return { grupos, foraPadrao };
   },
 
   // Corrige os códigos de lote já existentes em 3 passos — Passo 1: duplicado
@@ -8717,14 +8725,14 @@ const App = {
   // quantidade nem em nenhuma outra movimentação.
   async corrigirLotesDuplicados() {
     const btn = document.getElementById('btn-corrigir-lotes');
-    const { grupos, comHifen } = App._analisarLotes();
-    if (!grupos.length && !comHifen.length) { toast('Nenhum lote duplicado ou com hífen encontrado.'); return; }
+    const { grupos, foraPadrao } = App._analisarLotes();
+    if (!grupos.length && !foraPadrao.length) { toast('Todos os códigos de lote já estão no padrão e sem duplicata.'); return; }
 
     const totalDup = grupos.reduce((s, g) => s + g.length - 1, 0);
     const partes = [];
     if (totalDup) partes.push(`${grupos.length} código(s) duplicado(s) (${totalDup} item(ns))`);
-    if (comHifen.length) partes.push(`${comHifen.length} item(ns) com hífen no código`);
-    if (!confirm(`Encontrado: ${partes.join(' · ')}.\n\nCódigos com hífen ficam só letras/números; duplicados ganham código novo (o mais antigo do grupo muda menos). Brindes são realinhados com o código atual da compra que os trouxe. Nenhum valor, quantidade ou movimentação é apagada — só o código do lote muda.\n\nCorrigir agora?`)) return;
+    if (foraPadrao.length) partes.push(`${foraPadrao.length} item(ns) fora do padrão (com hífen ou sem código)`);
+    if (!confirm(`Encontrado: ${partes.join(' · ')}.\n\nCódigos ficam só letras/números; item sem código ganha um novo; duplicados ganham código novo (o mais antigo do grupo muda menos). Brindes são realinhados com o código atual da compra que os trouxe. Nenhum valor, quantidade ou movimentação é apagada — só o código do lote muda.\n\nCorrigir agora?`)) return;
 
     const orig = btn ? btn.innerHTML : '';
     if (btn) { btn.innerHTML = 'Corrigindo…'; btn.disabled = true; }
@@ -8741,25 +8749,41 @@ const App = {
         return novo;
       };
 
+      // Data de referência p/ gerar código de item que não tem solicitação
+      // ligada: usa a data do movimento de ENTRADA dele (é a "data de compra"
+      // de fato), caindo pro updatedAt do próprio item se nem isso existir.
+      const dataEntradaDe = id => {
+        const mov = Object.values(State.estoqueMov || {}).find(m => m.estoqueId === id && m.tipo === 'entrada');
+        return (mov?.data || '').substring(0, 10) || (estoque[id]?.updatedAt || '').substring(0, 10) || '';
+      };
+      const baseDe = (id, it) => {
+        const req = it.reqId ? (State.requests || {})[it.reqId] : null;
+        if (req) return req;
+        return { grupo: it.grupo, boughtAt: it.boughtAt || dataEntradaDe(id), shippedAt: it.shippedAt };
+      };
+
       // Passo 1: duplicados (não-brinde)
       grupos.forEach(grupo => {
         grupo.sort((a, b) => (a[1].updatedAt || '').localeCompare(b[1].updatedAt || ''));
         const [idBase, itBase] = grupo[0];
-        if (itBase.lote.includes('-')) targets[idBase] = itBase.lote.replace(/-/g, '');
-        grupo.slice(1).forEach(([id, it]) => {
-          const req  = it.reqId ? (State.requests || {})[it.reqId] : null;
-          const base = req || { grupo: it.grupo, boughtAt: it.boughtAt, shippedAt: it.shippedAt };
-          targets[id] = gerarUnico(base);
-        });
+        // O mais antigo só normaliza o formato (não precisa de código novo:
+        // é ele quem "fica" com o código original do grupo).
+        if (!App._loteFormatoOk(itBase.lote)) {
+          const limpo = String(itBase.lote).replace(/[^A-Za-z0-9]/g, '');
+          if (limpo) { targets[idBase] = limpo; ocupados.add(limpo); }
+        }
+        grupo.slice(1).forEach(([id, it]) => { targets[id] = gerarUnico(baseDe(id, it)); });
       });
 
-      // Passo 2: resto com hífen (não-brinde, ainda sem alvo) — só tira o
-      // hífen. Remover hífen não junta 2 códigos diferentes (posição é
-      // sempre a mesma no formato PREFIXO-DDDD-NÚMERO), então não precisa
-      // checar colisão aqui.
+      // Passo 2: resto fora do padrão (não-brinde, ainda sem alvo). Quem tem
+      // código só normaliza (tirar separador não junta 2 códigos distintos —
+      // a posição dos campos é fixa); quem NÃO tem código nenhum (item antigo
+      // de "Cadastro inicial") ganha um novo, garantido único.
       Object.entries(estoque).forEach(([id, it]) => {
-        if (!it.lote || targets[id] || App._isBrindeEstoque(it)) return;
-        if (it.lote.includes('-')) targets[id] = it.lote.replace(/-/g, '');
+        if (targets[id] || App._isBrindeEstoque(it) || App._loteFormatoOk(it.lote)) return;
+        const limpo = String(it.lote || '').replace(/[^A-Za-z0-9]/g, '');
+        if (limpo && !ocupados.has(limpo)) { targets[id] = limpo; ocupados.add(limpo); }
+        else targets[id] = gerarUnico(baseDe(id, it));
       });
 
       // Passo 3: brindes — sempre realinhados com o código FINAL do item-pai
@@ -8778,20 +8802,25 @@ const App = {
       });
 
       const ids = Object.keys(targets);
-      if (!ids.length) { toast('Nada pra corrigir.'); return; }
-
       const ops = [];
-      ids.forEach(id => {
-        const novo = targets[id];
-        ops.push(DB.set(`estoque/${id}/lote`, novo));
-        Object.entries(State.estoqueMov || {})
-          .filter(([, m]) => m.estoqueId === id)
-          .forEach(([mid]) => ops.push(DB.set(`estoqueMov/${mid}/lote`, novo)));
+      ids.forEach(id => ops.push(DB.set(`estoque/${id}/lote`, targets[id])));
+
+      // Sincroniza a movimentação com o código FINAL do item de estoque dela
+      // — não só a dos itens que mudaram agora: movimento antigo podia ter
+      // ficado com um código velho (ex.: legado "LOTE-000N") mesmo com o item
+      // já certo. Só grava onde está realmente diferente.
+      let nMov = 0;
+      Object.entries(State.estoqueMov || {}).forEach(([mid, m]) => {
+        if (!m.estoqueId) return;
+        const loteFinal = targets[m.estoqueId] || (estoque[m.estoqueId] || {}).lote;
+        if (loteFinal && m.lote !== loteFinal) { ops.push(DB.set(`estoqueMov/${mid}/lote`, loteFinal)); nMov++; }
       });
+
+      if (!ops.length) { toast('Nada pra corrigir.'); return; }
       await Promise.all(ops);
 
-      toast(`✓ ${ids.length} lote(s) corrigido(s).`);
-      App._logActivity?.('Estoque', 'Códigos de lote corrigidos', `${ids.length} item(ns)`);
+      toast(`✓ ${ids.length} lote(s) e ${nMov} movimentação(ões) corrigido(s).`);
+      App._logActivity?.('Estoque', 'Códigos de lote corrigidos', `${ids.length} item(ns) · ${nMov} movimentação(ões)`);
       App.renderCodigosTab?.();
       App.renderEstoque?.();
     } catch (e) {

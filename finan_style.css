@@ -1224,7 +1224,8 @@ html, body { height: 100%; background: var(--navy-900); color: var(--white); fon
 .meta-hist-mid { flex: 1; min-width: 0; }
 .meta-hist-vals { font-size: .78rem; color: #4a6080; font-weight: 600; }
 .meta-hist-var { font-size: .72rem; font-weight: 700; margin-top: 1px; }
-.meta-hist-badge { flex-shrink: 0; font-size: .7rem; font-weight: 800; padding: 4px 9px; border-radius: 100px; white-space: nowrap; }
+.meta-hist-badge { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; font-size: .7rem; font-weight: 800; padding: 4px 9px; border-radius: 100px; white-space: nowrap; }
+.meta-hist-badge svg { flex-shrink: 0; }
 .meta-hist-badge.meta-st-ok   { background: #eafaf3; color: #159666; }
 .meta-hist-badge.meta-st-warn { background: #fff3e6; color: #c2700a; }
 .meta-hist-badge.meta-st-over { background: #fdeaea; color: #c23a3a; }
